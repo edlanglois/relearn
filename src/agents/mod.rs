@@ -5,7 +5,7 @@ pub use random::RandomAgent;
 pub use tabular::TabularQLearningAgent;
 
 /// Description of an environment step
-pub struct Step<O, A> {
+pub struct Step<'a, O, A> {
     /// The initial observation.
     pub observation: O,
     /// The action taken from the initial state given the initial observation.
@@ -14,7 +14,7 @@ pub struct Step<O, A> {
     pub reward: f32,
     /// The resulting successor state; is None if the successor state is terminal.
     /// All trajectories from a terminal state have 0 reward on each step.
-    pub next_observation: Option<O>,
+    pub next_observation: Option<&'a O>,
     /// Whether this step ends the episode.
     /// An episode is always done if it reaches a terminal state.
     /// An episode may be done for other reasons, like a step limit.
