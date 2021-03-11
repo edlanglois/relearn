@@ -10,8 +10,8 @@ use std::f32;
 /// Specifically, an environment instance encapsulates a specific environment state and allows
 /// transitions between states.
 pub trait Environment {
-    type ObservationSpace: Space;
-    type ActionSpace: Space;
+    type Observation;
+    type Action;
 
     /// Take a step in the environment.
     ///
@@ -23,20 +23,19 @@ pub trait Environment {
     /// * `episode_done`: Whether this step ends the episode.
     ///     - If `observation` is `None` then `episode_done` must be true.
     ///     - An episode may be done for other reasons, like a step limit.
-    fn step(
-        &mut self,
-        action: &<<Self as Environment>::ActionSpace as Space>::Element,
-    ) -> (
-        Option<<<Self as Environment>::ObservationSpace as Space>::Element>,
-        f32,
-        bool,
-    );
+    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f32, bool);
 
     /// Reset the environment to an initial state.
     ///
     /// # Returns
     /// * `observation`: An observation of the resulting state.
-    fn reset(&mut self) -> <<Self as Environment>::ObservationSpace as Space>::Element;
+    fn reset(&mut self) -> Self::Observation;
+}
+
+/// The spaces and paramters of an environment.
+pub trait EnvSpec {
+    type ObservationSpace: Space;
+    type ActionSpace: Space;
 
     /// The environment observation space.
     fn observation_space(&self) -> Self::ObservationSpace;

@@ -1,5 +1,5 @@
-use super::Environment;
-use crate::spaces::IndexSpace;
+use super::{EnvSpec, Environment};
+use crate::spaces::{IndexSpace, Space};
 use rand::distributions::{Bernoulli, Distribution};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -18,8 +18,8 @@ impl BernoulliBandit {
 }
 
 impl Environment for BernoulliBandit {
-    type ObservationSpace = IndexSpace;
-    type ActionSpace = IndexSpace;
+    type Observation = <IndexSpace as Space>::Element;
+    type Action = <IndexSpace as Space>::Element;
 
     fn step(&mut self, action: &usize) -> (Option<usize>, f32, bool) {
         let prob = self.probabilities[*action];
@@ -30,6 +30,11 @@ impl Environment for BernoulliBandit {
     fn reset(&mut self) -> usize {
         0
     }
+}
+
+impl EnvSpec for BernoulliBandit {
+    type ObservationSpace = IndexSpace;
+    type ActionSpace = IndexSpace;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         IndexSpace::new(0)
