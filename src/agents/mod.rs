@@ -4,8 +4,6 @@ pub mod tabular;
 pub use random::RandomAgent;
 pub use tabular::TabularQLearningAgent;
 
-use rand::Rng;
-
 /// Description of an environment step
 pub struct Step<O, A> {
     /// The initial observation.
@@ -24,7 +22,7 @@ pub struct Step<O, A> {
 }
 
 /// An actor that produces actions given observations.
-pub trait Actor<O, A, R: Rng> {
+pub trait Actor<O, A> {
     /// Choose an action in the environment.
     ///
     /// This must be called sequentially within an episode.
@@ -33,13 +31,13 @@ pub trait Actor<O, A, R: Rng> {
     /// * `observation`: The current observation of the environment state.
     /// * `new_episode`: Whether this observation is the start of a new episode.
     /// * `rng`: A (pseudo) random number generator available to the agent.
-    fn act(&mut self, observation: &O, new_episode: bool, rng: &mut R) -> A;
+    fn act(&mut self, observation: &O, new_episode: bool) -> A;
 }
 
 /// A learning agent.
 ///
 /// Can interact with an environment and learns from the interaction.
-pub trait Agent<O, A, R: Rng>: Actor<O, A, R> {
+pub trait Agent<O, A>: Actor<O, A> {
     /// Update the agent based on the most recent action.
     ///
     /// # Args

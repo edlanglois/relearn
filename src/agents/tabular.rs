@@ -1,7 +1,8 @@
 //! Tabular agents
 use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
-use rand::Rng;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 
 use super::{Actor, Agent, Step};
 use crate::spaces::FiniteSpace;
@@ -17,6 +18,8 @@ where
     pub exploration_rate: f32,
     pub state_action_counts: Array2<u32>,
     pub state_action_values: Array2<f32>,
+
+    rng: StdRng,
 }
 
 impl<OS, AS> TabularQLearningAgent<OS, AS>
@@ -29,6 +32,7 @@ where
         action_space: AS,
         discount_factor: f32,
         exploration_rate: f32,
+        seed: u64,
     ) -> Self {
         let num_observations = observation_space.len();
         let num_actions = action_space.len();
@@ -41,19 +45,19 @@ where
             exploration_rate,
             state_action_counts,
             state_action_values,
+            rng: StdRng::seed_from_u64(seed),
         }
     }
 }
 
-impl<OS, AS, R> Actor<OS::Element, AS::Element, R> for TabularQLearningAgent<OS, AS>
+impl<OS, AS> Actor<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
 where
     OS: FiniteSpace,
     AS: FiniteSpace,
-    R: Rng,
 {
-    fn act(&mut self, observation: &OS::Element, _new_episode: bool, rng: &mut R) -> AS::Element {
-        if rng.gen::<f32>() < self.exploration_rate {
-            self.action_space.sample(rng)
+    fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
+        if self.rng.gen::<f32>() < self.exploration_rate {
+            self.action_space.sample(&mut self.rng)
         } else {
             let obs_idx = self.observation_space.index_of(observation);
             let act_idx = self
@@ -66,11 +70,10 @@ where
     }
 }
 
-impl<OS, AS, R> Agent<OS::Element, AS::Element, R> for TabularQLearningAgent<OS, AS>
+impl<OS, AS> Agent<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
 where
     OS: FiniteSpace,
     AS: FiniteSpace,
-    R: Rng,
 {
     fn update(&mut self, step: Step<OS::Element, AS::Element>) {
         let obs_idx = self.observation_space.index_of(&step.observation);
