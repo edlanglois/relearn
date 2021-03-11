@@ -45,7 +45,7 @@ where
     }
 }
 
-impl<OS, AS> Agent<OS, AS> for TabularQLearningAgent<OS, AS>
+impl<OS, AS> Agent<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
 where
     OS: FiniteSpace,
     AS: FiniteSpace,
@@ -59,11 +59,11 @@ where
         if let Some(prev_step) = prev_step {
             self.update(prev_step)
         }
-        MarkovAgent::<OS, AS>::act(self, observation, rng)
+        MarkovAgent::<OS::Element, AS::Element>::act(self, observation, rng)
     }
 }
 
-impl<OS, AS> MarkovAgent<OS, AS> for TabularQLearningAgent<OS, AS>
+impl<OS, AS> MarkovAgent<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
 where
     OS: FiniteSpace,
     AS: FiniteSpace,

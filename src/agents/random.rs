@@ -13,21 +13,21 @@ impl<AS: Space> RandomAgent<AS> {
     }
 }
 
-impl<OS: Space, AS: Space> Agent<OS, AS> for RandomAgent<AS> {
+impl<O, AS: Space> Agent<O, AS::Element> for RandomAgent<AS> {
     fn act<R: Rng>(
         &mut self,
-        observation: &OS::Element,
-        _prev_step: Option<Step<OS::Element, AS::Element>>,
+        observation: &O,
+        _prev_step: Option<Step<O, AS::Element>>,
         rng: &mut R,
     ) -> AS::Element {
-        MarkovAgent::<OS, AS>::act(self, observation, rng)
+        MarkovAgent::<O, AS::Element>::act(self, observation, rng)
     }
 }
 
-impl<OS: Space, AS: Space> MarkovAgent<OS, AS> for RandomAgent<AS> {
-    fn act<R: Rng>(&self, _observation: &OS::Element, rng: &mut R) -> AS::Element {
+impl<O, AS: Space> MarkovAgent<O, AS::Element> for RandomAgent<AS> {
+    fn act<R: Rng>(&self, _observation: &O, rng: &mut R) -> AS::Element {
         self.action_space.sample(rng)
     }
 
-    fn update(&mut self, _step: Step<OS::Element, AS::Element>) {}
+    fn update(&mut self, _step: Step<O, AS::Element>) {}
 }
