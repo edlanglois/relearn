@@ -4,7 +4,7 @@ pub mod tabular;
 pub use random::RandomAgent;
 pub use tabular::TabularQLearningAgent;
 
-use rand::Rng;
+use rand::{rngs::StdRng, Rng};
 
 /// Description of an environment step
 pub struct Step<O, A> {
@@ -24,7 +24,7 @@ pub struct Step<O, A> {
 }
 
 /// An agent that interacts with an environment
-pub trait Agent<O, A> {
+pub trait Agent<O, A, R: Rng = StdRng> {
     /// Choose an action in the environment.
     ///
     /// This must be called sequentially within an episode.
@@ -34,16 +34,16 @@ pub trait Agent<O, A> {
     /// * `prev_step`: The immediately preceeding environment step.
     ///     If `None` then this is the start of a new episode.
     /// * `rng`: A (pseudo) random number generator available to the agent.
-    fn act<R: Rng>(&mut self, observation: &O, prev_step: Option<Step<O, A>>, rng: &mut R) -> A;
+    fn act(&mut self, observation: &O, prev_step: Option<Step<O, A>>, rng: &mut R) -> A;
 }
 
 /// A Markov learning agent
 ///
 /// Markov agents do not depend on history when acting,
 /// except to the extent that they learn from past history.
-pub trait MarkovAgent<O, A> {
+pub trait MarkovAgent<O, A, R: Rng = StdRng> {
     /// Choose an action for the given observation.
-    fn act<R: Rng>(&self, observation: &O, rng: &mut R) -> A;
+    fn act(&self, observation: &O, rng: &mut R) -> A;
 
     /// Update the agent based on an environment step.
     fn update(&mut self, step: Step<O, A>);

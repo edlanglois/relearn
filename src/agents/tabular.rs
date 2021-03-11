@@ -45,30 +45,32 @@ where
     }
 }
 
-impl<OS, AS> Agent<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
+impl<OS, AS, R> Agent<OS::Element, AS::Element, R> for TabularQLearningAgent<OS, AS>
 where
     OS: FiniteSpace,
     AS: FiniteSpace,
+    R: Rng,
 {
-    fn act<R: Rng>(
+    fn act(
         &mut self,
         observation: &OS::Element,
         prev_step: Option<Step<OS::Element, AS::Element>>,
         rng: &mut R,
     ) -> AS::Element {
         if let Some(prev_step) = prev_step {
-            self.update(prev_step)
+            MarkovAgent::<OS::Element, AS::Element, R>::update(self, prev_step);
         }
-        MarkovAgent::<OS::Element, AS::Element>::act(self, observation, rng)
+        MarkovAgent::<OS::Element, AS::Element, R>::act(self, observation, rng)
     }
 }
 
-impl<OS, AS> MarkovAgent<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
+impl<OS, AS, R> MarkovAgent<OS::Element, AS::Element, R> for TabularQLearningAgent<OS, AS>
 where
     OS: FiniteSpace,
     AS: FiniteSpace,
+    R: Rng,
 {
-    fn act<R: Rng>(&self, observation: &OS::Element, rng: &mut R) -> AS::Element {
+    fn act(&self, observation: &OS::Element, rng: &mut R) -> AS::Element {
         if rng.gen::<f32>() < self.exploration_rate {
             self.action_space.sample(rng)
         } else {
