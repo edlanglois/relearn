@@ -2,6 +2,7 @@ use super::{Actor, Agent};
 use crate::spaces::Space;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
+use std::fmt;
 
 /// An agent that always acts randomly
 pub struct RandomAgent<AS: Space> {
@@ -25,3 +26,9 @@ impl<O, AS: Space> Actor<O, AS::Element> for RandomAgent<AS> {
 }
 
 impl<O, AS: Space> Agent<O, AS::Element> for RandomAgent<AS> {}
+
+impl<AS: Space + fmt::Display> fmt::Display for RandomAgent<AS> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "RandomAgent({})", self.action_space)
+    }
+}

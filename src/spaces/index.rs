@@ -1,6 +1,7 @@
 use super::{FiniteSpace, Space};
 use rand::distributions::Distribution;
 use rand::Rng;
+use std::fmt;
 
 /// An index space; integers 0 .. size-1
 pub struct IndexSpace {
@@ -10,6 +11,12 @@ pub struct IndexSpace {
 impl IndexSpace {
     pub fn new(size: usize) -> Self {
         Self { size }
+    }
+}
+
+impl fmt::Display for IndexSpace {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "IndexSpace({})", self.size)
     }
 }
 

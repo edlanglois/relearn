@@ -3,6 +3,7 @@ use crate::spaces::{IndexSpace, Space};
 use rand::distributions::{Bernoulli, Distribution};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
+use std::fmt;
 
 /// A multi-armed bandit with Bernoulli-distribution arm rewards.
 pub struct BernoulliBandit {
@@ -11,9 +12,15 @@ pub struct BernoulliBandit {
 }
 
 impl BernoulliBandit {
-    pub fn new(probabilities: Vec<f32>, seed: usize) -> Self {
-        let rng = StdRng::seed_from_u64(seed as u64);
+    pub fn new(probabilities: Vec<f32>, seed: u64) -> Self {
+        let rng = StdRng::seed_from_u64(seed);
         Self { probabilities, rng }
+    }
+}
+
+impl fmt::Display for BernoulliBandit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "BernoulliBandit({:?})", self.probabilities)
     }
 }
 
@@ -24,7 +31,7 @@ impl Environment for BernoulliBandit {
     fn step(&mut self, action: &usize) -> (Option<usize>, f32, bool) {
         let prob = self.probabilities[*action];
         let reward = Bernoulli::new(prob as f64).unwrap().sample(&mut self.rng);
-        (None, reward as u8 as f32, false)
+        (None, reward as u8 as f32, true)
     }
 
     fn reset(&mut self) -> usize {

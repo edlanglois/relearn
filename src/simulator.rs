@@ -2,8 +2,8 @@ use crate::agents::{Agent, Step};
 use crate::envs::Environment;
 
 pub fn run<O, A, F>(
-    agent: &mut dyn Agent<O, A>,
     environment: &mut dyn Environment<Observation = O, Action = A>,
+    agent: &mut dyn Agent<O, A>,
     callback: &mut F,
 ) where
     F: FnMut(&Step<O, A>) -> bool,
