@@ -3,7 +3,7 @@ use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
 use rand::Rng;
 
-use super::{Agent, MarkovAgent, Step};
+use super::{Actor, Agent, Step};
 use crate::spaces::FiniteSpace;
 
 pub struct TabularQLearningAgent<OS, AS>
@@ -45,32 +45,13 @@ where
     }
 }
 
-impl<OS, AS, R> Agent<OS::Element, AS::Element, R> for TabularQLearningAgent<OS, AS>
+impl<OS, AS, R> Actor<OS::Element, AS::Element, R> for TabularQLearningAgent<OS, AS>
 where
     OS: FiniteSpace,
     AS: FiniteSpace,
     R: Rng,
 {
-    fn act(
-        &mut self,
-        observation: &OS::Element,
-        prev_step: Option<Step<OS::Element, AS::Element>>,
-        rng: &mut R,
-    ) -> AS::Element {
-        if let Some(prev_step) = prev_step {
-            MarkovAgent::<OS::Element, AS::Element, R>::update(self, prev_step);
-        }
-        MarkovAgent::<OS::Element, AS::Element, R>::act(self, observation, rng)
-    }
-}
-
-impl<OS, AS, R> MarkovAgent<OS::Element, AS::Element, R> for TabularQLearningAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-    R: Rng,
-{
-    fn act(&self, observation: &OS::Element, rng: &mut R) -> AS::Element {
+    fn act(&mut self, observation: &OS::Element, _new_episode: bool, rng: &mut R) -> AS::Element {
         if rng.gen::<f32>() < self.exploration_rate {
             self.action_space.sample(rng)
         } else {
@@ -83,7 +64,14 @@ where
             self.action_space.index(act_idx)
         }
     }
+}
 
+impl<OS, AS, R> Agent<OS::Element, AS::Element, R> for TabularQLearningAgent<OS, AS>
+where
+    OS: FiniteSpace,
+    AS: FiniteSpace,
+    R: Rng,
+{
     fn update(&mut self, step: Step<OS::Element, AS::Element>) {
         let obs_idx = self.observation_space.index_of(&step.observation);
         let act_idx = self.action_space.index_of(&step.action);
