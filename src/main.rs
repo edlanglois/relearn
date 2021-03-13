@@ -1,4 +1,4 @@
-use rust_rl::agents::RandomAgent;
+use rust_rl::agents::TabularQLearningAgent;
 use rust_rl::envs::{BernoulliBandit, EnvSpec};
 use rust_rl::loggers::{CLILogger, Event, Logger};
 use rust_rl::simulator;
@@ -8,7 +8,14 @@ fn main() {
     let seed = 1;
     let mut environment = BernoulliBandit::new(vec![0.2, 0.8], seed);
     println!("Environment: {}", environment);
-    let mut agent = RandomAgent::new(environment.action_space(), seed + 1);
+    // let mut agent = RandomAgent::new(environment.action_space(), seed + 1);
+    let mut agent = TabularQLearningAgent::new(
+        environment.observation_space(),
+        environment.action_space(),
+        1.0,
+        0.2,
+        seed + 1,
+    );
     println!("Agent: {}", agent);
 
     let num_steps = 10_000_000;

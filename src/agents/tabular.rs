@@ -3,6 +3,7 @@ use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use std::fmt;
 
 use super::{Actor, Agent, Step};
 use crate::spaces::FiniteSpace;
@@ -47,6 +48,20 @@ where
             state_action_values,
             rng: StdRng::seed_from_u64(seed),
         }
+    }
+}
+
+impl<OS, AS> fmt::Display for TabularQLearningAgent<OS, AS>
+where
+    OS: FiniteSpace + fmt::Display,
+    AS: FiniteSpace + fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "TabularQLearningAgent({}, {}, {}, {})",
+            self.observation_space, self.action_space, self.discount_factor, self.exploration_rate
+        )
     }
 }
 

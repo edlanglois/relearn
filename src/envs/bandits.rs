@@ -44,7 +44,7 @@ impl EnvSpec for BernoulliBandit {
     type ActionSpace = IndexSpace;
 
     fn observation_space(&self) -> Self::ObservationSpace {
-        IndexSpace::new(0)
+        IndexSpace::new(1)
     }
 
     fn action_space(&self) -> Self::ActionSpace {
