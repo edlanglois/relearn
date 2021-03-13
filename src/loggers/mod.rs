@@ -15,7 +15,7 @@ pub enum Event {
 /// Log statistics from a simulation run.
 pub trait Logger {
     /// Log a floating-point scalar value.
-    fn log_scalar(&mut self, event: Event, name: &str, value: f64);
+    fn log_scalar(&mut self, event: Event, name: &'static str, value: f64);
 
     /// Mark the end of the given event.
     fn done(&mut self, event: Event);

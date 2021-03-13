@@ -59,10 +59,8 @@ impl CLILogger {
 }
 
 impl Logger for CLILogger {
-    fn log_scalar(&mut self, event: Event, name: &str, value: f64) {
-        self.events[event]
-            .pending_scalars
-            .insert(name.into(), value);
+    fn log_scalar(&mut self, event: Event, name: &'static str, value: f64) {
+        self.events[event].pending_scalars.insert(name, value);
     }
 
     fn done(&mut self, event: Event) {
@@ -112,9 +110,9 @@ struct EventLog {
     /// Duration of this summary period to the most recent update
     summary_duration: Duration,
     /// Scalars associated with completed events.
-    scalars: BTreeMap<String, f64>,
+    scalars: BTreeMap<&'static str, f64>,
     /// Pending scalars for the current incomplete event.
-    pending_scalars: BTreeMap<String, f64>,
+    pending_scalars: BTreeMap<&'static str, f64>,
 }
 
 impl EventLog {
