@@ -1,9 +1,10 @@
-use super::{FiniteSpace, Space};
+use super::{BaseSpace, FiniteSpace, Space};
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::fmt;
 
 /// An index space; integers 0 .. size-1
+#[derive(Debug, Clone)]
 pub struct IndexSpace {
     pub size: usize,
 }
@@ -19,6 +20,8 @@ impl fmt::Display for IndexSpace {
         write!(f, "IndexSpace({})", self.size)
     }
 }
+
+impl BaseSpace for IndexSpace {}
 
 impl Space for IndexSpace {
     type Element = usize;

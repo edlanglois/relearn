@@ -1,4 +1,4 @@
-use super::{EnvSpec, Environment};
+use super::{EnvStructure, Environment, StructuredEnvironment};
 use crate::spaces::{IndexSpace, Space};
 use rand::distributions::{Bernoulli, Distribution};
 use rand::rngs::StdRng;
@@ -39,19 +39,16 @@ impl Environment for BernoulliBandit {
     }
 }
 
-impl EnvSpec for BernoulliBandit {
+impl StructuredEnvironment for BernoulliBandit {
     type ObservationSpace = IndexSpace;
     type ActionSpace = IndexSpace;
 
-    fn observation_space(&self) -> Self::ObservationSpace {
-        IndexSpace::new(1)
-    }
-
-    fn action_space(&self) -> Self::ActionSpace {
-        IndexSpace::new(self.probabilities.len())
-    }
-
-    fn reward_range(&self) -> (f32, f32) {
-        (0.0, 1.0)
+    fn structure(&self) -> EnvStructure<IndexSpace, IndexSpace> {
+        EnvStructure {
+            observation_space: IndexSpace::new(1),
+            action_space: IndexSpace::new(self.probabilities.len()),
+            reward_range: (0.0, 1.0),
+            discount_factor: 1.0,
+        }
     }
 }
