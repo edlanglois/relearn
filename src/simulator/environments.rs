@@ -9,7 +9,7 @@ pub enum EnvDef {
     /// A BernoulliBandit with means [0.2, 0.8]
     SimpleBernoulliBandit,
     /// A BernoulliBandit
-    BernoulliBandit { means: Vec<f32> },
+    BernoulliBandit { num_arms: usize },
 }
 
 impl EnvDef {
@@ -21,12 +21,12 @@ impl EnvDef {
     ) -> Result<Box<dyn Simulator>, MakeAgentError> {
         match self {
             EnvDef::SimpleBernoulliBandit => {
-                let env = BernoulliBandit::new(vec![0.2, 0.8], seed);
+                let env = BernoulliBandit::from_means(vec![0.2, 0.8], seed);
                 let agent = agent_def.make_finite_finite(env.structure(), seed + 1)?;
                 Ok(Box::new(TypedSimulator::new(Box::new(env), agent, logger)))
             }
-            EnvDef::BernoulliBandit { means } => {
-                let env = BernoulliBandit::new(means, seed);
+            EnvDef::BernoulliBandit { num_arms } => {
+                let env = BernoulliBandit::uniform(num_arms, seed);
                 let agent = agent_def.make_finite_finite(env.structure(), seed + 1)?;
                 Ok(Box::new(TypedSimulator::new(Box::new(env), agent, logger)))
             }

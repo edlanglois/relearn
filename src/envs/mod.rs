@@ -1,5 +1,5 @@
-mod bandits;
+pub mod bandits;
 mod envs;
 
-pub use bandits::BernoulliBandit;
+pub use bandits::{Bandit, BernoulliBandit};
 pub use envs::{EnvStructure, Environment, StructuredEnvironment};
