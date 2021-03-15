@@ -8,7 +8,9 @@ use std::fmt;
 /// The definition of an agent
 #[derive(Debug)]
 pub enum AgentDef {
+    /// An agent that selects actions randomly.
     Random,
+    /// Epsilon-greedy tabular Q learning.
     TabularQLearning { exploration_rate: f32 },
 }
 
