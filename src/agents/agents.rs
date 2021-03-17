@@ -38,7 +38,6 @@ pub trait Actor<O, A> {
     /// # Args
     /// * `observation`: The current observation of the environment state.
     /// * `new_episode`: Whether this observation is the start of a new episode.
-    /// * `rng`: A (pseudo) random number generator available to the agent.
     fn act(&mut self, observation: &O, new_episode: bool) -> A;
 }
 

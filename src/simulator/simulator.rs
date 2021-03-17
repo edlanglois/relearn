@@ -41,15 +41,19 @@ impl<O, A, L: Logger> Simulator for TypedSimulator<O, A, L> {
             self.agent.as_mut(),
             &mut |step| {
                 let reward = step.reward as f64;
-                logger.log_scalar(Event::Step, "reward", reward);
+                logger.log(Event::Step, "reward", reward.into()).unwrap();
                 logger.done(Event::Step);
 
                 episode_length += 1;
                 episode_reward += reward;
                 if step.episode_done {
-                    logger.log_scalar(Event::Episode, "length", episode_length as f64);
+                    logger
+                        .log(Event::Episode, "length", (episode_length as f64).into())
+                        .unwrap();
                     episode_length = 0;
-                    logger.log_scalar(Event::Episode, "reward", episode_reward);
+                    logger
+                        .log(Event::Episode, "reward", episode_reward.into())
+                        .unwrap();
                     episode_reward = 0.0;
                     logger.done(Event::Episode);
                 }
