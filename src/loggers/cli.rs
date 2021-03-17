@@ -2,8 +2,9 @@ use super::{Event, LogError, Loggable, Logger};
 use enum_map::{enum_map, EnumMap};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use std::fmt;
-use std::ops::Drop;
+use std::ops::{AddAssign, Drop};
 use std::time::{Duration, Instant};
 
 /// Logger that writes summaries to stderr.
@@ -133,14 +134,12 @@ impl EventLog {
 #[derive(Debug)]
 enum Aggregator {
     ScalarMean {
-        sum: f64,
-        count: u64,
-        pending_sum: f64,
-        pending_count: u64,
+        accumulated: MeanAccumulator,
+        pending: MeanAccumulator,
     },
     IndexDistribution {
-        counts: Vec<u64>,
-        pending_counts: Vec<u64>,
+        accumulated: IndexDistributionAccumulator,
+        pending: IndexDistributionAccumulator,
     },
 }
 use Aggregator::*;
@@ -151,17 +150,15 @@ impl Aggregator {
     fn new(value: Loggable) -> Self {
         match value {
             Scalar(x) => ScalarMean {
-                sum: 0.0,
-                count: 0,
-                pending_sum: x,
-                pending_count: 1,
+                accumulated: MeanAccumulator::new(),
+                pending: x.into(),
             },
             IndexSample { value, size } => {
-                let mut pending_counts = vec![0; size];
-                pending_counts[value] = 1;
+                let mut pending = IndexDistributionAccumulator::new(size);
+                pending.counts[value] += 1;
                 IndexDistribution {
-                    counts: vec![0; size],
-                    pending_counts,
+                    accumulated: IndexDistributionAccumulator::new(size),
+                    pending,
                 }
             }
         }
@@ -171,58 +168,34 @@ impl Aggregator {
     ///
     /// Returns Err((value, expected)) if the value is incompatible with this aggregator.
     fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
-        match (self, value) {
-            (
-                ScalarMean {
-                    sum: _,
-                    count: _,
-                    pending_sum,
-                    pending_count,
-                },
-                Scalar(x),
-            ) => {
-                *pending_sum += x;
-                *pending_count += 1;
-            }
-
-            (
-                IndexDistribution {
-                    counts: _,
-                    pending_counts,
-                },
-                IndexSample { value, size },
-            ) if pending_counts.len() == size => {
-                pending_counts[value] += 1;
-            }
-
-            (s, value) => return Err((value, s.expected())),
+        match self {
+            ScalarMean {
+                accumulated: _,
+                pending,
+            } => pending.update(value),
+            IndexDistribution {
+                accumulated: _,
+                pending,
+            } => pending.update(value),
         }
-        Ok(())
     }
 
     /// Commit the pending values into the aggregate.
     fn commit(&mut self) {
         match self {
             ScalarMean {
-                sum,
-                count,
-                pending_sum,
-                pending_count,
+                accumulated,
+                pending,
             } => {
-                *sum += *pending_sum;
-                *count += *pending_count;
-                *pending_sum = 0.0;
-                *pending_count = 0;
+                *accumulated += pending;
+                pending.reset()
             }
-
             IndexDistribution {
-                counts,
-                pending_counts,
+                accumulated,
+                pending,
             } => {
-                for (c, pc) in counts.iter_mut().zip(pending_counts.iter_mut()) {
-                    *c = *pc;
-                    *pc = 0;
-                }
+                *accumulated += pending;
+                pending.reset()
             }
         }
     }
@@ -231,39 +204,17 @@ impl Aggregator {
     fn clear(&mut self) {
         match self {
             ScalarMean {
-                sum,
-                count,
-                pending_sum: _,
-                pending_count: _,
+                accumulated,
+                pending: _,
             } => {
-                *sum = 0.0;
-                *count = 0;
+                accumulated.reset();
             }
-
             IndexDistribution {
-                counts,
-                pending_counts: _,
+                accumulated,
+                pending: _,
             } => {
-                for c in counts.iter_mut() {
-                    *c = 0;
-                }
+                accumulated.reset();
             }
-        }
-    }
-
-    /// A string describing the expected loggable type
-    fn expected(&self) -> String {
-        match self {
-            ScalarMean {
-                sum: _,
-                count: _,
-                pending_sum: _,
-                pending_count: _,
-            } => "Scalar".into(),
-            IndexDistribution {
-                counts,
-                pending_counts: _,
-            } => format!("IndexSample{{size: {}}}", counts.len()),
         }
     }
 }
@@ -273,34 +224,166 @@ impl fmt::Display for Aggregator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ScalarMean {
-                sum,
-                count,
-                pending_sum: _,
-                pending_count: _,
-            } => {
-                write!(f, "{}", sum / (*count as f64))
-            }
+                accumulated,
+                pending: _,
+            } => accumulated.fmt(f),
             IndexDistribution {
-                counts,
-                pending_counts: _,
-            } => {
-                let total: u64 = counts.iter().sum();
-                if total > 0 {
-                    write!(f, "[")?;
-                    let mut first = true;
-                    for c in counts.iter() {
-                        if first {
-                            first = false;
-                        } else {
-                            write!(f, ", ")?;
-                        }
-                        write!(f, "{:.3}", (*c as f64) / (total as f64))?;
-                    }
-                    write!(f, "]")
-                } else {
-                    write!(f, "None")
-                }
+                accumulated,
+                pending: _,
+            } => accumulated.fmt(f),
+        }
+    }
+}
+
+/// Accumulate statistics of a loggable.
+trait Accumulator:
+    'static
+    + TryFrom<Loggable, Error = (Loggable, &'static str)>
+    + AddAssign<&'static Self>
+    + fmt::Display
+{
+    /// Add a new loggable value to the accumulator.
+    ///
+    /// Used when a value is logged multiple times in an event.
+    fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)>;
+
+    /// Reset the accumulator to empty
+    fn reset(&mut self);
+}
+
+#[derive(Debug)]
+struct MeanAccumulator {
+    sum: f64,
+    count: u64,
+}
+
+impl MeanAccumulator {
+    pub fn new() -> Self {
+        Self { sum: 0.0, count: 0 }
+    }
+}
+
+impl From<f64> for MeanAccumulator {
+    fn from(value: f64) -> Self {
+        Self {
+            sum: value,
+            count: 1,
+        }
+    }
+}
+
+impl Accumulator for MeanAccumulator {
+    fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
+        if let Scalar(x) = value {
+            self.sum += x;
+            self.count += 1;
+            Ok(())
+        } else {
+            Err((value, "Scalar".into()))
+        }
+    }
+
+    fn reset(&mut self) {
+        self.sum = 0.0;
+        self.count = 0;
+    }
+}
+
+impl TryFrom<Loggable> for MeanAccumulator {
+    type Error = (Loggable, &'static str);
+
+    fn try_from(value: Loggable) -> Result<Self, Self::Error> {
+        if let Scalar(x) = value {
+            Ok(x.into())
+        } else {
+            Err((value, "Scalar"))
+        }
+    }
+}
+
+impl AddAssign<&Self> for MeanAccumulator {
+    fn add_assign(&mut self, other: &Self) {
+        self.sum += other.sum;
+        self.count += other.count;
+    }
+}
+
+impl fmt::Display for MeanAccumulator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.sum / (self.count as f64))
+    }
+}
+
+#[derive(Debug)]
+struct IndexDistributionAccumulator {
+    counts: Vec<u64>,
+}
+
+impl IndexDistributionAccumulator {
+    fn new(size: usize) -> Self {
+        Self {
+            counts: vec![0; size],
+        }
+    }
+}
+
+impl Accumulator for IndexDistributionAccumulator {
+    fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
+        match value {
+            IndexSample { value, size } if self.counts.len() == size => {
+                self.counts[value] += 1;
+                Ok(())
             }
+            v => Err((v, format!("IndexSample{{size: {}}}", self.counts.len()))),
+        }
+    }
+
+    fn reset(&mut self) {
+        for count in self.counts.iter_mut() {
+            *count = 0;
+        }
+    }
+}
+
+impl TryFrom<Loggable> for IndexDistributionAccumulator {
+    type Error = (Loggable, &'static str);
+
+    fn try_from(value: Loggable) -> Result<Self, Self::Error> {
+        if let IndexSample { value, size } = value {
+            let mut acc = Self::new(size);
+            acc.counts[value] += 1;
+            Ok(acc)
+        } else {
+            Err((value, "IndexSample"))
+        }
+    }
+}
+
+impl AddAssign<&Self> for IndexDistributionAccumulator {
+    fn add_assign(&mut self, other: &Self) {
+        for (count, other_count) in self.counts.iter_mut().zip(other.counts.iter()) {
+            *count += other_count;
+        }
+    }
+}
+
+impl fmt::Display for IndexDistributionAccumulator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let total: u64 = self.counts.iter().sum();
+        if total > 0 {
+            write!(f, "[")?;
+            let mut first = true;
+            for c in self.counts.iter() {
+                if first {
+                    first = false;
+                } else {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{:.3}", (*c as f64) / (total as f64))?;
+            }
+            write!(f, "]")
+        } else {
+            write!(f, "None")
         }
     }
 }
