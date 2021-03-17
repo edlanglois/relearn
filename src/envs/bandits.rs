@@ -1,4 +1,4 @@
-use super::{EnvStructure, Environment, StructuredEnvironment};
+use super::{EnvStructure, Environment};
 use crate::spaces::{IndexSpace, Space};
 use rand::distributions::{Bernoulli, Distribution};
 use rand::prelude::*;
@@ -20,16 +20,32 @@ impl<D: Distribution<f32>> Bandit<D> {
 }
 
 impl<D: Distribution<f32>> Environment for Bandit<D> {
-    type Observation = <IndexSpace as Space>::Element;
-    type Action = <IndexSpace as Space>::Element;
+    type ObservationSpace = IndexSpace;
+    type ActionSpace = IndexSpace;
 
-    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f32, bool) {
+    fn step(
+        &mut self,
+        action: &<Self::ActionSpace as Space>::Element,
+    ) -> (
+        Option<<Self::ObservationSpace as Space>::Element>,
+        f32,
+        bool,
+    ) {
         let reward = self.distributions[*action].sample(&mut self.rng);
         (None, reward, true)
     }
 
-    fn reset(&mut self) -> Self::Observation {
+    fn reset(&mut self) -> <Self::ObservationSpace as Space>::Element {
         0
+    }
+
+    fn structure(&self) -> EnvStructure<IndexSpace, IndexSpace> {
+        EnvStructure {
+            observation_space: IndexSpace::new(1),
+            action_space: IndexSpace::new(self.distributions.len()),
+            reward_range: (0.0, 1.0),
+            discount_factor: 1.0,
+        }
     }
 }
 
@@ -55,24 +71,6 @@ impl BernoulliBandit {
             .map(|_| FloatBernoulli::new(rand::random()).unwrap())
             .collect();
         Self { distributions, rng }
-    }
-}
-
-impl StructuredEnvironment for BernoulliBandit {
-    type ObservationSpace = IndexSpace;
-    type ActionSpace = IndexSpace;
-
-    fn structure(&self) -> EnvStructure<IndexSpace, IndexSpace> {
-        EnvStructure {
-            observation_space: IndexSpace::new(1),
-            action_space: IndexSpace::new(self.distributions.len()),
-            reward_range: (0.0, 1.0),
-            discount_factor: 1.0,
-        }
-    }
-
-    fn as_env_mut(&mut self) -> &mut dyn Environment<Observation = usize, Action = usize> {
-        self
     }
 }
 

@@ -6,8 +6,8 @@ use std::f32;
 /// Specifically, an environment instance encapsulates a specific environment state and allows
 /// transitions between states.
 pub trait Environment {
-    type Observation;
-    type Action;
+    type ObservationSpace: Space;
+    type ActionSpace: Space;
 
     /// Take a step in the environment.
     ///
@@ -19,35 +19,23 @@ pub trait Environment {
     /// * `episode_done`: Whether this step ends the episode.
     ///     - If `observation` is `None` then `episode_done` must be true.
     ///     - An episode may be done for other reasons, like a step limit.
-    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f32, bool);
+    fn step(
+        &mut self,
+        action: &<Self::ActionSpace as Space>::Element,
+    ) -> (
+        Option<<Self::ObservationSpace as Space>::Element>,
+        f32,
+        bool,
+    );
 
     /// Reset the environment to an initial state.
     ///
     /// # Returns
     /// * `observation`: An observation of the resulting state.
-    fn reset(&mut self) -> Self::Observation;
-}
-
-/// An environment with a well-defined external structure.
-pub trait StructuredEnvironment:
-    Environment<
-    Observation = <<Self as StructuredEnvironment>::ObservationSpace as Space>::Element,
-    Action = <<Self as StructuredEnvironment>::ActionSpace as Space>::Element,
->
-{
-    type ObservationSpace: Space;
-    type ActionSpace: Space;
+    fn reset(&mut self) -> <Self::ObservationSpace as Space>::Element;
 
     /// Get the structure of this environment.
     fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace>;
-
-    /// Convert into a mutable Environment reference.
-    fn as_env_mut(
-        &mut self,
-    ) -> &mut dyn Environment<
-        Observation = <Self::ObservationSpace as Space>::Element,
-        Action = <Self::ActionSpace as Space>::Element,
-    >;
 }
 
 /// The external structure of an environment.

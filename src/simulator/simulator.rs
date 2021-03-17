@@ -1,5 +1,5 @@
 use crate::agents::{Agent, Step};
-use crate::envs::{Environment, StructuredEnvironment};
+use crate::envs::Environment;
 use crate::loggers::{Event, Logger};
 use crate::spaces::Space;
 
@@ -11,28 +11,14 @@ pub trait Simulator {
 
 /// A simulator for a specific observation space, action space, and logger.
 pub struct TypedSimulator<OS: Space, AS: Space, L: Logger> {
-    environment: Box<
-        dyn StructuredEnvironment<
-            ObservationSpace = OS,
-            ActionSpace = AS,
-            Observation = OS::Element,
-            Action = AS::Element,
-        >,
-    >,
+    environment: Box<dyn Environment<ObservationSpace = OS, ActionSpace = AS>>,
     agent: Box<dyn Agent<OS::Element, AS::Element>>,
     logger: L,
 }
 
 impl<OS: Space, AS: Space, L: Logger> TypedSimulator<OS, AS, L> {
     pub fn new(
-        environment: Box<
-            dyn StructuredEnvironment<
-                ObservationSpace = OS,
-                ActionSpace = AS,
-                Observation = OS::Element,
-                Action = AS::Element,
-            >,
-        >,
+        environment: Box<dyn Environment<ObservationSpace = OS, ActionSpace = AS>>,
         agent: Box<dyn Agent<OS::Element, AS::Element>>,
         logger: L,
     ) -> Self {
@@ -56,7 +42,7 @@ impl<OS: Space, AS: Space, L: Logger> Simulator for TypedSimulator<OS, AS, L> {
 
         let logger = &mut self.logger;
         run(
-            self.environment.as_env_mut(),
+            self.environment.as_mut(),
             self.agent.as_mut(),
             &mut |step| {
                 let reward = step.reward as f64;
@@ -102,12 +88,14 @@ impl<OS: Space, AS: Space, L: Logger> Simulator for TypedSimulator<OS, AS, L> {
 }
 
 /// Run an agent-environment simulation with a callback function called on each step.
-pub fn run<O, A, F>(
-    environment: &mut dyn Environment<Observation = O, Action = A>,
-    agent: &mut dyn Agent<O, A>,
+pub fn run<OS, AS, F>(
+    environment: &mut dyn Environment<ObservationSpace = OS, ActionSpace = AS>,
+    agent: &mut dyn Agent<OS::Element, AS::Element>,
     callback: &mut F,
 ) where
-    F: FnMut(&Step<O, A>) -> bool,
+    OS: Space,
+    AS: Space,
+    F: FnMut(&Step<OS::Element, AS::Element>) -> bool,
 {
     let mut observation = environment.reset();
     let new_episode = true;

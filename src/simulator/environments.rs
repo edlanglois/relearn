@@ -1,6 +1,6 @@
 //! Environment definitions
 use super::{AgentDef, MakeAgentError, Simulator, TypedSimulator};
-use crate::envs::{BernoulliBandit, StructuredEnvironment};
+use crate::envs::{BernoulliBandit, Environment};
 use crate::loggers::Logger;
 
 /// The definition of an environment
