@@ -1,4 +1,5 @@
 use super::{BaseSpace, FiniteSpace, Space};
+use crate::loggers::Loggable;
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::fmt;
@@ -28,6 +29,13 @@ impl Space for IndexSpace {
 
     fn contains(&self, value: &usize) -> bool {
         value < &self.size
+    }
+
+    fn as_loggable(&self, value: &usize) -> Loggable {
+        Loggable::IndexSample {
+            value: *value,
+            size: self.size,
+        }
     }
 }
 

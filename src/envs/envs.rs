@@ -40,6 +40,14 @@ pub trait StructuredEnvironment:
 
     /// Get the structure of this environment.
     fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace>;
+
+    /// Convert into a mutable Environment reference.
+    fn as_env_mut(
+        &mut self,
+    ) -> &mut dyn Environment<
+        Observation = <Self::ObservationSpace as Space>::Element,
+        Action = <Self::ActionSpace as Space>::Element,
+    >;
 }
 
 /// The external structure of an environment.

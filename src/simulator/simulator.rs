@@ -1,6 +1,7 @@
 use crate::agents::{Agent, Step};
-use crate::envs::Environment;
+use crate::envs::{Environment, StructuredEnvironment};
 use crate::loggers::{Event, Logger};
+use crate::spaces::Space;
 
 /// An agent-environment simulator.
 pub trait Simulator {
@@ -8,17 +9,31 @@ pub trait Simulator {
     fn run(&mut self, max_steps: Option<u64>);
 }
 
-/// A simulator templated on the observation and action spaces, as well as the logger.
-pub struct TypedSimulator<O, A, L: Logger> {
-    environment: Box<dyn Environment<Observation = O, Action = A>>,
-    agent: Box<dyn Agent<O, A>>,
+/// A simulator for a specific observation space, action space, and logger.
+pub struct TypedSimulator<OS: Space, AS: Space, L: Logger> {
+    environment: Box<
+        dyn StructuredEnvironment<
+            ObservationSpace = OS,
+            ActionSpace = AS,
+            Observation = OS::Element,
+            Action = AS::Element,
+        >,
+    >,
+    agent: Box<dyn Agent<OS::Element, AS::Element>>,
     logger: L,
 }
 
-impl<O, A, L: Logger> TypedSimulator<O, A, L> {
+impl<OS: Space, AS: Space, L: Logger> TypedSimulator<OS, AS, L> {
     pub fn new(
-        environment: Box<dyn Environment<Observation = O, Action = A>>,
-        agent: Box<dyn Agent<O, A>>,
+        environment: Box<
+            dyn StructuredEnvironment<
+                ObservationSpace = OS,
+                ActionSpace = AS,
+                Observation = OS::Element,
+                Action = AS::Element,
+            >,
+        >,
+        agent: Box<dyn Agent<OS::Element, AS::Element>>,
         logger: L,
     ) -> Self {
         Self {
@@ -29,19 +44,37 @@ impl<O, A, L: Logger> TypedSimulator<O, A, L> {
     }
 }
 
-impl<O, A, L: Logger> Simulator for TypedSimulator<O, A, L> {
+impl<OS: Space, AS: Space, L: Logger> Simulator for TypedSimulator<OS, AS, L> {
     fn run(&mut self, max_steps: Option<u64>) {
         let mut step_count = 0; // Global step count
         let mut episode_length = 0; // Length of the current episode in steps
         let mut episode_reward = 0.0; // Total reward for the current episode
 
+        let structure = self.environment.structure();
+        let observation_space = structure.observation_space;
+        let action_space = structure.action_space;
+
         let logger = &mut self.logger;
         run(
-            self.environment.as_mut(),
+            self.environment.as_env_mut(),
             self.agent.as_mut(),
             &mut |step| {
                 let reward = step.reward as f64;
                 logger.log(Event::Step, "reward", reward.into()).unwrap();
+                logger
+                    .log(
+                        Event::Step,
+                        "observation",
+                        observation_space.as_loggable(&step.observation),
+                    )
+                    .unwrap();
+                logger
+                    .log(
+                        Event::Step,
+                        "action",
+                        action_space.as_loggable(&step.action),
+                    )
+                    .unwrap();
                 logger.done(Event::Step);
 
                 episode_length += 1;

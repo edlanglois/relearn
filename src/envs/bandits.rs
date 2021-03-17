@@ -70,6 +70,10 @@ impl StructuredEnvironment for BernoulliBandit {
             discount_factor: 1.0,
         }
     }
+
+    fn as_env_mut(&mut self) -> &mut dyn Environment<Observation = usize, Action = usize> {
+        self
+    }
 }
 
 /// Wrapper Bernoulli distribution that can sample floats
