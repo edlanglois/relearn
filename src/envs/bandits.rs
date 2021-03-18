@@ -9,34 +9,41 @@ use rand::prelude::*;
 #[derive(Debug)]
 pub struct Bandit<D: Distribution<f32>> {
     distributions: Vec<D>,
-    rng: StdRng,
 }
 
 impl<D: Distribution<f32>> Bandit<D> {
-    pub fn new(distributions: Vec<D>, seed: u64) -> Self {
-        let rng = StdRng::seed_from_u64(seed);
-        Self { distributions, rng }
+    pub fn new(distributions: Vec<D>) -> Self {
+        Self { distributions }
     }
 }
 
+pub struct Empty {}
+
 impl<D: Distribution<f32>> Environment for Bandit<D> {
+    type State = Empty;
     type ObservationSpace = IndexSpace;
     type ActionSpace = IndexSpace;
 
-    fn step(
-        &mut self,
-        action: &<Self::ActionSpace as Space>::Element,
-    ) -> (
-        Option<<Self::ObservationSpace as Space>::Element>,
-        f32,
-        bool,
-    ) {
-        let reward = self.distributions[*action].sample(&mut self.rng);
-        (None, reward, true)
+    fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
+        Empty {}
     }
 
-    fn reset(&mut self) -> <Self::ObservationSpace as Space>::Element {
+    fn observe(
+        &self,
+        _state: &Self::State,
+        _rng: &mut StdRng,
+    ) -> <Self::ObservationSpace as Space>::Element {
         0
+    }
+
+    fn step(
+        &self,
+        _state: Self::State,
+        action: &<Self::ActionSpace as Space>::Element,
+        rng: &mut StdRng,
+    ) -> (Option<Self::State>, f32, bool) {
+        let reward = self.distributions[*action].sample(rng);
+        (None, reward, true)
     }
 
     fn structure(&self) -> EnvStructure<IndexSpace, IndexSpace> {
@@ -54,23 +61,21 @@ pub type BernoulliBandit = Bandit<FloatBernoulli>;
 
 impl BernoulliBandit {
     /// Create a new BernoulliBandit from a list of means.
-    pub fn from_means(means: Vec<f32>, seed: u64) -> Self {
+    pub fn from_means(means: Vec<f32>) -> Self {
         Self::new(
             means
                 .iter()
                 .map(|&p| FloatBernoulli::new(p as f64).unwrap())
                 .collect(),
-            seed,
         )
     }
 
     /// Create a new BernoulliBandit with uniform random means.
-    pub fn uniform(num_arms: usize, seed: u64) -> Self {
-        let rng = StdRng::seed_from_u64(seed);
+    pub fn uniform<R: Rng>(num_arms: usize, rng: &mut R) -> Self {
         let distributions = (0..num_arms)
-            .map(|_| FloatBernoulli::new(rand::random()).unwrap())
+            .map(|_| FloatBernoulli::new(rng.gen()).unwrap())
             .collect();
-        Self { distributions, rng }
+        Self { distributions }
     }
 }
 

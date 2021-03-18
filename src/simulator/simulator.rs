@@ -1,5 +1,5 @@
 use crate::agents::{Agent, Step};
-use crate::envs::Environment;
+use crate::envs::StatefulEnvironment;
 use crate::loggers::{Event, Logger};
 use crate::spaces::Space;
 
@@ -11,14 +11,14 @@ pub trait Simulator {
 
 /// A simulator for a specific observation space, action space, and logger.
 pub struct TypedSimulator<OS: Space, AS: Space, L: Logger> {
-    environment: Box<dyn Environment<ObservationSpace = OS, ActionSpace = AS>>,
+    environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
     agent: Box<dyn Agent<OS::Element, AS::Element>>,
     logger: L,
 }
 
 impl<OS: Space, AS: Space, L: Logger> TypedSimulator<OS, AS, L> {
     pub fn new(
-        environment: Box<dyn Environment<ObservationSpace = OS, ActionSpace = AS>>,
+        environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
         agent: Box<dyn Agent<OS::Element, AS::Element>>,
         logger: L,
     ) -> Self {
@@ -89,7 +89,7 @@ impl<OS: Space, AS: Space, L: Logger> Simulator for TypedSimulator<OS, AS, L> {
 
 /// Run an agent-environment simulation with a callback function called on each step.
 pub fn run<OS, AS, F>(
-    environment: &mut dyn Environment<ObservationSpace = OS, ActionSpace = AS>,
+    environment: &mut dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>,
     agent: &mut dyn Agent<OS::Element, AS::Element>,
     callback: &mut F,
 ) where

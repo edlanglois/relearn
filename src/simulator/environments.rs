@@ -1,7 +1,8 @@
 //! Environment definitions
 use super::{AgentDef, MakeAgentError, Simulator, TypedSimulator};
-use crate::envs::{BernoulliBandit, Environment};
+use crate::envs::{AsStateful, BernoulliBandit, Environment};
 use crate::loggers::Logger;
+use rand::prelude::*;
 
 /// The definition of an environment
 #[derive(Debug)]
@@ -21,14 +22,22 @@ impl EnvDef {
     ) -> Result<Box<dyn Simulator>, MakeAgentError> {
         match self {
             EnvDef::SimpleBernoulliBandit => {
-                let env = BernoulliBandit::from_means(vec![0.2, 0.8], seed);
+                let env = BernoulliBandit::from_means(vec![0.2, 0.8]);
                 let agent = agent_def.make_finite_finite(env.structure(), seed + 1)?;
-                Ok(Box::new(TypedSimulator::new(Box::new(env), agent, logger)))
+                Ok(Box::new(TypedSimulator::new(
+                    Box::new(env.as_stateful(seed)),
+                    agent,
+                    logger,
+                )))
             }
             EnvDef::BernoulliBandit { num_arms } => {
-                let env = BernoulliBandit::uniform(num_arms, seed);
+                let env = BernoulliBandit::uniform(num_arms, &mut StdRng::seed_from_u64(seed + 2));
                 let agent = agent_def.make_finite_finite(env.structure(), seed + 1)?;
-                Ok(Box::new(TypedSimulator::new(Box::new(env), agent, logger)))
+                Ok(Box::new(TypedSimulator::new(
+                    Box::new(env.as_stateful(seed)),
+                    agent,
+                    logger,
+                )))
             }
         }
     }
