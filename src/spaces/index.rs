@@ -27,11 +27,11 @@ impl BaseSpace for IndexSpace {}
 impl Space for IndexSpace {
     type Element = usize;
 
-    fn contains(&self, value: &usize) -> bool {
+    fn contains(&self, value: &Self::Element) -> bool {
         value < &self.size
     }
 
-    fn as_loggable(&self, value: &usize) -> Loggable {
+    fn as_loggable(&self, value: &Self::Element) -> Loggable {
         Loggable::IndexSample {
             value: *value,
             size: self.size,
@@ -44,17 +44,17 @@ impl FiniteSpace for IndexSpace {
         self.size
     }
 
-    fn index(&self, index: usize) -> usize {
+    fn index(&self, index: usize) -> Self::Element {
         index
     }
 
-    fn index_of(&self, element: &usize) -> usize {
+    fn index_of(&self, element: &Self::Element) -> usize {
         *element
     }
 }
 
-impl Distribution<usize> for IndexSpace {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> usize {
+impl Distribution<<Self as Space>::Element> for IndexSpace {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
         rng.gen_range(0..self.size)
     }
 }
