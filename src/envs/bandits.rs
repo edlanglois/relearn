@@ -1,5 +1,5 @@
 use super::{EnvStructure, Environment};
-use crate::spaces::{IndexSpace, Space};
+use crate::spaces::{IndexSpace, SingletonSpace, Space};
 use rand::distributions::{Bernoulli, Distribution};
 use rand::prelude::*;
 
@@ -21,7 +21,7 @@ pub struct Empty {}
 
 impl<D: Distribution<f32>> Environment for Bandit<D> {
     type State = Empty;
-    type ObservationSpace = IndexSpace;
+    type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
 
     fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
@@ -33,7 +33,7 @@ impl<D: Distribution<f32>> Environment for Bandit<D> {
         _state: &Self::State,
         _rng: &mut StdRng,
     ) -> <Self::ObservationSpace as Space>::Element {
-        0
+        ()
     }
 
     fn step(
@@ -46,9 +46,9 @@ impl<D: Distribution<f32>> Environment for Bandit<D> {
         (None, reward, true)
     }
 
-    fn structure(&self) -> EnvStructure<IndexSpace, IndexSpace> {
+    fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
         EnvStructure {
-            observation_space: IndexSpace::new(1),
+            observation_space: SingletonSpace::new(),
             action_space: IndexSpace::new(self.distributions.len()),
             reward_range: (0.0, 1.0),
             discount_factor: 1.0,
