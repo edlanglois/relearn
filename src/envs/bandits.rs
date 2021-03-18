@@ -1,3 +1,4 @@
+//! Multi-armed bandit environments
 use super::{EnvStructure, Environment};
 use crate::spaces::{IndexSpace, SingletonSpace, Space};
 use rand::distributions::{Bernoulli, Distribution};
