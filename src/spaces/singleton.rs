@@ -39,8 +39,8 @@ impl FiniteSpace for SingletonSpace {
         1
     }
 
-    fn index(&self, _index: usize) -> Self::Element {
-        ()
+    fn index(&self, _index: usize) -> Option<Self::Element> {
+        Some(())
     }
 
     fn index_of(&self, _element: &Self::Element) -> usize {

@@ -80,7 +80,7 @@ where
                 .index_axis(Axis(0), obs_idx)
                 .argmax()
                 .unwrap();
-            self.action_space.index(act_idx)
+            self.action_space.index(act_idx).unwrap()
         }
     }
 }
