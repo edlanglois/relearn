@@ -18,6 +18,9 @@ pub enum Event {
 /// A value that can be logged.
 #[derive(Debug)]
 pub enum Loggable {
+    /// Nothing. No data to log.
+    /// Logging Nothing data may still produce a placeholder entry for the name.
+    Nothing,
     /// A scalar value. Aggregate by taking means.
     Scalar(f64),
     /// A sample from a distrbution over 0 .. (size-1)

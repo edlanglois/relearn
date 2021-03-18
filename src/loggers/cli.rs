@@ -133,6 +133,8 @@ impl EventLog {
 
 #[derive(Debug)]
 enum Aggregator {
+    /// Aggregates nothing
+    Nothing,
     ScalarMean {
         accumulated: MeanAccumulator,
         pending: MeanAccumulator,
@@ -143,17 +145,17 @@ enum Aggregator {
     },
 }
 use Aggregator::*;
-use Loggable::*;
 
 impl Aggregator {
     /// Create a new aggregator from a logged value value.
     fn new(value: Loggable) -> Self {
         match value {
-            Scalar(x) => ScalarMean {
+            Loggable::Nothing => Nothing,
+            Loggable::Scalar(x) => ScalarMean {
                 accumulated: MeanAccumulator::new(),
                 pending: x.into(),
             },
-            IndexSample { value, size } => {
+            Loggable::IndexSample { value, size } => {
                 let mut pending = IndexDistributionAccumulator::new(size);
                 pending.counts[value] += 1;
                 IndexDistribution {
@@ -169,6 +171,13 @@ impl Aggregator {
     /// Returns Err((value, expected)) if the value is incompatible with this aggregator.
     fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
         match self {
+            Nothing => {
+                if let Loggable::Nothing = value {
+                    Ok(())
+                } else {
+                    Err((value, "Nothing".into()))
+                }
+            }
             ScalarMean {
                 accumulated: _,
                 pending,
@@ -183,6 +192,7 @@ impl Aggregator {
     /// Commit the pending values into the aggregate.
     fn commit(&mut self) {
         match self {
+            Nothing => {}
             ScalarMean {
                 accumulated,
                 pending,
@@ -203,6 +213,7 @@ impl Aggregator {
     /// Clear the aggregated values (but not the pending values)
     fn clear(&mut self) {
         match self {
+            Nothing => {}
             ScalarMean {
                 accumulated,
                 pending: _,
@@ -223,6 +234,7 @@ impl Aggregator {
 impl fmt::Display for Aggregator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Nothing => write!(f, "Nothing"),
             ScalarMean {
                 accumulated,
                 pending: _,
@@ -274,7 +286,7 @@ impl From<f64> for MeanAccumulator {
 
 impl Accumulator for MeanAccumulator {
     fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
-        if let Scalar(x) = value {
+        if let Loggable::Scalar(x) = value {
             self.sum += x;
             self.count += 1;
             Ok(())
@@ -293,7 +305,7 @@ impl TryFrom<Loggable> for MeanAccumulator {
     type Error = (Loggable, &'static str);
 
     fn try_from(value: Loggable) -> Result<Self, Self::Error> {
-        if let Scalar(x) = value {
+        if let Loggable::Scalar(x) = value {
             Ok(x.into())
         } else {
             Err((value, "Scalar"))
@@ -330,7 +342,7 @@ impl IndexDistributionAccumulator {
 impl Accumulator for IndexDistributionAccumulator {
     fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
         match value {
-            IndexSample { value, size } if self.counts.len() == size => {
+            Loggable::IndexSample { value, size } if self.counts.len() == size => {
                 self.counts[value] += 1;
                 Ok(())
             }
@@ -349,7 +361,7 @@ impl TryFrom<Loggable> for IndexDistributionAccumulator {
     type Error = (Loggable, &'static str);
 
     fn try_from(value: Loggable) -> Result<Self, Self::Error> {
-        if let IndexSample { value, size } = value {
+        if let Loggable::IndexSample { value, size } = value {
             let mut acc = Self::new(size);
             acc.counts[value] += 1;
             Ok(acc)
