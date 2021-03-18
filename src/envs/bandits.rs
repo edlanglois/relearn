@@ -18,15 +18,13 @@ impl<D: Distribution<f32>> Bandit<D> {
     }
 }
 
-pub struct Empty {}
-
 impl<D: Distribution<f32>> Environment for Bandit<D> {
-    type State = Empty;
+    type State = ();
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
 
     fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
-        Empty {}
+        ()
     }
 
     fn observe(
