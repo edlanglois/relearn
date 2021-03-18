@@ -1,6 +1,6 @@
 //! Environment definitions
 use super::{AgentDef, MakeAgentError, Simulator, TypedSimulator};
-use crate::envs::{AsStateful, BernoulliBandit, Environment};
+use crate::envs::{AsStateful, BernoulliBandit, Chain, Environment, StatefulEnvironment};
 use crate::loggers::Logger;
 use rand::prelude::*;
 
@@ -11,6 +11,8 @@ pub enum EnvDef {
     SimpleBernoulliBandit,
     /// A BernoulliBandit
     BernoulliBandit { num_arms: usize },
+    /// The Chain environment
+    Chain,
 }
 
 impl EnvDef {
@@ -38,6 +40,11 @@ impl EnvDef {
                     agent,
                     logger,
                 )))
+            }
+            EnvDef::Chain => {
+                let env = Chain::new(None).as_stateful(seed);
+                let agent = agent_def.make_finite_finite(env.structure(), seed + 1)?;
+                Ok(Box::new(TypedSimulator::new(Box::new(env), agent, logger)))
             }
         }
     }

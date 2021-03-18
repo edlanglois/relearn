@@ -43,6 +43,7 @@ pub struct Opts {
 pub enum Env {
     SimpleBernoulliBandit,
     BernoulliBandit,
+    Chain,
 }
 
 impl From<&Opts> for EnvDef {
@@ -52,6 +53,7 @@ impl From<&Opts> for EnvDef {
             Env::BernoulliBandit => EnvDef::BernoulliBandit {
                 num_arms: opts.num_arms,
             },
+            Env::Chain => EnvDef::Chain,
         }
     }
 }

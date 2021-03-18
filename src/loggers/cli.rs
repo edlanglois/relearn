@@ -93,11 +93,6 @@ impl Logger for CLILogger {
             return;
         }
 
-        // Don't output after steps - prefer complete episodes or epochs
-        if let Event::Step = event {
-            return;
-        }
-
         self.display();
     }
 }
