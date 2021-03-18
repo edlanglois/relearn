@@ -35,16 +35,16 @@ impl Space for SingletonSpace {
 }
 
 impl FiniteSpace for SingletonSpace {
-    fn len(&self) -> usize {
+    fn size(&self) -> usize {
         1
     }
 
-    fn index(&self, _index: usize) -> Option<Self::Element> {
-        Some(())
+    fn to_index(&self, _element: &Self::Element) -> usize {
+        0
     }
 
-    fn index_of(&self, _element: &Self::Element) -> usize {
-        0
+    fn from_index(&self, _index: usize) -> Option<Self::Element> {
+        Some(())
     }
 }
 

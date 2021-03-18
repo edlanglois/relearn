@@ -40,16 +40,16 @@ impl Space for IndexSpace {
 }
 
 impl FiniteSpace for IndexSpace {
-    fn len(&self) -> usize {
+    fn size(&self) -> usize {
         self.size
     }
 
-    fn index(&self, index: usize) -> Option<Self::Element> {
-        Some(index)
+    fn to_index(&self, element: &Self::Element) -> usize {
+        *element
     }
 
-    fn index_of(&self, element: &Self::Element) -> usize {
-        *element
+    fn from_index(&self, index: usize) -> Option<Self::Element> {
+        Some(index)
     }
 }
 

@@ -35,8 +35,8 @@ where
         exploration_rate: f32,
         seed: u64,
     ) -> Self {
-        let num_observations = observation_space.len();
-        let num_actions = action_space.len();
+        let num_observations = observation_space.size();
+        let num_actions = action_space.size();
         let state_action_counts = Array::from_elem((num_observations, num_actions), 0);
         let state_action_values = Array::from_elem((num_observations, num_actions), 0.0);
         Self {
@@ -74,13 +74,13 @@ where
         if self.rng.gen::<f32>() < self.exploration_rate {
             self.action_space.sample(&mut self.rng)
         } else {
-            let obs_idx = self.observation_space.index_of(observation);
+            let obs_idx = self.observation_space.to_index(observation);
             let act_idx = self
                 .state_action_values
                 .index_axis(Axis(0), obs_idx)
                 .argmax()
                 .unwrap();
-            self.action_space.index(act_idx).unwrap()
+            self.action_space.from_index(act_idx).unwrap()
         }
     }
 }
@@ -91,13 +91,13 @@ where
     AS: FiniteSpace,
 {
     fn update(&mut self, step: Step<OS::Element, AS::Element>) {
-        let obs_idx = self.observation_space.index_of(&step.observation);
-        let act_idx = self.action_space.index_of(&step.action);
+        let obs_idx = self.observation_space.to_index(&step.observation);
+        let act_idx = self.action_space.to_index(&step.action);
 
         let discounted_next_value = match step.next_observation {
             None => 0.0,
             Some(next_observation) => {
-                let next_obs_idx = self.observation_space.index_of(&next_observation);
+                let next_obs_idx = self.observation_space.to_index(&next_observation);
                 self.state_action_values
                     .index_axis(Axis(0), next_obs_idx)
                     .max()
