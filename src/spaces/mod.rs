@@ -1,8 +1,10 @@
 mod finite;
 mod index;
+mod singleton;
 
 pub use finite::FiniteSpace;
 pub use index::IndexSpace;
+pub use singleton::SingletonSpace;
 
 use crate::loggers::Loggable;
 use rand::distributions::Distribution;
