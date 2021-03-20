@@ -2,6 +2,7 @@ use super::{EnvStructure, Environment};
 use crate::loggers::Loggable;
 use crate::spaces::{BaseSpace, FiniteSpace, IndexSpace, Space};
 use rand::prelude::*;
+use std::convert::TryInto;
 use std::fmt;
 
 /// Chain Environment
@@ -15,19 +16,21 @@ use std::fmt;
 /// Described in "Bayesian Q-learning" by Dearden, Friedman and Russel (1998)
 #[derive(Debug)]
 pub struct Chain {
-    size: usize,
+    size: u32,
+    discount_factor: f32,
 }
 
 impl Chain {
-    pub fn new(size: Option<usize>) -> Self {
+    pub fn new(size: Option<u32>, discount_factor: Option<f32>) -> Self {
         Self {
             size: size.unwrap_or(5),
+            discount_factor: discount_factor.unwrap_or(0.95),
         }
     }
 }
 
 impl Environment for Chain {
-    type State = usize;
+    type State = u32;
     type ObservationSpace = IndexSpace;
     type ActionSpace = MoveSpace;
 
@@ -40,7 +43,7 @@ impl Environment for Chain {
         state: &Self::State,
         _rng: &mut StdRng,
     ) -> <Self::ObservationSpace as Space>::Element {
-        *state
+        (*state).try_into().unwrap()
     }
 
     fn step(
@@ -68,10 +71,10 @@ impl Environment for Chain {
 
     fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
         EnvStructure {
-            observation_space: IndexSpace::new(self.size),
+            observation_space: IndexSpace::new(self.size.try_into().unwrap()),
             action_space: MoveSpace {},
             reward_range: (0.0, 10.0),
-            discount_factor: 0.95,
+            discount_factor: self.discount_factor,
         }
     }
 }

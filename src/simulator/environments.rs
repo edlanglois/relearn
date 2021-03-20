@@ -10,9 +10,12 @@ pub enum EnvDef {
     /// A BernoulliBandit with means [0.2, 0.8]
     SimpleBernoulliBandit,
     /// A BernoulliBandit
-    BernoulliBandit { num_arms: usize },
+    BernoulliBandit { num_arms: u32 },
     /// The Chain environment
-    Chain,
+    Chain {
+        num_states: Option<u32>,
+        discount_factor: Option<f32>,
+    },
 }
 
 impl EnvDef {
@@ -41,8 +44,11 @@ impl EnvDef {
                     logger,
                 )))
             }
-            EnvDef::Chain => {
-                let env = Chain::new(None).as_stateful(seed);
+            EnvDef::Chain {
+                num_states,
+                discount_factor,
+            } => {
+                let env = Chain::new(num_states, discount_factor).as_stateful(seed);
                 let agent = agent_def.make_finite_finite(env.structure(), seed + 1)?;
                 Ok(Box::new(TypedSimulator::new(Box::new(env), agent, logger)))
             }

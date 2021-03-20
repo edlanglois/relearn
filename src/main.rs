@@ -20,9 +20,17 @@ pub struct Opts {
     /// Environment name
     environment: Env,
 
-    #[clap(long, default_value = "2")]
-    /// Number of arms for some bandit environments
-    num_arms: usize,
+    #[clap(long)]
+    /// Number of states in the environment; when configurable
+    num_states: Option<u32>,
+
+    #[clap(long)]
+    /// Number of actions in the environment; when configurable
+    num_actions: Option<u32>,
+
+    #[clap(long)]
+    /// Environment discount factor; when configurable
+    discount_factor: Option<f32>,
 
     // Agent args
     #[clap(arg_enum)]
@@ -51,9 +59,12 @@ impl From<&Opts> for EnvDef {
         match opts.environment {
             Env::SimpleBernoulliBandit => EnvDef::SimpleBernoulliBandit,
             Env::BernoulliBandit => EnvDef::BernoulliBandit {
-                num_arms: opts.num_arms,
+                num_arms: opts.num_actions.unwrap_or(2),
             },
-            Env::Chain => EnvDef::Chain,
+            Env::Chain => EnvDef::Chain {
+                num_states: opts.num_states,
+                discount_factor: opts.discount_factor,
+            },
         }
     }
 }

@@ -70,7 +70,7 @@ impl BernoulliBandit {
     }
 
     /// Create a new BernoulliBandit with uniform random means.
-    pub fn uniform<R: Rng>(num_arms: usize, rng: &mut R) -> Self {
+    pub fn uniform<R: Rng>(num_arms: u32, rng: &mut R) -> Self {
         let distributions = (0..num_arms)
             .map(|_| FloatBernoulli::new(rng.gen()).unwrap())
             .collect();
