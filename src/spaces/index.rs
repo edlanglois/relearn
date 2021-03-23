@@ -1,4 +1,4 @@
-use super::{BaseSpace, FiniteSpace, Space};
+use super::{FiniteSpace, Space};
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -21,8 +21,6 @@ impl fmt::Display for IndexSpace {
         write!(f, "IndexSpace({})", self.size)
     }
 }
-
-impl BaseSpace for IndexSpace {}
 
 impl Space for IndexSpace {
     type Element = usize;

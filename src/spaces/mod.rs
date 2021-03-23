@@ -8,10 +8,9 @@ pub use singleton::SingletonSpace;
 
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
-use std::fmt::{Debug, Display};
 
 /// A mathematical space
-pub trait Space: BaseSpace + Distribution<<Self as Space>::Element> {
+pub trait Space: Distribution<<Self as Space>::Element> {
     type Element;
 
     /// Check if the space contains a particular value
@@ -20,6 +19,3 @@ pub trait Space: BaseSpace + Distribution<<Self as Space>::Element> {
     /// Convert an element into a loggable object
     fn as_loggable(&self, value: &Self::Element) -> Loggable;
 }
-
-/// An object-safe base description of a mathematical space.
-pub trait BaseSpace: Display + Debug {}

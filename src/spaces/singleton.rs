@@ -1,4 +1,4 @@
-use super::{BaseSpace, FiniteSpace, Space};
+use super::{FiniteSpace, Space};
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -19,8 +19,6 @@ impl fmt::Display for SingletonSpace {
         write!(f, "SingletonSpace")
     }
 }
-
-impl BaseSpace for SingletonSpace {}
 
 impl Space for SingletonSpace {
     type Element = ();

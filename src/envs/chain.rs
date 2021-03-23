@@ -1,6 +1,6 @@
 use super::{EnvStructure, Environment};
 use crate::logging::Loggable;
-use crate::spaces::{BaseSpace, FiniteSpace, IndexSpace, Space};
+use crate::spaces::{FiniteSpace, IndexSpace, Space};
 use rand::prelude::*;
 use std::convert::TryInto;
 use std::fmt;
@@ -103,8 +103,6 @@ impl fmt::Display for MoveSpace {
         write!(f, "MoveSpace")
     }
 }
-
-impl BaseSpace for MoveSpace {}
 
 impl Distribution<Move> for MoveSpace {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Move {
