@@ -1,6 +1,6 @@
 use crate::agents::{Agent, Step};
 use crate::envs::StatefulEnvironment;
-use crate::loggers::{Event, Logger};
+use crate::logging::{Event, Logger};
 use crate::spaces::Space;
 
 /// An agent-environment simulator.

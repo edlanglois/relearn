@@ -6,7 +6,7 @@ pub use finite::FiniteSpace;
 pub use index::IndexSpace;
 pub use singleton::SingletonSpace;
 
-use crate::loggers::Loggable;
+use crate::logging::Loggable;
 use rand::distributions::Distribution;
 use std::fmt::{Debug, Display};
 

@@ -1,5 +1,5 @@
 use super::{EnvStructure, Environment};
-use crate::loggers::Loggable;
+use crate::logging::Loggable;
 use crate::spaces::{BaseSpace, FiniteSpace, IndexSpace, Space};
 use rand::prelude::*;
 use std::convert::TryInto;

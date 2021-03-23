@@ -1,6 +1,6 @@
 pub mod agents;
 pub mod envs;
-pub mod loggers;
+pub mod logging;
 pub mod simulator;
 pub mod spaces;
 

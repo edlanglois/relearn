@@ -1,5 +1,5 @@
 use super::{BaseSpace, FiniteSpace, Space};
-use crate::loggers::Loggable;
+use crate::logging::Loggable;
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::fmt;
