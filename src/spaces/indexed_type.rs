@@ -22,9 +22,22 @@ pub trait Indexed {
 }
 
 /// A space defined over an indexed type.
-#[derive(Default)]
 pub struct IndexedTypeSpace<T: Indexed> {
     element_type: PhantomData<T>,
+}
+
+impl<T: Indexed> IndexedTypeSpace<T> {
+    pub fn new() -> Self {
+        Self {
+            element_type: PhantomData,
+        }
+    }
+}
+
+impl<T: Indexed> Default for IndexedTypeSpace<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T: Indexed> fmt::Debug for IndexedTypeSpace<T> {
