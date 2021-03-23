@@ -1,9 +1,7 @@
 use super::{EnvStructure, Environment};
-use crate::logging::Loggable;
-use crate::spaces::{FiniteSpace, IndexSpace, Space};
+use crate::spaces::{IndexSpace, Indexed, IndexedTypeSpace, Space};
 use rand::prelude::*;
 use std::convert::TryInto;
-use std::fmt;
 
 /// Chain Environment
 ///
@@ -32,7 +30,7 @@ impl Chain {
 impl Environment for Chain {
     type State = u32;
     type ObservationSpace = IndexSpace;
-    type ActionSpace = MoveSpace;
+    type ActionSpace = IndexedTypeSpace<Move>;
 
     fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
         0
@@ -72,7 +70,7 @@ impl Environment for Chain {
     fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
         EnvStructure {
             observation_space: IndexSpace::new(self.size.try_into().unwrap()),
-            action_space: MoveSpace {},
+            action_space: Self::ActionSpace::new(),
             reward_range: (0.0, 10.0),
             discount_factor: self.discount_factor,
         }
@@ -94,50 +92,18 @@ impl Move {
     }
 }
 
-// TODO: Automate the following. Macro or template impl
-#[derive(Debug)]
-pub struct MoveSpace {}
+// TODO: Automate with a derive
+impl Indexed for Move {
+    const SIZE: usize = 2;
 
-impl fmt::Display for MoveSpace {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "MoveSpace")
-    }
-}
-
-impl Distribution<Move> for MoveSpace {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Move {
-        self.from_index(rng.gen_range(0..self.size())).unwrap()
-    }
-}
-
-impl Space for MoveSpace {
-    type Element = Move;
-
-    fn contains(&self, _value: &Self::Element) -> bool {
-        true
-    }
-
-    fn as_loggable(&self, value: &Self::Element) -> Loggable {
-        Loggable::IndexSample {
-            value: self.to_index(value),
-            size: self.size(),
-        }
-    }
-}
-
-impl FiniteSpace for MoveSpace {
-    fn size(&self) -> usize {
-        2
-    }
-
-    fn to_index(&self, element: &Self::Element) -> usize {
-        match element {
+    fn as_index(&self) -> usize {
+        match self {
             Move::Left => 0,
             Move::Right => 1,
         }
     }
 
-    fn from_index(&self, index: usize) -> Option<Self::Element> {
+    fn from_index(index: usize) -> Option<Self> {
         match index {
             0 => Some(Move::Left),
             1 => Some(Move::Right),
