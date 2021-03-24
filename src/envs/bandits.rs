@@ -90,3 +90,22 @@ impl Distribution<f32> for FloatBernoulli {
         self.0.sample(rng) as u8 as f32
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::{AsStateful, StatefulEnvironment};
+    use super::*;
+    use crate::agents::RandomAgent;
+    use crate::simulator;
+
+    #[test]
+    fn run_bernoulli_bandit() {
+        let mut env = BernoulliBandit::from_means(vec![0.2, 0.8]).as_stateful(6);
+        let mut agent = RandomAgent::new(env.structure().action_space, 6);
+        let mut step_count: u32 = 0;
+        simulator::run(&mut env, &mut agent, &mut |_| {
+            step_count += 1;
+            step_count < 1000
+        });
+    }
+}
