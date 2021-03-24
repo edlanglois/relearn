@@ -80,3 +80,97 @@ impl<T: Indexed> FiniteSpace for IndexedTypeSpace<T> {
         T::from_index(index)
     }
 }
+
+impl Indexed for bool {
+    const SIZE: usize = 2;
+
+    fn as_index(&self) -> usize {
+        *self as usize
+    }
+
+    fn from_index(index: usize) -> Option<Self> {
+        match index {
+            0 => Some(false),
+            1 => Some(true),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::finite::finite_space_checks;
+    use super::super::space_checks;
+    use super::*;
+
+    enum TestEnum {
+        A,
+        B,
+        C,
+    }
+
+    impl Indexed for TestEnum {
+        const SIZE: usize = 3;
+        fn as_index(&self) -> usize {
+            match self {
+                TestEnum::A => 0,
+                TestEnum::B => 1,
+                TestEnum::C => 2,
+            }
+        }
+
+        fn from_index(index: usize) -> Option<Self> {
+            match index {
+                0 => Some(TestEnum::A),
+                1 => Some(TestEnum::B),
+                2 => Some(TestEnum::C),
+                _ => None,
+            }
+        }
+    }
+
+    fn check_contains_samples<T: Indexed>() {
+        let space = IndexedTypeSpace::<T>::new();
+        space_checks::check_contains_samples(space, 100);
+    }
+
+    #[test]
+    fn contains_samples_bool() {
+        check_contains_samples::<bool>();
+    }
+
+    #[test]
+    fn contains_samples_enum() {
+        check_contains_samples::<TestEnum>();
+    }
+
+    fn check_from_to_index_iter_size<T: Indexed>() {
+        let space = IndexedTypeSpace::<T>::new();
+        finite_space_checks::check_from_to_index_iter_size(space);
+    }
+
+    #[test]
+    fn from_to_index_iter_size_bool() {
+        check_from_to_index_iter_size::<bool>();
+    }
+
+    #[test]
+    fn from_to_index_iter_size_enum() {
+        check_from_to_index_iter_size::<TestEnum>();
+    }
+
+    fn check_from_index_sampled<T: Indexed>() {
+        let space = IndexedTypeSpace::<T>::new();
+        finite_space_checks::check_from_index_sampled(space, 100);
+    }
+
+    #[test]
+    fn from_index_sampled_bool() {
+        check_from_index_sampled::<bool>();
+    }
+
+    #[test]
+    fn from_index_sampled_enum() {
+        check_from_index_sampled::<TestEnum>();
+    }
+}

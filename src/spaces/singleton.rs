@@ -51,3 +51,28 @@ impl Distribution<<Self as Space>::Element> for SingletonSpace {
         ()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::finite::finite_space_checks;
+    use super::super::space_checks;
+    use super::*;
+
+    #[test]
+    fn contains_samples() {
+        let space = SingletonSpace::new();
+        space_checks::check_contains_samples(space, 10);
+    }
+
+    #[test]
+    fn from_to_index_iter_size() {
+        let space = SingletonSpace::new();
+        finite_space_checks::check_from_to_index_iter_size(space);
+    }
+
+    #[test]
+    fn from_index_sampled() {
+        let space = SingletonSpace::new();
+        finite_space_checks::check_from_index_sampled(space, 10);
+    }
+}

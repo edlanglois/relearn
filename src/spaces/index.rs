@@ -56,3 +56,29 @@ impl Distribution<<Self as Space>::Element> for IndexSpace {
         rng.gen_range(0..self.size)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::finite::finite_space_checks;
+    use super::super::space_checks;
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    fn contains_samples(#[values(1, 5)] size: usize) {
+        let space = IndexSpace::new(size);
+        space_checks::check_contains_samples(space, 100);
+    }
+
+    #[rstest]
+    fn from_to_index_iter_size(#[values(1, 5)] size: usize) {
+        let space = IndexSpace::new(size);
+        finite_space_checks::check_from_to_index_iter_size(space);
+    }
+
+    #[rstest]
+    fn from_index_sampled(#[values(1, 5)] size: usize) {
+        let space = IndexSpace::new(size);
+        finite_space_checks::check_from_index_sampled(space, 100);
+    }
+}

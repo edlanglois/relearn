@@ -13,3 +13,6 @@ enum-map = "0.6.4"
 ndarray = "0.14.0"
 ndarray-stats = "0.4"
 rand = "0.8.3"
+
+[dev-dependencies]
+rstest = "0.7.0"
