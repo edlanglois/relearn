@@ -1,3 +1,4 @@
+/// Simulation trait and Simulator structs.
 use crate::agents::{Agent, Step};
 use crate::envs::StatefulEnvironment;
 use crate::logging::{Event, Logger};

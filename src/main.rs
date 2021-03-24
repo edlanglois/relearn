@@ -1,6 +1,6 @@
 use clap::{crate_authors, crate_description, crate_version, Clap};
 use rust_rl::logging::CLILogger;
-use rust_rl::simulator::{AgentDef, EnvDef};
+use rust_rl::simulation::{AgentDef, EnvDef};
 use std::convert::From;
 use std::error::Error;
 use std::time::Duration;

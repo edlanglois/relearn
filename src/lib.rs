@@ -1,7 +1,7 @@
 pub mod agents;
 pub mod envs;
 pub mod logging;
-pub mod simulator;
+pub mod simulation;
 pub mod spaces;
 
 pub use agents::Agent;
