@@ -99,7 +99,7 @@ mod tests {
     use crate::simulator;
 
     #[test]
-    fn run_bernoulli_bandit() {
+    fn bernoulli_run() {
         let mut env = BernoulliBandit::from_means(vec![0.2, 0.8]).as_stateful(6);
         let mut agent = RandomAgent::new(env.structure().action_space, 6);
         let mut step_count: u32 = 0;
@@ -107,5 +107,30 @@ mod tests {
             step_count += 1;
             step_count < 1000
         });
+    }
+
+    #[test]
+    fn bernoulli_rewards() {
+        let mean = 0.2;
+        let num_samples = 10000;
+        let env = BernoulliBandit::from_means(vec![mean]);
+        let mut rng = StdRng::seed_from_u64(1);
+        let mut reward_1_count = 0;
+        for _ in 0..num_samples {
+            let (_, reward, _) = env.step((), &0, &mut rng);
+            if reward < 0.5 {
+                assert_eq!(reward, 0.0);
+            } else {
+                assert_eq!(reward, 1.0);
+                reward_1_count += 1
+            }
+        }
+        // Check that the number of 1 rewards is plausible.
+        // Approximate the binomial as Gaussian and
+        // check that the number of successes is +- 3 standard deviations of the mean.
+        let bin_mean = (num_samples as f32) * mean;
+        let bin_stddev = ((num_samples as f32) * mean * (1.0 - mean)).sqrt();
+        assert!((reward_1_count as f32) > bin_mean - 3.0 * bin_stddev);
+        assert!((reward_1_count as f32) < bin_mean + 3.0 * bin_stddev);
     }
 }
