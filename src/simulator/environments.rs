@@ -1,5 +1,5 @@
 //! Environment definitions
-use super::{AgentDef, MakeAgentError, Simulator, TypedSimulator};
+use super::{AgentDef, BoxedSimulator, MakeAgentError, Simulation};
 use crate::envs::{AsStateful, BernoulliBandit, Chain, Environment, StatefulEnvironment};
 use crate::logging::Logger;
 use rand::prelude::*;
@@ -19,17 +19,17 @@ pub enum EnvDef {
 }
 
 impl EnvDef {
-    pub fn make_simulator<L: Logger + 'static>(
+    pub fn make_simulation<L: Logger + 'static>(
         self,
         agent_def: AgentDef,
         seed: u64,
         logger: L,
-    ) -> Result<Box<dyn Simulator>, MakeAgentError> {
+    ) -> Result<Box<dyn Simulation>, MakeAgentError> {
         match self {
             EnvDef::SimpleBernoulliBandit => {
                 let env = BernoulliBandit::from_means(vec![0.2, 0.8]);
                 let agent = agent_def.make_finite_finite(env.structure(), seed + 1)?;
-                Ok(Box::new(TypedSimulator::new(
+                Ok(Box::new(BoxedSimulator::new(
                     Box::new(env.as_stateful(seed)),
                     agent,
                     logger,
@@ -38,7 +38,7 @@ impl EnvDef {
             EnvDef::BernoulliBandit { num_arms } => {
                 let env = BernoulliBandit::uniform(num_arms, &mut StdRng::seed_from_u64(seed + 2));
                 let agent = agent_def.make_finite_finite(env.structure(), seed + 1)?;
-                Ok(Box::new(TypedSimulator::new(
+                Ok(Box::new(BoxedSimulator::new(
                     Box::new(env.as_stateful(seed)),
                     agent,
                     logger,
@@ -50,7 +50,7 @@ impl EnvDef {
             } => {
                 let env = Chain::new(num_states, discount_factor).as_stateful(seed);
                 let agent = agent_def.make_finite_finite(env.structure(), seed + 1)?;
-                Ok(Box::new(TypedSimulator::new(Box::new(env), agent, logger)))
+                Ok(Box::new(BoxedSimulator::new(Box::new(env), agent, logger)))
             }
         }
     }

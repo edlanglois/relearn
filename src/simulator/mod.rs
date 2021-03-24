@@ -4,4 +4,4 @@ mod simulator;
 
 pub use agents::{AgentDef, MakeAgentError};
 pub use environments::EnvDef;
-pub use simulator::{Simulator, TypedSimulator};
+pub use simulator::{BoxedSimulator, Simulation, Simulator};

@@ -3,20 +3,73 @@ use crate::envs::StatefulEnvironment;
 use crate::logging::{Event, Logger};
 use crate::spaces::Space;
 
-/// An agent-environment simulator.
-pub trait Simulator {
-    /// Run the simulation for the specified number of steps.
+/// Runs a simulation.
+pub trait Simulation {
+    /// Run a simulation for the specified number of steps.
     fn run(&mut self, max_steps: Option<u64>);
 }
 
-/// A simulator for a specific observation space, action space, and logger.
-pub struct TypedSimulator<OS: Space, AS: Space, L: Logger> {
+/// An agent-environment simulator with logging.
+#[derive(Debug)]
+pub struct Simulator<E, A, L>
+where
+    E: StatefulEnvironment,
+    A: Agent<
+        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+    >,
+    L: Logger,
+{
+    environment: E,
+    agent: A,
+    logger: L,
+}
+
+impl<E, A, L> Simulator<E, A, L>
+where
+    E: StatefulEnvironment,
+    A: Agent<
+        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+    >,
+    L: Logger,
+{
+    pub fn new(environment: E, agent: A, logger: L) -> Self {
+        Self {
+            environment,
+            agent,
+            logger,
+        }
+    }
+}
+
+impl<E, A, L> Simulation for Simulator<E, A, L>
+where
+    E: StatefulEnvironment,
+    A: Agent<
+        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+    >,
+    L: Logger,
+{
+    fn run(&mut self, max_steps: Option<u64>) {
+        run_with_logging(
+            &mut self.environment,
+            &mut self.agent,
+            &mut self.logger,
+            max_steps,
+        );
+    }
+}
+
+/// An simulator of a boxed agent and environment.
+pub struct BoxedSimulator<OS: Space, AS: Space, L: Logger> {
     environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
     agent: Box<dyn Agent<OS::Element, AS::Element>>,
     logger: L,
 }
 
-impl<OS: Space, AS: Space, L: Logger> TypedSimulator<OS, AS, L> {
+impl<OS: Space, AS: Space, L: Logger> BoxedSimulator<OS, AS, L> {
     pub fn new(
         environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
         agent: Box<dyn Agent<OS::Element, AS::Element>>,
@@ -30,72 +83,94 @@ impl<OS: Space, AS: Space, L: Logger> TypedSimulator<OS, AS, L> {
     }
 }
 
-impl<OS: Space, AS: Space, L: Logger> Simulator for TypedSimulator<OS, AS, L> {
+impl<OS: Space, AS: Space, L: Logger> Simulation for BoxedSimulator<OS, AS, L> {
     fn run(&mut self, max_steps: Option<u64>) {
-        let mut step_count = 0; // Global step count
-        let mut episode_length = 0; // Length of the current episode in steps
-        let mut episode_reward = 0.0; // Total reward for the current episode
-
-        let structure = self.environment.structure();
-        let observation_space = structure.observation_space;
-        let action_space = structure.action_space;
-
-        let logger = &mut self.logger;
-        run(
+        run_with_logging(
             self.environment.as_mut(),
             self.agent.as_mut(),
-            &mut |step| {
-                let reward = step.reward as f64;
-                logger.log(Event::Step, "reward", reward.into()).unwrap();
-                logger
-                    .log(
-                        Event::Step,
-                        "observation",
-                        observation_space.as_loggable(&step.observation),
-                    )
-                    .unwrap();
-                logger
-                    .log(
-                        Event::Step,
-                        "action",
-                        action_space.as_loggable(&step.action),
-                    )
-                    .unwrap();
-                logger.done(Event::Step);
-
-                episode_length += 1;
-                episode_reward += reward;
-                if step.episode_done {
-                    logger
-                        .log(Event::Episode, "length", (episode_length as f64).into())
-                        .unwrap();
-                    episode_length = 0;
-                    logger
-                        .log(Event::Episode, "reward", episode_reward.into())
-                        .unwrap();
-                    episode_reward = 0.0;
-                    logger.done(Event::Episode);
-                }
-
-                step_count += 1;
-                match max_steps {
-                    Some(steps) => step_count >= steps,
-                    None => false,
-                }
-            },
+            &mut self.logger,
+            max_steps,
         );
     }
 }
 
-/// Run an agent-environment simulation with a callback function called on each step.
-pub fn run<OS, AS, F>(
-    environment: &mut dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>,
-    agent: &mut dyn Agent<OS::Element, AS::Element>,
-    callback: &mut F,
+/// Run an agent-environment simulation with logging.
+pub fn run_with_logging<E, A, L>(
+    environment: &mut E,
+    agent: &mut A,
+    logger: &mut L,
+    max_steps: Option<u64>,
 ) where
-    OS: Space,
-    AS: Space,
-    F: FnMut(&Step<OS::Element, AS::Element>) -> bool,
+    E: StatefulEnvironment + ?Sized,
+    A: Agent<
+            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        > + ?Sized,
+    L: Logger,
+{
+    let mut step_count = 0; // Global step count
+    let mut episode_length = 0; // Length of the current episode in steps
+    let mut episode_reward = 0.0; // Total reward for the current episode
+
+    let structure = environment.structure();
+    let observation_space = structure.observation_space;
+    let action_space = structure.action_space;
+
+    run(environment, agent, &mut |step| {
+        let reward = step.reward as f64;
+        logger.log(Event::Step, "reward", reward.into()).unwrap();
+        logger
+            .log(
+                Event::Step,
+                "observation",
+                observation_space.as_loggable(&step.observation),
+            )
+            .unwrap();
+        logger
+            .log(
+                Event::Step,
+                "action",
+                action_space.as_loggable(&step.action),
+            )
+            .unwrap();
+        logger.done(Event::Step);
+
+        episode_length += 1;
+        episode_reward += reward;
+        if step.episode_done {
+            logger
+                .log(Event::Episode, "length", (episode_length as f64).into())
+                .unwrap();
+            episode_length = 0;
+            logger
+                .log(Event::Episode, "reward", episode_reward.into())
+                .unwrap();
+            episode_reward = 0.0;
+            logger.done(Event::Episode);
+        }
+
+        step_count += 1;
+        match max_steps {
+            Some(steps) => step_count >= steps,
+            None => false,
+        }
+    });
+}
+
+/// Run an agent-environment simulation with a callback function called on each step.
+pub fn run<E, A, F>(environment: &mut E, agent: &mut A, callback: &mut F)
+where
+    E: StatefulEnvironment + ?Sized,
+    A: Agent<
+            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        > + ?Sized,
+    F: FnMut(
+        &Step<
+            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        >,
+    ) -> bool,
 {
     let mut observation = environment.reset();
     let new_episode = true;
