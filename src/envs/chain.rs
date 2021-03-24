@@ -1,6 +1,7 @@
 use super::{EnvStructure, Environment};
-use crate::spaces::{IndexSpace, Indexed, IndexedTypeSpace, Space};
+use crate::spaces::{IndexSpace, IndexedTypeSpace, Space};
 use rand::prelude::*;
+use rust_rl_derive::Indexed;
 use std::convert::TryInto;
 
 /// Chain Environment
@@ -77,7 +78,7 @@ impl Environment for Chain {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Indexed)]
 pub enum Move {
     Left,
     Right,
@@ -88,26 +89,6 @@ impl Move {
         match self {
             Move::Left => Move::Right,
             Move::Right => Move::Left,
-        }
-    }
-}
-
-// TODO: Automate with a derive
-impl Indexed for Move {
-    const SIZE: usize = 2;
-
-    fn as_index(&self) -> usize {
-        match self {
-            Move::Left => 0,
-            Move::Right => 1,
-        }
-    }
-
-    fn from_index(index: usize) -> Option<Self> {
-        match index {
-            0 => Some(Move::Left),
-            1 => Some(Move::Right),
-            _ => None,
         }
     }
 }

@@ -174,3 +174,80 @@ mod tests {
         check_from_index_sampled::<TestEnum>();
     }
 }
+
+#[cfg(test)]
+/// Test the derive(Indexed) macro
+mod derive_indexed_tests {
+    use super::*;
+    use rust_rl_derive::Indexed;
+
+    #[derive(Debug, Indexed)]
+    enum EmptyEnum {}
+
+    #[derive(Debug, Indexed)]
+    enum NonEmptyEnum {
+        A,
+        B,
+    }
+
+    #[test]
+    fn empty_enum_len() {
+        assert_eq!(EmptyEnum::SIZE, 0);
+    }
+
+    #[test]
+    fn empty_enum_from_index_invalid_0() {
+        let result = EmptyEnum::from_index(0);
+        if let None = result {
+        } else {
+            panic!("Expected `None`, got {:?}", result);
+        }
+    }
+
+    #[test]
+    fn empty_enum_from_index_invalid_1() {
+        let result = EmptyEnum::from_index(1);
+        if let None = result {
+        } else {
+            panic!("Expected `None`, got {:?}", result);
+        }
+    }
+
+    #[test]
+    fn non_empty_enum_len() {
+        assert_eq!(NonEmptyEnum::SIZE, 2);
+    }
+
+    #[test]
+    fn non_empty_enum_to_index() {
+        assert_eq!(NonEmptyEnum::A.as_index(), 0);
+        assert_eq!(NonEmptyEnum::B.as_index(), 1);
+    }
+
+    #[test]
+    fn non_empty_enum_from_index_valid_0() {
+        let result = NonEmptyEnum::from_index(0);
+        if let Some(NonEmptyEnum::A) = result {
+        } else {
+            panic!("Expected `Some(NonEmptyEnum::A)`, got {:?}", result);
+        }
+    }
+
+    #[test]
+    fn non_empty_enum_from_index_valid_1() {
+        let result = NonEmptyEnum::from_index(1);
+        if let Some(NonEmptyEnum::B) = result {
+        } else {
+            panic!("Expected `Some(NonEmptyEnum::B)`, got {:?}", result);
+        }
+    }
+
+    #[test]
+    fn non_empty_enum_from_index_invalid_2() {
+        let result = NonEmptyEnum::from_index(2);
+        if let None = result {
+        } else {
+            panic!("Expected `None`, got {:?}", result);
+        }
+    }
+}

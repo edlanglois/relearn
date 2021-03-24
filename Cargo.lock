@@ -418,6 +418,15 @@ dependencies = [
  "ndarray-stats",
  "rand 0.8.3",
  "rstest",
+ "rust_rl_derive",
+]
+
+[[package]]
+name = "rust_rl_derive"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
