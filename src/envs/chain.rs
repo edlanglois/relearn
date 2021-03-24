@@ -95,19 +95,11 @@ impl Move {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{AsStateful, StatefulEnvironment};
+    use super::super::envs::env_checks;
     use super::*;
-    use crate::agents::RandomAgent;
-    use crate::simulator;
 
     #[test]
     fn run_chain_default() {
-        let mut env = Chain::new(None, None).as_stateful(4);
-        let mut agent = RandomAgent::new(env.structure().action_space, 5);
-        let mut step_count: u32 = 0;
-        simulator::run(&mut env, &mut agent, &mut |_| {
-            step_count += 1;
-            step_count < 1000
-        });
+        env_checks::run_stateless(Chain::new(None, None), 1000, 0);
     }
 }
