@@ -93,13 +93,13 @@ impl Distribution<f32> for FloatBernoulli {
 
 #[cfg(test)]
 mod tests {
-    use super::super::envs::env_checks;
+    use super::super::testing;
     use super::*;
 
     #[test]
     fn bernoulli_run() {
         let env = BernoulliBandit::from_means(vec![0.2, 0.8]);
-        env_checks::run_stateless(env, 1000, 0);
+        testing::run_stateless(env, 1000, 0);
     }
 
     #[test]

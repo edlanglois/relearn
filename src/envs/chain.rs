@@ -1,3 +1,4 @@
+//! Chain environment
 use super::{EnvStructure, Environment};
 use crate::spaces::{IndexSpace, IndexedTypeSpace, Space};
 use rand::prelude::*;
@@ -95,11 +96,11 @@ impl Move {
 
 #[cfg(test)]
 mod tests {
-    use super::super::envs::env_checks;
+    use super::super::testing;
     use super::*;
 
     #[test]
     fn run_chain_default() {
-        env_checks::run_stateless(Chain::new(None, None), 1000, 0);
+        testing::run_stateless(Chain::new(None, None), 1000, 0);
     }
 }

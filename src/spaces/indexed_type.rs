@@ -1,3 +1,4 @@
+//! IndexedTypeSpace and Indexed trait
 use super::{FiniteSpace, Space};
 
 use crate::logging::Loggable;
@@ -99,8 +100,7 @@ impl Indexed for bool {
 
 #[cfg(test)]
 mod tests {
-    use super::super::finite::finite_space_checks;
-    use super::super::space_checks;
+    use super::super::testing;
     use super::*;
 
     enum TestEnum {
@@ -131,7 +131,7 @@ mod tests {
 
     fn check_contains_samples<T: Indexed>() {
         let space = IndexedTypeSpace::<T>::new();
-        space_checks::check_contains_samples(space, 100);
+        testing::check_contains_samples(space, 100);
     }
 
     #[test]
@@ -146,7 +146,7 @@ mod tests {
 
     fn check_from_to_index_iter_size<T: Indexed>() {
         let space = IndexedTypeSpace::<T>::new();
-        finite_space_checks::check_from_to_index_iter_size(space);
+        testing::check_from_to_index_iter_size(space);
     }
 
     #[test]
@@ -161,7 +161,7 @@ mod tests {
 
     fn check_from_index_sampled<T: Indexed>() {
         let space = IndexedTypeSpace::<T>::new();
-        finite_space_checks::check_from_index_sampled(space, 100);
+        testing::check_from_index_sampled(space, 100);
     }
 
     #[test]

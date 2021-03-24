@@ -1,3 +1,4 @@
+//! IndexSpace definition
 use super::{FiniteSpace, Space};
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
@@ -59,26 +60,25 @@ impl Distribution<<Self as Space>::Element> for IndexSpace {
 
 #[cfg(test)]
 mod tests {
-    use super::super::finite::finite_space_checks;
-    use super::super::space_checks;
+    use super::super::testing;
     use super::*;
     use rstest::rstest;
 
     #[rstest]
     fn contains_samples(#[values(1, 5)] size: usize) {
         let space = IndexSpace::new(size);
-        space_checks::check_contains_samples(space, 100);
+        testing::check_contains_samples(space, 100);
     }
 
     #[rstest]
     fn from_to_index_iter_size(#[values(1, 5)] size: usize) {
         let space = IndexSpace::new(size);
-        finite_space_checks::check_from_to_index_iter_size(space);
+        testing::check_from_to_index_iter_size(space);
     }
 
     #[rstest]
     fn from_index_sampled(#[values(1, 5)] size: usize) {
         let space = IndexSpace::new(size);
-        finite_space_checks::check_from_index_sampled(space, 100);
+        testing::check_from_index_sampled(space, 100);
     }
 }
