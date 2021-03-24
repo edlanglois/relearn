@@ -19,7 +19,7 @@ pub trait Space: Distribution<<Self as Space>::Element> {
     fn contains(&self, value: &Self::Element) -> bool;
 
     /// Convert an element into a loggable object
-    fn as_loggable(&self, value: &Self::Element) -> Loggable;
+    fn as_loggable(&self, element: &Self::Element) -> Loggable;
 }
 
 #[cfg(test)]

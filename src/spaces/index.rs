@@ -29,9 +29,9 @@ impl Space for IndexSpace {
         value < &self.size
     }
 
-    fn as_loggable(&self, value: &Self::Element) -> Loggable {
+    fn as_loggable(&self, element: &Self::Element) -> Loggable {
         Loggable::IndexSample {
-            value: *value,
+            value: *element,
             size: self.size,
         }
     }

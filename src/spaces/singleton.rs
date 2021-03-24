@@ -27,7 +27,7 @@ impl Space for SingletonSpace {
         true
     }
 
-    fn as_loggable(&self, _value: &Self::Element) -> Loggable {
+    fn as_loggable(&self, _element: &Self::Element) -> Loggable {
         Loggable::Nothing
     }
 }
