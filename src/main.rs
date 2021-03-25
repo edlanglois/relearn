@@ -30,7 +30,7 @@ pub struct Opts {
 
     #[clap(long)]
     /// Environment discount factor; when configurable
-    discount_factor: Option<f32>,
+    discount_factor: Option<f64>,
 
     // Agent args
     #[clap(arg_enum)]
@@ -39,7 +39,7 @@ pub struct Opts {
 
     #[clap(long, default_value = "0.2")]
     /// Agent exploration rate
-    exploration_rate: f32,
+    exploration_rate: f64,
 
     // Experiment args
     #[clap(long)]

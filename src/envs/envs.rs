@@ -1,7 +1,7 @@
 //! Environment traits
 use crate::spaces::Space;
 use rand::rngs::StdRng;
-use std::f32;
+use std::f64;
 
 /// A reinforcement learning environment.
 ///
@@ -40,7 +40,7 @@ pub trait Environment {
         state: Self::State,
         action: &<Self::ActionSpace as Space>::Element,
         rng: &mut StdRng,
-    ) -> (Option<Self::State>, f32, bool);
+    ) -> (Option<Self::State>, f64, bool);
 
     /// The structure of this environment.
     fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace>;
@@ -70,7 +70,7 @@ pub trait StatefulEnvironment {
         action: &<Self::ActionSpace as Space>::Element,
     ) -> (
         Option<<Self::ObservationSpace as Space>::Element>,
-        f32,
+        f64,
         bool,
     );
 
@@ -101,7 +101,7 @@ pub struct EnvStructure<OS: Space, AS: Space> {
     /// A lower and upper bound on possible reward values.
     ///
     /// These bounds are not required to be tight but ideally will be as tight as possible.
-    pub reward_range: (f32, f32),
+    pub reward_range: (f64, f64),
     /// A discount factor applied to future rewards.
-    pub discount_factor: f32,
+    pub discount_factor: f64,
 }

@@ -11,7 +11,7 @@ pub enum AgentDef {
     /// An agent that selects actions randomly.
     Random,
     /// Epsilon-greedy tabular Q learning.
-    TabularQLearning { exploration_rate: f32 },
+    TabularQLearning { exploration_rate: f64 },
 }
 
 impl AgentDef {

@@ -18,7 +18,7 @@ pub enum EnvDef {
     /// The Chain environment
     Chain {
         num_states: Option<u32>,
-        discount_factor: Option<f32>,
+        discount_factor: Option<f64>,
     },
 }
 

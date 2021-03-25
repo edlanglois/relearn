@@ -15,10 +15,10 @@ where
 {
     pub observation_space: OS,
     pub action_space: AS,
-    pub discount_factor: f32,
-    pub exploration_rate: f32,
+    pub discount_factor: f64,
+    pub exploration_rate: f64,
     pub state_action_counts: Array2<u32>,
-    pub state_action_values: Array2<f32>,
+    pub state_action_values: Array2<f64>,
 
     rng: StdRng,
 }
@@ -31,8 +31,8 @@ where
     pub fn new(
         observation_space: OS,
         action_space: AS,
-        discount_factor: f32,
-        exploration_rate: f32,
+        discount_factor: f64,
+        exploration_rate: f64,
         seed: u64,
     ) -> Self {
         let num_observations = observation_space.size();
@@ -71,7 +71,7 @@ where
     AS: FiniteSpace,
 {
     fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
-        if self.rng.gen::<f32>() < self.exploration_rate {
+        if self.rng.gen::<f64>() < self.exploration_rate {
             self.action_space.sample(&mut self.rng)
         } else {
             let obs_idx = self.observation_space.to_index(observation);
@@ -109,7 +109,7 @@ where
         self.state_action_counts[idx] += 1;
 
         let value = step.reward + discounted_next_value;
-        let weight = (self.state_action_counts[idx] as f32).recip();
+        let weight = (self.state_action_counts[idx] as f64).recip();
         self.state_action_values[idx] *= 1.0 - weight;
         self.state_action_values[idx] += weight * value;
     }

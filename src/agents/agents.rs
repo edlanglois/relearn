@@ -6,7 +6,7 @@ pub struct Step<'a, O, A> {
     /// The action taken from the initial state given the initial observation.
     pub action: A,
     /// The resulting reward.
-    pub reward: f32,
+    pub reward: f64,
     /// The resulting successor state; is None if the successor state is terminal.
     /// All trajectories from a terminal state have 0 reward on each step.
     pub next_observation: Option<&'a O>,

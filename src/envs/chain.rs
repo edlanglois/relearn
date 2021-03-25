@@ -17,11 +17,11 @@ use std::convert::TryInto;
 #[derive(Debug)]
 pub struct Chain {
     size: u32,
-    discount_factor: f32,
+    discount_factor: f64,
 }
 
 impl Chain {
-    pub fn new(size: Option<u32>, discount_factor: Option<f32>) -> Self {
+    pub fn new(size: Option<u32>, discount_factor: Option<f64>) -> Self {
         Self {
             size: size.unwrap_or(5),
             discount_factor: discount_factor.unwrap_or(0.95),
@@ -51,9 +51,9 @@ impl Environment for Chain {
         state: Self::State,
         action: &<Self::ActionSpace as Space>::Element,
         rng: &mut StdRng,
-    ) -> (Option<Self::State>, f32, bool) {
+    ) -> (Option<Self::State>, f64, bool) {
         let mut action = *action;
-        if rng.gen::<f32>() < 0.2 {
+        if rng.gen::<f64>() < 0.2 {
             action = action.swap();
         }
         let (state, reward) = match action {

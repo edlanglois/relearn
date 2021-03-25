@@ -8,17 +8,17 @@ use rand::prelude::*;
 ///
 /// The distribution of each arm has type `D`.
 #[derive(Debug)]
-pub struct Bandit<D: Distribution<f32>> {
+pub struct Bandit<D: Distribution<f64>> {
     distributions: Vec<D>,
 }
 
-impl<D: Distribution<f32>> Bandit<D> {
+impl<D: Distribution<f64>> Bandit<D> {
     pub fn new(distributions: Vec<D>) -> Self {
         Self { distributions }
     }
 }
 
-impl<D: Distribution<f32> + Bounded> Environment for Bandit<D> {
+impl<D: Distribution<f64> + Bounded> Environment for Bandit<D> {
     type State = ();
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
@@ -40,7 +40,7 @@ impl<D: Distribution<f32> + Bounded> Environment for Bandit<D> {
         _state: Self::State,
         action: &<Self::ActionSpace as Space>::Element,
         rng: &mut StdRng,
-    ) -> (Option<Self::State>, f32, bool) {
+    ) -> (Option<Self::State>, f64, bool) {
         let reward = self.distributions[*action].sample(rng);
         (None, reward, true)
     }
@@ -72,7 +72,7 @@ pub type BernoulliBandit = Bandit<FloatBernoulli>;
 
 impl BernoulliBandit {
     /// Create a new BernoulliBandit from a list of means.
-    pub fn from_means<I: IntoIterator<Item = f32>>(
+    pub fn from_means<I: IntoIterator<Item = f64>>(
         means: I,
     ) -> Result<Self, rand::distributions::BernoulliError> {
         let distributions = means
@@ -99,13 +99,13 @@ impl FloatBernoulli {
         Ok(Self(Bernoulli::new(mean)?))
     }
 }
-impl Distribution<f32> for FloatBernoulli {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> f32 {
-        self.0.sample(rng) as u8 as f32
+impl Distribution<f64> for FloatBernoulli {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> f64 {
+        self.0.sample(rng) as u8 as f64
     }
 }
 impl Bounded for FloatBernoulli {
-    fn bounds(&self) -> (f32, f32) {
+    fn bounds(&self) -> (f64, f64) {
         (0.0, 1.0)
     }
 }
@@ -115,7 +115,7 @@ pub type DeterministicBandit = Bandit<Deterministic>;
 
 impl DeterministicBandit {
     /// Create a new DeterministicBandit from a list of values.
-    pub fn from_values<I: IntoIterator<Item = f32>>(means: I) -> Self {
+    pub fn from_values<I: IntoIterator<Item = f64>>(means: I) -> Self {
         let distributions = means.into_iter().map(Deterministic::new).collect();
         Self::new(distributions)
     }
@@ -125,21 +125,21 @@ impl DeterministicBandit {
 ///
 /// Always produces the same value when sampled.
 #[derive(Debug)]
-pub struct Deterministic(f32);
+pub struct Deterministic(f64);
 
 impl Deterministic {
-    pub fn new(value: f32) -> Self {
+    pub fn new(value: f64) -> Self {
         Self(value)
     }
 }
 
-impl Distribution<f32> for Deterministic {
-    fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> f32 {
+impl Distribution<f64> for Deterministic {
+    fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> f64 {
         self.0
     }
 }
 impl Bounded for Deterministic {
-    fn bounds(&self) -> (f32, f32) {
+    fn bounds(&self) -> (f64, f64) {
         (self.0, self.0)
     }
 }
@@ -149,7 +149,7 @@ pub trait Bounded {
     /// Minimum and maximum values (inclusive). Infinities are allowed
     ///
     /// If max < min then the interval is empty.
-    fn bounds(&self) -> (f32, f32);
+    fn bounds(&self) -> (f64, f64);
 }
 
 #[cfg(test)]
@@ -182,10 +182,10 @@ mod tests {
         // Check that the number of 1 rewards is plausible.
         // Approximate the binomial as Gaussian and
         // check that the number of successes is +- 3 standard deviations of the mean.
-        let bin_mean = (num_samples as f32) * mean;
-        let bin_stddev = ((num_samples as f32) * mean * (1.0 - mean)).sqrt();
-        assert!((reward_1_count as f32) > bin_mean - 3.0 * bin_stddev);
-        assert!((reward_1_count as f32) < bin_mean + 3.0 * bin_stddev);
+        let bin_mean = (num_samples as f64) * mean;
+        let bin_stddev = ((num_samples as f64) * mean * (1.0 - mean)).sqrt();
+        assert!((reward_1_count as f64) > bin_mean - 3.0 * bin_stddev);
+        assert!((reward_1_count as f64) < bin_mean + 3.0 * bin_stddev);
     }
 
     #[test]

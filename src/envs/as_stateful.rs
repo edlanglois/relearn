@@ -30,7 +30,7 @@ impl<E: Environment> StatefulEnvironment for EnvWithState<E> {
         action: &<Self::ActionSpace as Space>::Element,
     ) -> (
         Option<<Self::ObservationSpace as Space>::Element>,
-        f32,
+        f64,
         bool,
     ) {
         let state = self
