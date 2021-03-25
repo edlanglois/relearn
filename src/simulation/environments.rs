@@ -27,7 +27,7 @@ impl EnvDef {
     ) -> Result<Box<dyn Simulation>, MakeAgentError> {
         match self {
             EnvDef::SimpleBernoulliBandit => {
-                let env = BernoulliBandit::from_means(vec![0.2, 0.8]);
+                let env = BernoulliBandit::from_means(vec![0.2, 0.8]).unwrap();
                 let agent = agent_def.make_finite_finite(env.structure(), seed + 1)?;
                 Ok(Box::new(BoxedSimulator::new(
                     Box::new(env.as_stateful(seed)),

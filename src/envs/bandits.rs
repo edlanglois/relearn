@@ -60,13 +60,14 @@ pub type BernoulliBandit = Bandit<FloatBernoulli>;
 
 impl BernoulliBandit {
     /// Create a new BernoulliBandit from a list of means.
-    pub fn from_means(means: Vec<f32>) -> Self {
-        Self::new(
-            means
-                .iter()
-                .map(|&p| FloatBernoulli::new(p as f64).unwrap())
-                .collect(),
-        )
+    pub fn from_means<I: IntoIterator<Item = f32>>(
+        means: I,
+    ) -> Result<Self, rand::distributions::BernoulliError> {
+        let distributions = means
+            .into_iter()
+            .map(|p| FloatBernoulli::new(p as f64))
+            .collect::<Result<_, _>>()?;
+        Ok(Self::new(distributions))
     }
 
     /// Create a new BernoulliBandit with uniform random means.
@@ -98,7 +99,7 @@ mod tests {
 
     #[test]
     fn bernoulli_run() {
-        let env = BernoulliBandit::from_means(vec![0.2, 0.8]);
+        let env = BernoulliBandit::from_means(vec![0.2, 0.8]).unwrap();
         testing::run_stateless(env, 1000, 0);
     }
 
@@ -106,7 +107,7 @@ mod tests {
     fn bernoulli_rewards() {
         let mean = 0.2;
         let num_samples = 10000;
-        let env = BernoulliBandit::from_means(vec![mean]);
+        let env = BernoulliBandit::from_means(vec![mean]).unwrap();
         let mut rng = StdRng::seed_from_u64(1);
         let mut reward_1_count = 0;
         for _ in 0..num_samples {
