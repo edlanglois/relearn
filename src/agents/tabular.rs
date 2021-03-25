@@ -114,3 +114,44 @@ where
         self.state_action_values[idx] += weight * value;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::testing;
+    use super::*;
+
+    #[test]
+    fn train_tabular_q_learning_train() {
+        testing::train_deterministic_bandit(
+            |env_structure| {
+                TabularQLearningAgent::new(
+                    env_structure.observation_space,
+                    env_structure.action_space,
+                    env_structure.discount_factor,
+                    0.1,
+                    0,
+                )
+            },
+            1000,
+            0.9,
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn train_tabular_q_learning_exploration() {
+        testing::train_deterministic_bandit(
+            |env_structure| {
+                TabularQLearningAgent::new(
+                    env_structure.observation_space,
+                    env_structure.action_space,
+                    env_structure.discount_factor,
+                    0.95,
+                    0,
+                )
+            },
+            1000,
+            0.9,
+        );
+    }
+}

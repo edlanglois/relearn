@@ -5,5 +5,5 @@ pub mod simulation;
 pub mod spaces;
 
 pub use agents::Agent;
-pub use envs::Environment;
+pub use envs::{EnvStructure, Environment, StatefulEnvironment};
 pub use spaces::Space;
