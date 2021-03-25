@@ -1,6 +1,5 @@
-use std::fmt;
-
 /// Description of an environment step
+#[derive(Debug)]
 pub struct Step<'a, O, A> {
     /// The initial observation.
     pub observation: O,
@@ -15,18 +14,6 @@ pub struct Step<'a, O, A> {
     /// An episode is always done if it reaches a terminal state.
     /// An episode may be done for other reasons, like a step limit.
     pub episode_done: bool,
-}
-
-impl<'a, O: fmt::Debug, A: fmt::Debug> fmt::Debug for Step<'a, O, A> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Step")
-            .field("observation", &self.observation)
-            .field("action", &self.action)
-            .field("reward", &self.reward)
-            .field("next_observation", &self.next_observation)
-            .field("episode_done", &self.episode_done)
-            .finish()
-    }
 }
 
 /// An actor that produces actions in response to a sequence of observations.
