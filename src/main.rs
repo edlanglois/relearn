@@ -51,6 +51,7 @@ pub struct Opts {
 pub enum Env {
     SimpleBernoulliBandit,
     BernoulliBandit,
+    DeterministicBandit,
     Chain,
 }
 
@@ -59,6 +60,9 @@ impl From<&Opts> for EnvDef {
         match opts.environment {
             Env::SimpleBernoulliBandit => EnvDef::SimpleBernoulliBandit,
             Env::BernoulliBandit => EnvDef::BernoulliBandit {
+                num_arms: opts.num_actions.unwrap_or(2),
+            },
+            Env::DeterministicBandit => EnvDef::DeterministicBandit {
                 num_arms: opts.num_actions.unwrap_or(2),
             },
             Env::Chain => EnvDef::Chain {

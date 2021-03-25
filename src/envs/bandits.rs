@@ -18,7 +18,7 @@ impl<D: Distribution<f32>> Bandit<D> {
     }
 }
 
-impl<D: Distribution<f32>> Environment for Bandit<D> {
+impl<D: Distribution<f32> + Bounded> Environment for Bandit<D> {
     type State = ();
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
@@ -46,10 +46,22 @@ impl<D: Distribution<f32>> Environment for Bandit<D> {
     }
 
     fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
+        let reward_range = self.distributions.iter().map(|d| d.bounds()).fold(
+            (0.0, -1.0),
+            |(a_min, a_max), (b_min, b_max)| {
+                if a_max < a_min {
+                    (b_min, b_max)
+                } else if b_max < b_min {
+                    (a_min, a_max)
+                } else {
+                    (a_min.min(b_min), a_max.max(b_max))
+                }
+            },
+        );
         EnvStructure {
             observation_space: SingletonSpace::new(),
             action_space: IndexSpace::new(self.distributions.len()),
-            reward_range: (0.0, 1.0),
+            reward_range: reward_range,
             discount_factor: 1.0,
         }
     }
@@ -80,6 +92,7 @@ impl BernoulliBandit {
 }
 
 /// Wrapper Bernoulli distribution that can sample floats
+#[derive(Debug)]
 pub struct FloatBernoulli(Bernoulli);
 impl FloatBernoulli {
     pub fn new(mean: f64) -> Result<FloatBernoulli, rand::distributions::BernoulliError> {
@@ -90,6 +103,53 @@ impl Distribution<f32> for FloatBernoulli {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> f32 {
         self.0.sample(rng) as u8 as f32
     }
+}
+impl Bounded for FloatBernoulli {
+    fn bounds(&self) -> (f32, f32) {
+        (1.0, 1.0)
+    }
+}
+
+/// A multi-armed bandit where each arm has a determistic distribution.
+pub type DeterministicBandit = Bandit<Deterministic>;
+
+impl DeterministicBandit {
+    /// Create a new DeterministicBandit from a list of values.
+    pub fn from_values<I: IntoIterator<Item = f32>>(means: I) -> Self {
+        let distributions = means.into_iter().map(Deterministic::new).collect();
+        Self::new(distributions)
+    }
+}
+
+/// A determistic distribution.
+///
+/// Always produces the same value when sampled.
+#[derive(Debug)]
+pub struct Deterministic(f32);
+
+impl Deterministic {
+    pub fn new(value: f32) -> Self {
+        Self(value)
+    }
+}
+
+impl Distribution<f32> for Deterministic {
+    fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> f32 {
+        self.0
+    }
+}
+impl Bounded for Deterministic {
+    fn bounds(&self) -> (f32, f32) {
+        (self.0, self.0)
+    }
+}
+
+/// Bounds on a scalar value
+pub trait Bounded {
+    /// Minimum and maximum values (inclusive). Infinities are allowed
+    ///
+    /// If max < min then the interval is empty.
+    fn bounds(&self) -> (f32, f32);
 }
 
 #[cfg(test)]
@@ -126,5 +186,21 @@ mod tests {
         let bin_stddev = ((num_samples as f32) * mean * (1.0 - mean)).sqrt();
         assert!((reward_1_count as f32) > bin_mean - 3.0 * bin_stddev);
         assert!((reward_1_count as f32) < bin_mean + 3.0 * bin_stddev);
+    }
+
+    #[test]
+    fn deterministic_run() {
+        let env = DeterministicBandit::from_values(vec![0.2, 0.8]);
+        testing::run_stateless(env, 1000, 0);
+    }
+
+    #[test]
+    fn deterministic_rewards() {
+        let mut rng = StdRng::seed_from_u64(0);
+        let env = DeterministicBandit::from_values(vec![0.2, 0.8]);
+        let (_, reward, _) = env.step((), &0, &mut rng);
+        assert_eq!(reward, 0.2);
+        let (_, reward, _) = env.step((), &1, &mut rng);
+        assert_eq!(reward, 0.8);
     }
 }

@@ -7,6 +7,6 @@ mod envs;
 pub mod testing;
 
 pub use as_stateful::{AsStateful, EnvWithState};
-pub use bandits::{Bandit, BernoulliBandit};
+pub use bandits::{Bandit, BernoulliBandit, DeterministicBandit};
 pub use chain::Chain;
 pub use envs::{EnvStructure, Environment, StatefulEnvironment};
