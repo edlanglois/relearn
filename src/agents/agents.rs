@@ -29,7 +29,10 @@ impl<'a, O: fmt::Debug, A: fmt::Debug> fmt::Debug for Step<'a, O, A> {
     }
 }
 
-/// An actor that produces actions given observations.
+/// An actor that produces actions in response to a sequence of observations.
+///
+/// The action selection process may depend on the history of observations and actions within an
+/// episode.
 pub trait Actor<O, A> {
     /// Choose an action in the environment.
     ///
