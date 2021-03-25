@@ -8,6 +8,7 @@ use std::fmt;
 use super::{Actor, Agent, Step};
 use crate::spaces::FiniteSpace;
 
+#[derive(Debug)]
 pub struct TabularQLearningAgent<OS, AS>
 where
     OS: FiniteSpace,
