@@ -106,7 +106,7 @@ impl Distribution<f32> for FloatBernoulli {
 }
 impl Bounded for FloatBernoulli {
     fn bounds(&self) -> (f32, f32) {
-        (1.0, 1.0)
+        (0.0, 1.0)
     }
 }
 

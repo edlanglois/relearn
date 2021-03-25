@@ -4,14 +4,29 @@ use super::{EnvStructure, Environment, StatefulEnvironment};
 use crate::agents::RandomAgent;
 use crate::simulation;
 use crate::spaces::Space;
+use std::fmt::Debug;
 
 /// Run a stateless environment and check that invariants are satisfied.
-pub fn run_stateless<E: Environment>(env: E, num_steps: u64, seed: u64) {
+pub fn run_stateless<E>(env: E, num_steps: u64, seed: u64)
+where
+    E: Environment,
+    <E as Environment>::ObservationSpace: Debug,
+    <<E as Environment>::ObservationSpace as Space>::Element: Debug,
+    <E as Environment>::ActionSpace: Debug,
+    <<E as Environment>::ActionSpace as Space>::Element: Debug,
+{
     run_stateful(&mut env.as_stateful(seed), num_steps, seed + 1)
 }
 
 /// Run a stateful environment and check that invariants are satisfied.
-pub fn run_stateful<E: StatefulEnvironment>(env: &mut E, mut num_steps: u64, seed: u64) {
+pub fn run_stateful<E>(env: &mut E, mut num_steps: u64, seed: u64)
+where
+    E: StatefulEnvironment,
+    <E as StatefulEnvironment>::ObservationSpace: Debug,
+    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Debug,
+    <E as StatefulEnvironment>::ActionSpace: Debug,
+    <<E as StatefulEnvironment>::ActionSpace as Space>::Element: Debug,
+{
     let EnvStructure {
         observation_space,
         action_space,
@@ -32,6 +47,6 @@ pub fn run_stateful<E: StatefulEnvironment>(env: &mut E, mut num_steps: u64, see
         }
 
         num_steps -= 1;
-        num_steps > 0
+        num_steps == 0
     });
 }
