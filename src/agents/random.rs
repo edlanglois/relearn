@@ -1,4 +1,4 @@
-use super::{Actor, Agent};
+use super::{Actor, Agent, Step};
 use crate::spaces::Space;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -25,7 +25,9 @@ impl<O, AS: Space> Actor<O, AS::Element> for RandomAgent<AS> {
     }
 }
 
-impl<O, AS: Space> Agent<O, AS::Element> for RandomAgent<AS> {}
+impl<O, AS: Space> Agent<O, AS::Element> for RandomAgent<AS> {
+    fn update(&mut self, _step: Step<O, AS::Element>) {}
+}
 
 impl<AS: Space + fmt::Display> fmt::Display for RandomAgent<AS> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

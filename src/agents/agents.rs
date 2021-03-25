@@ -39,5 +39,5 @@ pub trait Agent<O, A>: Actor<O, A> {
     ///
     /// # Args
     /// * `step`: The environment step resulting from the  most recent call to [Actor::act].
-    fn update(&mut self, _step: Step<O, A>) {} // Default implementation does nothing
+    fn update(&mut self, _step: Step<O, A>);
 }
