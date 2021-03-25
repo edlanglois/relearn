@@ -16,18 +16,23 @@ where
     let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).as_stateful(0);
     let mut agent = make_agent(env.structure());
 
-    let num_eval_steps = 1000;
-    let num_steps = num_train_steps + num_eval_steps;
-    let mut step_count = 0;
-    let mut action_1_count = 0;
+    // Training
+    if num_train_steps > 0 {
+        let mut step_count = 0;
+        simulation::run(&mut env, &mut agent, |_| {
+            step_count += 1;
+            step_count < num_train_steps
+        });
+    }
 
-    simulation::run(&mut env, &mut agent, |step| {
-        if step_count >= num_train_steps {
-            // Evaluation
-            action_1_count += (step.action == 1) as u64;
-        }
+    // Evaluation
+    let num_eval_steps = 1000;
+    let mut action_1_count = 0;
+    let mut step_count = 0;
+    simulation::run_actor(&mut env, &mut agent, |step| {
+        action_1_count += (step.action == 1) as u64;
         step_count += 1;
-        step_count < num_steps
+        step_count < num_eval_steps
     });
 
     assert!(action_1_count >= ((num_eval_steps as f64) * threshold) as u64);

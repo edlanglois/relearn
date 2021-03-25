@@ -1,5 +1,5 @@
 /// Simulation trait and Simulator structs.
-use crate::agents::{Agent, Step};
+use crate::agents::{Actor, Agent, Step};
 use crate::envs::StatefulEnvironment;
 use crate::logging::{Event, Logger};
 use crate::spaces::Space;
@@ -192,6 +192,52 @@ where
         let stop = !callback(&step);
         agent.update(step);
         if stop {
+            break;
+        }
+
+        observation = if episode_done {
+            environment.reset()
+        } else {
+            next_observation.expect("Observation must exist if the episode is not done")
+        };
+    }
+}
+
+/// Run an actor-environment simulation with a callback function called on each step.
+///
+/// The simulation will continue while the callback returns `true`.
+///
+/// An actor never learns between episodes.
+/// An actor may depend on history from the current episode.
+pub fn run_actor<E, A, F>(environment: &mut E, actor: &mut A, mut callback: F)
+where
+    E: StatefulEnvironment + ?Sized,
+    A: Actor<
+            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        > + ?Sized,
+    F: FnMut(
+        &Step<
+            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        >,
+    ) -> bool,
+{
+    let mut observation = environment.reset();
+    let new_episode = true;
+
+    loop {
+        let action = actor.act(&observation, new_episode);
+        let (next_observation, reward, episode_done) = environment.step(&action);
+
+        let step = Step {
+            observation,
+            action,
+            reward,
+            next_observation: next_observation.as_ref(),
+            episode_done,
+        };
+        if !callback(&step) {
             break;
         }
 
