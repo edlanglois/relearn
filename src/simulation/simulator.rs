@@ -117,7 +117,7 @@ pub fn run_with_logging<E, A, L>(
     let observation_space = structure.observation_space;
     let action_space = structure.action_space;
 
-    run(environment, agent, &mut |step| {
+    run(environment, agent, |step| {
         let reward = step.reward as f64;
         logger.log(Event::Step, "reward", reward.into()).unwrap();
         logger
@@ -159,7 +159,7 @@ pub fn run_with_logging<E, A, L>(
 }
 
 /// Run an agent-environment simulation with a callback function called on each step.
-pub fn run<E, A, F>(environment: &mut E, agent: &mut A, callback: &mut F)
+pub fn run<E, A, F>(environment: &mut E, agent: &mut A, mut callback: F)
 where
     E: StatefulEnvironment + ?Sized,
     A: Agent<
