@@ -36,6 +36,10 @@ where
     assert!(discount_factor >= 0.0);
     assert!(discount_factor <= 1.0);
 
+    if num_steps == 0 {
+        return;
+    }
+
     let mut agent = RandomAgent::new(action_space, seed);
     simulation::run(env, &mut agent, |step| {
         assert!(step.reward >= min_reward);
@@ -47,6 +51,6 @@ where
         }
 
         num_steps -= 1;
-        num_steps == 0
+        num_steps > 0
     });
 }

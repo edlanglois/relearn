@@ -152,13 +152,15 @@ pub fn run_with_logging<E, A, L>(
 
         step_count += 1;
         match max_steps {
-            Some(steps) => step_count >= steps,
-            None => false,
+            Some(steps) => step_count < steps,
+            None => true,
         }
     });
 }
 
 /// Run an agent-environment simulation with a callback function called on each step.
+///
+/// The simulation will continue while the callback returns `true`.
 pub fn run<E, A, F>(environment: &mut E, agent: &mut A, mut callback: F)
 where
     E: StatefulEnvironment + ?Sized,
@@ -187,10 +189,11 @@ where
             next_observation: next_observation.as_ref(),
             episode_done,
         };
-        if callback(&step) {
+        let stop = !callback(&step);
+        agent.update(step);
+        if stop {
             break;
         }
-        agent.update(step);
 
         observation = if episode_done {
             environment.reset()

@@ -22,18 +22,12 @@ where
     let mut action_1_count = 0;
 
     simulation::run(&mut env, &mut agent, |step| {
-        step_count += 1;
-        if step_count < num_train_steps {
-            // Training
-            false
-        } else if step_count < num_steps {
+        if step_count >= num_train_steps {
             // Evaluation
             action_1_count += (step.action == 1) as u64;
-            false
-        } else {
-            // Done
-            true
         }
+        step_count += 1;
+        step_count < num_steps
     });
 
     assert!(action_1_count >= ((num_eval_steps as f64) * threshold) as u64);
