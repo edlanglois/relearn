@@ -37,6 +37,43 @@ where
     }
 }
 
+/// The index of a maximal element in a collection, according to a comparison function.
+///
+/// # Example
+/// Get the argmax of an iterator of floats and panic if any are NaN:
+///
+/// ```
+/// use rust_rl::utilities::iter::ArgMaxBy;
+///
+/// let v = vec![1.0, 2.5, -3.0];
+/// let argmax = v.into_iter().argmax_by(|a, b| a.partial_cmp(b).unwrap());
+/// assert_eq!(argmax, Some(1));
+/// ```
+pub trait ArgMaxBy {
+    type Item;
+
+    /// The index of an element that gives the maximum value from the specified function.
+    ///
+    /// If several elements are equally maximum, the last index is returned.
+    /// If the iterator is empty, None is returned.
+    fn argmax_by<F>(self, compare: F) -> Option<usize>
+    where
+        F: FnMut(&Self::Item, &Self::Item) -> Ordering;
+}
+
+impl<I: Iterator> ArgMaxBy for I {
+    type Item = <I as Iterator>::Item;
+
+    fn argmax_by<F>(self, mut compare: F) -> Option<usize>
+    where
+        F: FnMut(&Self::Item, &Self::Item) -> Ordering,
+    {
+        self.enumerate()
+            .max_by(|(_, x), (_, y)| compare(x, y))
+            .map(|(i, _)| i)
+    }
+}
+
 /// Reason that the maximum does not exist.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PartialMaxError {
