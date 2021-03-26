@@ -14,6 +14,7 @@ ndarray = "0.14.0"
 ndarray-stats = "0.4"
 rand = "0.7.3"
 rust_rl_derive = { path = "rust_rl_derive" }
+statrs = "0.13.0"
 
 [dev-dependencies]
 rstest = "0.7.0"

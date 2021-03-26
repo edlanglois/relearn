@@ -41,6 +41,9 @@ pub struct Opts {
     /// Agent exploration rate
     exploration_rate: f64,
 
+    #[clap(long, default_value = "1")]
+    num_samples: usize,
+
     // Experiment args
     #[clap(long)]
     /// Maximum number of experiment steps
@@ -77,6 +80,7 @@ impl From<&Opts> for EnvDef {
 pub enum Agent {
     Random,
     TabularQLearning,
+    BetaThompsonSampling,
 }
 
 impl From<&Opts> for AgentDef {
@@ -85,6 +89,9 @@ impl From<&Opts> for AgentDef {
             Agent::Random => AgentDef::Random,
             Agent::TabularQLearning => AgentDef::TabularQLearning {
                 exploration_rate: opts.exploration_rate,
+            },
+            Agent::BetaThompsonSampling => AgentDef::BetaThompsonSampling {
+                num_samples: opts.num_samples,
             },
         }
     }

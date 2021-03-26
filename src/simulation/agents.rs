@@ -1,5 +1,5 @@
 //! Agent definitions
-use crate::agents::{Agent, RandomAgent, TabularQLearningAgent};
+use crate::agents::{Agent, BetaThompsonSamplingAgent, RandomAgent, TabularQLearningAgent};
 use crate::envs::EnvStructure;
 use crate::spaces::{FiniteSpace, Space};
 use std::error::Error;
@@ -12,6 +12,10 @@ pub enum AgentDef {
     Random,
     /// Epsilon-greedy tabular Q learning.
     TabularQLearning { exploration_rate: f64 },
+    /// Thompson sampling of for Bernoulli rewards using Beta priors.
+    ///
+    /// Assumes no relationship between states.
+    BetaThompsonSampling { num_samples: usize },
 }
 
 impl AgentDef {
@@ -52,6 +56,15 @@ impl AgentDef {
                     structure.action_space,
                     structure.discount_factor,
                     exploration_rate,
+                    seed,
+                )))
+            }
+            AgentDef::BetaThompsonSampling { num_samples } => {
+                Ok(Box::new(BetaThompsonSamplingAgent::new(
+                    structure.observation_space,
+                    structure.action_space,
+                    structure.reward_range,
+                    num_samples,
                     seed,
                 )))
             }
