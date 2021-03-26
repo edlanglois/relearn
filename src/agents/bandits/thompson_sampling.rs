@@ -134,7 +134,7 @@ where
 }
 
 #[cfg(test)]
-mod bernoulli_thompson_sampling {
+mod beta_thompson_sampling {
     use super::super::super::testing;
     use super::*;
 
