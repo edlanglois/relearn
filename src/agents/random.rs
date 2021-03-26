@@ -4,7 +4,7 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::fmt;
 
-/// An agent that always acts randomly
+/// An agent that always acts randomly.
 pub struct RandomAgent<AS: Space> {
     action_space: AS,
     rng: StdRng,

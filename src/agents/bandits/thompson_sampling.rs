@@ -8,7 +8,7 @@ use rand::prelude::*;
 use statrs::distribution::Beta;
 use std::fmt;
 
-/// Thompson sampling agent assuming Beta-Bernoulli rewards.
+/// A Thompson sampling agent for Bernoulli rewards with a Beta prior.
 #[derive(Debug)]
 pub struct BetaThompsonSamplingAgent<OS, AS>
 where

@@ -8,6 +8,7 @@ use std::fmt;
 use super::{Actor, Agent, Step};
 use crate::spaces::FiniteSpace;
 
+/// An epsilon-greedy tabular Q learning.
 #[derive(Debug)]
 pub struct TabularQLearningAgent<OS, AS>
 where

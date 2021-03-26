@@ -1,3 +1,4 @@
+//! Logging statistics from simulation runs
 pub mod cli;
 
 pub use cli::CLILogger;

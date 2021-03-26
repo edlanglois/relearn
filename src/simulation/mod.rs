@@ -1,3 +1,4 @@
+//! Simulating agent-environment interaction
 mod agents;
 mod environments;
 mod simulator;

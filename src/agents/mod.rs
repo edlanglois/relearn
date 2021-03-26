@@ -1,3 +1,4 @@
+//! Reinforcement learning agents
 mod agents;
 mod bandits;
 mod random;
