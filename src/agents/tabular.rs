@@ -1,12 +1,11 @@
 //! Tabular agents
+use super::{Actor, Agent, Step};
+use crate::spaces::FiniteSpace;
 use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::fmt;
-
-use super::{Actor, Agent, Step};
-use crate::spaces::FiniteSpace;
 
 /// An epsilon-greedy tabular Q learning.
 #[derive(Debug)]

@@ -81,6 +81,7 @@ pub enum Agent {
     Random,
     TabularQLearning,
     BetaThompsonSampling,
+    UCB1,
 }
 
 impl From<&Opts> for AgentDef {
@@ -92,6 +93,9 @@ impl From<&Opts> for AgentDef {
             },
             Agent::BetaThompsonSampling => AgentDef::BetaThompsonSampling {
                 num_samples: opts.num_samples,
+            },
+            Agent::UCB1 => AgentDef::UCB1 {
+                exploration_rate: opts.exploration_rate,
             },
         }
     }

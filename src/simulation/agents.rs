@@ -1,9 +1,12 @@
 //! Agent definitions
-use crate::agents::{Agent, BetaThompsonSamplingAgent, RandomAgent, TabularQLearningAgent};
+use crate::agents::error::NewAgentError;
+use crate::agents::{
+    Agent, BetaThompsonSamplingAgent, RandomAgent, TabularQLearningAgent, UCB1Agent,
+};
 use crate::envs::EnvStructure;
 use crate::spaces::{FiniteSpace, Space};
-use std::error::Error;
 use std::fmt;
+use thiserror::Error;
 
 /// The definition of an agent
 #[derive(Debug)]
@@ -16,6 +19,8 @@ pub enum AgentDef {
     ///
     /// Assumes no relationship between states.
     BetaThompsonSampling { num_samples: usize },
+    /// UCB1 agent from Auer 2002
+    UCB1 { exploration_rate: f64 },
 }
 
 impl AgentDef {
@@ -33,8 +38,10 @@ impl AgentDef {
             AgentDef::Random => Ok(Box::new(RandomAgent::new(structure.action_space, seed))),
             _ => Err(MakeAgentError {
                 agent: self,
-                observation_space: Box::new(structure.observation_space),
-                action_space: Box::new(structure.action_space),
+                cause: NewAgentError::InvalidSpace {
+                    observation_space: Box::new(structure.observation_space),
+                    action_space: Box::new(structure.action_space),
+                },
             }),
         }
     }
@@ -68,26 +75,26 @@ impl AgentDef {
                     seed,
                 )))
             }
+            AgentDef::UCB1 { exploration_rate } => {
+                match UCB1Agent::new(
+                    structure.observation_space,
+                    structure.action_space,
+                    structure.reward_range,
+                    exploration_rate,
+                ) {
+                    Ok(agent) => Ok(Box::new(agent)),
+                    Err(cause) => Err(MakeAgentError { agent: self, cause }),
+                }
+            }
             _ => self.make_any_any(structure, seed),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[error("error constructing agent {agent:?}")]
 pub struct MakeAgentError {
     agent: AgentDef,
-    observation_space: Box<dyn fmt::Debug>,
-    action_space: Box<dyn fmt::Debug>,
+    #[source]
+    cause: NewAgentError,
 }
-
-impl fmt::Display for MakeAgentError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Agent {:?} does not support observation space {:?} and action space {:?}",
-            self.agent, self.observation_space, self.action_space
-        )
-    }
-}
-
-impl Error for MakeAgentError {}
