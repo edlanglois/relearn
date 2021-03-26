@@ -1,11 +1,12 @@
 //! Tabular agents
-use super::{Actor, Agent, Step};
-use crate::spaces::FiniteSpace;
-use crate::utils::iter::ArgMaxBy;
 use ndarray::{Array, Array2, Axis};
+use ndarray_stats::QuantileExt;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::fmt;
+
+use super::{Actor, Agent, Step};
+use crate::spaces::FiniteSpace;
 
 #[derive(Debug)]
 pub struct TabularQLearningAgent<OS, AS>
@@ -78,8 +79,7 @@ where
             let act_idx = self
                 .state_action_values
                 .index_axis(Axis(0), obs_idx)
-                .iter()
-                .argmax_by(|a, b| a.partial_cmp(b).unwrap())
+                .argmax()
                 .unwrap();
             self.action_space.from_index(act_idx).unwrap()
         }
@@ -101,8 +101,7 @@ where
                 let next_obs_idx = self.observation_space.to_index(&next_observation);
                 self.state_action_values
                     .index_axis(Axis(0), next_obs_idx)
-                    .iter()
-                    .max_by(|a, b| a.partial_cmp(b).unwrap())
+                    .max()
                     .unwrap()
                     * self.discount_factor
             }

@@ -11,6 +11,7 @@ description = "Run reinforcement learning experiments"
 clap = "3.0.0-beta.2"
 enum-map = "0.6.4"
 ndarray = "0.14.0"
+ndarray-stats = "0.4"
 rand = "0.8.3"
 rust_rl_derive = { path = "rust_rl_derive" }
 
