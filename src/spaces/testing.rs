@@ -26,7 +26,7 @@ pub fn check_from_to_index_random<T: FiniteSpace>(space: T, num_samples: u32) {
     let size = space.size();
     let mut rng = StdRng::seed_from_u64(2);
     for _ in 0..num_samples {
-        let index = rng.gen_range(0..size);
+        let index = rng.gen_range(0, size);
         let element = space.from_index(index).unwrap();
         assert!(space.contains(&element));
         let index2 = space.to_index(&element);
