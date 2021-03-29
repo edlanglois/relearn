@@ -1,12 +1,12 @@
 //! Agent definitions
+use super::spaces::{CommonActionSpace, CommonObservationSpace};
 use crate::agents::error::NewAgentError;
 use crate::agents::{
     simple_mlp_policy, Agent, BetaThompsonSamplingAgent, PolicyGradientAgent, RandomAgent,
     TabularQLearningAgent, UCB1Agent,
 };
 use crate::envs::EnvStructure;
-use crate::spaces::{FiniteSpace, Space};
-use std::fmt;
+use crate::spaces::FiniteSpace;
 use tch::nn::Adam;
 use thiserror::Error;
 
@@ -38,8 +38,8 @@ impl AgentDef {
         seed: u64,
     ) -> Result<Box<dyn Agent<OS::Element, AS::Element>>, MakeAgentError>
     where
-        OS: Space + fmt::Debug + 'static,
-        AS: Space + fmt::Debug + 'static,
+        OS: CommonObservationSpace + 'static,
+        AS: CommonActionSpace + 'static,
     {
         match self {
             AgentDef::Random => Ok(Box::new(RandomAgent::new(structure.action_space, seed))),
@@ -60,8 +60,8 @@ impl AgentDef {
         seed: u64,
     ) -> Result<Box<dyn Agent<OS::Element, AS::Element>>, MakeAgentError>
     where
-        OS: FiniteSpace + fmt::Debug + 'static,
-        AS: FiniteSpace + fmt::Debug + 'static,
+        OS: CommonObservationSpace + FiniteSpace + 'static,
+        AS: CommonActionSpace + FiniteSpace + 'static,
     {
         match self {
             AgentDef::TabularQLearning { exploration_rate } => {

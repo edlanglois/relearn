@@ -2,6 +2,7 @@
 mod agents;
 mod environments;
 mod simulator;
+mod spaces;
 
 pub use agents::{AgentDef, MakeAgentError};
 pub use environments::EnvDef;

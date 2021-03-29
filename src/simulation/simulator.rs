@@ -1,8 +1,8 @@
 /// Simulation trait and Simulator structs.
 use crate::agents::{Actor, Agent, Step};
 use crate::envs::StatefulEnvironment;
-use crate::logging::{Event, Logger};
-use crate::spaces::Space;
+use crate::logging::{Event, Loggable, Logger};
+use crate::spaces::{ElementRefInto, Space};
 
 /// Runs a simulation.
 pub trait Simulation {
@@ -20,6 +20,8 @@ where
         <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
         <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
     >,
+    <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
+    <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
     L: Logger,
 {
     environment: E,
@@ -35,6 +37,8 @@ where
         <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
         <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
     >,
+    <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
+    <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
     L: Logger,
 {
     pub fn new(environment: E, agent: A, logger: L) -> Self {
@@ -54,6 +58,8 @@ where
         <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
         <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
     >,
+    <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
+    <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
     L: Logger,
 {
     fn run(&mut self, max_steps: Option<u64>) {
@@ -95,9 +101,9 @@ where
 
 impl<OS, AS, L> Simulation for BoxedSimulator<OS, AS, L>
 where
-    OS: Space,
+    OS: Space + ElementRefInto<Loggable>,
     <OS as Space>::Element: Clone,
-    AS: Space,
+    AS: Space + ElementRefInto<Loggable>,
     L: Logger,
 {
     fn run(&mut self, max_steps: Option<u64>) {
@@ -123,6 +129,8 @@ pub fn run_with_logging<E, A, L>(
             <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
             <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
         > + ?Sized,
+    <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
+    <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
     L: Logger,
 {
     let mut step_count = 0; // Global step count
@@ -140,14 +148,14 @@ pub fn run_with_logging<E, A, L>(
             .log(
                 Event::Step,
                 "observation",
-                observation_space.as_loggable(&step.observation),
+                observation_space.elem_ref_into(&step.observation),
             )
             .unwrap();
         logger
             .log(
                 Event::Step,
                 "action",
-                action_space.as_loggable(&step.action),
+                action_space.elem_ref_into(&step.action),
             )
             .unwrap();
         logger.done(Event::Step);

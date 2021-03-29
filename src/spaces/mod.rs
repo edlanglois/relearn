@@ -1,4 +1,4 @@
-//! Space definitions
+//! Space trait definitions
 mod finite;
 mod index;
 mod indexed_type;
@@ -11,19 +11,20 @@ pub use index::IndexSpace;
 pub use indexed_type::{Indexed, IndexedTypeSpace};
 pub use singleton::SingletonSpace;
 
-use crate::logging::Loggable;
 use rand::distributions::Distribution;
 
 /// A space: a set of values with some added structure.
-pub trait Space: Distribution<<Self as Space>::Element> {
+///
+/// A space is effectively a runtime-defined type.
+pub trait Space {
     type Element;
 
-    /// Check if the space contains a particular value
+    /// Check whether a particular value is contained in the space.
     fn contains(&self, value: &Self::Element) -> bool;
-
-    /// Convert an element into a loggable object
-    fn as_loggable(&self, element: &Self::Element) -> Loggable;
 }
+
+/// A space from which samples can be drawn.
+pub trait SampleSpace: Space + Distribution<<Self as Space>::Element> {}
 
 /// A space whose elements can be converted to feature vectors.
 pub trait FeatureSpace<T, T2 = T>: Space {
@@ -73,13 +74,34 @@ pub trait ParameterizedSampleSpace<T, T2 = T>: Space {
         Self::Element: 'a;
 }
 
-///// Enables sampling of elements from parameter vectors.
-//pub trait ParameterizedSamplingSpace<T, T2 = T>: Space {
-//    /// Length of the parameter vectors from which elements are sampled.
-//    fn num_sampling_parameters() -> usize;
+/// Convert elements of the space into values of type T
+pub trait ElementInto<T>: Space {
+    /// Convert an element into a value of type T
+    fn elem_into(&self, element: Self::Element) -> T;
+}
 
-//    /// Sample an element from a paramter vector.
-//    ///
-//    /// The input array must have length equal to `num_sampling_parameters()`.
+/// Create values of type T from element references.
+pub trait ElementRefInto<T>: Space {
+    /// Create a value of type T from an element reference.
+    fn elem_ref_into(&self, element: &Self::Element) -> T;
+}
 
-//}
+impl<T: ElementRefInto<U>, U> ElementInto<U> for T {
+    fn elem_into(&self, element: Self::Element) -> U {
+        self.elem_ref_into(&element)
+    }
+}
+
+/// Construct elements of the space from values of type T
+pub trait ElementFrom<T>: Space {
+    /// Construct an element of the space from a value of type T
+    fn elem_from(&self, value: T) -> Self::Element;
+}
+
+/// Try to construct an element from a value where the operation may fail.
+pub trait ElementTryFrom<T>: Space {
+    /// Try to construct an element from a value of type T, where conversion might not be possible.
+    ///
+    /// Returns Some(x) if and only if x is an element of this space.
+    fn elem_try_from(&self, value: T) -> Option<Self::Element>;
+}

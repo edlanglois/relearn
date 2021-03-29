@@ -1,5 +1,5 @@
 //! IndexSpace definition
-use super::{FiniteSpace, Space};
+use super::{ElementRefInto, FiniteSpace, SampleSpace, Space};
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -29,14 +29,16 @@ impl Space for IndexSpace {
     fn contains(&self, value: &Self::Element) -> bool {
         value < &self.size
     }
+}
 
-    fn as_loggable(&self, element: &Self::Element) -> Loggable {
-        Loggable::IndexSample {
-            value: *element,
-            size: self.size,
-        }
+// Subspaces
+impl Distribution<<Self as Space>::Element> for IndexSpace {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
+        rng.gen_range(0, self.size)
     }
 }
+
+impl SampleSpace for IndexSpace {}
 
 impl FiniteSpace for IndexSpace {
     fn size(&self) -> usize {
@@ -52,9 +54,13 @@ impl FiniteSpace for IndexSpace {
     }
 }
 
-impl Distribution<<Self as Space>::Element> for IndexSpace {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
-        rng.gen_range(0, self.size)
+// Element conversions
+impl ElementRefInto<Loggable> for IndexSpace {
+    fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
+        Loggable::IndexSample {
+            value: *element,
+            size: self.size,
+        }
     }
 }
 

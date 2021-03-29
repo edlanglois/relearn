@@ -1,9 +1,9 @@
 //! Space test utilities
-use super::{FiniteSpace, Space};
+use super::{FiniteSpace, SampleSpace};
 use rand::prelude::*;
 
 /// Check that space contains samples it generates
-pub fn check_contains_samples<T: Space>(space: T, num_samples: u32) {
+pub fn check_contains_samples<T: SampleSpace>(space: T, num_samples: u32) {
     let mut rng = StdRng::seed_from_u64(1);
     for _ in 0..num_samples {
         let element = space.sample(&mut rng);
@@ -35,7 +35,7 @@ pub fn check_from_to_index_random<T: FiniteSpace>(space: T, num_samples: u32) {
 }
 
 /// Check from_index for element sampled from the space.
-pub fn check_from_index_sampled<T: FiniteSpace>(space: T, num_samples: u32) {
+pub fn check_from_index_sampled<T: FiniteSpace + SampleSpace>(space: T, num_samples: u32) {
     let mut rng = StdRng::seed_from_u64(3);
     let size = space.size();
     for _ in 0..num_samples {

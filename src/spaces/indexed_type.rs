@@ -1,5 +1,5 @@
 //! IndexedTypeSpace and Indexed trait
-use super::{FiniteSpace, Space};
+use super::{ElementRefInto, FiniteSpace, SampleSpace, Space};
 
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
@@ -23,6 +23,7 @@ pub trait Indexed {
 }
 
 /// A space defined over an indexed type.
+#[derive(Clone)]
 pub struct IndexedTypeSpace<T: Indexed> {
     element_type: PhantomData<T>,
 }
@@ -53,20 +54,16 @@ impl<T: Indexed> Space for IndexedTypeSpace<T> {
     fn contains(&self, _element: &Self::Element) -> bool {
         true
     }
-
-    fn as_loggable(&self, element: &Self::Element) -> Loggable {
-        Loggable::IndexSample {
-            value: T::as_index(element),
-            size: T::SIZE,
-        }
-    }
 }
 
+// Subspaces
 impl<T: Indexed> Distribution<T> for IndexedTypeSpace<T> {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
         T::from_index(rng.gen_range(0, T::SIZE)).unwrap()
     }
 }
+
+impl<T: Indexed> SampleSpace for IndexedTypeSpace<T> {}
 
 impl<T: Indexed> FiniteSpace for IndexedTypeSpace<T> {
     fn size(&self) -> usize {
@@ -79,6 +76,15 @@ impl<T: Indexed> FiniteSpace for IndexedTypeSpace<T> {
 
     fn from_index(&self, index: usize) -> Option<Self::Element> {
         T::from_index(index)
+    }
+}
+
+impl<T: Indexed> ElementRefInto<Loggable> for IndexedTypeSpace<T> {
+    fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
+        Loggable::IndexSample {
+            value: T::as_index(element),
+            size: T::SIZE,
+        }
     }
 }
 

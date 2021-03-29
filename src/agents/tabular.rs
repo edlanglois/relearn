@@ -1,6 +1,6 @@
 //! Tabular agents
 use super::{Actor, Agent, Step};
-use crate::spaces::FiniteSpace;
+use crate::spaces::{FiniteSpace, SampleSpace};
 use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
 use rand::rngs::StdRng;
@@ -69,7 +69,7 @@ where
 impl<OS, AS> Actor<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
 where
     OS: FiniteSpace,
-    AS: FiniteSpace,
+    AS: FiniteSpace + SampleSpace,
 {
     fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
         if self.rng.gen::<f64>() < self.exploration_rate {
@@ -89,7 +89,7 @@ where
 impl<OS, AS> Agent<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
 where
     OS: FiniteSpace,
-    AS: FiniteSpace,
+    AS: FiniteSpace + SampleSpace,
 {
     fn update(&mut self, step: Step<OS::Element, AS::Element>) {
         let obs_idx = self.observation_space.to_index(&step.observation);

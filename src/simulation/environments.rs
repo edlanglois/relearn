@@ -1,4 +1,5 @@
 //! Environment definitions
+use super::spaces::{CommonActionSpace, CommonObservationSpace};
 use super::{AgentDef, BoxedSimulator, MakeAgentError, Simulation};
 use crate::envs::{AsStateful, BernoulliBandit, Chain, DeterministicBandit, StatefulEnvironment};
 use crate::logging::Logger;
@@ -29,9 +30,9 @@ fn finite_finite_simulator<OS, AS, L>(
     seed: u64,
 ) -> Result<Box<dyn Simulation>, MakeAgentError>
 where
-    OS: FiniteSpace + Debug + 'static,
+    OS: CommonObservationSpace + FiniteSpace + 'static,
     <OS as Space>::Element: Clone,
-    AS: FiniteSpace + Debug + 'static,
+    AS: CommonActionSpace + FiniteSpace + 'static,
     L: Logger + 'static,
 {
     let agent = agent_def.make_finite_finite(environment.structure(), seed)?;
