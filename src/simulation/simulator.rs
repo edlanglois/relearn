@@ -15,6 +15,7 @@ pub trait Simulation {
 pub struct Simulator<E, A, L>
 where
     E: StatefulEnvironment,
+    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
     A: Agent<
         <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
         <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
@@ -29,6 +30,7 @@ where
 impl<E, A, L> Simulator<E, A, L>
 where
     E: StatefulEnvironment,
+    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
     A: Agent<
         <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
         <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
@@ -47,6 +49,7 @@ where
 impl<E, A, L> Simulation for Simulator<E, A, L>
 where
     E: StatefulEnvironment,
+    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
     A: Agent<
         <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
         <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
@@ -70,7 +73,13 @@ pub struct BoxedSimulator<OS: Space, AS: Space, L: Logger> {
     logger: L,
 }
 
-impl<OS: Space, AS: Space, L: Logger> BoxedSimulator<OS, AS, L> {
+impl<OS, AS, L> BoxedSimulator<OS, AS, L>
+where
+    OS: Space,
+    <OS as Space>::Element: Clone,
+    AS: Space,
+    L: Logger,
+{
     pub fn new(
         environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
         agent: Box<dyn Agent<OS::Element, AS::Element>>,
@@ -84,7 +93,13 @@ impl<OS: Space, AS: Space, L: Logger> BoxedSimulator<OS, AS, L> {
     }
 }
 
-impl<OS: Space, AS: Space, L: Logger> Simulation for BoxedSimulator<OS, AS, L> {
+impl<OS, AS, L> Simulation for BoxedSimulator<OS, AS, L>
+where
+    OS: Space,
+    <OS as Space>::Element: Clone,
+    AS: Space,
+    L: Logger,
+{
     fn run(&mut self, max_steps: Option<u64>) {
         run_with_logging(
             self.environment.as_mut(),
@@ -103,6 +118,7 @@ pub fn run_with_logging<E, A, L>(
     max_steps: Option<u64>,
 ) where
     E: StatefulEnvironment + ?Sized,
+    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
     A: Agent<
             <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
             <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
@@ -164,6 +180,7 @@ pub fn run_with_logging<E, A, L>(
 pub fn run<E, A, F>(environment: &mut E, agent: &mut A, mut callback: F)
 where
     E: StatefulEnvironment + ?Sized,
+    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
     A: Agent<
             <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
             <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
@@ -186,7 +203,7 @@ where
             observation,
             action,
             reward,
-            next_observation: next_observation.as_ref(),
+            next_observation: next_observation.clone(),
             episode_done,
         };
         let stop = !callback(&step);
@@ -212,6 +229,7 @@ where
 pub fn run_actor<E, A, F>(environment: &mut E, actor: &mut A, mut callback: F)
 where
     E: StatefulEnvironment + ?Sized,
+    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
     A: Actor<
             <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
             <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
@@ -234,7 +252,7 @@ where
             observation,
             action,
             reward,
-            next_observation: next_observation.as_ref(),
+            next_observation: next_observation.clone(),
             episode_done,
         };
         if !callback(&step) {

@@ -2,7 +2,7 @@
 use super::{AgentDef, BoxedSimulator, MakeAgentError, Simulation};
 use crate::envs::{AsStateful, BernoulliBandit, Chain, DeterministicBandit, StatefulEnvironment};
 use crate::logging::Logger;
-use crate::spaces::FiniteSpace;
+use crate::spaces::{FiniteSpace, Space};
 use rand::prelude::*;
 use std::fmt::Debug;
 
@@ -30,6 +30,7 @@ fn finite_finite_simulator<OS, AS, L>(
 ) -> Result<Box<dyn Simulation>, MakeAgentError>
 where
     OS: FiniteSpace + Debug + 'static,
+    <OS as Space>::Element: Clone,
     AS: FiniteSpace + Debug + 'static,
     L: Logger + 'static,
 {
