@@ -97,12 +97,13 @@ where
 /// Like Tensor::one_hot but allows the Kind to be set.
 ///
 /// # Args
-/// * `labels` - An i64 tensor with any shape `(*)`.
+/// * `labels` - An i64 tensor with any shape `[*BATCH_SHAPE]`.
 /// * `num_classes` - Total number of classes.
 /// * `kind` - The data type of the resulting tensor.
 ///
 /// # Returns
-/// A tensor with shape `(*, num_classes)` with [*idx, labels[*idx]] = 1 and 0 everywhere else.
+/// A tensor with shape `[*BATCH_SHAPE, num_classes]`
+/// equal to 1 at indices `[*idx, labels[*idx]]` and 0 everywhere else.
 ///
 fn f_one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Result<Tensor, TchError> {
     let mut shape = labels.size();
