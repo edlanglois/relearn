@@ -37,9 +37,17 @@ pub struct Opts {
     /// Agent name
     agent: Agent,
 
+    #[clap(long, default_value = "0.01")]
+    /// Agent learning rate
+    learning_rate: f64,
+
     #[clap(long, default_value = "0.2")]
     /// Agent exploration rate
     exploration_rate: f64,
+
+    #[clap(long, default_value = "1000")]
+    /// Number of steps the agent collects between policy updates.
+    steps_per_epoch: usize,
 
     #[clap(long, default_value = "1")]
     num_samples: usize,
@@ -82,6 +90,7 @@ pub enum Agent {
     TabularQLearning,
     BetaThompsonSampling,
     UCB1,
+    SimpleMLPPolicyGradient,
 }
 
 impl From<&Opts> for AgentDef {
@@ -96,6 +105,10 @@ impl From<&Opts> for AgentDef {
             },
             Agent::UCB1 => AgentDef::UCB1 {
                 exploration_rate: opts.exploration_rate,
+            },
+            Agent::SimpleMLPPolicyGradient => AgentDef::SimpleMLPPolicyGradient {
+                steps_per_epoch: opts.steps_per_epoch,
+                learning_rate: opts.learning_rate,
             },
         }
     }

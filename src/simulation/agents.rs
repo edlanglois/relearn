@@ -1,11 +1,13 @@
 //! Agent definitions
 use crate::agents::error::NewAgentError;
 use crate::agents::{
-    Agent, BetaThompsonSamplingAgent, RandomAgent, TabularQLearningAgent, UCB1Agent,
+    simple_mlp_policy, Agent, BetaThompsonSamplingAgent, PolicyGradientAgent, RandomAgent,
+    TabularQLearningAgent, UCB1Agent,
 };
 use crate::envs::EnvStructure;
 use crate::spaces::{FiniteSpace, Space};
 use std::fmt;
+use tch::nn::Adam;
 use thiserror::Error;
 
 /// The definition of an agent
@@ -21,6 +23,11 @@ pub enum AgentDef {
     BetaThompsonSampling { num_samples: usize },
     /// UCB1 agent from Auer 2002
     UCB1 { exploration_rate: f64 },
+    /// A simple MLP policy gradient agent.
+    SimpleMLPPolicyGradient {
+        steps_per_epoch: usize,
+        learning_rate: f64,
+    },
 }
 
 impl AgentDef {
@@ -86,6 +93,18 @@ impl AgentDef {
                     Err(cause) => Err(MakeAgentError { agent: self, cause }),
                 }
             }
+            AgentDef::SimpleMLPPolicyGradient {
+                steps_per_epoch,
+                learning_rate,
+            } => Ok(Box::new(PolicyGradientAgent::new(
+                structure.observation_space,
+                structure.action_space,
+                structure.discount_factor,
+                steps_per_epoch,
+                learning_rate,
+                simple_mlp_policy,
+                Adam::default(),
+            ))),
             _ => self.make_any_any(structure, seed),
         }
     }
