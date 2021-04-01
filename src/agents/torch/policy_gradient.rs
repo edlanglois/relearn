@@ -231,11 +231,19 @@ fn history_data<OS: FeatureSpace<Tensor>, AS: FiniteSpace>(
         if include {
             episode_length += 1
         }
-        if step.episode_done {
+        if step.episode_done && episode_length > 0 {
             episode_lengths.push(episode_length);
             episode_length = 0;
         }
     }
+
+    assert!(
+        episode_lengths.len() > 0,
+        "No steps were included in the training batch. \
+        This can happen if the discount factor (={}) is close to 1 \
+        and episodes never end or are cut off before reaching a terminal state.",
+        discount_factor
+    );
 
     // A f32 tensor of shape [NUM_STEPS] containing cumulative known episode returns for each step.
     let returns = Tensor::of_slice(
