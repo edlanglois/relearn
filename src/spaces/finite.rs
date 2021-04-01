@@ -77,3 +77,178 @@ impl<S: FiniteSpace> ParameterizedSampleSpace<Tensor> for S {
             .squeeze1(-1)
     }
 }
+
+#[cfg(test)]
+mod feature_space_tensor {
+    use super::super::IndexedTypeSpace;
+    use super::*;
+    use rust_rl_derive::Indexed;
+
+    #[derive(Debug, Indexed)]
+    enum Trit {
+        One,
+        Two,
+        Three,
+    }
+
+    #[test]
+    fn num_features() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        assert_eq!(3, space.num_features());
+    }
+
+    #[test]
+    fn features() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        assert_eq!(
+            Tensor::of_slice(&[1.0, 0.0, 0.0]),
+            space.features(&Trit::One)
+        );
+        assert_eq!(
+            Tensor::of_slice(&[0.0, 1.0, 0.0]),
+            space.features(&Trit::Two)
+        );
+        assert_eq!(
+            Tensor::of_slice(&[0.0, 0.0, 1.0]),
+            space.features(&Trit::Three)
+        );
+    }
+
+    #[test]
+    fn batch_features() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        assert_eq!(
+            Tensor::of_slice(&[
+                0.0, 0.0, 1.0, // Three
+                1.0, 0.0, 0.0, // One
+                0.0, 1.0, 0.0, // Two
+                1.0, 0.0, 0.0 // One
+            ])
+            .reshape(&[4, 3]),
+            space.batch_features(&[Trit::Three, Trit::One, Trit::Two, Trit::One])
+        );
+    }
+}
+
+#[cfg(test)]
+mod parameterized_sample_space_tensor {
+    use super::super::IndexedTypeSpace;
+    use super::*;
+    use f32;
+    use rust_rl_derive::Indexed;
+
+    #[derive(Debug, Indexed, PartialEq)]
+    enum Trit {
+        One,
+        Two,
+        Three,
+    }
+
+    #[test]
+    fn num_sample_params() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        assert_eq!(3, space.num_sample_params());
+    }
+
+    #[test]
+    fn sample_deterministic() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        let params = Tensor::of_slice(&[f32::NEG_INFINITY, 0.0, f32::NEG_INFINITY]);
+        for _ in 0..10 {
+            assert_eq!(Trit::Two, space.sample(&params));
+        }
+    }
+
+    #[test]
+    fn sample_two_of_three() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        let params = Tensor::of_slice(&[f32::NEG_INFINITY, 0.0, 0.0]);
+        for _ in 0..10 {
+            assert!(Trit::One != space.sample(&params));
+        }
+    }
+
+    #[test]
+    fn sample_check_distribution() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        // Probabilities: [0.09, 0.24, 0.67]
+        let params = Tensor::of_slice(&[-1.0, 0.0, 1.0]);
+        let mut one_count = 0;
+        let mut two_count = 0;
+        let mut three_count = 0;
+        for _ in 0..1000 {
+            match space.sample(&params) {
+                Trit::One => one_count += 1,
+                Trit::Two => two_count += 1,
+                Trit::Three => three_count += 1,
+            }
+        }
+        // Check that the counts are within 3.5 standard deviations of the mean
+        assert!(one_count >= 58 && one_count <= 121);
+        assert!(two_count >= 197 && two_count <= 292);
+        assert!(three_count >= 613 && three_count <= 717);
+    }
+
+    #[test]
+    fn batch_log_probs() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        let params = Tensor::of_slice(&[
+            // elem: Two
+            f32::NEG_INFINITY,
+            0.0,
+            f32::NEG_INFINITY,
+            // elem: One
+            f32::NEG_INFINITY,
+            0.0,
+            f32::NEG_INFINITY,
+            // elem: Three
+            f32::NEG_INFINITY,
+            0.0,
+            0.0,
+            // elem: One
+            f32::NEG_INFINITY,
+            0.0,
+            0.0,
+            // elem: One
+            -1.0,
+            0.0,
+            1.0,
+            // elem: Two
+            -1.0,
+            0.0,
+            1.0,
+            // elem: Three
+            -1.0,
+            0.0,
+            1.0,
+        ])
+        .reshape(&[-1, 3]);
+        let elements = [
+            Trit::Two,
+            Trit::One,
+            Trit::Three,
+            Trit::One,
+            Trit::One,
+            Trit::Two,
+            Trit::Three,
+        ];
+
+        // Log normalizing constant for the [-1, 0.0, 1] distribution
+        let log_normalizer = f32::ln(f32::exp(-1.0) + 1.0 + f32::exp(1.0));
+        let expected = Tensor::of_slice(&[
+            0.0,
+            f32::NEG_INFINITY,
+            -f32::ln(2.0),
+            f32::NEG_INFINITY,
+            -1.0 - log_normalizer,
+            -log_normalizer,
+            1.0 - log_normalizer,
+        ]);
+
+        let actual = space.batch_log_probs(&params, &elements);
+
+        assert!(Into::<bool>::into(
+            expected.isclose(&actual, 1e-6, 1e-6, false).all()
+        ));
+    }
+}
