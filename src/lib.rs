@@ -4,6 +4,7 @@ pub mod envs;
 pub mod logging;
 pub mod simulation;
 pub mod spaces;
+pub mod torch;
 pub mod utils;
 
 pub use agents::{Actor, Agent};

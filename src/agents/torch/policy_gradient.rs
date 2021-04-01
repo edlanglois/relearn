@@ -1,14 +1,14 @@
 //! Policy-gradient agents
 use super::super::{Actor, Agent, Step};
-use crate::spaces::FiniteSpace;
-use tch::{kind::Kind, nn, nn::OptimizerConfig, Device, IndexOp, TchError, Tensor};
+use crate::spaces::{FeatureSpace, FiniteSpace};
+use tch::{kind::Kind, nn, nn::OptimizerConfig, Device, IndexOp, Tensor};
 
 /// A vanilla policy-gradient agent.
 ///
 /// Supports both recurrent and non-recurrent policies.
 pub struct PolicyGradientAgent<OS, AS, P, O>
 where
-    OS: FiniteSpace,
+    OS: FeatureSpace<Tensor>,
     AS: FiniteSpace,
     P: Policy,
     O: OptimizerConfig,
@@ -56,7 +56,7 @@ where
 
 impl<OS, AS, P, O> PolicyGradientAgent<OS, AS, P, O>
 where
-    OS: FiniteSpace,
+    OS: FeatureSpace<Tensor>,
     AS: FiniteSpace,
     P: Policy,
     O: OptimizerConfig,
@@ -74,7 +74,11 @@ where
         F: FnOnce(&nn::Path, usize, usize) -> P,
     {
         let vs = nn::VarStore::new(Device::Cpu);
-        let policy = make_policy(&vs.root(), observation_space.size(), action_space.size());
+        let policy = make_policy(
+            &vs.root(),
+            observation_space.num_features(),
+            action_space.size(),
+        );
         let state = policy.initial_state(1);
         let optimizer = optimizer_config.build(&vs, learning_rate).unwrap();
         Self {
@@ -92,42 +96,15 @@ where
     }
 }
 
-/// Create a one-hot tensor from a tensor of indices,
-///
-/// Like Tensor::one_hot but allows the Kind to be set.
-///
-/// # Args
-/// * `labels` - An i64 tensor with any shape `[*BATCH_SHAPE]`.
-/// * `num_classes` - Total number of classes.
-/// * `kind` - The data type of the resulting tensor.
-///
-/// # Returns
-/// A tensor with shape `[*BATCH_SHAPE, num_classes]`
-/// equal to 1 at indices `[*idx, labels[*idx]]` and 0 everywhere else.
-///
-fn f_one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Result<Tensor, TchError> {
-    let mut shape = labels.size();
-    shape.push(num_classes as i64);
-    Tensor::f_zeros(&shape, (kind, labels.device()))?.f_scatter1(-1, &labels.unsqueeze(-1), 1)
-}
-
-fn one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Tensor {
-    f_one_hot(labels, num_classes, kind).unwrap()
-}
-
 impl<OS, AS, P, O> Actor<OS::Element, AS::Element> for PolicyGradientAgent<OS, AS, P, O>
 where
-    OS: FiniteSpace,
+    OS: FeatureSpace<Tensor>,
     AS: FiniteSpace,
     P: Policy,
     O: OptimizerConfig,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
-        let input = one_hot(
-            &Tensor::of_slice(&[self.observation_space.to_index(observation) as i64]),
-            self.observation_space.size(),
-            Kind::Float,
-        );
+        let observation_features = self.observation_space.features(observation).unsqueeze(0);
 
         if new_episode {
             self.state = self.policy.initial_state(1);
@@ -135,7 +112,7 @@ where
         let state = &self.state;
 
         let (action_index, state) = tch::no_grad(|| {
-            let (output, state) = self.policy.step(&input, &state);
+            let (output, state) = self.policy.step(&observation_features, &state);
             let output = output.squeeze1(0); // Squeeze the batch dimension
             let action_index =
                 Into::<i64>::into(output.softmax(-1, Kind::Float).multinomial(1, true));
@@ -149,7 +126,7 @@ where
 
 impl<OS, AS, P, O> Agent<OS::Element, AS::Element> for PolicyGradientAgent<OS, AS, P, O>
 where
-    OS: FiniteSpace,
+    OS: FeatureSpace<Tensor>,
     AS: FiniteSpace,
     P: Policy,
     O: OptimizerConfig,
@@ -213,7 +190,7 @@ struct HistoryData {
 /// Therefore, when an episode ends in a non-terminal state, the steps close to the end of the
 /// episode are dropped. Specifically a step is dropped if the discounting applied to the unknown
 /// part of the return is > max_unknown_return_discount.
-fn history_data<OS: FiniteSpace, AS: FiniteSpace>(
+fn history_data<OS: FeatureSpace<Tensor>, AS: FiniteSpace>(
     history: &[Step<OS::Element, AS::Element>],
     observation_space: &OS,
     action_space: &AS,
@@ -268,13 +245,13 @@ fn history_data<OS: FiniteSpace, AS: FiniteSpace>(
             .filter_map(|(return_, &include)| if include { Some(return_ as f32) } else { None })
             .collect::<Vec<_>>(),
     );
-    let (observation_indices, action_indices): (Vec<_>, Vec<_>) = history
+    let (observations, action_indices): (Vec<_>, Vec<_>) = history
         .iter()
         .zip(include_steps)
         .filter_map(|(step, include)| {
             if include {
                 Some((
-                    observation_space.to_index(&step.observation) as i64,
+                    &step.observation,
                     action_space.to_index(&step.action) as i64,
                 ))
             } else {
@@ -284,11 +261,8 @@ fn history_data<OS: FiniteSpace, AS: FiniteSpace>(
         .unzip();
 
     // A tensor of shape [NUM_STEPS, NUM_OBSERVATION_FEATURES] containing one-hot feature vectors.
-    let observation_features = one_hot(
-        &Tensor::of_slice(&observation_indices),
-        observation_space.size(),
-        Kind::Float,
-    );
+    let observation_features = observation_space.batch_features(observations);
+
     // A tensor of shape [NUM_STEPS] containg action indices
     let actions = Tensor::of_slice(&action_indices);
 
