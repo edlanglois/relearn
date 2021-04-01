@@ -14,7 +14,7 @@ pub use singleton::SingletonSpace;
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
 
-/// A mathematical space
+/// A space: a set of values with some added structure.
 pub trait Space: Distribution<<Self as Space>::Element> {
     type Element;
 
