@@ -138,3 +138,26 @@ where
         *mean_reward += (scaled_reward - *mean_reward) / (*state_action_count as f64);
     }
 }
+
+#[cfg(test)]
+mod ucb1_agent {
+    use super::super::super::testing;
+    use super::*;
+
+    #[test]
+    fn train() {
+        testing::train_deterministic_bandit(
+            |env_structure| {
+                UCB1Agent::new(
+                    env_structure.observation_space,
+                    env_structure.action_space,
+                    env_structure.reward_range,
+                    0.2,
+                )
+                .unwrap()
+            },
+            1000,
+            0.9,
+        );
+    }
+}
