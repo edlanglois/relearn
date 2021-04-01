@@ -153,18 +153,18 @@ pub trait Bounded {
 }
 
 #[cfg(test)]
-mod tests {
+mod bernoulli_bandit {
     use super::super::testing;
     use super::*;
 
     #[test]
-    fn bernoulli_run() {
+    fn run() {
         let env = BernoulliBandit::from_means(vec![0.2, 0.8]).unwrap();
         testing::run_stateless(env, 1000, 0);
     }
 
     #[test]
-    fn bernoulli_rewards() {
+    fn rewards() {
         let mean = 0.2;
         let num_samples = 10000;
         let env = BernoulliBandit::from_means(vec![mean]).unwrap();
@@ -187,15 +187,21 @@ mod tests {
         assert!((reward_1_count as f64) > bin_mean - 3.0 * bin_stddev);
         assert!((reward_1_count as f64) < bin_mean + 3.0 * bin_stddev);
     }
+}
+
+#[cfg(test)]
+mod deterministic_bandit {
+    use super::super::testing;
+    use super::*;
 
     #[test]
-    fn deterministic_run() {
+    fn run() {
         let env = DeterministicBandit::from_values(vec![0.2, 0.8]);
         testing::run_stateless(env, 1000, 0);
     }
 
     #[test]
-    fn deterministic_rewards() {
+    fn rewards() {
         let mut rng = StdRng::seed_from_u64(0);
         let env = DeterministicBandit::from_values(vec![0.2, 0.8]);
         let (_, reward, _) = env.step((), &0, &mut rng);

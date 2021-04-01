@@ -58,7 +58,7 @@ impl ElementRefInto<Loggable> for SingletonSpace {
 }
 
 #[cfg(test)]
-mod tests {
+mod singleton_space {
     use super::super::testing;
     use super::*;
 

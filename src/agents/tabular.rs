@@ -117,12 +117,12 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+mod tabular_q_learning {
     use super::super::testing;
     use super::*;
 
     #[test]
-    fn train_tabular_q_learning_train() {
+    fn train() {
         testing::train_deterministic_bandit(
             |env_structure| {
                 TabularQLearningAgent::new(
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn train_tabular_q_learning_exploration() {
+    fn exploration() {
         testing::train_deterministic_bandit(
             |env_structure| {
                 TabularQLearningAgent::new(

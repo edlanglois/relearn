@@ -105,7 +105,7 @@ impl Indexed for bool {
 }
 
 #[cfg(test)]
-mod tests {
+mod indexed_type_space {
     use super::super::testing;
     use super::*;
 

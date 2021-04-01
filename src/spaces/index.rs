@@ -65,7 +65,7 @@ impl ElementRefInto<Loggable> for IndexSpace {
 }
 
 #[cfg(test)]
-mod tests {
+mod index_space {
     use super::super::testing;
     use super::*;
     use rstest::rstest;

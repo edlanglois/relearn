@@ -46,7 +46,7 @@ impl<T: PartialOrd> From<T> for ExpectOrd<T> {
 }
 
 #[cfg(test)]
-mod tests {
+mod expect_ord {
     use super::*;
     use f64;
     use rstest::rstest;
@@ -57,7 +57,7 @@ mod tests {
     #[case(2.0, 1.0, Ordering::Greater)]
     #[case(0.0, f64::INFINITY, Ordering::Less)]
     #[case(f64::INFINITY, f64::NEG_INFINITY, Ordering::Greater)]
-    fn expect_ord_float_cmp(#[case] a: f64, #[case] b: f64, #[case] expected: Ordering) {
+    fn float_cmp(#[case] a: f64, #[case] b: f64, #[case] expected: Ordering) {
         assert_eq!(ExpectOrd::from(a).cmp(&ExpectOrd::from(b)), expected);
     }
 
@@ -66,12 +66,12 @@ mod tests {
     #[case(f64::NAN, 1.0)]
     #[case(f64::NAN, f64::NAN)]
     #[should_panic]
-    fn expect_ord_float_cmp_nan(#[case] a: f64, #[case] b: f64) {
+    fn float_cmp_nan(#[case] a: f64, #[case] b: f64) {
         let _ = ExpectOrd::from(a).cmp(&ExpectOrd::from(b));
     }
 
     #[test]
-    fn expect_ord_float_sort() {
+    fn float_sort() {
         let mut v: Vec<_> = vec![5.0, f64::INFINITY, 0.0, -2.5]
             .into_iter()
             .map(ExpectOrd::from)
@@ -83,7 +83,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn expect_ord_float_sort_nan() {
+    fn float_sort_nan() {
         let mut v: Vec<_> = vec![0.0, f64::NAN]
             .into_iter()
             .map(ExpectOrd::from)
@@ -95,7 +95,7 @@ mod tests {
     #[case(1.0, 2.0, true)]
     #[case(1.0, 1.0, false)]
     #[case(2.0, 1.0, false)]
-    fn expect_ord_float_lt(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
+    fn float_lt(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
         assert_eq!(ExpectOrd::new(a) < ExpectOrd::new(b), expected);
     }
 
@@ -104,7 +104,7 @@ mod tests {
     #[case(f64::NAN, 1.0)]
     #[case(f64::NAN, f64::NAN)]
     #[should_panic]
-    fn expect_ord_float_lt_nan(#[case] a: f64, #[case] b: f64) {
+    fn float_lt_nan(#[case] a: f64, #[case] b: f64) {
         let _ = ExpectOrd::new(a) < ExpectOrd::new(b);
     }
 
@@ -112,7 +112,7 @@ mod tests {
     #[case(1.0, 2.0, true)]
     #[case(1.0, 1.0, true)]
     #[case(2.0, 1.0, false)]
-    fn expect_ord_float_le(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
+    fn float_le(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
         assert_eq!(ExpectOrd::new(a) <= ExpectOrd::new(b), expected);
     }
 
@@ -121,7 +121,7 @@ mod tests {
     #[case(f64::NAN, 1.0)]
     #[case(f64::NAN, f64::NAN)]
     #[should_panic]
-    fn expect_ord_float_le_nan(#[case] a: f64, #[case] b: f64) {
+    fn float_le_nan(#[case] a: f64, #[case] b: f64) {
         let _ = ExpectOrd::new(a) <= ExpectOrd::new(b);
     }
 
@@ -129,7 +129,7 @@ mod tests {
     #[case(1.0, 2.0, false)]
     #[case(1.0, 1.0, false)]
     #[case(2.0, 1.0, true)]
-    fn expect_ord_float_gt(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
+    fn float_gt(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
         assert_eq!(ExpectOrd::new(a) > ExpectOrd::new(b), expected);
     }
 
@@ -138,7 +138,7 @@ mod tests {
     #[case(f64::NAN, 1.0)]
     #[case(f64::NAN, f64::NAN)]
     #[should_panic]
-    fn expect_ord_float_gt_nan(#[case] a: f64, #[case] b: f64) {
+    fn float_gt_nan(#[case] a: f64, #[case] b: f64) {
         let _ = ExpectOrd::new(a) > ExpectOrd::new(b);
     }
 
@@ -146,7 +146,7 @@ mod tests {
     #[case(1.0, 2.0, false)]
     #[case(1.0, 1.0, true)]
     #[case(2.0, 1.0, true)]
-    fn expect_ord_float_ge(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
+    fn float_ge(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
         assert_eq!(ExpectOrd::new(a) >= ExpectOrd::new(b), expected);
     }
 
@@ -155,14 +155,14 @@ mod tests {
     #[case(f64::NAN, 1.0)]
     #[case(f64::NAN, f64::NAN)]
     #[should_panic]
-    fn expect_ord_float_ge_nan(#[case] a: f64, #[case] b: f64) {
+    fn float_ge_nan(#[case] a: f64, #[case] b: f64) {
         let _ = ExpectOrd::new(a) >= ExpectOrd::new(b);
     }
 
     #[rstest]
     #[case(1.0, 2.0, false)]
     #[case(1.0, 1.0, true)]
-    fn expect_ord_float_eq(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
+    fn float_eq(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
         assert_eq!(ExpectOrd::new(a) == ExpectOrd::new(b), expected);
     }
 
@@ -171,14 +171,14 @@ mod tests {
     #[case(f64::NAN, 1.0)]
     #[case(f64::NAN, f64::NAN)]
     #[should_panic]
-    fn expect_ord_float_eq_nan(#[case] a: f64, #[case] b: f64) {
+    fn float_eq_nan(#[case] a: f64, #[case] b: f64) {
         let _ = ExpectOrd::new(a) == ExpectOrd::new(b);
     }
 
     #[rstest]
     #[case(1.0, 2.0, true)]
     #[case(1.0, 1.0, false)]
-    fn expect_ord_float_ne(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
+    fn float_ne(#[case] a: f64, #[case] b: f64, #[case] expected: bool) {
         assert_eq!(ExpectOrd::new(a) != ExpectOrd::new(b), expected);
     }
 
@@ -187,7 +187,7 @@ mod tests {
     #[case(f64::NAN, 1.0)]
     #[case(f64::NAN, f64::NAN)]
     #[should_panic]
-    fn expect_ord_float_ne_nan(#[case] a: f64, #[case] b: f64) {
+    fn float_ne_nan(#[case] a: f64, #[case] b: f64) {
         let _ = ExpectOrd::new(a) != ExpectOrd::new(b);
     }
 
@@ -196,7 +196,7 @@ mod tests {
     #[case(1.0, 0.0, 1.0)]
     #[case(1.0, f64::INFINITY, f64::INFINITY)]
     #[case(1.0, f64::NEG_INFINITY, 1.0)]
-    fn expect_ord_float_max(#[case] a: f64, #[case] b: f64, #[case] expected: f64) {
+    fn float_max(#[case] a: f64, #[case] b: f64, #[case] expected: f64) {
         assert_eq!(ExpectOrd::new(a).max(ExpectOrd::new(b)).value, expected);
     }
 
@@ -205,7 +205,7 @@ mod tests {
     #[case(f64::NAN, 1.0)]
     #[case(f64::NAN, f64::NAN)]
     #[should_panic]
-    fn expect_ord_float_max_nan(#[case] a: f64, #[case] b: f64) {
+    fn float_max_nan(#[case] a: f64, #[case] b: f64) {
         let _ = ExpectOrd::new(a).max(ExpectOrd::new(b));
     }
 }
