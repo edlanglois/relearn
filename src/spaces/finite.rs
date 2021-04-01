@@ -1,5 +1,5 @@
 //! FiniteSpace trait definition
-use super::{FeatureSpace, Space};
+use super::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::utils as torch_utils;
 use tch::{kind::Kind, Device, Tensor};
 
@@ -46,5 +46,34 @@ impl<S: FiniteSpace> FeatureSpace<Tensor> for S {
             self.num_features(),
             Kind::Float,
         )
+    }
+}
+
+impl<S: FiniteSpace> ParameterizedSampleSpace<Tensor> for S {
+    fn num_sample_params(&self) -> usize {
+        self.size()
+    }
+
+    fn sample(&self, parameters: &Tensor) -> Self::Element {
+        self.from_index(
+            Into::<i64>::into(parameters.softmax(-1, Kind::Float).multinomial(1, true)) as usize,
+        )
+        .unwrap()
+    }
+
+    fn batch_log_probs<'a, I>(&self, parameters: &Tensor, elements: I) -> Tensor
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+    {
+        let indices: Vec<_> = elements
+            .into_iter()
+            .map(|element| self.to_index(element) as i64)
+            .collect();
+        let index_tensor = Tensor::of_slice(&indices);
+        let logits = parameters.log_softmax(-1, Kind::Float);
+        logits
+            .gather(-1, &index_tensor.unsqueeze(-1), false)
+            .squeeze1(-1)
     }
 }

@@ -1,6 +1,6 @@
 //! Policy-gradient agents
 use super::super::{Actor, Agent, Step};
-use crate::spaces::{FeatureSpace, FiniteSpace};
+use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use tch::{kind::Kind, nn, nn::OptimizerConfig, Device, IndexOp, Tensor};
 
 /// A vanilla policy-gradient agent.
@@ -9,7 +9,7 @@ use tch::{kind::Kind, nn, nn::OptimizerConfig, Device, IndexOp, Tensor};
 pub struct PolicyGradientAgent<OS, AS, P, O>
 where
     OS: FeatureSpace<Tensor>,
-    AS: FiniteSpace,
+    AS: ParameterizedSampleSpace<Tensor>,
     P: Policy,
     O: OptimizerConfig,
 {
@@ -57,7 +57,7 @@ where
 impl<OS, AS, P, O> PolicyGradientAgent<OS, AS, P, O>
 where
     OS: FeatureSpace<Tensor>,
-    AS: FiniteSpace,
+    AS: ParameterizedSampleSpace<Tensor>,
     P: Policy,
     O: OptimizerConfig,
 {
@@ -77,7 +77,7 @@ where
         let policy = make_policy(
             &vs.root(),
             observation_space.num_features(),
-            action_space.size(),
+            action_space.num_sample_params(),
         );
         let state = policy.initial_state(1);
         let optimizer = optimizer_config.build(&vs, learning_rate).unwrap();
@@ -99,7 +99,7 @@ where
 impl<OS, AS, P, O> Actor<OS::Element, AS::Element> for PolicyGradientAgent<OS, AS, P, O>
 where
     OS: FeatureSpace<Tensor>,
-    AS: FiniteSpace,
+    AS: ParameterizedSampleSpace<Tensor>,
     P: Policy,
     O: OptimizerConfig,
 {
@@ -111,23 +111,21 @@ where
         }
         let state = &self.state;
 
-        let (action_index, state) = tch::no_grad(|| {
+        let (action, state) = tch::no_grad(|| {
             let (output, state) = self.policy.step(&observation_features, &state);
             let output = output.squeeze1(0); // Squeeze the batch dimension
-            let action_index =
-                Into::<i64>::into(output.softmax(-1, Kind::Float).multinomial(1, true));
-            (action_index, state)
+            let action = ParameterizedSampleSpace::sample(&self.action_space, &output);
+            (action, state)
         });
         self.state = state;
-
-        self.action_space.from_index(action_index as usize).unwrap()
+        action
     }
 }
 
 impl<OS, AS, P, O> Agent<OS::Element, AS::Element> for PolicyGradientAgent<OS, AS, P, O>
 where
     OS: FeatureSpace<Tensor>,
-    AS: FiniteSpace,
+    AS: ParameterizedSampleSpace<Tensor>,
     P: Policy,
     O: OptimizerConfig,
 {
@@ -144,34 +142,32 @@ where
 
         // Epoch
         // Update the policy
-        let history_data = history_data(
-            &self.history,
+        let history_data: HistoryData<AS> = history_data(
+            &mut self.history,
             &self.observation_space,
-            &self.action_space,
             self.discount_factor,
             self.max_unknown_return_discount,
         );
-        self.history.clear();
 
         let output = self.policy.seq_serial(
             &history_data.observation_features,
             &history_data.episode_lengths,
         );
-        let logits = output.log_softmax(-1, Kind::Float);
-        let log_probs = logits
-            .gather(-1, &history_data.actions.unsqueeze(-1), false)
-            .squeeze1(-1);
+        let log_probs = self
+            .action_space
+            .batch_log_probs(&output, &history_data.actions);
+
         let loss = -(log_probs * history_data.returns).mean(Kind::Float);
         self.optimizer.backward_step(&loss);
     }
 }
 
 // TODO: Do something like packed sequence so that batch processing is possible.
-struct HistoryData {
+struct HistoryData<AS: Space> {
     /// Observation features. A f32 tensor of shape [NUM_STEPS, NUM_OBS_FEATURES]
     observation_features: Tensor,
-    /// Action indices. An i64 tensor of shape [NUM_STEPS]
-    actions: Tensor,
+    /// Actions.
+    actions: Vec<AS::Element>,
     // /// Log probabilities of the selected actions. A f32 tensor of shape [NUM_STEPS]
     // action_log_probs: Tensor,
     /// Cumulative discounted observed episode returns. A f32 tensor of shape [NUM_STEPS]
@@ -180,7 +176,9 @@ struct HistoryData {
     episode_lengths: Vec<usize>,
 }
 
-/// Construct history data tensors from an array of steps.
+/// Convert a step history vector into data tensors / vectors.
+///
+/// Empties history in the process.
 ///
 /// An episode can end with a terminal or a non terminal state.
 /// If an episode ends with a terminal state then all steps are included in the result.
@@ -190,13 +188,12 @@ struct HistoryData {
 /// Therefore, when an episode ends in a non-terminal state, the steps close to the end of the
 /// episode are dropped. Specifically a step is dropped if the discounting applied to the unknown
 /// part of the return is > max_unknown_return_discount.
-fn history_data<OS: FeatureSpace<Tensor>, AS: FiniteSpace>(
-    history: &[Step<OS::Element, AS::Element>],
+fn history_data<OS: FeatureSpace<Tensor>, AS: ParameterizedSampleSpace<Tensor>>(
+    history: &mut Vec<Step<OS::Element, AS::Element>>,
     observation_space: &OS,
-    action_space: &AS,
     discount_factor: f64,
     max_unknown_return_discount: f64,
-) -> HistoryData {
+) -> HistoryData<AS> {
     // For each step, calculate state = (known_return, unknown_return_discount)
     // * known_return is the discounted sum of rewards in all future observed steps of the episode.
     // * unknown_return_scale is the discounting applied to any unknown rewards that might appear
@@ -253,26 +250,26 @@ fn history_data<OS: FeatureSpace<Tensor>, AS: FiniteSpace>(
             .filter_map(|(return_, &include)| if include { Some(return_ as f32) } else { None })
             .collect::<Vec<_>>(),
     );
-    let (observations, action_indices): (Vec<_>, Vec<_>) = history
+
+    let observations: Vec<_> = history
         .iter()
-        .zip(include_steps)
-        .filter_map(|(step, include)| {
+        .zip(include_steps.iter())
+        .filter_map(|(step, &include)| {
             if include {
-                Some((
-                    &step.observation,
-                    action_space.to_index(&step.action) as i64,
-                ))
+                Some(&step.observation)
             } else {
                 None
             }
         })
-        .unzip();
-
+        .collect();
     // A tensor of shape [NUM_STEPS, NUM_OBSERVATION_FEATURES] containing one-hot feature vectors.
     let observation_features = observation_space.batch_features(observations);
 
-    // A tensor of shape [NUM_STEPS] containg action indices
-    let actions = Tensor::of_slice(&action_indices);
+    let actions = history
+        .drain(..)
+        .zip(include_steps)
+        .filter_map(|(step, include)| if include { Some(step.action) } else { None })
+        .collect();
 
     HistoryData {
         observation_features,
@@ -283,7 +280,6 @@ fn history_data<OS: FeatureSpace<Tensor>, AS: FiniteSpace>(
 }
 
 /// A possibly recurrent policy operating on torch tensors.
-// TODO: Move action/observation space coding / decoding into Policy?
 pub trait Policy {
     type State;
     /// Construct an initial hidden state.
