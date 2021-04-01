@@ -1,7 +1,9 @@
 //! Logging statistics from simulation runs
 pub mod cli;
+mod null;
 
 pub use cli::CLILogger;
+pub use null::NullLogger;
 use std::convert::From;
 
 use enum_map::Enum;

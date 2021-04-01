@@ -19,7 +19,7 @@ where
 }
 
 /// Run a stateful environment and check that invariants are satisfied.
-pub fn run_stateful<E>(env: &mut E, mut num_steps: u64, seed: u64)
+pub fn run_stateful<E>(env: &mut E, num_steps: u64, seed: u64)
 where
     E: StatefulEnvironment,
     <E as StatefulEnvironment>::ObservationSpace: Debug,
@@ -41,7 +41,7 @@ where
     }
 
     let mut agent = RandomAgent::new(action_space, seed);
-    simulation::run(env, &mut agent, |step| {
+    simulation::run(env, &mut agent, Some(num_steps), |step| {
         assert!(step.reward >= min_reward);
         assert!(step.reward <= max_reward);
         if let Some(obs) = &step.next_observation {
@@ -49,8 +49,5 @@ where
         } else {
             assert!(step.episode_done);
         }
-
-        num_steps -= 1;
-        num_steps > 0
     });
 }

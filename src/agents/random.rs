@@ -1,4 +1,5 @@
 use super::{Actor, Agent, Step};
+use crate::logging::Logger;
 use crate::spaces::SampleSpace;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -26,7 +27,7 @@ impl<O, AS: SampleSpace> Actor<O, AS::Element> for RandomAgent<AS> {
 }
 
 impl<O, AS: SampleSpace> Agent<O, AS::Element> for RandomAgent<AS> {
-    fn update(&mut self, _step: Step<O, AS::Element>) {}
+    fn update(&mut self, _step: Step<O, AS::Element>, _logger: &mut dyn Logger) {}
 }
 
 impl<AS: SampleSpace + fmt::Display> fmt::Display for RandomAgent<AS> {

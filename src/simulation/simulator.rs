@@ -1,7 +1,7 @@
 /// Simulation trait and Simulator structs.
 use crate::agents::{Actor, Agent, Step};
-use crate::envs::StatefulEnvironment;
-use crate::logging::{Event, Loggable, Logger};
+use crate::envs::{EnvStructure, StatefulEnvironment};
+use crate::logging::{Event, Loggable, Logger, NullLogger};
 use crate::spaces::{ElementRefInto, Space};
 
 /// Runs a simulation.
@@ -68,6 +68,7 @@ where
             &mut self.agent,
             &mut self.logger,
             max_steps,
+            |_| (),
         );
     }
 }
@@ -112,16 +113,18 @@ where
             self.agent.as_mut(),
             &mut self.logger,
             max_steps,
+            |_| (),
         );
     }
 }
 
 /// Run an agent-environment simulation with logging.
-pub fn run_with_logging<E, A, L>(
+pub fn run_with_logging<E, A, L, F>(
     environment: &mut E,
     agent: &mut A,
     logger: &mut L,
     max_steps: Option<u64>,
+    mut callback: F,
 ) where
     E: StatefulEnvironment + ?Sized,
     <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
@@ -132,47 +135,19 @@ pub fn run_with_logging<E, A, L>(
     <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
     <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
     L: Logger,
+    F: FnMut(
+        &Step<
+            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        >,
+    ),
 {
     let mut step_count = 0; // Global step count
-    let mut episode_length = 0; // Length of the current episode in steps
-    let mut episode_reward = 0.0; // Total reward for the current episode
+    let mut tracker = SimulationTracker::new(environment.structure());
 
-    let structure = environment.structure();
-    let observation_space = structure.observation_space;
-    let action_space = structure.action_space;
-
-    run(environment, agent, |step| {
-        let reward = step.reward as f64;
-        logger.log(Event::Step, "reward", reward.into()).unwrap();
-        logger
-            .log(
-                Event::Step,
-                "observation",
-                observation_space.elem_ref_into(&step.observation),
-            )
-            .unwrap();
-        logger
-            .log(
-                Event::Step,
-                "action",
-                action_space.elem_ref_into(&step.action),
-            )
-            .unwrap();
-        logger.done(Event::Step);
-
-        episode_length += 1;
-        episode_reward += reward;
-        if step.episode_done {
-            logger
-                .log(Event::Episode, "length", (episode_length as f64).into())
-                .unwrap();
-            episode_length = 0;
-            logger
-                .log(Event::Episode, "reward", episode_reward.into())
-                .unwrap();
-            episode_reward = 0.0;
-            logger.done(Event::Episode);
-        }
+    run_(environment, agent, logger, |step, logger| {
+        tracker.log_step(step, logger);
+        callback(step);
 
         step_count += 1;
         match max_steps {
@@ -182,10 +157,8 @@ pub fn run_with_logging<E, A, L>(
     });
 }
 
-/// Run an agent-environment simulation with a callback function called on each step.
-///
-/// The simulation will continue while the callback returns `true`.
-pub fn run<E, A, F>(environment: &mut E, agent: &mut A, mut callback: F)
+/// Run an agent-environment simulation.
+pub fn run<E, A, F>(environment: &mut E, agent: &mut A, max_steps: Option<u64>, mut callback: F)
 where
     E: StatefulEnvironment + ?Sized,
     <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
@@ -198,7 +171,39 @@ where
             <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
             <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
         >,
+    ),
+{
+    let mut step_count = 0; // Global step count
+    let mut logger = NullLogger::new();
+
+    run_(environment, agent, &mut logger, |step, _| {
+        callback(step);
+
+        step_count += 1;
+        match max_steps {
+            Some(steps) => step_count < steps,
+            None => true,
+        }
+    });
+}
+
+/// Run an agent-environment simulation with a callback and logger pass-through to the agent.
+fn run_<E, A, F, L>(environment: &mut E, agent: &mut A, logger: &mut L, mut callback: F)
+where
+    E: StatefulEnvironment + ?Sized,
+    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
+    A: Agent<
+            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        > + ?Sized,
+    F: FnMut(
+        &Step<
+            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        >,
+        &mut L,
     ) -> bool,
+    L: Logger,
 {
     let mut observation = environment.reset();
     let new_episode = true;
@@ -214,8 +219,8 @@ where
             next_observation: next_observation.clone(),
             episode_done,
         };
-        let stop = !callback(&step);
-        agent.update(step);
+        let stop = !callback(&step, logger);
+        agent.update(step, logger);
         if stop {
             break;
         }
@@ -272,5 +277,71 @@ where
         } else {
             next_observation.expect("Observation must exist if the episode is not done")
         };
+    }
+}
+
+/// Track simulation progress for logging
+struct SimulationTracker<OS, AS>
+where
+    OS: ElementRefInto<Loggable>,
+    AS: ElementRefInto<Loggable>,
+{
+    pub observation_space: OS,
+    pub action_space: AS,
+
+    pub episode_length: u64,
+    pub episode_reward: f64,
+}
+
+impl<OS, AS> SimulationTracker<OS, AS>
+where
+    OS: ElementRefInto<Loggable>,
+    AS: ElementRefInto<Loggable>,
+{
+    pub fn new(env_structure: EnvStructure<OS, AS>) -> Self {
+        Self {
+            observation_space: env_structure.observation_space,
+            action_space: env_structure.action_space,
+            episode_length: 0,
+            episode_reward: 0.0,
+        }
+    }
+
+    pub fn log_step<L: Logger>(&mut self, step: &Step<OS::Element, AS::Element>, logger: &mut L) {
+        let reward = step.reward as f64;
+        logger.log(Event::Step, "reward", reward.into()).unwrap();
+        logger
+            .log(
+                Event::Step,
+                "observation",
+                self.observation_space.elem_ref_into(&step.observation),
+            )
+            .unwrap();
+        logger
+            .log(
+                Event::Step,
+                "action",
+                self.action_space.elem_ref_into(&step.action),
+            )
+            .unwrap();
+        logger.done(Event::Step);
+
+        self.episode_length += 1;
+        self.episode_reward += reward;
+        if step.episode_done {
+            logger
+                .log(
+                    Event::Episode,
+                    "length",
+                    (self.episode_length as f64).into(),
+                )
+                .unwrap();
+            self.episode_length = 0;
+            logger
+                .log(Event::Episode, "reward", self.episode_reward.into())
+                .unwrap();
+            self.episode_reward = 0.0;
+            logger.done(Event::Episode);
+        }
     }
 }

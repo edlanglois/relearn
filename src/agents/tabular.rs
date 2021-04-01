@@ -1,5 +1,6 @@
 //! Tabular agents
 use super::{Actor, Agent, Step};
+use crate::logging::Logger;
 use crate::spaces::{FiniteSpace, SampleSpace};
 use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
@@ -91,7 +92,7 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace + SampleSpace,
 {
-    fn update(&mut self, step: Step<OS::Element, AS::Element>) {
+    fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn Logger) {
         let obs_idx = self.observation_space.to_index(&step.observation);
         let act_idx = self.action_space.to_index(&step.action);
 

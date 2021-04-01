@@ -1,5 +1,6 @@
 //! Policy-gradient agents
 use super::super::{Actor, Agent, Step};
+use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use tch::{kind::Kind, nn, nn::OptimizerConfig, Device, IndexOp, Tensor};
 
@@ -131,7 +132,7 @@ where
     P: Policy,
     O: OptimizerConfig,
 {
-    fn update(&mut self, step: Step<OS::Element, AS::Element>) {
+    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn Logger) {
         let episode_done = step.episode_done;
         self.history.push(step);
 
@@ -161,6 +162,22 @@ where
 
         let loss = -(log_probs * history_data.returns).mean(Kind::Float);
         self.optimizer.backward_step(&loss);
+
+        logger
+            .log(
+                Event::Epoch,
+                "batch_num_steps",
+                (history_data.actions.len() as f64).into(),
+            )
+            .unwrap();
+        logger
+            .log(
+                Event::Epoch,
+                "batch_num_episodes",
+                (history_data.episode_lengths.len() as f64).into(),
+            )
+            .unwrap();
+        logger.done(Event::Epoch);
     }
 }
 

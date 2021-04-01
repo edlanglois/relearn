@@ -1,3 +1,5 @@
+use crate::logging::Logger;
+
 /// Description of an environment step
 #[derive(Debug)]
 pub struct Step<O, A> {
@@ -39,5 +41,5 @@ pub trait Agent<O, A>: Actor<O, A> {
     ///
     /// # Args
     /// * `step`: The environment step resulting from the  most recent call to [Actor::act].
-    fn update(&mut self, step: Step<O, A>);
+    fn update(&mut self, step: Step<O, A>, logger: &mut dyn Logger);
 }

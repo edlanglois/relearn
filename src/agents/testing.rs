@@ -18,11 +18,7 @@ where
 
     // Training
     if num_train_steps > 0 {
-        let mut step_count = 0;
-        simulation::run(&mut env, &mut agent, |_| {
-            step_count += 1;
-            step_count < num_train_steps
-        });
+        simulation::run(&mut env, &mut agent, Some(num_train_steps), |_| ());
     }
 
     // Evaluation
