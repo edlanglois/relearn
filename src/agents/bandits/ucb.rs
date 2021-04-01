@@ -145,7 +145,7 @@ mod ucb1_agent {
     use super::*;
 
     #[test]
-    fn train() {
+    fn learns_determinstic_bandit() {
         testing::train_deterministic_bandit(
             |env_structure| {
                 UCB1Agent::new(

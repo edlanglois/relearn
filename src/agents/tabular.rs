@@ -122,7 +122,7 @@ mod tabular_q_learning {
     use super::*;
 
     #[test]
-    fn train() {
+    fn learns_determinstic_bandit() {
         testing::train_deterministic_bandit(
             |env_structure| {
                 TabularQLearningAgent::new(
@@ -140,7 +140,7 @@ mod tabular_q_learning {
 
     #[test]
     #[should_panic]
-    fn exploration() {
+    fn explores() {
         testing::train_deterministic_bandit(
             |env_structure| {
                 TabularQLearningAgent::new(

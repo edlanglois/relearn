@@ -139,7 +139,7 @@ mod beta_thompson_sampling {
     use super::*;
 
     #[test]
-    fn train() {
+    fn learns_determinstic_bandit() {
         testing::train_deterministic_bandit(
             |env_structure| {
                 BetaThompsonSamplingAgent::new(

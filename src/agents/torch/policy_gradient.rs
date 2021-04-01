@@ -406,7 +406,7 @@ mod policy_gradient {
     use super::*;
 
     #[test]
-    fn train_simple_mlp() {
+    fn simple_mlp_learns_derministic_bandit() {
         testing::train_deterministic_bandit(
             |env_structure| {
                 PolicyGradientAgent::new(
