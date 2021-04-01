@@ -73,6 +73,7 @@ where
     where
         F: FnOnce(&nn::Path, usize, usize) -> P,
     {
+        let max_steps_per_epoch = (steps_per_epoch as f64 * 1.1) as usize;
         let vs = nn::VarStore::new(Device::Cpu);
         let policy = make_policy(
             &vs.root(),
@@ -90,7 +91,8 @@ where
             max_unknown_return_discount: 0.1,
             policy,
             state,
-            history: Vec::new(),
+            // Slight excess in case of off-by-one errors.
+            history: Vec::with_capacity(max_steps_per_epoch + 1),
             optimizer,
         }
     }
