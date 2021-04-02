@@ -12,4 +12,4 @@ pub use agents::{Actor, Agent, Step};
 pub use bandits::{BetaThompsonSamplingAgent, UCB1Agent};
 pub use random::RandomAgent;
 pub use tabular::TabularQLearningAgent;
-pub use torch::{MLPConfig, PolicyGradientAgent};
+pub use torch::PolicyGradientAgent;

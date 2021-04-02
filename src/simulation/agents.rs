@@ -2,11 +2,12 @@
 use super::spaces::{CommonActionSpace, CommonObservationSpace};
 use crate::agents::error::NewAgentError;
 use crate::agents::{
-    Agent, BetaThompsonSamplingAgent, MLPConfig, PolicyGradientAgent, RandomAgent,
-    TabularQLearningAgent, UCB1Agent,
+    Agent, BetaThompsonSamplingAgent, PolicyGradientAgent, RandomAgent, TabularQLearningAgent,
+    UCB1Agent,
 };
 use crate::envs::EnvStructure;
 use crate::spaces::FiniteSpace;
+use crate::torch::configs::MLPConfig;
 use tch::nn::Adam;
 use thiserror::Error;
 
