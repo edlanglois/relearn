@@ -2,7 +2,11 @@
 use super::super::{Actor, Agent, Step};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
-use tch::{kind::Kind, nn, nn::OptimizerConfig, Device, IndexOp, Tensor};
+use crate::torch::seq_modules::{IterativeModule, SequenceModule};
+use crate::torch::{Activation, ModuleBuilder};
+use std::borrow::Borrow;
+use std::iter;
+use tch::{kind::Kind, nn, nn::OptimizerConfig, Device, Tensor};
 
 /// A vanilla policy-gradient agent.
 ///
@@ -11,7 +15,7 @@ pub struct PolicyGradientAgent<OS, AS, P, O>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: Policy,
+    P: IterativeModule,
     O: OptimizerConfig,
 {
     /// Environment observation space
@@ -59,24 +63,24 @@ impl<OS, AS, P, O> PolicyGradientAgent<OS, AS, P, O>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: Policy,
+    P: IterativeModule,
     O: OptimizerConfig,
 {
-    pub fn new<F>(
+    pub fn new<C>(
         observation_space: OS,
         action_space: AS,
         discount_factor: f64,
         steps_per_epoch: usize,
         learning_rate: f64,
-        make_policy: F,
+        policy_config: &C,
         optimizer_config: O,
     ) -> Self
     where
-        F: FnOnce(&nn::Path, usize, usize) -> P,
+        C: ModuleBuilder<Module = P>,
     {
         let max_steps_per_epoch = (steps_per_epoch as f64 * 1.1) as usize;
         let vs = nn::VarStore::new(Device::Cpu);
-        let policy = make_policy(
+        let policy = policy_config.build(
             &vs.root(),
             observation_space.num_features(),
             action_space.num_sample_params(),
@@ -103,7 +107,7 @@ impl<OS, AS, P, O> Actor<OS::Element, AS::Element> for PolicyGradientAgent<OS, A
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: Policy,
+    P: IterativeModule,
     O: OptimizerConfig,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
@@ -129,7 +133,7 @@ impl<OS, AS, P, O> Agent<OS::Element, AS::Element> for PolicyGradientAgent<OS, A
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: Policy,
+    P: IterativeModule + SequenceModule,
     O: OptimizerConfig,
 {
     fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn Logger) {
@@ -298,123 +302,61 @@ fn history_data<OS: FeatureSpace<Tensor>, AS: ParameterizedSampleSpace<Tensor>>(
     }
 }
 
-/// A possibly recurrent policy operating on torch tensors.
-pub trait Policy {
-    type State;
-    /// Construct an initial hidden state.
-    fn initial_state(&self, batch_size: usize) -> Self::State;
-
-    /// Apply one step of the policy.
-    ///
-    /// # Args
-    /// * `input`: The input for one (batched) step.
-    ///     A tensor with shape [BATCH_SIZE, NUM_INPUT_FEATURES]
-    /// * `state`: The policy hidden state.
-    ///
-    /// # Returns
-    /// * `output`: The output tensor. Has shape [BATCH_SIZE, NUM_OUT_FEATURES]
-    /// * `state`: A new value for the hidden state.
-    fn step(&self, input: &Tensor, state: &Self::State) -> (Tensor, Self::State);
-
-    /// Apply the policy over multiple sequences arranged in series one after another.
-    ///
-    /// `input.i(.., ..seq_lengths[0], ..)` is the first batch of sequences,
-    /// `input.i(.., seq_lengths[0]..seq_lengths[1], ..)` is the second, etc.
-    ///
-    /// # Args:
-    /// * `inputs`: Batched input sequences arranged in series.
-    ///     A tensor of shape [BATCH_SIZE, TOTAL_SEQ_LENGTH, NUM_INPUT_FEATURES]
-    /// * `seq_lengths`: Length of each sequence.
-    ///     The sequence length is the same across the batch dimension.
-    ///
-    /// # Returns
-    /// * `outputs`: Batched output sequences arranged in series.
-    ///     A tensor of shape [BATCH_SHAPE, TOTAL_SEQ_LENGTH, NUM_OUTPUT_FEATURES]
-    fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor;
-
-    // TODO: seq_packed
+/// Multi-Layer Perceptron Configuration
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MLPConfig {
+    /// Sizes of the hidden layers
+    hidden_sizes: Vec<usize>,
+    /// Activation function between hidden layers.
+    activation: Activation,
+    /// Activation function on the output.
+    output_activation: Activation,
 }
 
-impl<R: nn::RNN> Policy for R {
-    type State = R::State;
-
-    fn initial_state(&self, batch_size: usize) -> Self::State {
-        self.zero_state(batch_size as i64)
-    }
-
-    fn step(&self, input: &Tensor, state: &Self::State) -> (Tensor, Self::State) {
-        // (Un)squeeze is to add/remove a seq_len dimension.
-        let (output, state) = self.seq_init(&input.unsqueeze(-2), state);
-        (output.squeeze1(-2), state)
-    }
-
-    fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
-        Tensor::cat(
-            &seq_lengths
-                .into_iter()
-                .scan(0, |offset, &length| {
-                    let ilength = length as i64;
-                    let (output, _) = self.seq(&inputs.i((.., *offset..(*offset + ilength), ..)));
-                    *offset += ilength;
-                    Some(output)
-                })
-                .collect::<Vec<_>>(),
-            -2,
-        )
+impl Default for MLPConfig {
+    fn default() -> Self {
+        MLPConfig {
+            hidden_sizes: vec![100],
+            activation: Activation::Relu,
+            output_activation: Activation::Identity,
+        }
     }
 }
 
-/// Wrap a torch module as a non-recurrent policy.
-///
-/// The module must accept a tensor of shape [BATCH_SHAPE..., NUM_INPUT_FEATURES],
-/// where BATCH_SHAPE... represents arbitrarily many batch dimensions,
-/// and return a tensor of shape [BATCH_SHAPE..., NUM_OUTPUT_FEATURES].
-pub struct ModulePolicy<M: nn::Module>(M);
+impl ModuleBuilder for MLPConfig {
+    type Module = nn::Sequential;
 
-impl<M: nn::Module> Policy for ModulePolicy<M> {
-    type State = ();
+    fn build<'a, T: Borrow<nn::Path<'a>>>(
+        &self,
+        vs: T,
+        input_dim: usize,
+        output_dim: usize,
+    ) -> Self::Module {
+        let vs = vs.borrow();
 
-    fn initial_state(&self, _batch_size: usize) -> Self::State {
-        ()
+        let iter_in_dim = iter::once(&input_dim).chain(self.hidden_sizes.iter());
+        let iter_out_dim = self.hidden_sizes.iter().chain(iter::once(&output_dim));
+
+        let mut layers = nn::seq();
+        for (i, (&layer_in_dim, &layer_out_dim)) in iter_in_dim.zip(iter_out_dim).enumerate() {
+            if i > 0 {
+                if let Some(m) = self.activation.maybe_module() {
+                    layers = layers.add(m);
+                }
+            }
+            layers = layers.add(nn::linear(
+                vs / format!("layer_{}", i),
+                layer_in_dim as i64,
+                layer_out_dim as i64,
+                Default::default(),
+            ));
+        }
+
+        if let Some(m) = self.output_activation.maybe_module() {
+            layers = layers.add(m);
+        }
+        layers
     }
-
-    fn step(&self, input: &Tensor, _state: &Self::State) -> (Tensor, Self::State) {
-        (input.apply(&self.0), ())
-    }
-
-    fn seq_serial(&self, inputs: &Tensor, _seq_lengths: &[usize]) -> Tensor {
-        inputs.apply(&self.0)
-    }
-}
-
-impl<M: nn::Module> From<M> for ModulePolicy<M> {
-    fn from(module: M) -> Self {
-        ModulePolicy(module)
-    }
-}
-
-/// A simple MLP policy
-pub fn simple_mlp_policy(
-    vs: &nn::Path,
-    input_size: usize,
-    output_size: usize,
-) -> ModulePolicy<nn::Sequential> {
-    let hidden_size = 100;
-    nn::seq()
-        .add(nn::linear(
-            vs / "layer1",
-            input_size as i64,
-            hidden_size as i64,
-            Default::default(),
-        ))
-        .add_fn(Tensor::relu)
-        .add(nn::linear(
-            vs,
-            hidden_size as i64,
-            output_size as i64,
-            Default::default(),
-        ))
-        .into()
 }
 
 #[cfg(test)]
@@ -432,7 +374,7 @@ mod policy_gradient {
                     env_structure.discount_factor,
                     20,  // steps_per_epoch
                     0.1, // learning_rate
-                    simple_mlp_policy,
+                    &MLPConfig::default(),
                     nn::Adam::default(),
                 )
             },

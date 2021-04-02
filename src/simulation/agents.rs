@@ -2,7 +2,7 @@
 use super::spaces::{CommonActionSpace, CommonObservationSpace};
 use crate::agents::error::NewAgentError;
 use crate::agents::{
-    simple_mlp_policy, Agent, BetaThompsonSamplingAgent, PolicyGradientAgent, RandomAgent,
+    Agent, BetaThompsonSamplingAgent, MLPConfig, PolicyGradientAgent, RandomAgent,
     TabularQLearningAgent, UCB1Agent,
 };
 use crate::envs::EnvStructure;
@@ -102,7 +102,7 @@ impl AgentDef {
                 structure.discount_factor,
                 steps_per_epoch,
                 learning_rate,
-                simple_mlp_policy,
+                &MLPConfig::default(),
                 Adam::default(),
             ))),
             _ => self.make_any_any(structure, seed),
