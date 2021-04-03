@@ -1,9 +1,12 @@
 //! Sequence modules. Like [tch::nn::Module] but operate on a sequence of data.
 pub mod module;
-pub mod rnn;
-mod stacked;
+mod rnn;
+mod seq_regressor;
+#[cfg(test)]
+pub mod testing;
 
-pub use stacked::PostTransform;
+pub use rnn::SeqModRNN;
+pub use seq_regressor::SequenceRegressor;
 
 use tch::Tensor;
 

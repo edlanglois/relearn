@@ -154,10 +154,13 @@ where
             self.max_unknown_return_discount,
         );
 
-        let output = self.policy.seq_serial(
-            &history_data.observation_features,
-            &history_data.episode_lengths,
-        );
+        let output = self
+            .policy
+            .seq_serial(
+                &history_data.observation_features.unsqueeze(0), // Batch dimension
+                &history_data.episode_lengths,
+            )
+            .squeeze1(0);
         let log_probs = self
             .action_space
             .batch_log_probs(&output, &history_data.actions);
@@ -304,10 +307,10 @@ fn history_data<OS: FeatureSpace<Tensor>, AS: ParameterizedSampleSpace<Tensor>>(
 mod policy_gradient {
     use super::super::super::testing;
     use super::*;
-    use crate::torch::configs::MLPConfig;
+    use crate::torch::configs::{GruMlpConfig, MLPConfig};
 
     #[test]
-    fn simple_mlp_learns_derministic_bandit() {
+    fn default_mlp_learns_derministic_bandit() {
         testing::train_deterministic_bandit(
             |env_structure| {
                 PolicyGradientAgent::new(
@@ -317,6 +320,25 @@ mod policy_gradient {
                     20,  // steps_per_epoch
                     0.1, // learning_rate
                     &MLPConfig::default(),
+                    nn::Adam::default(),
+                )
+            },
+            1_000,
+            0.9,
+        );
+    }
+
+    #[test]
+    fn default_gru_mlp_learns_derministic_bandit() {
+        testing::train_deterministic_bandit(
+            |env_structure| {
+                PolicyGradientAgent::new(
+                    env_structure.observation_space,
+                    env_structure.action_space,
+                    env_structure.discount_factor,
+                    20,  // steps_per_epoch
+                    0.1, // learning_rate
+                    &GruMlpConfig::default(),
                     nn::Adam::default(),
                 )
             },

@@ -1,5 +1,4 @@
-//! Module configurations / builders.
-use super::{Activation, ModuleBuilder};
+use super::super::{Activation, ModuleBuilder};
 use std::borrow::Borrow;
 use std::iter;
 use tch::nn;
@@ -18,7 +17,7 @@ pub struct MLPConfig {
 impl Default for MLPConfig {
     fn default() -> Self {
         MLPConfig {
-            hidden_sizes: vec![100],
+            hidden_sizes: vec![128],
             activation: Activation::Relu,
             output_activation: Activation::Identity,
         }
@@ -58,5 +57,43 @@ impl ModuleBuilder for MLPConfig {
             layers = layers.add(m);
         }
         layers
+    }
+}
+
+#[cfg(test)]
+mod mlp_config {
+    use super::super::super::seq_modules::testing;
+    use super::*;
+    use rstest::{fixture, rstest};
+    use tch::{kind::Kind, Device};
+
+    type MLP = <MLPConfig as ModuleBuilder>::Module;
+
+    #[fixture]
+    fn default_module() -> (MLP, usize, usize) {
+        let in_dim = 3;
+        let out_dim = 2;
+        let config = MLPConfig::default();
+        let vs = nn::VarStore::new(Device::Cpu);
+        let module = config.build(&vs.root(), in_dim, out_dim);
+        (module, in_dim, out_dim)
+    }
+
+    #[rstest]
+    fn default_module_forward_batch(default_module: (MLP, usize, usize)) {
+        let (default_mlp, in_dim, out_dim) = default_module;
+        testing::check_forward(&default_mlp, in_dim, out_dim, &[4], Kind::Float);
+    }
+
+    #[rstest]
+    fn default_module_seq_serial(default_module: (MLP, usize, usize)) {
+        let (default_mlp, in_dim, out_dim) = default_module;
+        testing::check_seq_serial(&default_mlp, in_dim, out_dim);
+    }
+
+    #[rstest]
+    fn default_module_step(default_module: (MLP, usize, usize)) {
+        let (default_mlp, in_dim, out_dim) = default_module;
+        testing::check_step(&default_mlp, in_dim, out_dim);
     }
 }
