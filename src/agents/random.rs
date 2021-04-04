@@ -27,6 +27,10 @@ impl<O, AS: SampleSpace> Actor<O, AS::Element> for RandomAgent<AS> {
 }
 
 impl<O, AS: SampleSpace> Agent<O, AS::Element> for RandomAgent<AS> {
+    fn act(&mut self, observation: &O, new_episode: bool) -> AS::Element {
+        Actor::act(self, observation, new_episode)
+    }
+
     fn update(&mut self, _step: Step<O, AS::Element>, _logger: &mut dyn Logger) {}
 }
 

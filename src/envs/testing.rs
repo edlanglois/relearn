@@ -41,7 +41,7 @@ where
     }
 
     let mut agent = RandomAgent::new(action_space, seed);
-    simulation::run(env, &mut agent, Some(num_steps), |step| {
+    simulation::run_agent(env, &mut agent, Some(num_steps), |step| {
         assert!(step.reward >= min_reward);
         assert!(step.reward <= max_reward);
         if let Some(obs) = &step.next_observation {

@@ -134,6 +134,10 @@ where
     P: IterativeModule + SequenceModule,
     O: OptimizerConfig,
 {
+    fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
+        Actor::act(self, observation, new_episode)
+    }
+
     fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn Logger) {
         let episode_done = step.episode_done;
         self.history.push(step);

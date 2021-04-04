@@ -102,6 +102,24 @@ where
 {
     fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
         let obs_idx = self.observation_space.to_index(observation);
+        // Take the action with the largest action count
+        let act_idx = self
+            .state_action_count
+            .index_axis(Axis(0), obs_idx)
+            .into_iter()
+            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
+            .expect("Empty action space");
+        self.action_space.from_index(act_idx).unwrap()
+    }
+}
+
+impl<OS, AS> Agent<OS::Element, AS::Element> for UCB1Agent<OS, AS>
+where
+    OS: FiniteSpace,
+    AS: FiniteSpace,
+{
+    fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
+        let obs_idx = self.observation_space.to_index(observation);
         let log_squared_visit_count = 2.0 * (self.state_visit_count[obs_idx] as f64).ln();
         let ucb = self
             .state_action_count
@@ -116,13 +134,6 @@ where
             .expect("Empty action space");
         self.action_space.from_index(act_idx).unwrap()
     }
-}
-
-impl<OS, AS> Agent<OS::Element, AS::Element> for UCB1Agent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
     fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn Logger) {
         let obs_idx = self.observation_space.to_index(&step.observation);
         let act_idx = self.action_space.to_index(&step.action);

@@ -145,7 +145,7 @@ pub fn run_with_logging<E, A, L, F>(
     let mut step_count = 0; // Global step count
     let mut tracker = SimulationTracker::new(environment.structure());
 
-    run_(environment, agent, logger, |step, logger| {
+    run_agent_(environment, agent, logger, |step, logger| {
         tracker.log_step(step, logger);
         callback(step);
 
@@ -158,8 +158,12 @@ pub fn run_with_logging<E, A, L, F>(
 }
 
 /// Run an agent-environment simulation.
-pub fn run<E, A, F>(environment: &mut E, agent: &mut A, max_steps: Option<u64>, mut callback: F)
-where
+pub fn run_agent<E, A, F>(
+    environment: &mut E,
+    agent: &mut A,
+    max_steps: Option<u64>,
+    mut callback: F,
+) where
     E: StatefulEnvironment + ?Sized,
     <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
     A: Agent<
@@ -176,7 +180,7 @@ where
     let mut step_count = 0; // Global step count
     let mut logger = NullLogger::new();
 
-    run_(environment, agent, &mut logger, |step, _| {
+    run_agent_(environment, agent, &mut logger, |step, _| {
         callback(step);
 
         step_count += 1;
@@ -188,7 +192,7 @@ where
 }
 
 /// Run an agent-environment simulation with a callback and logger pass-through to the agent.
-fn run_<E, A, F, L>(environment: &mut E, agent: &mut A, logger: &mut L, mut callback: F)
+fn run_agent_<E, A, F, L>(environment: &mut E, agent: &mut A, logger: &mut L, mut callback: F)
 where
     E: StatefulEnvironment + ?Sized,
     <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,

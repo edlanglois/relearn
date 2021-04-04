@@ -22,6 +22,10 @@ pub struct Step<O, A> {
 ///
 /// The action selection process may depend on the history of observations and actions within an
 /// episode.
+///
+/// The generated actions should not assume that any updates will follow.
+/// In particular, this means that [Actor::act] may act more greedily compare to
+/// [Agent::act], which assumes that updates will follow.
 pub trait Actor<O, A> {
     /// Choose an action in the environment.
     ///
@@ -36,7 +40,17 @@ pub trait Actor<O, A> {
 /// A learning agent.
 ///
 /// Can interact with an environment and learns from the interaction.
-pub trait Agent<O, A>: Actor<O, A> {
+pub trait Agent<O, A> {
+    /// Choose an action in the environment.
+    ///
+    /// [Agent::update] must be called immediately after with the result.
+    /// Must be called sequentially on steps within an episode.
+    ///
+    /// # Args
+    /// * `observation`: The current observation of the environment state.
+    /// * `new_episode`: Whether this observation is the start of a new episode.
+    fn act(&mut self, observation: &O, new_episode: bool) -> A;
+
     /// Update the agent based on the most recent action.
     ///
     /// # Args

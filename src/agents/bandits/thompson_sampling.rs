@@ -80,12 +80,31 @@ where
 {
     fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
         let obs_idx = self.observation_space.to_index(observation);
+        // Counts are initalized to 1 so no risk of 0/0
+        let act_idx = self
+            .low_high_reward_counts
+            .index_axis(Axis(0), obs_idx)
+            .mapv(|(beta, alpha)| alpha as f64 / (alpha + beta) as f64)
+            .into_iter()
+            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
+            .expect("Empty action space");
+        self.action_space.from_index(act_idx).unwrap()
+    }
+}
+
+impl<OS, AS> Agent<OS::Element, AS::Element> for BetaThompsonSamplingAgent<OS, AS>
+where
+    OS: FiniteSpace,
+    AS: FiniteSpace,
+{
+    fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
+        let obs_idx = self.observation_space.to_index(observation);
         let num_samples = self.num_samples;
         let rng = &mut self.rng;
         let act_idx = self
             .low_high_reward_counts
             .index_axis(Axis(0), obs_idx)
-            .map(|(beta, alpha)| -> f64 {
+            .mapv(|(beta, alpha)| -> f64 {
                 // Explanation for the rng reference:
                 // sample_iter takes its argument by value rather than by reference.
                 // We cannot the rng into sample_iter because it needs to stay with self.
@@ -100,7 +119,7 @@ where
                 // original rng (without naming `self` within the closure) and then reference it
                 // again in the closure so that the reference is created local to the closure and
                 // can be safely moved.
-                Beta::new(*alpha as f64, *beta as f64)
+                Beta::new(alpha as f64, beta as f64)
                     .unwrap()
                     .sample_iter(&mut *rng)
                     .take(num_samples)
@@ -111,13 +130,7 @@ where
             .expect("Empty action space");
         self.action_space.from_index(act_idx).unwrap()
     }
-}
 
-impl<OS, AS> Agent<OS::Element, AS::Element> for BetaThompsonSamplingAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
     fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn Logger) {
         let obs_idx = self.observation_space.to_index(&step.observation);
         let act_idx = self.action_space.to_index(&step.action);

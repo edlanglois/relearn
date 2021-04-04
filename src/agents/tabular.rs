@@ -73,17 +73,13 @@ where
     AS: FiniteSpace + SampleSpace,
 {
     fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
-        if self.rng.gen::<f64>() < self.exploration_rate {
-            self.action_space.sample(&mut self.rng)
-        } else {
-            let obs_idx = self.observation_space.to_index(observation);
-            let act_idx = self
-                .state_action_values
-                .index_axis(Axis(0), obs_idx)
-                .argmax()
-                .unwrap();
-            self.action_space.from_index(act_idx).unwrap()
-        }
+        let obs_idx = self.observation_space.to_index(observation);
+        let act_idx = self
+            .state_action_values
+            .index_axis(Axis(0), obs_idx)
+            .argmax()
+            .unwrap();
+        self.action_space.from_index(act_idx).unwrap()
     }
 }
 
@@ -92,6 +88,14 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace + SampleSpace,
 {
+    fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
+        if self.rng.gen::<f64>() < self.exploration_rate {
+            self.action_space.sample(&mut self.rng)
+        } else {
+            Actor::act(self, observation, new_episode)
+        }
+    }
+
     fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn Logger) {
         let obs_idx = self.observation_space.to_index(&step.observation);
         let act_idx = self.action_space.to_index(&step.action);
@@ -121,6 +125,8 @@ where
 mod tabular_q_learning {
     use super::super::testing;
     use super::*;
+    use crate::envs::{AsStateful, DeterministicBandit, StatefulEnvironment};
+    use crate::simulation;
 
     #[test]
     fn learns_determinstic_bandit() {
@@ -140,20 +146,33 @@ mod tabular_q_learning {
     }
 
     #[test]
-    #[should_panic]
-    fn explores() {
-        testing::train_deterministic_bandit(
-            |env_structure| {
-                TabularQLearningAgent::new(
-                    env_structure.observation_space,
-                    env_structure.action_space,
-                    env_structure.discount_factor,
-                    0.95,
-                    0,
-                )
-            },
-            1000,
-            0.9,
+    fn explore_exploit() {
+        let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).as_stateful(0);
+        let env_structure = env.structure();
+        let mut agent = TabularQLearningAgent::new(
+            env_structure.observation_space,
+            env_structure.action_space,
+            env_structure.discount_factor,
+            0.95,
+            0,
         );
+
+        // The agent explores
+        let mut action_1_count = 0;
+        simulation::run_agent(&mut env, &mut agent, Some(1000), |step| {
+            action_1_count += (step.action == 1) as u64;
+        });
+        assert!(action_1_count > 300);
+        assert!(action_1_count < 700);
+
+        // The actor exploits
+        let mut step_count = 0;
+        let mut action_1_count = 0;
+        simulation::run_actor(&mut env, &mut agent, |step| {
+            action_1_count += (step.action == 1) as u64;
+            step_count += 1;
+            step_count < 1000
+        });
+        assert!(action_1_count > 900);
     }
 }

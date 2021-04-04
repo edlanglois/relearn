@@ -6,4 +6,6 @@ mod spaces;
 
 pub use agents::{AgentDef, MakeAgentError};
 pub use environments::EnvDef;
-pub use simulator::{run, run_actor, run_with_logging, BoxedSimulator, Simulation, Simulator};
+pub use simulator::{
+    run_actor, run_agent, run_with_logging, BoxedSimulator, Simulation, Simulator,
+};
