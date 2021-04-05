@@ -5,7 +5,7 @@ mod seq_regressor;
 #[cfg(test)]
 pub mod testing;
 
-pub use rnn::SeqModRNN;
+pub use rnn::SeqModRnn;
 pub use seq_regressor::SequenceRegressor;
 
 use tch::Tensor;

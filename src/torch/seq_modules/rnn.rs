@@ -3,9 +3,9 @@ use super::{IterativeModule, SequenceModule};
 use tch::{nn::RNN, IndexOp, Tensor};
 
 /// Wrapper that implements the Sequence/Iterative Module tratis for [tch::nn::RNN].
-pub struct SeqModRNN<R: RNN>(R);
+pub struct SeqModRnn<R: RNN>(R);
 
-impl<R: RNN> SequenceModule for SeqModRNN<R> {
+impl<R: RNN> SequenceModule for SeqModRnn<R> {
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         Tensor::cat(
             &seq_lengths
@@ -24,7 +24,7 @@ impl<R: RNN> SequenceModule for SeqModRNN<R> {
     }
 }
 
-impl<R: RNN> IterativeModule for SeqModRNN<R> {
+impl<R: RNN> IterativeModule for SeqModRnn<R> {
     type State = R::State;
 
     fn initial_state(&self, batch_size: usize) -> Self::State {
@@ -38,9 +38,9 @@ impl<R: RNN> IterativeModule for SeqModRNN<R> {
     }
 }
 
-impl<R: RNN> From<R> for SeqModRNN<R> {
+impl<R: RNN> From<R> for SeqModRnn<R> {
     fn from(rnn: R) -> Self {
-        SeqModRNN(rnn)
+        SeqModRnn(rnn)
     }
 }
 
@@ -52,11 +52,11 @@ mod seq_mod_rnn {
     use tch::{nn, Device};
 
     #[fixture]
-    fn gru() -> (SeqModRNN<nn::GRU>, usize, usize) {
+    fn gru() -> (SeqModRnn<nn::GRU>, usize, usize) {
         let in_dim: usize = 3;
         let out_dim: usize = 2;
         let vs = nn::VarStore::new(Device::Cpu);
-        let gru = SeqModRNN::from(nn::gru(
+        let gru = SeqModRnn::from(nn::gru(
             &vs.root(),
             in_dim as i64,
             out_dim as i64,
@@ -66,13 +66,13 @@ mod seq_mod_rnn {
     }
 
     #[rstest]
-    fn gru_seq_serial(gru: (SeqModRNN<nn::GRU>, usize, usize)) {
+    fn gru_seq_serial(gru: (SeqModRnn<nn::GRU>, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_seq_serial(&gru, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_step(gru: (SeqModRNN<nn::GRU>, usize, usize)) {
+    fn gru_step(gru: (SeqModRnn<nn::GRU>, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_step(&gru, in_dim, out_dim);
     }

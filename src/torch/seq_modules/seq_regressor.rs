@@ -49,22 +49,22 @@ impl<'a, S: IterativeModule, M: Module> IterativeModule for SequenceRegressor<'a
 
 #[cfg(test)]
 mod sequence_regressor {
-    use super::super::{testing, SeqModRNN};
+    use super::super::{testing, SeqModRnn};
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{nn, Device};
 
-    type SRGRU = SequenceRegressor<'static, SeqModRNN<nn::GRU>, nn::Linear>;
+    type GruMlp = SequenceRegressor<'static, SeqModRnn<nn::GRU>, nn::Linear>;
 
     /// GRU followed by a relu then a linear layer.
     #[fixture]
-    fn gru_relu_linear() -> (SRGRU, usize, usize) {
+    fn gru_relu_linear() -> (GruMlp, usize, usize) {
         let in_dim: usize = 3;
         let hidden_dim: usize = 5;
         let out_dim: usize = 2;
         let vs = nn::VarStore::new(Device::Cpu);
         let path = &vs.root();
-        let gru = SeqModRNN::from(nn::gru(
+        let gru = SeqModRnn::from(nn::gru(
             &(path / "rnn"),
             in_dim as i64,
             hidden_dim as i64,
@@ -81,13 +81,13 @@ mod sequence_regressor {
     }
 
     #[rstest]
-    fn gru_relu_linear_seq_serial(gru_relu_linear: (SRGRU, usize, usize)) {
+    fn gru_relu_linear_seq_serial(gru_relu_linear: (GruMlp, usize, usize)) {
         let (gru_relu_linear, in_dim, out_dim) = gru_relu_linear;
         testing::check_seq_serial(&gru_relu_linear, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_relu_linear_step(gru_relu_linear: (SRGRU, usize, usize)) {
+    fn gru_relu_linear_step(gru_relu_linear: (GruMlp, usize, usize)) {
         let (gru_relu_linear, in_dim, out_dim) = gru_relu_linear;
         testing::check_step(&gru_relu_linear, in_dim, out_dim);
     }

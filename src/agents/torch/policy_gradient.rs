@@ -386,11 +386,11 @@ fn history_data<OS: FeatureSpace<Tensor>, AS: ParameterizedSampleSpace<Tensor>>(
 mod policy_gradient {
     use super::super::super::testing;
     use super::*;
-    use crate::torch::configs::{GruMlpConfig, MLPConfig};
+    use crate::torch::configs::{GruMlpConfig, MlpConfig};
 
     #[test]
     fn default_mlp_learns_derministic_bandit() {
-        let mut config = PolicyGradientAgentConfig::<MLPConfig, nn::Adam>::default();
+        let mut config = PolicyGradientAgentConfig::<MlpConfig, nn::Adam>::default();
         // Increase learning rate for the sake of quick testing on an easy environment
         config.learning_rate = 0.1;
         testing::train_deterministic_bandit(

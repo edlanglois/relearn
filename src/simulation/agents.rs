@@ -6,7 +6,7 @@ use crate::agents::{
 };
 use crate::envs::EnvStructure;
 use crate::spaces::FiniteSpace;
-use crate::torch::configs::MLPConfig;
+use crate::torch::configs::MlpConfig;
 use tch::nn::Adam;
 use thiserror::Error;
 
@@ -102,7 +102,7 @@ impl AgentDef {
                 structure.discount_factor,
                 steps_per_epoch,
                 learning_rate,
-                &MLPConfig::default(),
+                &MlpConfig::default(),
                 Adam::default(),
             ))),
             _ => self.make_any_any(structure, seed),

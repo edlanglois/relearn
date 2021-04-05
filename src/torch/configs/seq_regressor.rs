@@ -1,6 +1,6 @@
-use super::super::seq_modules::{SeqModRNN, SequenceRegressor};
+use super::super::seq_modules::{SeqModRnn, SequenceRegressor};
 use super::super::{Activation, ModuleBuilder};
-use super::{MLPConfig, RNNConfig};
+use super::{MlpConfig, RnnConfig};
 use std::borrow::Borrow;
 use tch::nn;
 
@@ -19,9 +19,9 @@ where
 }
 
 /// Configuration for an MLP stacked on top of a GRU.
-pub type GruMlpConfig = SequenceRegressorConfig<RNNConfig<nn::GRU>, MLPConfig>;
+pub type GruMlpConfig = SequenceRegressorConfig<RnnConfig<nn::GRU>, MlpConfig>;
 /// Configuration for an MLP stacked on top of an LSTM.
-pub type LstmMlpConfig = SequenceRegressorConfig<RNNConfig<nn::LSTM>, MLPConfig>;
+pub type LstmMlpConfig = SequenceRegressorConfig<RnnConfig<nn::LSTM>, MlpConfig>;
 
 impl<R, P> Default for SequenceRegressorConfig<R, P>
 where
@@ -49,7 +49,7 @@ where
 {
     type Module = SequenceRegressor<
         'static,
-        SeqModRNN<<R as ModuleBuilder>::Module>,
+        SeqModRnn<<R as ModuleBuilder>::Module>,
         <P as ModuleBuilder>::Module,
     >;
 

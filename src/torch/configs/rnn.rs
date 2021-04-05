@@ -5,13 +5,13 @@ use tch::nn;
 
 /// Configuration of a recurrent neural network.
 #[derive(Debug)]
-pub struct RNNConfig<R: nn::RNN> {
+pub struct RnnConfig<R: nn::RNN> {
     pub has_biases: bool,
     pub num_layers: usize,
     type_: PhantomData<R>,
 }
 
-impl<R: nn::RNN> Default for RNNConfig<R> {
+impl<R: nn::RNN> Default for RnnConfig<R> {
     fn default() -> Self {
         Self {
             num_layers: 1,
@@ -21,7 +21,7 @@ impl<R: nn::RNN> Default for RNNConfig<R> {
     }
 }
 
-impl ModuleBuilder for RNNConfig<nn::GRU> {
+impl ModuleBuilder for RnnConfig<nn::GRU> {
     type Module = nn::GRU;
 
     fn build<'a, T: Borrow<nn::Path<'a>>>(
@@ -42,7 +42,7 @@ impl ModuleBuilder for RNNConfig<nn::GRU> {
     }
 }
 
-impl ModuleBuilder for RNNConfig<nn::LSTM> {
+impl ModuleBuilder for RnnConfig<nn::LSTM> {
     type Module = nn::LSTM;
 
     fn build<'a, T: Borrow<nn::Path<'a>>>(
@@ -71,7 +71,7 @@ mod rnn_config {
     /// Check that the default GRU Config builds successfully
     #[test]
     fn default_gru_builds() {
-        let config: RNNConfig<nn::GRU> = Default::default();
+        let config: RnnConfig<nn::GRU> = Default::default();
         let vs = nn::VarStore::new(Device::Cpu);
         let _ = config.build(&vs.root(), 3, 2);
     }
@@ -79,7 +79,7 @@ mod rnn_config {
     /// Check that the default LSTM Config builds successfully
     #[test]
     fn default_lstm_builds() {
-        let config: RNNConfig<nn::LSTM> = Default::default();
+        let config: RnnConfig<nn::LSTM> = Default::default();
         let vs = nn::VarStore::new(Device::Cpu);
         let _ = config.build(&vs.root(), 3, 2);
     }

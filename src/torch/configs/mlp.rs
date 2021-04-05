@@ -5,7 +5,7 @@ use tch::nn;
 
 /// Multi-Layer Perceptron Configuration
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MLPConfig {
+pub struct MlpConfig {
     /// Sizes of the hidden layers
     hidden_sizes: Vec<usize>,
     /// Activation function between hidden layers.
@@ -14,9 +14,9 @@ pub struct MLPConfig {
     output_activation: Activation,
 }
 
-impl Default for MLPConfig {
+impl Default for MlpConfig {
     fn default() -> Self {
-        MLPConfig {
+        MlpConfig {
             hidden_sizes: vec![128],
             activation: Activation::Relu,
             output_activation: Activation::Identity,
@@ -24,7 +24,7 @@ impl Default for MLPConfig {
     }
 }
 
-impl ModuleBuilder for MLPConfig {
+impl ModuleBuilder for MlpConfig {
     type Module = nn::Sequential;
 
     fn build<'a, T: Borrow<nn::Path<'a>>>(
@@ -67,13 +67,13 @@ mod mlp_config {
     use rstest::{fixture, rstest};
     use tch::{kind::Kind, Device};
 
-    type MLP = <MLPConfig as ModuleBuilder>::Module;
+    type MLP = <MlpConfig as ModuleBuilder>::Module;
 
     #[fixture]
     fn default_module() -> (MLP, usize, usize) {
         let in_dim = 3;
         let out_dim = 2;
-        let config = MLPConfig::default();
+        let config = MlpConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
         let module = config.build(&vs.root(), in_dim, out_dim);
         (module, in_dim, out_dim)
