@@ -1,18 +1,19 @@
+use super::hooks::SimulationHook;
 /// Simulation trait and Simulator structs.
 use crate::agents::{Actor, Agent, Step};
-use crate::envs::{EnvStructure, StatefulEnvironment};
-use crate::logging::{Event, Loggable, Logger, NullLogger};
+use crate::envs::StatefulEnvironment;
+use crate::logging::{Loggable, Logger};
 use crate::spaces::{ElementRefInto, Space};
 
 /// Runs a simulation.
 pub trait Simulation {
-    /// Run a simulation for the specified number of steps.
-    fn run(&mut self, max_steps: Option<u64>);
+    /// Run a simulation
+    fn run(&mut self);
 }
 
 /// An agent-environment simulator with logging.
 #[derive(Debug)]
-pub struct Simulator<E, A, L>
+pub struct Simulator<E, A, L, H>
 where
     E: StatefulEnvironment,
     <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
@@ -23,13 +24,19 @@ where
     <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
     <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
     L: Logger,
+    H: SimulationHook<
+        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        L,
+    >,
 {
     environment: E,
     agent: A,
     logger: L,
+    hook: H,
 }
 
-impl<E, A, L> Simulator<E, A, L>
+impl<E, A, L, H> Simulator<E, A, L, H>
 where
     E: StatefulEnvironment,
     <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
@@ -40,17 +47,23 @@ where
     <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
     <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
     L: Logger,
+    H: SimulationHook<
+        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        L,
+    >,
 {
-    pub fn new(environment: E, agent: A, logger: L) -> Self {
+    pub fn new(environment: E, agent: A, logger: L, hook: H) -> Self {
         Self {
             environment,
             agent,
             logger,
+            hook,
         }
     }
 }
 
-impl<E, A, L> Simulation for Simulator<E, A, L>
+impl<E, A, L, H> Simulation for Simulator<E, A, L, H>
 where
     E: StatefulEnvironment,
     <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
@@ -61,161 +74,112 @@ where
     <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
     <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
     L: Logger,
+    H: SimulationHook<
+        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
+        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        L,
+    >,
 {
-    fn run(&mut self, max_steps: Option<u64>) {
-        run_with_logging(
+    fn run(&mut self) {
+        run_agent(
             &mut self.environment,
             &mut self.agent,
             &mut self.logger,
-            max_steps,
-            |_| (),
+            &mut self.hook,
         );
     }
 }
 
-/// An simulator of a boxed agent and environment.
-pub struct BoxedSimulator<OS: Space, AS: Space, L: Logger> {
+/// A simulator of a boxed agent and environment.
+pub struct BoxedSimulator<OS, AS, L, H>
+where
+    OS: Space,
+    AS: Space,
+    L: Logger,
+    H: SimulationHook<OS::Element, AS::Element, L>,
+{
     environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
     agent: Box<dyn Agent<OS::Element, AS::Element>>,
     logger: L,
+    hook: H,
 }
 
-impl<OS, AS, L> BoxedSimulator<OS, AS, L>
+impl<OS, AS, L, H> BoxedSimulator<OS, AS, L, H>
 where
     OS: Space,
     <OS as Space>::Element: Clone,
     AS: Space,
     L: Logger,
+    H: SimulationHook<OS::Element, AS::Element, L>,
 {
     pub fn new(
         environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
         agent: Box<dyn Agent<OS::Element, AS::Element>>,
         logger: L,
+        hook: H,
     ) -> Self {
         Self {
             environment,
             agent,
             logger,
+            hook,
         }
     }
 }
 
-impl<OS, AS, L> Simulation for BoxedSimulator<OS, AS, L>
+impl<OS, AS, L, H> Simulation for BoxedSimulator<OS, AS, L, H>
 where
     OS: Space + ElementRefInto<Loggable>,
     <OS as Space>::Element: Clone,
     AS: Space + ElementRefInto<Loggable>,
     L: Logger,
+    H: SimulationHook<OS::Element, AS::Element, L>,
 {
-    fn run(&mut self, max_steps: Option<u64>) {
-        run_with_logging(
+    fn run(&mut self) {
+        run_agent(
             self.environment.as_mut(),
             self.agent.as_mut(),
             &mut self.logger,
-            max_steps,
-            |_| (),
+            &mut self.hook,
         );
     }
 }
 
-/// Run an agent-environment simulation with logging.
-pub fn run_with_logging<E, A, L, F>(
-    environment: &mut E,
-    agent: &mut A,
-    logger: &mut L,
-    max_steps: Option<u64>,
-    mut callback: F,
-) where
-    E: StatefulEnvironment + ?Sized,
-    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
-    A: Agent<
-            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
-        > + ?Sized,
-    <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
-    <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
-    L: Logger,
-    F: FnMut(
-        &Step<
-            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
-        >,
-    ),
-{
-    let mut step_count = 0; // Global step count
-    let mut tracker = SimulationTracker::new(environment.structure());
-
-    run_agent_(environment, agent, logger, |step, logger| {
-        tracker.log_step(step, logger);
-        callback(step);
-
-        step_count += 1;
-        match max_steps {
-            Some(steps) => step_count < steps,
-            None => true,
-        }
-    });
-}
-
 /// Run an agent-environment simulation.
-pub fn run_agent<E, A, F>(
-    environment: &mut E,
-    agent: &mut A,
-    max_steps: Option<u64>,
-    mut callback: F,
-) where
-    E: StatefulEnvironment + ?Sized,
-    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
-    A: Agent<
-            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
-        > + ?Sized,
-    F: FnMut(
-        &Step<
-            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
-        >,
-    ),
-{
-    let mut step_count = 0; // Global step count
-    let mut logger = NullLogger::new();
-
-    run_agent_(environment, agent, &mut logger, |step, _| {
-        callback(step);
-
-        step_count += 1;
-        match max_steps {
-            Some(steps) => step_count < steps,
-            None => true,
-        }
-    });
-}
-
-/// Run an agent-environment simulation with a callback and logger pass-through to the agent.
-fn run_agent_<E, A, F, L>(environment: &mut E, agent: &mut A, logger: &mut L, mut callback: F)
+///
+/// # Args
+/// * `environment` - The environment to simulate.
+/// * `agent` - The agent to simulate.
+/// * `logger` - The logger to use.
+/// * `hook` - A simulation hook run on each step. Controls when the simulation stops.
+pub fn run_agent<E, A, L, H>(environment: &mut E, agent: &mut A, logger: &mut L, hook: &mut H)
 where
+    // The ?Sized allows this function to be called with types
+    // (&mut dyn Environment, &mut dyn Agent, ...
+    // In that case it only needs to be instantiated once and can work with trait pointers.
+    //
+    // Alternatively, it can use the concrete struct types, which allows inlining.
     E: StatefulEnvironment + ?Sized,
     <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
     A: Agent<
             <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
             <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
         > + ?Sized,
-    F: FnMut(
-        &Step<
+    L: Logger, // Not ?Sized because can't convert &(Logger + ?Sized) => &mut dyn Logger
+    H: SimulationHook<
             <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
             <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
-        >,
-        &mut L,
-    ) -> bool,
-    L: Logger,
+            L,
+        > + ?Sized,
 {
     let mut observation = environment.reset();
-    let new_episode = true;
+    let mut new_episode = true;
 
     loop {
         let action = agent.act(&observation, new_episode);
         let (next_observation, reward, episode_done) = environment.step(&action);
 
+        new_episode = false;
         let step = Step {
             observation,
             action,
@@ -223,27 +187,34 @@ where
             next_observation: next_observation.clone(),
             episode_done,
         };
-        let stop = !callback(&step, logger);
+
+        let stop = !hook.call(&step, logger);
         agent.update(step, logger);
         if stop {
             break;
         }
 
-        observation = if episode_done {
-            environment.reset()
+        if episode_done {
+            new_episode = true;
+            observation = environment.reset();
         } else {
-            next_observation.expect("Observation must exist if the episode is not done")
-        };
+            observation =
+                next_observation.expect("Observation must exist if the episode is not done")
+        }
     }
 }
 
-/// Run an actor-environment simulation with a callback function called on each step.
-///
-/// The simulation will continue while the callback returns `true`.
+/// Run an actor-environment simulation.
 ///
 /// An actor never learns between episodes.
 /// An actor may depend on history from the current episode.
-pub fn run_actor<E, A, F>(environment: &mut E, actor: &mut A, mut callback: F)
+///
+/// # Args
+/// * `environment` - The environment to simulate.
+/// * `actor` - The actor to simulate.
+/// * `logger` - The logger to use. Passed to hook calls.
+/// * `hook` - A simulation hook run on each step. Controls when the simulation stops.
+pub fn run_actor<E, A, L, H>(environment: &mut E, actor: &mut A, logger: &mut L, hook: &mut H)
 where
     E: StatefulEnvironment + ?Sized,
     <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
@@ -251,20 +222,21 @@ where
             <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
             <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
         > + ?Sized,
-    F: FnMut(
-        &Step<
+    L: Logger + ?Sized,
+    H: SimulationHook<
             <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
             <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
-        >,
-    ) -> bool,
+            L,
+        > + ?Sized,
 {
     let mut observation = environment.reset();
-    let new_episode = true;
+    let mut new_episode = true;
 
     loop {
         let action = actor.act(&observation, new_episode);
         let (next_observation, reward, episode_done) = environment.step(&action);
 
+        new_episode = false;
         let step = Step {
             observation,
             action,
@@ -272,7 +244,8 @@ where
             next_observation: next_observation.clone(),
             episode_done,
         };
-        if !callback(&step) {
+
+        if !hook.call(&step, logger) {
             break;
         }
 
@@ -281,71 +254,5 @@ where
         } else {
             next_observation.expect("Observation must exist if the episode is not done")
         };
-    }
-}
-
-/// Track simulation progress for logging
-struct SimulationTracker<OS, AS>
-where
-    OS: ElementRefInto<Loggable>,
-    AS: ElementRefInto<Loggable>,
-{
-    pub observation_space: OS,
-    pub action_space: AS,
-
-    pub episode_length: u64,
-    pub episode_reward: f64,
-}
-
-impl<OS, AS> SimulationTracker<OS, AS>
-where
-    OS: ElementRefInto<Loggable>,
-    AS: ElementRefInto<Loggable>,
-{
-    pub fn new(env_structure: EnvStructure<OS, AS>) -> Self {
-        Self {
-            observation_space: env_structure.observation_space,
-            action_space: env_structure.action_space,
-            episode_length: 0,
-            episode_reward: 0.0,
-        }
-    }
-
-    pub fn log_step<L: Logger>(&mut self, step: &Step<OS::Element, AS::Element>, logger: &mut L) {
-        let reward = step.reward as f64;
-        logger.log(Event::Step, "reward", reward.into()).unwrap();
-        logger
-            .log(
-                Event::Step,
-                "observation",
-                self.observation_space.elem_ref_into(&step.observation),
-            )
-            .unwrap();
-        logger
-            .log(
-                Event::Step,
-                "action",
-                self.action_space.elem_ref_into(&step.action),
-            )
-            .unwrap();
-        logger.done(Event::Step);
-
-        self.episode_length += 1;
-        self.episode_reward += reward;
-        if step.episode_done {
-            logger
-                .log(
-                    Event::Episode,
-                    "length",
-                    (self.episode_length as f64).into(),
-                )
-                .unwrap();
-            self.episode_length = 0;
-            logger
-                .log(Event::Episode, "reward", self.episode_reward.into())
-                .unwrap();
-            self.episode_reward = 0.0;
-            logger.done(Event::Episode);
-        }
     }
 }

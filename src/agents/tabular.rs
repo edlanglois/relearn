@@ -126,7 +126,9 @@ mod tabular_q_learning {
     use super::super::testing;
     use super::*;
     use crate::envs::{AsStateful, DeterministicBandit, StatefulEnvironment};
+    use crate::logging::NullLogger;
     use crate::simulation;
+    use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 
     #[test]
     fn learns_determinstic_bandit() {
@@ -149,6 +151,7 @@ mod tabular_q_learning {
     fn explore_exploit() {
         let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).as_stateful(0);
         let env_structure = env.structure();
+        let action_space = env_structure.action_space.clone();
         let mut agent = TabularQLearningAgent::new(
             env_structure.observation_space,
             env_structure.action_space,
@@ -158,21 +161,31 @@ mod tabular_q_learning {
         );
 
         // The agent explores
-        let mut action_1_count = 0;
-        simulation::run_agent(&mut env, &mut agent, Some(1000), |step| {
-            action_1_count += (step.action == 1) as u64;
-        });
+        let mut explore_hooks = (
+            IndexedActionCounter::new(action_space.clone()),
+            StepLimit::new(1000),
+        );
+        simulation::run_agent(
+            &mut env,
+            &mut agent,
+            &mut NullLogger::new(),
+            &mut explore_hooks,
+        );
+        let action_1_count = explore_hooks.0.counts[1];
         assert!(action_1_count > 300);
         assert!(action_1_count < 700);
 
         // The actor exploits
-        let mut step_count = 0;
-        let mut action_1_count = 0;
-        simulation::run_actor(&mut env, &mut agent, |step| {
-            action_1_count += (step.action == 1) as u64;
-            step_count += 1;
-            step_count < 1000
-        });
-        assert!(action_1_count > 900);
+        let mut exploit_hooks = (
+            IndexedActionCounter::new(action_space),
+            StepLimit::new(1000),
+        );
+        simulation::run_actor(
+            &mut env,
+            &mut agent,
+            &mut NullLogger::new(),
+            &mut exploit_hooks,
+        );
+        assert!(exploit_hooks.0.counts[1] > 900);
     }
 }

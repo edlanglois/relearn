@@ -1,8 +1,10 @@
 //! Environment testing utilities
 use super::as_stateful::AsStateful;
 use super::{EnvStructure, Environment, StatefulEnvironment};
-use crate::agents::RandomAgent;
+use crate::agents::{RandomAgent, Step};
+use crate::logging::NullLogger;
 use crate::simulation;
+use crate::simulation::hooks::{ClosureHook, StepLimit};
 use crate::spaces::{SampleSpace, Space};
 use std::fmt::Debug;
 
@@ -41,13 +43,22 @@ where
     }
 
     let mut agent = RandomAgent::new(action_space, seed);
-    simulation::run_agent(env, &mut agent, Some(num_steps), |step| {
-        assert!(step.reward >= min_reward);
-        assert!(step.reward <= max_reward);
-        if let Some(obs) = &step.next_observation {
-            assert!(observation_space.contains(obs))
-        } else {
-            assert!(step.episode_done);
-        }
-    });
+    simulation::run_agent(
+        env,
+        &mut agent,
+        &mut NullLogger::new(),
+        &mut (
+            ClosureHook::from(|step: &Step<_, _>| -> bool {
+                assert!(step.reward >= min_reward);
+                assert!(step.reward <= max_reward);
+                if let Some(obs) = &step.next_observation {
+                    assert!(observation_space.contains(obs))
+                } else {
+                    assert!(step.episode_done);
+                }
+                true
+            }),
+            StepLimit::new(num_steps),
+        ),
+    );
 }

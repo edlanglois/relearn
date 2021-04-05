@@ -123,7 +123,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Agent: {:?}", agent_def);
 
     let logger = CLILogger::new(Duration::from_millis(1000), true);
-    let mut simulation = env_def.make_simulation(agent_def, opts.seed, logger)?;
-    simulation.run(opts.max_steps);
+    let mut simulation = env_def.make_simulation(agent_def, opts.seed, logger, ())?;
+    simulation.run();
     Ok(())
 }

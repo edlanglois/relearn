@@ -7,6 +7,6 @@ pub mod spaces;
 pub mod torch;
 pub mod utils;
 
-pub use agents::{Actor, Agent};
+pub use agents::{Actor, Agent, Step};
 pub use envs::{EnvStructure, Environment, StatefulEnvironment};
 pub use spaces::Space;

@@ -1,6 +1,8 @@
 //! Agent testing utilities
 use crate::envs::{AsStateful, DeterministicBandit, StatefulEnvironment};
+use crate::logging::NullLogger;
 use crate::simulation;
+use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::{Actor, Agent, EnvStructure};
 
@@ -14,22 +16,27 @@ where
     F: FnOnce(EnvStructure<SingletonSpace, IndexSpace>) -> A,
 {
     let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).as_stateful(0);
-    let mut agent = make_agent(env.structure());
+    let env_structure = env.structure();
+    let action_space = env_structure.action_space.clone();
+    let mut agent = make_agent(env_structure);
 
     // Training
     if num_train_steps > 0 {
-        simulation::run_agent(&mut env, &mut agent, Some(num_train_steps), |_| ());
+        simulation::run_agent(
+            &mut env,
+            &mut agent,
+            &mut NullLogger::new(),
+            &mut StepLimit::new(num_train_steps),
+        );
     }
 
     // Evaluation
     let num_eval_steps = 1000;
-    let mut action_1_count = 0;
-    let mut step_count = 0;
-    simulation::run_actor(&mut env, &mut agent, |step| {
-        action_1_count += (step.action == 1) as u64;
-        step_count += 1;
-        step_count < num_eval_steps
-    });
 
+    let action_counter = IndexedActionCounter::new(action_space);
+    let mut hooks = (action_counter, StepLimit::new(num_eval_steps));
+    simulation::run_actor(&mut env, &mut agent, &mut NullLogger::new(), &mut hooks);
+
+    let action_1_count = hooks.0.counts[1];
     assert!(action_1_count >= ((num_eval_steps as f64) * threshold) as u64);
 }

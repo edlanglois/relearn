@@ -1,4 +1,5 @@
 //! Environment definitions
+use super::hooks::{GenericSimulationHook, SimulationHook, StepLogger};
 use super::spaces::{CommonActionSpace, CommonObservationSpace};
 use super::{AgentDef, BoxedSimulator, MakeAgentError, Simulation};
 use crate::envs::{AsStateful, BernoulliBandit, Chain, DeterministicBandit, StatefulEnvironment};
@@ -23,54 +24,68 @@ pub enum EnvDef {
     },
 }
 
-fn finite_finite_simulator<OS, AS, L>(
+fn finite_finite_simulator<OS, AS, L, H>(
     environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
     agent_def: AgentDef,
     logger: L,
+    hook: H,
     seed: u64,
 ) -> Result<Box<dyn Simulation>, MakeAgentError>
 where
-    OS: CommonObservationSpace + FiniteSpace + 'static,
+    OS: CommonObservationSpace + FiniteSpace + Clone + 'static,
     <OS as Space>::Element: Clone,
-    AS: CommonActionSpace + FiniteSpace + 'static,
+    AS: CommonActionSpace + FiniteSpace + Clone + 'static,
     L: Logger + 'static,
+    H: SimulationHook<<OS as Space>::Element, <AS as Space>::Element, L> + 'static,
 {
-    let agent = agent_def.make_finite_finite(environment.structure(), seed)?;
-    Ok(Box::new(BoxedSimulator::new(environment, agent, logger)))
+    let env_structure = environment.structure();
+    let log_hook = StepLogger::new(
+        env_structure.observation_space.clone(),
+        env_structure.action_space.clone(),
+    );
+    let hook = (log_hook, hook);
+    let agent = agent_def.make_finite_finite(env_structure, seed)?;
+    Ok(Box::new(BoxedSimulator::new(
+        environment,
+        agent,
+        logger,
+        hook,
+    )))
 }
 
 impl EnvDef {
-    pub fn make_simulation<L: Logger + 'static>(
+    pub fn make_simulation<L: Logger + 'static, H: GenericSimulationHook + 'static>(
         self,
         agent_def: AgentDef,
         seed: u64,
         logger: L,
+        hook: H,
     ) -> Result<Box<dyn Simulation>, MakeAgentError> {
         match self {
             EnvDef::SimpleBernoulliBandit => {
                 let env = BernoulliBandit::from_means(vec![0.2, 0.8])
                     .unwrap()
                     .as_stateful(seed);
-                finite_finite_simulator(Box::new(env), agent_def, logger, seed + 1)
+                finite_finite_simulator(Box::new(env), agent_def, logger, hook, seed + 1)
             }
             EnvDef::BernoulliBandit { num_arms } => {
                 let env = BernoulliBandit::uniform(num_arms, &mut StdRng::seed_from_u64(seed + 2))
                     .as_stateful(seed);
-                finite_finite_simulator(Box::new(env), agent_def, logger, seed + 1)
+                finite_finite_simulator(Box::new(env), agent_def, logger, hook, seed + 1)
             }
             EnvDef::DeterministicBandit { num_arms } => {
                 let mut rng = StdRng::seed_from_u64(seed + 2);
                 let env =
                     DeterministicBandit::from_values((0..num_arms).into_iter().map(|_| rng.gen()))
                         .as_stateful(seed);
-                finite_finite_simulator(Box::new(env), agent_def, logger, seed + 1)
+                finite_finite_simulator(Box::new(env), agent_def, logger, hook, seed + 1)
             }
             EnvDef::Chain {
                 num_states,
                 discount_factor,
             } => {
                 let env = Chain::new(num_states, discount_factor).as_stateful(seed);
-                finite_finite_simulator(Box::new(env), agent_def, logger, seed + 1)
+                finite_finite_simulator(Box::new(env), agent_def, logger, hook, seed + 1)
             }
         }
     }
