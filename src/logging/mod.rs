@@ -1,9 +1,7 @@
 //! Logging statistics from simulation runs
 pub mod cli;
-mod null;
 
 pub use cli::CLILogger;
-pub use null::NullLogger;
 use std::convert::From;
 
 use enum_map::Enum;
@@ -58,6 +56,15 @@ pub trait Logger {
 
     /// Mark the end of an event.
     fn done(&mut self, event: Event);
+}
+
+/// Logger that does nothing
+impl Logger for () {
+    fn log(&mut self, _: Event, _: &'static str, _: Loggable) -> Result<(), LogError> {
+        Ok(())
+    }
+
+    fn done(&mut self, _: Event) {}
 }
 
 #[derive(Debug)]

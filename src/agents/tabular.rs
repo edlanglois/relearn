@@ -126,7 +126,6 @@ mod tabular_q_learning {
     use super::super::testing;
     use super::*;
     use crate::envs::{AsStateful, DeterministicBandit, StatefulEnvironment};
-    use crate::logging::NullLogger;
     use crate::simulation;
     use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 
@@ -165,12 +164,7 @@ mod tabular_q_learning {
             IndexedActionCounter::new(action_space.clone()),
             StepLimit::new(1000),
         );
-        simulation::run_agent(
-            &mut env,
-            &mut agent,
-            &mut NullLogger::new(),
-            &mut explore_hooks,
-        );
+        simulation::run_agent(&mut env, &mut agent, &mut (), &mut explore_hooks);
         let action_1_count = explore_hooks.0.counts[1];
         assert!(action_1_count > 300);
         assert!(action_1_count < 700);
@@ -180,12 +174,7 @@ mod tabular_q_learning {
             IndexedActionCounter::new(action_space),
             StepLimit::new(1000),
         );
-        simulation::run_actor(
-            &mut env,
-            &mut agent,
-            &mut NullLogger::new(),
-            &mut exploit_hooks,
-        );
+        simulation::run_actor(&mut env, &mut agent, &mut (), &mut exploit_hooks);
         assert!(exploit_hooks.0.counts[1] > 900);
     }
 }

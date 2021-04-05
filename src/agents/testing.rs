@@ -1,6 +1,5 @@
 //! Agent testing utilities
 use crate::envs::{AsStateful, DeterministicBandit, StatefulEnvironment};
-use crate::logging::NullLogger;
 use crate::simulation;
 use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 use crate::spaces::{IndexSpace, SingletonSpace};
@@ -25,7 +24,7 @@ where
         simulation::run_agent(
             &mut env,
             &mut agent,
-            &mut NullLogger::new(),
+            &mut (),
             &mut StepLimit::new(num_train_steps),
         );
     }
@@ -35,7 +34,7 @@ where
 
     let action_counter = IndexedActionCounter::new(action_space);
     let mut hooks = (action_counter, StepLimit::new(num_eval_steps));
-    simulation::run_actor(&mut env, &mut agent, &mut NullLogger::new(), &mut hooks);
+    simulation::run_actor(&mut env, &mut agent, &mut (), &mut hooks);
 
     let action_1_count = hooks.0.counts[1];
     assert!(action_1_count >= ((num_eval_steps as f64) * threshold) as u64);

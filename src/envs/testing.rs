@@ -2,7 +2,6 @@
 use super::as_stateful::AsStateful;
 use super::{EnvStructure, Environment, StatefulEnvironment};
 use crate::agents::{RandomAgent, Step};
-use crate::logging::NullLogger;
 use crate::simulation;
 use crate::simulation::hooks::{ClosureHook, StepLimit};
 use crate::spaces::{SampleSpace, Space};
@@ -46,7 +45,7 @@ where
     simulation::run_agent(
         env,
         &mut agent,
-        &mut NullLogger::new(),
+        &mut (),
         &mut (
             ClosureHook::from(|step: &Step<_, _>| -> bool {
                 assert!(step.reward >= min_reward);
