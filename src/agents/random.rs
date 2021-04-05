@@ -1,9 +1,34 @@
-use super::{Actor, Agent, Step};
+use super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
+use crate::envs::EnvStructure;
 use crate::logging::Logger;
-use crate::spaces::SampleSpace;
+use crate::spaces::{SampleSpace, Space};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::fmt;
+
+/// Configuration setttings for a random agent.
+#[derive(Debug)]
+pub struct RandomAgentConfig {}
+
+impl RandomAgentConfig {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for RandomAgentConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<OS: Space, AS: SampleSpace> AgentBuilder<OS, AS> for RandomAgentConfig {
+    type Agent = RandomAgent<AS>;
+
+    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, NewAgentError> {
+        Ok(RandomAgent::new(es.action_space, seed))
+    }
+}
 
 /// An agent that always acts randomly.
 pub struct RandomAgent<AS: SampleSpace> {

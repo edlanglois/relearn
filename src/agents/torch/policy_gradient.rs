@@ -1,10 +1,85 @@
 //! Policy-gradient agents
-use super::super::{Actor, Agent, Step};
+use super::super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{IterativeModule, SequenceModule};
 use crate::torch::ModuleBuilder;
+use crate::EnvStructure;
 use tch::{kind::Kind, nn, nn::OptimizerConfig, Device, Tensor};
+
+/// Configuration for PolicyGradientAgent
+#[derive(Debug)]
+pub struct PolicyGradientAgentConfig<C, O>
+where
+    C: ModuleBuilder,
+    <C as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    O: OptimizerConfig,
+{
+    pub steps_per_epoch: usize,
+    pub learning_rate: f64,
+    pub policy_config: C,
+    pub optimizer_config: O,
+}
+
+impl<C, O> PolicyGradientAgentConfig<C, O>
+where
+    C: ModuleBuilder,
+    <C as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    O: OptimizerConfig,
+{
+    pub fn new(
+        steps_per_epoch: usize,
+        learning_rate: f64,
+        policy_config: C,
+        optimizer_config: O,
+    ) -> Self {
+        Self {
+            steps_per_epoch,
+            learning_rate,
+            policy_config,
+            optimizer_config,
+        }
+    }
+}
+
+impl<C, O> Default for PolicyGradientAgentConfig<C, O>
+where
+    C: ModuleBuilder + Default,
+    <C as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    O: OptimizerConfig + Default,
+{
+    fn default() -> Self {
+        Self {
+            steps_per_epoch: 1000,
+            learning_rate: 1e-2,
+            policy_config: Default::default(),
+            optimizer_config: Default::default(),
+        }
+    }
+}
+
+impl<OS, AS, C, O> AgentBuilder<OS, AS> for PolicyGradientAgentConfig<C, O>
+where
+    OS: FeatureSpace<Tensor>,
+    AS: ParameterizedSampleSpace<Tensor>,
+    C: ModuleBuilder,
+    <C as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    O: OptimizerConfig + Clone,
+{
+    type Agent = PolicyGradientAgent<OS, AS, <C as ModuleBuilder>::Module, O>;
+
+    fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, NewAgentError> {
+        Ok(Self::Agent::new(
+            es.observation_space,
+            es.action_space,
+            es.discount_factor,
+            self.steps_per_epoch,
+            self.learning_rate,
+            &self.policy_config,
+            self.optimizer_config.clone(),
+        ))
+    }
+}
 
 /// A vanilla policy-gradient agent.
 ///
@@ -315,18 +390,11 @@ mod policy_gradient {
 
     #[test]
     fn default_mlp_learns_derministic_bandit() {
+        let mut config = PolicyGradientAgentConfig::<MLPConfig, nn::Adam>::default();
+        // Increase learning rate for the sake of quick testing on an easy environment
+        config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
-            |env_structure| {
-                PolicyGradientAgent::new(
-                    env_structure.observation_space,
-                    env_structure.action_space,
-                    env_structure.discount_factor,
-                    20,  // steps_per_epoch
-                    0.1, // learning_rate
-                    &MLPConfig::default(),
-                    nn::Adam::default(),
-                )
-            },
+            |env_structure| config.build(env_structure, 0).unwrap(),
             1_000,
             0.9,
         );
@@ -334,18 +402,11 @@ mod policy_gradient {
 
     #[test]
     fn default_gru_mlp_learns_derministic_bandit() {
+        let mut config = PolicyGradientAgentConfig::<GruMlpConfig, nn::Adam>::default();
+        // Increase learning rate for the sake of quick testing on an easy environment
+        config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
-            |env_structure| {
-                PolicyGradientAgent::new(
-                    env_structure.observation_space,
-                    env_structure.action_space,
-                    env_structure.discount_factor,
-                    20,  // steps_per_epoch
-                    0.1, // learning_rate
-                    &GruMlpConfig::default(),
-                    nn::Adam::default(),
-                )
-            },
+            |env_structure| config.build(env_structure, 0).unwrap(),
             1_000,
             0.9,
         );

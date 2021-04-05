@@ -1,5 +1,6 @@
 //! Tabular agents
-use super::{Actor, Agent, Step};
+use super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
+use crate::envs::EnvStructure;
 use crate::logging::Logger;
 use crate::spaces::{FiniteSpace, SampleSpace};
 use ndarray::{Array, Array2, Axis};
@@ -7,6 +8,41 @@ use ndarray_stats::QuantileExt;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::fmt;
+
+/// Configuration of an Epsilon-Greedy Tabular Q Learning Agent.
+#[derive(Debug)]
+pub struct TabularQLearningAgentConfig {
+    /// Probability of taking a random action.
+    pub exploration_rate: f64,
+}
+
+impl TabularQLearningAgentConfig {
+    pub fn new(exploration_rate: f64) -> Self {
+        Self { exploration_rate }
+    }
+}
+
+impl Default for TabularQLearningAgentConfig {
+    fn default() -> Self {
+        Self::new(0.2)
+    }
+}
+
+impl<OS: FiniteSpace, AS: FiniteSpace + SampleSpace> AgentBuilder<OS, AS>
+    for TabularQLearningAgentConfig
+{
+    type Agent = TabularQLearningAgent<OS, AS>;
+
+    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, NewAgentError> {
+        Ok(Self::Agent::new(
+            es.observation_space,
+            es.action_space,
+            es.discount_factor,
+            self.exploration_rate,
+            seed,
+        ))
+    }
+}
 
 /// An epsilon-greedy tabular Q learning.
 #[derive(Debug)]
@@ -131,16 +167,9 @@ mod tabular_q_learning {
 
     #[test]
     fn learns_determinstic_bandit() {
+        let config = TabularQLearningAgentConfig::default();
         testing::train_deterministic_bandit(
-            |env_structure| {
-                TabularQLearningAgent::new(
-                    env_structure.observation_space,
-                    env_structure.action_space,
-                    env_structure.discount_factor,
-                    0.1,
-                    0,
-                )
-            },
+            |env_structure| config.build(env_structure, 0).unwrap(),
             1000,
             0.9,
         );
@@ -151,15 +180,10 @@ mod tabular_q_learning {
         let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).as_stateful(0);
         let env_structure = env.structure();
         let action_space = env_structure.action_space.clone();
-        let mut agent = TabularQLearningAgent::new(
-            env_structure.observation_space,
-            env_structure.action_space,
-            env_structure.discount_factor,
-            0.95,
-            0,
-        );
 
         // The agent explores
+        let config = TabularQLearningAgentConfig::new(0.95);
+        let mut agent = config.build(env_structure, 0).unwrap();
         let mut explore_hooks = (
             IndexedActionCounter::new(action_space.clone()),
             StepLimit::new(1000),

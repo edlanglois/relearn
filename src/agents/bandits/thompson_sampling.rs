@@ -1,5 +1,6 @@
 //! Thompson sampling bandit agent
-use super::super::{Actor, Agent, Step};
+use super::super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
+use crate::envs::EnvStructure;
 use crate::logging::Logger;
 use crate::spaces::FiniteSpace;
 use crate::utils::iter::ArgMaxBy;
@@ -8,6 +9,40 @@ use rand::distributions::Distribution;
 use rand::prelude::*;
 use statrs::distribution::Beta;
 use std::fmt;
+
+/// Configuration for a BetaThompsonSamplingAgent
+#[derive(Debug)]
+pub struct BetaThompsonSamplingAgentConfig {
+    /// Number of posterior samples to draw.
+    /// Takes the action with the highest mean sampled value.
+    pub num_samples: usize,
+}
+
+impl BetaThompsonSamplingAgentConfig {
+    pub fn new(num_samples: usize) -> Self {
+        Self { num_samples }
+    }
+}
+
+impl Default for BetaThompsonSamplingAgentConfig {
+    fn default() -> Self {
+        Self::new(1)
+    }
+}
+
+impl<OS: FiniteSpace, AS: FiniteSpace> AgentBuilder<OS, AS> for BetaThompsonSamplingAgentConfig {
+    type Agent = BetaThompsonSamplingAgent<OS, AS>;
+
+    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, NewAgentError> {
+        Ok(Self::Agent::new(
+            es.observation_space,
+            es.action_space,
+            es.reward_range,
+            self.num_samples,
+            seed,
+        ))
+    }
+}
 
 /// A Thompson sampling agent for Bernoulli rewards with a Beta prior.
 #[derive(Debug)]
@@ -154,16 +189,9 @@ mod beta_thompson_sampling {
 
     #[test]
     fn learns_determinstic_bandit() {
+        let config = BetaThompsonSamplingAgentConfig::default();
         testing::train_deterministic_bandit(
-            |env_structure| {
-                BetaThompsonSamplingAgent::new(
-                    env_structure.observation_space,
-                    env_structure.action_space,
-                    env_structure.reward_range,
-                    1,
-                    0,
-                )
-            },
+            |env_structure| config.build(env_structure, 0).unwrap(),
             1000,
             0.9,
         );

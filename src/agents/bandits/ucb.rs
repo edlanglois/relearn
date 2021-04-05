@@ -1,12 +1,47 @@
 //! Upper confidence bound bandit agent.
-use super::super::error::NewAgentError;
-use super::super::{Actor, Agent, Step};
+use super::super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
+use crate::envs::EnvStructure;
 use crate::logging::Logger;
 use crate::spaces::FiniteSpace;
 use crate::utils::iter::ArgMaxBy;
 use ndarray::{Array, Array1, Array2, Axis};
 use std::f64;
 use std::fmt;
+
+/// Configuration for a UCB1Agent
+#[derive(Debug)]
+pub struct UCB1AgentConfig {
+    /// Scale factor on the confidence interval; controls the exploration rate.
+    ///
+    /// A value of 0.2 is recommended by Audibert and Munos in their ICML
+    /// tutorial Introduction to Bandits: Algorithms and Theory (2011).
+    pub exploration_rate: f64,
+}
+
+impl UCB1AgentConfig {
+    pub fn new(exploration_rate: f64) -> Self {
+        Self { exploration_rate }
+    }
+}
+
+impl Default for UCB1AgentConfig {
+    fn default() -> Self {
+        Self::new(0.2)
+    }
+}
+
+impl<OS: FiniteSpace, AS: FiniteSpace> AgentBuilder<OS, AS> for UCB1AgentConfig {
+    type Agent = UCB1Agent<OS, AS>;
+
+    fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, NewAgentError> {
+        Self::Agent::new(
+            es.observation_space,
+            es.action_space,
+            es.reward_range,
+            self.exploration_rate,
+        )
+    }
+}
 
 /// A UCB1 Agent
 ///
@@ -158,16 +193,9 @@ mod ucb1_agent {
 
     #[test]
     fn learns_determinstic_bandit() {
+        let config = UCB1AgentConfig::default();
         testing::train_deterministic_bandit(
-            |env_structure| {
-                UCB1Agent::new(
-                    env_structure.observation_space,
-                    env_structure.action_space,
-                    env_structure.reward_range,
-                    0.2,
-                )
-                .unwrap()
-            },
+            |env_structure| config.build(env_structure, 0).unwrap(),
             1000,
             0.9,
         );

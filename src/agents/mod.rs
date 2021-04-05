@@ -1,7 +1,8 @@
 //! Reinforcement learning agents
 mod agents;
 mod bandits;
-pub mod error;
+mod builder;
+mod error;
 mod random;
 mod tabular;
 #[cfg(test)]
@@ -9,7 +10,11 @@ mod testing;
 mod torch;
 
 pub use agents::{Actor, Agent, Step};
-pub use bandits::{BetaThompsonSamplingAgent, UCB1Agent};
-pub use random::RandomAgent;
-pub use tabular::TabularQLearningAgent;
-pub use torch::PolicyGradientAgent;
+pub use bandits::{
+    BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
+};
+pub use builder::AgentBuilder;
+pub use error::NewAgentError;
+pub use random::{RandomAgent, RandomAgentConfig};
+pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
+pub use torch::{PolicyGradientAgent, PolicyGradientAgentConfig};
