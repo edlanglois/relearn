@@ -3,70 +3,62 @@ use super::super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{IterativeModule, SequenceModule};
-use crate::torch::ModuleBuilder;
+use crate::torch::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use crate::EnvStructure;
-use tch::{kind::Kind, nn, nn::OptimizerConfig, Device, Tensor};
+use tch::{kind::Kind, nn, Device, Tensor};
 
 /// Configuration for PolicyGradientAgent
 #[derive(Debug)]
-pub struct PolicyGradientAgentConfig<C, O>
+pub struct PolicyGradientAgentConfig<PB, OB>
 where
-    C: ModuleBuilder,
-    <C as ModuleBuilder>::Module: SequenceModule + IterativeModule,
-    O: OptimizerConfig,
+    PB: ModuleBuilder,
+    <PB as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    OB: OptimizerBuilder,
 {
     pub steps_per_epoch: usize,
-    pub learning_rate: f64,
-    pub policy_config: C,
-    pub optimizer_config: O,
+    pub policy_config: PB,
+    pub optimizer_config: OB,
 }
 
-impl<C, O> PolicyGradientAgentConfig<C, O>
+impl<PB, OB> PolicyGradientAgentConfig<PB, OB>
 where
-    C: ModuleBuilder,
-    <C as ModuleBuilder>::Module: SequenceModule + IterativeModule,
-    O: OptimizerConfig,
+    PB: ModuleBuilder,
+    <PB as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    OB: OptimizerBuilder,
 {
-    pub fn new(
-        steps_per_epoch: usize,
-        learning_rate: f64,
-        policy_config: C,
-        optimizer_config: O,
-    ) -> Self {
+    pub fn new(steps_per_epoch: usize, policy_config: PB, optimizer_config: OB) -> Self {
         Self {
             steps_per_epoch,
-            learning_rate,
             policy_config,
             optimizer_config,
         }
     }
 }
 
-impl<C, O> Default for PolicyGradientAgentConfig<C, O>
+impl<PB, OB> Default for PolicyGradientAgentConfig<PB, OB>
 where
-    C: ModuleBuilder + Default,
-    <C as ModuleBuilder>::Module: SequenceModule + IterativeModule,
-    O: OptimizerConfig + Default,
+    PB: ModuleBuilder + Default,
+    <PB as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    OB: OptimizerBuilder + Default,
 {
     fn default() -> Self {
         Self {
             steps_per_epoch: 1000,
-            learning_rate: 1e-2,
             policy_config: Default::default(),
             optimizer_config: Default::default(),
         }
     }
 }
 
-impl<OS, AS, C, O> AgentBuilder<OS, AS> for PolicyGradientAgentConfig<C, O>
+impl<OS, AS, PB, OB> AgentBuilder<OS, AS> for PolicyGradientAgentConfig<PB, OB>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    C: ModuleBuilder,
-    <C as ModuleBuilder>::Module: SequenceModule + IterativeModule,
-    O: OptimizerConfig + Clone,
+    PB: ModuleBuilder,
+    <PB as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    OB: OptimizerBuilder,
 {
-    type Agent = PolicyGradientAgent<OS, AS, <C as ModuleBuilder>::Module, O>;
+    type Agent = PolicyGradientAgent<OS, AS, <PB as ModuleBuilder>::Module, OB::Optimizer>;
 
     fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, NewAgentError> {
         Ok(Self::Agent::new(
@@ -74,9 +66,8 @@ where
             es.action_space,
             es.discount_factor,
             self.steps_per_epoch,
-            self.learning_rate,
             &self.policy_config,
-            self.optimizer_config.clone(),
+            &self.optimizer_config,
         ))
     }
 }
@@ -89,7 +80,7 @@ where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     P: IterativeModule,
-    O: OptimizerConfig,
+    O: Optimizer,
 {
     /// Environment observation space
     pub observation_space: OS,
@@ -129,7 +120,7 @@ where
     history: Vec<Step<OS::Element, AS::Element>>,
 
     /// Optimizer
-    optimizer: nn::Optimizer<O>,
+    optimizer: O,
 }
 
 impl<OS, AS, P, O> PolicyGradientAgent<OS, AS, P, O>
@@ -137,19 +128,19 @@ where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     P: IterativeModule,
-    O: OptimizerConfig,
+    O: Optimizer,
 {
-    pub fn new<C>(
+    pub fn new<PB, OB>(
         observation_space: OS,
         action_space: AS,
         discount_factor: f64,
         steps_per_epoch: usize,
-        learning_rate: f64,
-        policy_config: &C,
-        optimizer_config: O,
+        policy_config: &PB,
+        optimizer_config: &OB,
     ) -> Self
     where
-        C: ModuleBuilder<Module = P>,
+        PB: ModuleBuilder<Module = P>,
+        OB: OptimizerBuilder<Optimizer = O>,
     {
         let max_steps_per_epoch = (steps_per_epoch as f64 * 1.1) as usize;
         let vs = nn::VarStore::new(Device::Cpu);
@@ -159,7 +150,7 @@ where
             action_space.num_sample_params(),
         );
         let state = policy.initial_state(1);
-        let optimizer = optimizer_config.build(&vs, learning_rate).unwrap();
+        let optimizer = optimizer_config.build(&vs).unwrap();
         Self {
             observation_space,
             action_space,
@@ -181,7 +172,7 @@ where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     P: IterativeModule,
-    O: OptimizerConfig,
+    O: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
         let observation_features = self.observation_space.features(observation).unsqueeze(0);
@@ -207,7 +198,7 @@ where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     P: IterativeModule + SequenceModule,
-    O: OptimizerConfig,
+    O: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
         Actor::act(self, observation, new_episode)
@@ -387,12 +378,13 @@ mod policy_gradient {
     use super::super::super::testing;
     use super::*;
     use crate::torch::configs::{GruMlpConfig, MlpConfig};
+    use crate::torch::optimizers::AdamConfig;
 
     #[test]
     fn default_mlp_learns_derministic_bandit() {
-        let mut config = PolicyGradientAgentConfig::<MlpConfig, nn::Adam>::default();
+        let mut config = PolicyGradientAgentConfig::<MlpConfig, AdamConfig>::default();
         // Increase learning rate for the sake of quick testing on an easy environment
-        config.learning_rate = 0.1;
+        config.optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
             |env_structure| config.build(env_structure, 0).unwrap(),
             1_000,
@@ -402,9 +394,9 @@ mod policy_gradient {
 
     #[test]
     fn default_gru_mlp_learns_derministic_bandit() {
-        let mut config = PolicyGradientAgentConfig::<GruMlpConfig, nn::Adam>::default();
+        let mut config = PolicyGradientAgentConfig::<GruMlpConfig, AdamConfig>::default();
         // Increase learning rate for the sake of quick testing on an easy environment
-        config.learning_rate = 0.1;
+        config.optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
             |env_structure| config.build(env_structure, 0).unwrap(),
             1_000,

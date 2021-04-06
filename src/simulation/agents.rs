@@ -7,7 +7,7 @@ use crate::agents::{
 use crate::envs::EnvStructure;
 use crate::spaces::FiniteSpace;
 use crate::torch::configs::MlpConfig;
-use tch::nn::Adam;
+use crate::torch::optimizers::AdamConfig;
 use thiserror::Error;
 
 /// The definition of an agent
@@ -96,15 +96,18 @@ impl AgentDef {
             AgentDef::SimpleMLPPolicyGradient {
                 steps_per_epoch,
                 learning_rate,
-            } => Ok(Box::new(PolicyGradientAgent::new(
-                structure.observation_space,
-                structure.action_space,
-                structure.discount_factor,
-                steps_per_epoch,
-                learning_rate,
-                &MlpConfig::default(),
-                Adam::default(),
-            ))),
+            } => {
+                let mut optimizer_config = AdamConfig::default();
+                optimizer_config.learning_rate = learning_rate;
+                Ok(Box::new(PolicyGradientAgent::new(
+                    structure.observation_space,
+                    structure.action_space,
+                    structure.discount_factor,
+                    steps_per_epoch,
+                    &MlpConfig::default(),
+                    &optimizer_config,
+                )))
+            }
             _ => self.make_any_any(structure, seed),
         }
     }
