@@ -1,6 +1,7 @@
 //! Command-line options
 use super::agent::AgentName;
 use super::env::EnvName;
+use super::optimizer::OptimizerName;
 use super::policy::PolicyName;
 use crate::torch::Activation;
 use clap::{crate_authors, crate_description, crate_version, Clap};
@@ -36,10 +37,6 @@ pub struct Opts {
     #[clap(arg_enum)]
     /// Agent name
     pub agent: AgentName,
-
-    #[clap(long)]
-    /// Agent learning rate
-    pub learning_rate: Option<f64>,
 
     #[clap(long)]
     /// Agent exploration rate
@@ -80,7 +77,24 @@ pub struct Opts {
     /// Policy rnn output activation function
     pub rnn_output_activation: Option<Activation>,
 
-    // Experiment args
+    // Optimizer args
+    #[clap(long, arg_enum, default_value = "adam")]
+    /// Optimizer name
+    pub optimizer: OptimizerName,
+
+    #[clap(long)]
+    /// Agent optimizer learning rate
+    pub learning_rate: Option<f64>,
+
+    #[clap(long)]
+    /// Agent optimizer momentum
+    pub momentum: Option<f64>,
+
+    #[clap(long)]
+    /// Agent optimizer weight decay (L2 regularization)
+    pub weight_decay: Option<f64>,
+
+    // Simulation args
     #[clap(long)]
     /// Maximum number of experiment steps
     pub max_steps: Option<u64>,

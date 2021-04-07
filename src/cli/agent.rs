@@ -62,11 +62,9 @@ impl From<&Opts> for PolicyGradientAgentDef {
     fn from(opts: &Opts) -> Self {
         let mut config = PolicyGradientAgentDef::default();
         config.policy = opts.into();
+        config.optimizer = opts.into();
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
             config.steps_per_epoch = steps_per_epoch;
-        }
-        if let Some(learning_rate) = opts.learning_rate {
-            config.optimizer.set_learning_rate(learning_rate)
         }
         config
     }
