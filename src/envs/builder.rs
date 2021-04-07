@@ -1,3 +1,4 @@
+use super::Environment;
 use rand::distributions::BernoulliError;
 use thiserror::Error;
 
@@ -16,4 +17,15 @@ pub trait EnvBuilder<E> {
 pub enum BuildEnvError {
     #[error(transparent)]
     BernoulliError(#[from] BernoulliError),
+}
+
+/// Non-stateful, cloneable environments can build themselves.
+///
+/// This allows using the environment as a configuration definition for itself,
+/// avoiding the need for a duplicate structure to hold the same content,
+/// and is useful for specifying wrapped environment configurations.
+impl<E: Environment + Clone> EnvBuilder<E> for E {
+    fn build(&self, _seed: u64) -> Result<E, BuildEnvError> {
+        Ok(self.clone())
+    }
 }

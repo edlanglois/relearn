@@ -86,7 +86,14 @@ impl EnvDef {
                 num_states,
                 discount_factor,
             } => {
-                let env = Chain::new(num_states, discount_factor).as_stateful(seed);
+                let mut env = Chain::default();
+                if let Some(num_states) = num_states {
+                    env.size = num_states;
+                }
+                if let Some(discount_factor) = discount_factor {
+                    env.discount_factor = discount_factor;
+                }
+                let env = env.as_stateful(seed);
                 finite_finite_simulator(Box::new(env), agent_def, logger, hook, seed + 1)
             }
         }

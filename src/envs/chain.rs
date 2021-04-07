@@ -14,17 +14,26 @@ use std::convert::TryInto;
 /// * Every action has a 0.2 chance of "slipping" and taking the opposite action.
 ///
 /// Described in "Bayesian Q-learning" by Dearden, Friedman and Russel (1998)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Chain {
-    size: u32,
-    discount_factor: f64,
+    pub size: u32,
+    pub discount_factor: f64,
 }
 
 impl Chain {
-    pub fn new(size: Option<u32>, discount_factor: Option<f64>) -> Self {
+    pub fn new(size: u32, discount_factor: f64) -> Self {
         Self {
-            size: size.unwrap_or(5),
-            discount_factor: discount_factor.unwrap_or(0.95),
+            size,
+            discount_factor,
+        }
+    }
+}
+
+impl Default for Chain {
+    fn default() -> Self {
+        Self {
+            size: 5,
+            discount_factor: 0.95,
         }
     }
 }
@@ -101,6 +110,6 @@ mod tests {
 
     #[test]
     fn run_chain_default() {
-        testing::run_stateless(Chain::new(None, None), 1000, 0);
+        testing::run_stateless(Chain::default(), 1000, 0);
     }
 }
