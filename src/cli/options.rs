@@ -11,26 +11,24 @@ use clap::{crate_authors, crate_description, crate_version, Clap};
     version = crate_version!(),
     author = crate_authors!(),
     about = crate_description!(),
+    after_help = "Most options only apply for some environments/agents and are ignored otherwise.",
 )]
 pub struct Options {
-    #[clap(long, default_value = "1")]
-    /// Random seed for the experiment
-    pub seed: u64,
-    // Environment args
+    // Environment options
     #[clap(arg_enum)]
     /// Environment name
     pub environment: EnvName,
 
-    #[clap(long)]
-    /// Number of states in the environment; when configurable
+    #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
+    /// Number of states in the environment
     pub num_states: Option<u32>,
 
-    #[clap(long)]
-    /// Number of actions in the environment; when configurable
+    #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
+    /// Number of actions in the environment
     pub num_actions: Option<u32>,
 
-    #[clap(long)]
-    /// Environment discount factor; when configurable
+    #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
+    /// Environment discount factor
     pub discount_factor: Option<f64>,
 
     // Agent args
@@ -38,64 +36,68 @@ pub struct Options {
     /// Agent name
     pub agent: AgentName,
 
-    #[clap(long)]
+    #[clap(long, help_heading = Some("AGENT OPTIONS"))]
     /// Agent exploration rate
     pub exploration_rate: Option<f64>,
 
-    #[clap(long)]
+    #[clap(long, help_heading = Some("AGENT OPTIONS"))]
     /// Number of steps the agent collects between policy updates.
     pub steps_per_epoch: Option<usize>,
 
-    #[clap(long)]
+    #[clap(long, help_heading = Some("AGENT OPTIONS"))]
     /// Number of samples for Thompson sampling agents.
     pub num_samples: Option<usize>,
 
-    // Policy args
-    #[clap(long, arg_enum, default_value = "mlp")]
+    // Policy options
+    #[clap(long, arg_enum, default_value = "mlp", help_heading = Some("AGENT POLICY OPTIONS"))]
     /// Policy name
     // Note: If using Option<PolicyName> instead, PolicyDef::default() can't be used because
     // we need to read the inner attributes from Options if they are set.
     pub policy: PolicyName,
 
-    /// Policy mlp activation function
-    #[clap(long, arg_enum)]
+    /// Policy MLP activation function
+    #[clap(long, arg_enum, help_heading = Some("AGENT POLICY OPTIONS"))]
     pub activation: Option<Activation>,
 
-    #[clap(long)]
-    /// Policy mlp hidden layer sizes
+    #[clap(long, help_heading = Some("AGENT POLICY OPTIONS"))]
+    /// Policy MLP hidden layer sizes
     pub hidden_sizes: Option<Vec<usize>>,
 
-    #[clap(long)]
+    #[clap(long, help_heading = Some("AGENT POLICY OPTIONS"))]
     /// Policy rnn hidden layer size
     pub rnn_hidden_size: Option<usize>,
 
-    #[clap(long)]
+    #[clap(long, help_heading = Some("AGENT POLICY OPTIONS"))]
     /// Policy rnn number of hidden layers
     pub rnn_num_layers: Option<usize>,
 
-    #[clap(long, arg_enum)]
+    #[clap(long, arg_enum, help_heading = Some("AGENT POLICY OPTIONS"))]
     /// Policy rnn output activation function
     pub rnn_output_activation: Option<Activation>,
 
-    // Optimizer args
-    #[clap(long, arg_enum, default_value = "adam")]
+    // Optimizer options
+    #[clap(long, arg_enum, default_value = "adam", help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
     /// Optimizer name
     pub optimizer: OptimizerName,
 
-    #[clap(long)]
+    #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
     /// Agent optimizer learning rate
     pub learning_rate: Option<f64>,
 
-    #[clap(long)]
+    #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
     /// Agent optimizer momentum
     pub momentum: Option<f64>,
 
-    #[clap(long)]
+    #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
     /// Agent optimizer weight decay (L2 regularization)
     pub weight_decay: Option<f64>,
 
-    // Simulation args
-    #[clap(long)]
+    // Simulation options
+    #[clap(long, default_value = "1", help_heading = Some("SIMULATION OPTIONS"))]
+    /// Random seed for the experiment
+    pub seed: u64,
+
+    #[clap(long, help_heading = Some("SIMULATION OPTIONS"))]
     /// Maximum number of experiment steps
     pub max_steps: Option<u64>,
 }
