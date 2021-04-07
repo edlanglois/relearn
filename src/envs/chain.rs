@@ -16,12 +16,12 @@ use std::convert::TryInto;
 /// Described in "Bayesian Q-learning" by Dearden, Friedman and Russel (1998)
 #[derive(Debug, Clone)]
 pub struct Chain {
-    pub size: u32,
+    pub size: u64,
     pub discount_factor: f64,
 }
 
 impl Chain {
-    pub fn new(size: u32, discount_factor: f64) -> Self {
+    pub fn new(size: u64, discount_factor: f64) -> Self {
         Self {
             size,
             discount_factor,
@@ -39,7 +39,7 @@ impl Default for Chain {
 }
 
 impl Environment for Chain {
-    type State = u32;
+    type State = u64;
     type ObservationSpace = IndexSpace;
     type ActionSpace = IndexedTypeSpace<Move>;
 

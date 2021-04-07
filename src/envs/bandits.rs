@@ -2,7 +2,7 @@
 use super::{BuildEnvError, EnvBuilder, EnvStructure, Environment};
 use crate::spaces::{IndexSpace, SingletonSpace, Space};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
-use rand::distributions::Distribution;
+use rand::distributions::{Distribution, Standard};
 use rand::prelude::*;
 use std::borrow::Borrow;
 
@@ -34,9 +34,36 @@ where
 #[derive(Debug)]
 pub struct PriorMeansBanditConfig<D> {
     /// The number of arms
-    num_arms: usize,
+    pub num_arms: usize,
     /// The arm mean prior distribution
-    mean_prior: D,
+    pub mean_prior: D,
+}
+
+impl Default for PriorMeansBanditConfig<Standard> {
+    fn default() -> Self {
+        Self {
+            num_arms: 10,
+            mean_prior: Standard,
+        }
+    }
+}
+
+impl<DR, DM> EnvBuilder<Bandit<DR>> for PriorMeansBanditConfig<DM>
+where
+    DR: Distribution<f64> + FromMean<f64>,
+    <DR as FromMean<f64>>::Error: Into<BuildEnvError>,
+    DM: Distribution<f64>,
+{
+    fn build(&self, seed: u64) -> Result<Bandit<DR>, BuildEnvError> {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mean_prior = &self.mean_prior;
+        Bandit::from_means(
+            (0..self.num_arms)
+                .into_iter()
+                .map(|_| mean_prior.sample(&mut rng)),
+        )
+        .map_err(|e: <DR as FromMean<f64>>::Error| e.into())
+    }
 }
 
 /// A multi-armed bandit

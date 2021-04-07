@@ -1,5 +1,6 @@
 use super::Environment;
 use rand::distributions::BernoulliError;
+use std::convert::Infallible;
 use thiserror::Error;
 
 pub trait EnvBuilder<E> {
@@ -27,5 +28,11 @@ pub enum BuildEnvError {
 impl<E: Environment + Clone> EnvBuilder<E> for E {
     fn build(&self, _seed: u64) -> Result<E, BuildEnvError> {
         Ok(self.clone())
+    }
+}
+
+impl From<Infallible> for BuildEnvError {
+    fn from(_: Infallible) -> Self {
+        unreachable!();
     }
 }

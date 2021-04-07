@@ -1,5 +1,5 @@
 //! Policy-gradient agents
-use super::super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
+use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use super::Policy;
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
@@ -61,7 +61,7 @@ where
 {
     type Agent = PolicyGradientAgent<OS, AS, <PB as ModuleBuilder>::Module, OB::Optimizer>;
 
-    fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, NewAgentError> {
+    fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, BuildAgentError> {
         Ok(Self::Agent::new(
             es.observation_space,
             es.action_space,

@@ -1,5 +1,5 @@
 //! Upper confidence bound bandit agent.
-use super::super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
+use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::envs::EnvStructure;
 use crate::logging::Logger;
 use crate::spaces::FiniteSpace;
@@ -33,7 +33,7 @@ impl Default for UCB1AgentConfig {
 impl<OS: FiniteSpace, AS: FiniteSpace> AgentBuilder<OS, AS> for UCB1AgentConfig {
     type Agent = UCB1Agent<OS, AS>;
 
-    fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, NewAgentError> {
+    fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, BuildAgentError> {
         Self::Agent::new(
             es.observation_space,
             es.action_space,
@@ -85,12 +85,12 @@ where
         action_space: AS,
         reward_range: (f64, f64),
         exploration_rate: f64,
-    ) -> Result<Self, NewAgentError> {
+    ) -> Result<Self, BuildAgentError> {
         let (min_reward, max_reward) = reward_range;
 
         let reward_width = max_reward - min_reward;
         if !reward_width.is_finite() {
-            return Err(NewAgentError::UnboundedReward);
+            return Err(BuildAgentError::UnboundedReward);
         }
         let reward_scale_factor = reward_width.recip();
         let reward_shift = -min_reward;

@@ -1,5 +1,5 @@
 //! Thompson sampling bandit agent
-use super::super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
+use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::envs::EnvStructure;
 use crate::logging::Logger;
 use crate::spaces::FiniteSpace;
@@ -33,7 +33,7 @@ impl Default for BetaThompsonSamplingAgentConfig {
 impl<OS: FiniteSpace, AS: FiniteSpace> AgentBuilder<OS, AS> for BetaThompsonSamplingAgentConfig {
     type Agent = BetaThompsonSamplingAgent<OS, AS>;
 
-    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, NewAgentError> {
+    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         Ok(Self::Agent::new(
             es.observation_space,
             es.action_space,

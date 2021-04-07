@@ -1,6 +1,7 @@
-use super::NewAgentError;
 use crate::envs::EnvStructure;
 use crate::spaces::Space;
+use tch::TchError;
+use thiserror::Error;
 
 /// Build an agent instance.
 pub trait AgentBuilder<OS: Space, AS: Space> {
@@ -16,5 +17,16 @@ pub trait AgentBuilder<OS: Space, AS: Space> {
         &self,
         env_structure: EnvStructure<OS, AS>,
         seed: u64,
-    ) -> Result<Self::Agent, NewAgentError>;
+    ) -> Result<Self::Agent, BuildAgentError>;
+}
+
+/// Error building an agent
+#[derive(Debug, Error)]
+pub enum BuildAgentError {
+    #[error("space bound(s) are too loose for this agent")]
+    InvalidSpaceBounds,
+    #[error("reward range must not be unbounded")]
+    UnboundedReward,
+    #[error(transparent)]
+    TorchError(#[from] TchError),
 }

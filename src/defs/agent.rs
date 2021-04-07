@@ -1,6 +1,6 @@
 use super::{OptimizerDef, PolicyDef};
 use crate::agents::{
-    Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, NewAgentError, PolicyGradientAgent,
+    Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError, PolicyGradientAgent,
     RandomAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::EnvStructure;
@@ -35,7 +35,7 @@ impl AgentDef {
         &self,
         es: EnvStructure<OS, AS>,
         seed: u64,
-    ) -> Result<Box<dyn Agent<OS::Element, AS::Element>>, NewAgentError>
+    ) -> Result<Box<dyn Agent<OS::Element, AS::Element>>, BuildAgentError>
     where
         OS: RLSpace + FiniteSpace + 'static,
         AS: RLSpace + FiniteSpace + 'static,
@@ -57,7 +57,7 @@ impl AgentDef {
         &self,
         es: EnvStructure<OS, AS>,
         seed: u64,
-    ) -> Result<Box<dyn Agent<OS::Element, AS::Element>>, NewAgentError>
+    ) -> Result<Box<dyn Agent<OS::Element, AS::Element>>, BuildAgentError>
     where
         OS: RLSpace + 'static,
         AS: RLSpace + 'static,
@@ -68,7 +68,7 @@ impl AgentDef {
                 .build(es, seed)
                 .map(|a| Box::new(a) as _),
             PolicyGradient(pg_def) => pg_def.build(es, seed),
-            _ => Err(NewAgentError::InvalidSpaceBounds),
+            _ => Err(BuildAgentError::InvalidSpaceBounds),
         }
     }
 }
@@ -98,7 +98,7 @@ where
 {
     type Agent = Box<dyn Agent<OS::Element, AS::Element>>;
 
-    fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, NewAgentError> {
+    fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, BuildAgentError> {
         use PolicyDef::*;
         Ok(match &self.policy {
             Mlp(config) => Box::new(PolicyGradientAgent::new(

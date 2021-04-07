@@ -1,6 +1,6 @@
 //! Command-line options
 use super::agent::AgentName;
-use super::env::EnvName;
+use super::env::{BanditArmPrior, EnvName};
 use super::optimizer::OptimizerName;
 use super::policy::PolicyName;
 use crate::torch::Activation;
@@ -21,15 +21,23 @@ pub struct Options {
 
     #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
     /// Number of states in the environment
-    pub num_states: Option<u32>,
+    pub num_states: Option<u64>,
 
     #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
     /// Number of actions in the environment
-    pub num_actions: Option<u32>,
+    pub num_actions: Option<u64>,
 
     #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
     /// Environment discount factor
     pub discount_factor: Option<f64>,
+
+    #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
+    /// Bandit arm reward means
+    pub arm_rewards: Option<Vec<f64>>,
+
+    #[clap(long, arg_enum, default_value = "fixed", help_heading = Some("ENVIRONMENT OPTIONS"))]
+    /// How bandit arm reward means are generated (once). Fixed uses --arm-rewards.
+    pub arm_prior: BanditArmPrior,
 
     // Agent args
     #[clap(arg_enum)]

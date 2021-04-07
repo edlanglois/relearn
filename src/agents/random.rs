@@ -1,4 +1,4 @@
-use super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
+use super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::envs::EnvStructure;
 use crate::logging::Logger;
 use crate::spaces::{SampleSpace, Space};
@@ -25,7 +25,7 @@ impl Default for RandomAgentConfig {
 impl<OS: Space, AS: SampleSpace> AgentBuilder<OS, AS> for RandomAgentConfig {
     type Agent = RandomAgent<AS>;
 
-    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, NewAgentError> {
+    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         Ok(RandomAgent::new(es.action_space, seed))
     }
 }

@@ -1,5 +1,5 @@
 //! Tabular agents
-use super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
+use super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::envs::EnvStructure;
 use crate::logging::Logger;
 use crate::spaces::{FiniteSpace, SampleSpace};
@@ -33,7 +33,7 @@ impl<OS: FiniteSpace, AS: FiniteSpace + SampleSpace> AgentBuilder<OS, AS>
 {
     type Agent = TabularQLearningAgent<OS, AS>;
 
-    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, NewAgentError> {
+    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         Ok(Self::Agent::new(
             es.observation_space,
             es.action_space,
