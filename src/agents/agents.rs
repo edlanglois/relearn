@@ -57,3 +57,8 @@ pub trait Agent<O, A> {
     /// * `step`: The environment step resulting from the  most recent call to [Actor::act].
     fn update(&mut self, step: Step<O, A>, logger: &mut dyn Logger);
 }
+
+/// Both an Actor and an Agent
+pub trait ActorAgent<O, A>: Actor<O, A> + Agent<O, A> {}
+
+impl<O, A, T: Actor<O, A> + Agent<O, A>> ActorAgent<O, A> for T {}

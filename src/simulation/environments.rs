@@ -1,10 +1,11 @@
 //! Environment definitions
 use super::hooks::{GenericSimulationHook, SimulationHook, StepLogger};
-use super::spaces::{CommonActionSpace, CommonObservationSpace};
-use super::{AgentDef, BoxedSimulator, MakeAgentError, Simulation};
+use super::{BoxedSimulator, Simulation};
+use crate::agents::NewAgentError;
+use crate::defs::AgentDef;
 use crate::envs::{AsStateful, BernoulliBandit, Chain, DeterministicBandit, StatefulEnvironment};
 use crate::logging::Logger;
-use crate::spaces::{FiniteSpace, Space};
+use crate::spaces::{FiniteSpace, RLSpace, Space};
 use rand::prelude::*;
 use std::fmt::Debug;
 
@@ -30,11 +31,11 @@ fn finite_finite_simulator<OS, AS, L, H>(
     logger: L,
     hook: H,
     seed: u64,
-) -> Result<Box<dyn Simulation>, MakeAgentError>
+) -> Result<Box<dyn Simulation>, NewAgentError>
 where
-    OS: CommonObservationSpace + FiniteSpace + Clone + 'static,
+    OS: RLSpace + FiniteSpace + Clone + 'static,
     <OS as Space>::Element: Clone,
-    AS: CommonActionSpace + FiniteSpace + Clone + 'static,
+    AS: RLSpace + FiniteSpace + Clone + 'static,
     L: Logger + 'static,
     H: SimulationHook<<OS as Space>::Element, <AS as Space>::Element, L> + 'static,
 {
@@ -44,7 +45,7 @@ where
         env_structure.action_space.clone(),
     );
     let hook = (log_hook, hook);
-    let agent = agent_def.make_finite_finite(env_structure, seed)?;
+    let agent = agent_def.build_finite_finite(env_structure, seed)?;
     Ok(Box::new(BoxedSimulator::new(
         environment,
         agent,
@@ -60,7 +61,7 @@ impl EnvDef {
         seed: u64,
         logger: L,
         hook: H,
-    ) -> Result<Box<dyn Simulation>, MakeAgentError> {
+    ) -> Result<Box<dyn Simulation>, NewAgentError> {
         match self {
             EnvDef::SimpleBernoulliBandit => {
                 let env = BernoulliBandit::from_means(vec![0.2, 0.8])

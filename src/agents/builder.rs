@@ -1,10 +1,10 @@
-use super::{Actor, Agent, NewAgentError};
+use super::NewAgentError;
 use crate::envs::EnvStructure;
 use crate::spaces::Space;
 
 /// Build an agent instance.
 pub trait AgentBuilder<OS: Space, AS: Space> {
-    type Agent: Actor<OS::Element, AS::Element> + Agent<OS::Element, AS::Element>;
+    type Agent;
 
     /// Build an agent for the given environment structure.
     ///

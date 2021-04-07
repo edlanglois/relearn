@@ -1,8 +1,9 @@
 //! Policy-gradient agents
 use super::super::{Actor, Agent, AgentBuilder, NewAgentError, Step};
+use super::Policy;
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
-use crate::torch::seq_modules::{IterativeModule, SequenceModule};
+use crate::torch::seq_modules::IterativeModule;
 use crate::torch::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use crate::EnvStructure;
 use tch::{kind::Kind, nn, Device, Tensor};
@@ -12,7 +13,7 @@ use tch::{kind::Kind, nn, Device, Tensor};
 pub struct PolicyGradientAgentConfig<PB, OB>
 where
     PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    <PB as ModuleBuilder>::Module: Policy,
     OB: OptimizerBuilder,
 {
     pub steps_per_epoch: usize,
@@ -23,7 +24,7 @@ where
 impl<PB, OB> PolicyGradientAgentConfig<PB, OB>
 where
     PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    <PB as ModuleBuilder>::Module: Policy,
     OB: OptimizerBuilder,
 {
     pub fn new(steps_per_epoch: usize, policy_config: PB, optimizer_config: OB) -> Self {
@@ -38,7 +39,7 @@ where
 impl<PB, OB> Default for PolicyGradientAgentConfig<PB, OB>
 where
     PB: ModuleBuilder + Default,
-    <PB as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    <PB as ModuleBuilder>::Module: Policy,
     OB: OptimizerBuilder + Default,
 {
     fn default() -> Self {
@@ -55,7 +56,7 @@ where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: SequenceModule + IterativeModule,
+    <PB as ModuleBuilder>::Module: Policy,
     OB: OptimizerBuilder,
 {
     type Agent = PolicyGradientAgent<OS, AS, <PB as ModuleBuilder>::Module, OB::Optimizer>;
@@ -197,7 +198,7 @@ impl<OS, AS, P, O> Agent<OS::Element, AS::Element> for PolicyGradientAgent<OS, A
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: IterativeModule + SequenceModule,
+    P: Policy,
     O: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {

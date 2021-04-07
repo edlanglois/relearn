@@ -77,35 +77,6 @@ where
     }
 }
 
-/// Definition of an optimizer
-#[derive(Debug, Clone)]
-pub enum OptimizerDef {
-    Sgd(SgdConfig),
-    RmsProp(RmsPropConfig),
-    Adam(AdamConfig),
-    AdamW(AdamWConfig),
-}
-
-impl Default for OptimizerDef {
-    fn default() -> Self {
-        OptimizerDef::Adam(Default::default())
-    }
-}
-
-impl TryFrom<&OptimizerDef> for COptimizer {
-    type Error = TchError;
-
-    fn try_from(def: &OptimizerDef) -> Result<Self, Self::Error> {
-        use OptimizerDef::*;
-        match def {
-            Sgd(config) => config.try_into(),
-            RmsProp(config) => config.try_into(),
-            Adam(config) => config.try_into(),
-            AdamW(config) => config.try_into(),
-        }
-    }
-}
-
 /// Configuration for the SGD optimizer.
 #[derive(Debug, Clone)]
 pub struct SgdConfig {

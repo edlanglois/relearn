@@ -8,4 +8,4 @@ pub mod utils;
 
 pub use activations::Activation;
 pub use builder::ModuleBuilder;
-pub use optimizers::{Optimizer, OptimizerBuilder, OptimizerDef};
+pub use optimizers::{Optimizer, OptimizerBuilder};

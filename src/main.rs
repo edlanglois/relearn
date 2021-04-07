@@ -1,6 +1,10 @@
 use clap::{crate_authors, crate_description, crate_version, Clap};
+use rust_rl::agents::{
+    BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
+};
+use rust_rl::defs::{AgentDef, OptimizerDef, PolicyGradientAgentDef};
 use rust_rl::logging::CLILogger;
-use rust_rl::simulation::{AgentDef, EnvDef};
+use rust_rl::simulation::EnvDef;
 use std::convert::From;
 use std::error::Error;
 use std::time::Duration;
@@ -90,26 +94,29 @@ pub enum Agent {
     TabularQLearning,
     BetaThompsonSampling,
     UCB1,
-    SimpleMLPPolicyGradient,
+    MlpPolicyGradient,
 }
 
 impl From<&Opts> for AgentDef {
     fn from(opts: &Opts) -> Self {
         match opts.agent {
             Agent::Random => AgentDef::Random,
-            Agent::TabularQLearning => AgentDef::TabularQLearning {
+            Agent::TabularQLearning => AgentDef::TabularQLearning(TabularQLearningAgentConfig {
                 exploration_rate: opts.exploration_rate,
-            },
-            Agent::BetaThompsonSampling => AgentDef::BetaThompsonSampling {
-                num_samples: opts.num_samples,
-            },
-            Agent::UCB1 => AgentDef::UCB1 {
+            }),
+            Agent::BetaThompsonSampling => {
+                AgentDef::BetaThompsonSampling(BetaThompsonSamplingAgentConfig {
+                    num_samples: opts.num_samples,
+                })
+            }
+            Agent::UCB1 => AgentDef::UCB1(UCB1AgentConfig {
                 exploration_rate: opts.exploration_rate,
-            },
-            Agent::SimpleMLPPolicyGradient => AgentDef::SimpleMLPPolicyGradient {
+            }),
+            Agent::MlpPolicyGradient => AgentDef::PolicyGradient(PolicyGradientAgentDef {
                 steps_per_epoch: opts.steps_per_epoch,
-                learning_rate: opts.learning_rate,
-            },
+                policy: Default::default(), // TODO: set from opts,
+                optimizer: OptimizerDef::default().with_learning_rate(opts.learning_rate),
+            }),
         }
     }
 }

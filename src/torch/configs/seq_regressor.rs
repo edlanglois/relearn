@@ -5,6 +5,7 @@ use std::borrow::Borrow;
 use tch::nn;
 
 /// Configuration for an RNN followed by a feed-forward network.
+#[derive(Debug, Clone)]
 pub struct SequenceRegressorConfig<R, P>
 where
     R: ModuleBuilder,

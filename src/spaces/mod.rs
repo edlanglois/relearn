@@ -2,6 +2,7 @@
 mod finite;
 mod index;
 mod indexed_type;
+mod rl;
 mod singleton;
 #[cfg(test)]
 pub mod testing;
@@ -9,6 +10,7 @@ pub mod testing;
 pub use finite::FiniteSpace;
 pub use index::IndexSpace;
 pub use indexed_type::{Indexed, IndexedTypeSpace};
+pub use rl::RLSpace;
 pub use singleton::SingletonSpace;
 
 use rand::distributions::Distribution;
