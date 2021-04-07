@@ -2,7 +2,7 @@ use super::Opts;
 use crate::agents::{
     BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
-use crate::defs::{AgentDef, OptimizerDef, PolicyGradientAgentDef};
+use crate::defs::{AgentDef, PolicyGradientAgentDef};
 use clap::Clap;
 
 /// Agent name
@@ -20,22 +20,53 @@ impl From<&Opts> for AgentDef {
         use AgentName::*;
         match opts.agent {
             Random => AgentDef::Random,
-            TabularQLearning => AgentDef::TabularQLearning(TabularQLearningAgentConfig {
-                exploration_rate: opts.exploration_rate,
-            }),
-            BetaThompsonSampling => {
-                AgentDef::BetaThompsonSampling(BetaThompsonSamplingAgentConfig {
-                    num_samples: opts.num_samples,
-                })
-            }
-            UCB1 => AgentDef::UCB1(UCB1AgentConfig {
-                exploration_rate: opts.exploration_rate,
-            }),
-            MlpPolicyGradient => AgentDef::PolicyGradient(PolicyGradientAgentDef {
-                steps_per_epoch: opts.steps_per_epoch,
-                policy: Default::default(), // TODO: set from opts,
-                optimizer: OptimizerDef::default().with_learning_rate(opts.learning_rate),
-            }),
+            TabularQLearning => AgentDef::TabularQLearning(From::from(opts)),
+            BetaThompsonSampling => AgentDef::BetaThompsonSampling(From::from(opts)),
+            UCB1 => AgentDef::UCB1(From::from(opts)),
+            MlpPolicyGradient => AgentDef::PolicyGradient(From::from(opts)),
         }
+    }
+}
+
+impl From<&Opts> for TabularQLearningAgentConfig {
+    fn from(opts: &Opts) -> Self {
+        let mut config = TabularQLearningAgentConfig::default();
+        if let Some(exploration_rate) = opts.exploration_rate {
+            config.exploration_rate = exploration_rate;
+        }
+        config
+    }
+}
+
+impl From<&Opts> for BetaThompsonSamplingAgentConfig {
+    fn from(opts: &Opts) -> Self {
+        let mut config = BetaThompsonSamplingAgentConfig::default();
+        if let Some(num_samples) = opts.num_samples {
+            config.num_samples = num_samples;
+        }
+        config
+    }
+}
+
+impl From<&Opts> for UCB1AgentConfig {
+    fn from(opts: &Opts) -> Self {
+        let mut config = UCB1AgentConfig::default();
+        if let Some(exploration_rate) = opts.exploration_rate {
+            config.exploration_rate = exploration_rate;
+        }
+        config
+    }
+}
+
+impl From<&Opts> for PolicyGradientAgentDef {
+    fn from(opts: &Opts) -> Self {
+        let mut config = PolicyGradientAgentDef::default();
+        if let Some(steps_per_epoch) = opts.steps_per_epoch {
+            config.steps_per_epoch = steps_per_epoch;
+        }
+        if let Some(learning_rate) = opts.learning_rate {
+            config.optimizer.set_learning_rate(learning_rate)
+        }
+        config
     }
 }

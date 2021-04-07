@@ -35,20 +35,21 @@ pub struct Opts {
     /// Agent name
     pub agent: AgentName,
 
-    #[clap(long, default_value = "0.01")]
+    #[clap(long)]
     /// Agent learning rate
-    pub learning_rate: f64,
+    pub learning_rate: Option<f64>,
 
-    #[clap(long, default_value = "0.2")]
+    #[clap(long)]
     /// Agent exploration rate
-    pub exploration_rate: f64,
+    pub exploration_rate: Option<f64>,
 
-    #[clap(long, default_value = "1000")]
+    #[clap(long)]
     /// Number of steps the agent collects between policy updates.
-    pub steps_per_epoch: usize,
+    pub steps_per_epoch: Option<usize>,
 
-    #[clap(long, default_value = "1")]
-    pub num_samples: usize,
+    #[clap(long)]
+    /// Number of samples for Thompson sampling agents.
+    pub num_samples: Option<usize>,
 
     // Experiment args
     #[clap(long)]
