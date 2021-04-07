@@ -76,9 +76,10 @@ impl EnvDef {
             }
             EnvDef::DeterministicBandit { num_arms } => {
                 let mut rng = StdRng::seed_from_u64(seed + 2);
-                let env =
-                    DeterministicBandit::from_values((0..num_arms).into_iter().map(|_| rng.gen()))
-                        .as_stateful(seed);
+                let env = DeterministicBandit::from_values(
+                    (0..num_arms).into_iter().map(|_| rng.gen::<f64>()),
+                )
+                .as_stateful(seed);
                 finite_finite_simulator(Box::new(env), agent_def, logger, hook, seed + 1)
             }
             EnvDef::Chain {

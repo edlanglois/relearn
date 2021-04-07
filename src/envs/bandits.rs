@@ -1,8 +1,43 @@
 //! Multi-armed bandit environments
-use super::{EnvStructure, Environment};
+use super::{BuildEnvError, EnvBuilder, EnvStructure, Environment};
 use crate::spaces::{IndexSpace, SingletonSpace, Space};
-use rand::distributions::{Bernoulli, Distribution};
+use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
+use rand::distributions::Distribution;
 use rand::prelude::*;
+use std::borrow::Borrow;
+
+/// Configuration for a Bandit environment with fixed means
+#[derive(Debug)]
+pub struct FixedMeansBanditConfig {
+    /// The arm means
+    pub means: Vec<f64>,
+}
+
+impl Default for FixedMeansBanditConfig {
+    fn default() -> Self {
+        FixedMeansBanditConfig {
+            means: vec![0.2, 0.8],
+        }
+    }
+}
+
+impl<D> EnvBuilder<Bandit<D>> for FixedMeansBanditConfig
+where
+    D: Distribution<f64> + FromMean<f64>,
+    <D as FromMean<f64>>::Error: Into<BuildEnvError>,
+{
+    fn build(&self, _seed: u64) -> Result<Bandit<D>, BuildEnvError> {
+        Bandit::from_means(&self.means).map_err(|e: <D as FromMean<f64>>::Error| e.into())
+    }
+}
+/// Configuration for a Bandit environment with arm means drawn IID from some distribution.
+#[derive(Debug)]
+pub struct PriorMeansBanditConfig<D> {
+    /// The number of arms
+    num_arms: usize,
+    /// The arm mean prior distribution
+    mean_prior: D,
+}
 
 /// A multi-armed bandit
 ///
@@ -18,7 +53,7 @@ impl<D: Distribution<f64>> Bandit<D> {
     }
 }
 
-impl<D: Distribution<f64> + Bounded> Environment for Bandit<D> {
+impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
     type State = ();
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
@@ -67,89 +102,40 @@ impl<D: Distribution<f64> + Bounded> Environment for Bandit<D> {
     }
 }
 
+impl<D: Distribution<f64> + FromMean<f64>> Bandit<D> {
+    /// Create a new Bandit from a list of means.
+    pub fn from_means<I: IntoIterator<Item = T>, T: Borrow<f64>>(
+        means: I,
+    ) -> Result<Self, <D as FromMean<f64>>::Error> {
+        means
+            .into_iter()
+            .map(|m| D::from_mean(*m.borrow()))
+            .collect::<Result<_, _>>()
+            .map(Self::new)
+    }
+}
+
 /// A multi-armed bandit where each arm samples from a Bernoulli distribution.
-pub type BernoulliBandit = Bandit<FloatBernoulli>;
+pub type BernoulliBandit = Bandit<Bernoulli>;
 
 impl BernoulliBandit {
-    /// Create a new BernoulliBandit from a list of means.
-    pub fn from_means<I: IntoIterator<Item = f64>>(
-        means: I,
-    ) -> Result<Self, rand::distributions::BernoulliError> {
-        let distributions = means
-            .into_iter()
-            .map(|p| FloatBernoulli::new(p as f64))
-            .collect::<Result<_, _>>()?;
-        Ok(Self::new(distributions))
-    }
-
     /// Create a new BernoulliBandit with uniform random means.
     pub fn uniform<R: Rng>(num_arms: u32, rng: &mut R) -> Self {
         let distributions = (0..num_arms)
-            .map(|_| FloatBernoulli::new(rng.gen()).unwrap())
+            .map(|_| Bernoulli::new(rng.gen()).unwrap())
             .collect();
         Self { distributions }
     }
 }
 
-/// Wrapper Bernoulli distribution that can sample floats
-#[derive(Debug)]
-pub struct FloatBernoulli(Bernoulli);
-impl FloatBernoulli {
-    pub fn new(mean: f64) -> Result<FloatBernoulli, rand::distributions::BernoulliError> {
-        Ok(Self(Bernoulli::new(mean)?))
-    }
-}
-impl Distribution<f64> for FloatBernoulli {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> f64 {
-        self.0.sample(rng) as u8 as f64
-    }
-}
-impl Bounded for FloatBernoulli {
-    fn bounds(&self) -> (f64, f64) {
-        (0.0, 1.0)
-    }
-}
-
 /// A multi-armed bandit where each arm has a determistic distribution.
-pub type DeterministicBandit = Bandit<Deterministic>;
+pub type DeterministicBandit = Bandit<Deterministic<f64>>;
 
 impl DeterministicBandit {
-    /// Create a new DeterministicBandit from a list of values.
-    pub fn from_values<I: IntoIterator<Item = f64>>(means: I) -> Self {
-        let distributions = means.into_iter().map(Deterministic::new).collect();
-        Self::new(distributions)
+    /// Create a new DeterministicBandit from a list of arm rewards
+    pub fn from_values<I: IntoIterator<Item = T>, T: Borrow<f64>>(values: I) -> Self {
+        Self::from_means(values).unwrap()
     }
-}
-
-/// A determistic distribution.
-///
-/// Always produces the same value when sampled.
-#[derive(Debug)]
-pub struct Deterministic(f64);
-
-impl Deterministic {
-    pub fn new(value: f64) -> Self {
-        Self(value)
-    }
-}
-
-impl Distribution<f64> for Deterministic {
-    fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> f64 {
-        self.0
-    }
-}
-impl Bounded for Deterministic {
-    fn bounds(&self) -> (f64, f64) {
-        (self.0, self.0)
-    }
-}
-
-/// Bounds on a scalar value
-pub trait Bounded {
-    /// Minimum and maximum values (inclusive). Infinities are allowed
-    ///
-    /// If max < min then the interval is empty.
-    fn bounds(&self) -> (f64, f64);
 }
 
 #[cfg(test)]

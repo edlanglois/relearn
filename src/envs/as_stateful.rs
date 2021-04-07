@@ -1,5 +1,5 @@
 //! Converting an Environment into a StatefulEnvironment
-use super::{Environment, StatefulEnvironment};
+use super::{BuildEnvError, EnvBuilder, Environment, StatefulEnvironment};
 use crate::envs::EnvStructure;
 use crate::spaces::Space;
 use rand::prelude::*;
@@ -71,5 +71,17 @@ impl<E: Environment> AsStateful for E {
 
     fn as_stateful(self, seed: u64) -> Self::Output {
         Self::Output::new(self, seed)
+    }
+}
+
+impl<E: Environment, B: EnvBuilder<E>> EnvBuilder<EnvWithState<E>> for B {
+    fn build(&self, seed: u64) -> Result<EnvWithState<E>, BuildEnvError> {
+        // Re-use seed so that EnvBuilder<E> and EnvBuilder<EnvWithState<E>>
+        // have the same environment structure given the same seed.
+        let structure_seed = seed;
+        // Add an arbitrary offset for the dynamics seed.
+        // Want to avoid collissions with other seed derivations.
+        let dynamics_seed = seed.wrapping_add(135);
+        Ok(self.build(structure_seed)?.as_stateful(dynamics_seed))
     }
 }
