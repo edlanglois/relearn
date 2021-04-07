@@ -16,10 +16,9 @@ impl From<&Opts> for PolicyDef {
     fn from(opts: &Opts) -> Self {
         use PolicyName::*;
         match opts.policy {
-            // Can't use default() for None because that ignores opts for hidden size etc.
-            Some(Mlp) | None => PolicyDef::Mlp(opts.into()),
-            Some(GruMlp) => PolicyDef::GruMlp(opts.into()),
-            Some(LstmMlp) => PolicyDef::LstmMlp(opts.into()),
+            Mlp => PolicyDef::Mlp(opts.into()),
+            GruMlp => PolicyDef::GruMlp(opts.into()),
+            LstmMlp => PolicyDef::LstmMlp(opts.into()),
         }
     }
 }

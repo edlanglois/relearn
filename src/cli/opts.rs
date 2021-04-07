@@ -54,9 +54,11 @@ pub struct Opts {
     pub num_samples: Option<usize>,
 
     // Policy args
-    #[clap(long, arg_enum)]
+    #[clap(long, arg_enum, default_value = "mlp")]
     /// Policy name
-    pub policy: Option<PolicyName>,
+    // Note: If using Option<PolicyName> instead, PolicyDef::default() can't be used because
+    // we need to read the inner attributes from Opts if they are set.
+    pub policy: PolicyName,
 
     /// Policy mlp activation function
     #[clap(long, arg_enum)]
