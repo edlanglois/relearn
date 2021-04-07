@@ -8,7 +8,8 @@ description = "Run reinforcement learning experiments"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = "3.0.0-beta.2"
+# To get https://github.com/clap-rs/clap/issues/2022
+clap = { git = "https://github.com/clap-rs/clap.git", branch = "master" }
 enum-map = "0.6.4"
 ndarray = "0.14.0"
 ndarray-stats = "0.4"
