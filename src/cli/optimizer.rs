@@ -1,4 +1,4 @@
-use super::Opts;
+use super::Options;
 use crate::defs::OptimizerDef;
 use crate::torch::optimizers::{AdamConfig, AdamWConfig, RmsPropConfig, SgdConfig};
 use clap::Clap;
@@ -12,8 +12,8 @@ pub enum OptimizerName {
     AdamW,
 }
 
-impl From<&Opts> for OptimizerDef {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for OptimizerDef {
+    fn from(opts: &Options) -> Self {
         use OptimizerName::*;
         match opts.optimizer {
             Sgd => OptimizerDef::Sgd(opts.into()),
@@ -24,8 +24,8 @@ impl From<&Opts> for OptimizerDef {
     }
 }
 
-impl From<&Opts> for SgdConfig {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for SgdConfig {
+    fn from(opts: &Options) -> Self {
         let mut config = Self::default();
         if let Some(learning_rate) = opts.learning_rate {
             config.learning_rate = learning_rate;
@@ -40,8 +40,8 @@ impl From<&Opts> for SgdConfig {
     }
 }
 
-impl From<&Opts> for RmsPropConfig {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for RmsPropConfig {
+    fn from(opts: &Options) -> Self {
         let mut config = Self::default();
         if let Some(learning_rate) = opts.learning_rate {
             config.learning_rate = learning_rate;
@@ -56,8 +56,8 @@ impl From<&Opts> for RmsPropConfig {
     }
 }
 
-impl From<&Opts> for AdamConfig {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for AdamConfig {
+    fn from(opts: &Options) -> Self {
         let mut config = Self::default();
         if let Some(learning_rate) = opts.learning_rate {
             config.learning_rate = learning_rate;
@@ -69,8 +69,8 @@ impl From<&Opts> for AdamConfig {
     }
 }
 
-impl From<&Opts> for AdamWConfig {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for AdamWConfig {
+    fn from(opts: &Options) -> Self {
         let mut config = Self::default();
         if let Some(learning_rate) = opts.learning_rate {
             config.learning_rate = learning_rate;

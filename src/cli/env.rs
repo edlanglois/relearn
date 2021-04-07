@@ -1,5 +1,5 @@
-//! Parse environment definition from Opts
-use super::Opts;
+//! Parse environment definition from Options
+use super::Options;
 use crate::simulation::EnvDef;
 use clap::Clap;
 
@@ -12,8 +12,8 @@ pub enum EnvName {
     Chain,
 }
 
-impl From<&Opts> for EnvDef {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for EnvDef {
+    fn from(opts: &Options) -> Self {
         use EnvName::*;
         match opts.environment {
             SimpleBernoulliBandit => EnvDef::SimpleBernoulliBandit,

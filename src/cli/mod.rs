@@ -5,4 +5,4 @@ mod optimizer;
 mod opts;
 mod policy;
 
-pub use opts::Opts;
+pub use opts::Options;

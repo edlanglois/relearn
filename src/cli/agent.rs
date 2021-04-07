@@ -1,4 +1,4 @@
-use super::Opts;
+use super::Options;
 use crate::agents::{
     BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
@@ -15,8 +15,8 @@ pub enum AgentName {
     PolicyGradient,
 }
 
-impl From<&Opts> for AgentDef {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for AgentDef {
+    fn from(opts: &Options) -> Self {
         use AgentName::*;
         match opts.agent {
             Random => AgentDef::Random,
@@ -28,8 +28,8 @@ impl From<&Opts> for AgentDef {
     }
 }
 
-impl From<&Opts> for TabularQLearningAgentConfig {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for TabularQLearningAgentConfig {
+    fn from(opts: &Options) -> Self {
         let mut config = TabularQLearningAgentConfig::default();
         if let Some(exploration_rate) = opts.exploration_rate {
             config.exploration_rate = exploration_rate;
@@ -38,8 +38,8 @@ impl From<&Opts> for TabularQLearningAgentConfig {
     }
 }
 
-impl From<&Opts> for BetaThompsonSamplingAgentConfig {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for BetaThompsonSamplingAgentConfig {
+    fn from(opts: &Options) -> Self {
         let mut config = BetaThompsonSamplingAgentConfig::default();
         if let Some(num_samples) = opts.num_samples {
             config.num_samples = num_samples;
@@ -48,8 +48,8 @@ impl From<&Opts> for BetaThompsonSamplingAgentConfig {
     }
 }
 
-impl From<&Opts> for UCB1AgentConfig {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for UCB1AgentConfig {
+    fn from(opts: &Options) -> Self {
         let mut config = UCB1AgentConfig::default();
         if let Some(exploration_rate) = opts.exploration_rate {
             config.exploration_rate = exploration_rate;
@@ -58,8 +58,8 @@ impl From<&Opts> for UCB1AgentConfig {
     }
 }
 
-impl From<&Opts> for PolicyGradientAgentDef {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for PolicyGradientAgentDef {
+    fn from(opts: &Options) -> Self {
         let mut config = PolicyGradientAgentDef::default();
         config.policy = opts.into();
         config.optimizer = opts.into();

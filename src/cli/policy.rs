@@ -1,4 +1,4 @@
-use super::Opts;
+use super::Options;
 use crate::defs::PolicyDef;
 use crate::torch::configs::{MlpConfig, RnnConfig, SequenceRegressorConfig};
 use clap::Clap;
@@ -12,8 +12,8 @@ pub enum PolicyName {
     LstmMlp,
 }
 
-impl From<&Opts> for PolicyDef {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for PolicyDef {
+    fn from(opts: &Options) -> Self {
         use PolicyName::*;
         match opts.policy {
             Mlp => PolicyDef::Mlp(opts.into()),
@@ -23,8 +23,8 @@ impl From<&Opts> for PolicyDef {
     }
 }
 
-impl From<&Opts> for MlpConfig {
-    fn from(opts: &Opts) -> Self {
+impl From<&Options> for MlpConfig {
+    fn from(opts: &Options) -> Self {
         let mut config = MlpConfig::default();
         if let Some(hidden_sizes) = &opts.hidden_sizes {
             config.hidden_sizes = hidden_sizes.clone();
@@ -36,13 +36,13 @@ impl From<&Opts> for MlpConfig {
     }
 }
 
-impl<R, P> From<&Opts> for SequenceRegressorConfig<R, P>
+impl<R, P> From<&Options> for SequenceRegressorConfig<R, P>
 where
     R: Default,
     P: Default,
-    for<'a> &'a Opts: Into<R> + Into<P>,
+    for<'a> &'a Options: Into<R> + Into<P>,
 {
-    fn from(opts: &Opts) -> Self {
+    fn from(opts: &Options) -> Self {
         let mut config = Self::default();
         config.rnn_config = opts.into();
         config.post_config = opts.into();
@@ -56,8 +56,8 @@ where
     }
 }
 
-impl<R: RNN> From<&Opts> for RnnConfig<R> {
-    fn from(opts: &Opts) -> Self {
+impl<R: RNN> From<&Options> for RnnConfig<R> {
+    fn from(opts: &Options) -> Self {
         let mut config = RnnConfig::default();
         if let Some(num_layers) = opts.rnn_num_layers {
             config.num_layers = num_layers

@@ -12,7 +12,7 @@ use clap::{crate_authors, crate_description, crate_version, Clap};
     author = crate_authors!(),
     about = crate_description!(),
 )]
-pub struct Opts {
+pub struct Options {
     #[clap(long, default_value = "1")]
     /// Random seed for the experiment
     pub seed: u64,
@@ -54,7 +54,7 @@ pub struct Opts {
     #[clap(long, arg_enum, default_value = "mlp")]
     /// Policy name
     // Note: If using Option<PolicyName> instead, PolicyDef::default() can't be used because
-    // we need to read the inner attributes from Opts if they are set.
+    // we need to read the inner attributes from Options if they are set.
     pub policy: PolicyName,
 
     /// Policy mlp activation function

@@ -1,12 +1,12 @@
 use clap::Clap;
 use rust_rl::logging::CLILogger;
-use rust_rl::{cli::Opts, AgentDef, EnvDef};
+use rust_rl::{cli::Options, AgentDef, EnvDef};
 use std::convert::From;
 use std::error::Error;
 use std::time::Duration;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let opts: Opts = Opts::parse();
+    let opts: Options = Options::parse();
     println!("{:#?}", opts);
     let env_def = EnvDef::from(&opts);
     println!("Environment:\n{:#?}", env_def);
