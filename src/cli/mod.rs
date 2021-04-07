@@ -2,7 +2,7 @@
 mod agent;
 mod env;
 mod optimizer;
-mod opts;
+mod options;
 mod policy;
 
-pub use opts::Options;
+pub use options::Options;
