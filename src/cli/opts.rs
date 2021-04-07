@@ -1,6 +1,8 @@
 //! Command-line options
 use super::agent::AgentName;
 use super::env::EnvName;
+use super::policy::PolicyName;
+use crate::torch::Activation;
 use clap::{crate_authors, crate_description, crate_version, Clap};
 
 #[derive(Clap, Debug)]
@@ -50,6 +52,31 @@ pub struct Opts {
     #[clap(long)]
     /// Number of samples for Thompson sampling agents.
     pub num_samples: Option<usize>,
+
+    // Policy args
+    #[clap(long, arg_enum)]
+    /// Policy name
+    pub policy: Option<PolicyName>,
+
+    /// Policy mlp activation function
+    #[clap(long, arg_enum)]
+    pub activation: Option<Activation>,
+
+    #[clap(long)]
+    /// Policy mlp hidden layer sizes
+    pub hidden_sizes: Option<Vec<usize>>,
+
+    #[clap(long)]
+    /// Policy rnn hidden layer size
+    pub rnn_hidden_size: Option<usize>,
+
+    #[clap(long)]
+    /// Policy rnn number of hidden layers
+    pub rnn_num_layers: Option<usize>,
+
+    #[clap(long, arg_enum)]
+    /// Policy rnn output activation function
+    pub rnn_output_activation: Option<Activation>,
 
     // Experiment args
     #[clap(long)]

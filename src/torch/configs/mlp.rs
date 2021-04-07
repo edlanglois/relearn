@@ -7,11 +7,11 @@ use tch::nn;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MlpConfig {
     /// Sizes of the hidden layers
-    hidden_sizes: Vec<usize>,
+    pub hidden_sizes: Vec<usize>,
     /// Activation function between hidden layers.
-    activation: Activation,
+    pub activation: Activation,
     /// Activation function on the output.
-    output_activation: Activation,
+    pub output_activation: Activation,
 }
 
 impl Default for MlpConfig {

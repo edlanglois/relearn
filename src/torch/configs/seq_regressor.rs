@@ -6,17 +6,11 @@ use tch::nn;
 
 /// Configuration for an RNN followed by a feed-forward network.
 #[derive(Debug, Clone)]
-pub struct SequenceRegressorConfig<R, P>
-where
-    R: ModuleBuilder,
-    <R as ModuleBuilder>::Module: nn::RNN,
-    P: ModuleBuilder,
-    <P as ModuleBuilder>::Module: nn::Module,
-{
-    rnn_config: R,
-    rnn_hidden_size: usize,
-    rnn_output_activation: Activation,
-    post_config: P,
+pub struct SequenceRegressorConfig<R, P> {
+    pub rnn_config: R,
+    pub rnn_hidden_size: usize,
+    pub rnn_output_activation: Activation,
+    pub post_config: P,
 }
 
 /// Configuration for an MLP stacked on top of a GRU.
@@ -26,10 +20,8 @@ pub type LstmMlpConfig = SequenceRegressorConfig<RnnConfig<nn::LSTM>, MlpConfig>
 
 impl<R, P> Default for SequenceRegressorConfig<R, P>
 where
-    R: ModuleBuilder + Default,
-    <R as ModuleBuilder>::Module: nn::RNN,
-    P: ModuleBuilder + Default,
-    <P as ModuleBuilder>::Module: nn::Module,
+    R: Default,
+    P: Default,
 {
     fn default() -> Self {
         Self {

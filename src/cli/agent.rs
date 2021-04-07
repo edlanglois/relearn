@@ -12,7 +12,7 @@ pub enum AgentName {
     TabularQLearning,
     BetaThompsonSampling,
     UCB1,
-    MlpPolicyGradient,
+    PolicyGradient,
 }
 
 impl From<&Opts> for AgentDef {
@@ -20,10 +20,10 @@ impl From<&Opts> for AgentDef {
         use AgentName::*;
         match opts.agent {
             Random => AgentDef::Random,
-            TabularQLearning => AgentDef::TabularQLearning(From::from(opts)),
-            BetaThompsonSampling => AgentDef::BetaThompsonSampling(From::from(opts)),
+            TabularQLearning => AgentDef::TabularQLearning(opts.into()),
+            BetaThompsonSampling => AgentDef::BetaThompsonSampling(opts.into()),
             UCB1 => AgentDef::UCB1(From::from(opts)),
-            MlpPolicyGradient => AgentDef::PolicyGradient(From::from(opts)),
+            PolicyGradient => AgentDef::PolicyGradient(opts.into()),
         }
     }
 }
@@ -61,6 +61,7 @@ impl From<&Opts> for UCB1AgentConfig {
 impl From<&Opts> for PolicyGradientAgentDef {
     fn from(opts: &Opts) -> Self {
         let mut config = PolicyGradientAgentDef::default();
+        config.policy = opts.into();
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
             config.steps_per_epoch = steps_per_epoch;
         }

@@ -1,8 +1,9 @@
 //! Activation functions
+use clap::Clap;
 use tch::{nn, Tensor};
 
 /// Activation functions.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Clap)]
 pub enum Activation {
     /// No transformation
     Identity,
