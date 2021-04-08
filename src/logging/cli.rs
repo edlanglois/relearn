@@ -31,11 +31,10 @@ impl CLILogger {
     pub fn display(&mut self) {
         println!("");
         for (event, mut event_log) in self.events.iter_mut() {
-            let summary_delta = event_log.index - event_log.summary_start_index;
-            if summary_delta == 0 {
+            let summary_size = event_log.index - event_log.summary_start_index;
+            if summary_size == 0 {
                 continue;
             }
-            let summary_size = summary_delta - 1;
 
             print!("==== ");
             if self.average_between_displays {
