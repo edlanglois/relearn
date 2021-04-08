@@ -232,9 +232,9 @@ where
                 &history_data.episode_lengths,
             )
             .squeeze1(0);
-        let log_probs = self
+        let (log_probs, entropies) = self
             .action_space
-            .batch_log_probs(&output, &history_data.actions);
+            .batch_statistics(&output, &history_data.actions);
 
         let loss = -(log_probs * history_data.returns).mean(Kind::Float);
         self.optimizer.backward_step(&loss);
@@ -251,6 +251,13 @@ where
                 Event::Epoch,
                 "batch_num_episodes",
                 (history_data.episode_lengths.len() as f64).into(),
+            )
+            .unwrap();
+        logger
+            .log(
+                Event::Epoch,
+                "policy_entropy",
+                f64::from(entropies.mean(Kind::Float)).into(),
             )
             .unwrap();
         logger.done(Event::Epoch);

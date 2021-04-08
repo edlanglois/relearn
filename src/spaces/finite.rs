@@ -49,6 +49,7 @@ impl<S: FiniteSpace> FeatureSpace<Tensor> for S {
     }
 }
 
+/// Parameterize a categorical distribution.
 impl<S: FiniteSpace> ParameterizedSampleSpace<Tensor> for S {
     fn num_sample_params(&self) -> usize {
         self.size()
@@ -66,16 +67,40 @@ impl<S: FiniteSpace> ParameterizedSampleSpace<Tensor> for S {
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a,
     {
-        let indices: Vec<_> = elements
-            .into_iter()
-            .map(|element| self.to_index(element) as i64)
-            .collect();
-        let index_tensor = Tensor::of_slice(&indices);
         let logits = parameters.log_softmax(-1, Kind::Float);
+        let index_tensor = to_index_tensor(self, elements);
         logits
             .gather(-1, &index_tensor.unsqueeze(-1), false)
             .squeeze1(-1)
     }
+
+    fn batch_statistics<'a, I>(&self, parameters: &Tensor, elements: I) -> (Tensor, Tensor)
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+    {
+        let logits = parameters.log_softmax(-1, Kind::Float);
+        let index_tensor = to_index_tensor(self, elements);
+        let log_probs = logits
+            .gather(-1, &index_tensor.unsqueeze(-1), false)
+            .squeeze1(-1);
+        let entropy = -(&logits * logits.exp()).sum1(&[-1], false, Kind::Float);
+        (log_probs, entropy)
+    }
+}
+
+/// Convert an iterator of elements into a index tensor
+fn to_index_tensor<'a, S, I>(space: &S, elements: I) -> Tensor
+where
+    S: FiniteSpace,
+    I: IntoIterator<Item = &'a S::Element>,
+    S::Element: 'a,
+{
+    let indices: Vec<_> = elements
+        .into_iter()
+        .map(|element| space.to_index(element) as i64)
+        .collect();
+    Tensor::of_slice(&indices)
 }
 
 #[cfg(test)]

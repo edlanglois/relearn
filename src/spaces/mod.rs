@@ -52,7 +52,7 @@ pub trait FeatureSpace<T, T2 = T>: Space {
 /// Sample elements from parameter vectors.
 ///
 /// Uses an arbitrary non-seeded source of randomness.
-pub trait ParameterizedSampleSpace<T, T2 = T>: Space {
+pub trait ParameterizedSampleSpace<T, T2 = T, T0 = T>: Space {
     /// Size of the parameter vector for which elements are sampled.
     fn num_sample_params(&self) -> usize;
 
@@ -71,6 +71,23 @@ pub trait ParameterizedSampleSpace<T, T2 = T>: Space {
     /// A one-dimensional array of length N containing the log probability of each element
     /// under the distribution defined by the corresponding parameter vector.
     fn batch_log_probs<'a, I>(&self, parameters: &T2, elements: I) -> T
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a;
+
+    /// Batch statistics from parameterized distributions.
+    ///
+    /// # Args
+    /// * `parameters` - A two-dimensional array of shape `[N, num_sample_params()]`
+    /// * `elements` - A list of N elements.
+    ///
+    /// # Returns
+    /// * `log_probs` - A one-dimensional array of length N containing the log probability
+    ///                 of each element under the distribution defined by the corresponding
+    ///                 parameter vector.
+    /// * `entropy`   - A one-dimensional array of length N containing the entropy
+    ///                 of each parameterized distribution.
+    fn batch_statistics<'a, I>(&self, parameters: &T2, elements: I) -> (T, T)
     where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a;
