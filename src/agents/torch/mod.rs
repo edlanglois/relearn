@@ -1,7 +1,9 @@
 //! Agents that use torch
-mod policy_gradient;
+mod vpg;
+mod vpg_gae;
 
-pub use policy_gradient::{PolicyGradientAgent, PolicyGradientAgentConfig};
+pub use vpg::{PolicyGradientAgent, PolicyGradientAgentConfig};
+pub use vpg_gae::{GaePolicyGradientAgent, GaePolicyGradientAgentConfig};
 
 use crate::torch::seq_modules::{IterativeModule, SequenceModule};
 

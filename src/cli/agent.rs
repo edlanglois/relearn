@@ -2,7 +2,7 @@ use super::Options;
 use crate::agents::{
     BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
-use crate::defs::{AgentDef, PolicyGradientAgentDef};
+use crate::defs::{AgentDef, GaePolicyGradientAgentDef, PolicyGradientAgentDef};
 use clap::Clap;
 
 /// Agent name
@@ -13,6 +13,7 @@ pub enum AgentName {
     BetaThompsonSampling,
     UCB1,
     PolicyGradient,
+    GaePolicyGradient,
 }
 
 impl From<&Options> for AgentDef {
@@ -24,6 +25,7 @@ impl From<&Options> for AgentDef {
             BetaThompsonSampling => AgentDef::BetaThompsonSampling(opts.into()),
             UCB1 => AgentDef::UCB1(From::from(opts)),
             PolicyGradient => AgentDef::PolicyGradient(opts.into()),
+            GaePolicyGradient => AgentDef::GaePolicyGradient(opts.into()),
         }
     }
 }
@@ -63,6 +65,18 @@ impl From<&Options> for PolicyGradientAgentDef {
         let mut config = PolicyGradientAgentDef::default();
         config.policy = opts.into();
         config.optimizer = opts.into();
+        if let Some(steps_per_epoch) = opts.steps_per_epoch {
+            config.steps_per_epoch = steps_per_epoch;
+        }
+        config
+    }
+}
+
+impl From<&Options> for GaePolicyGradientAgentDef {
+    fn from(opts: &Options) -> Self {
+        let mut config = GaePolicyGradientAgentDef::default();
+        config.policy = opts.into();
+        config.policy_optimizer = opts.into();
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
             config.steps_per_epoch = steps_per_epoch;
         }

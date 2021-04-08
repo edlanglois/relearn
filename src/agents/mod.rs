@@ -15,4 +15,7 @@ pub use bandits::{
 pub use builder::{AgentBuilder, BuildAgentError};
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
-pub use torch::{Policy, PolicyGradientAgent, PolicyGradientAgentConfig};
+pub use torch::{
+    GaePolicyGradientAgent, GaePolicyGradientAgentConfig, Policy, PolicyGradientAgent,
+    PolicyGradientAgentConfig,
+};

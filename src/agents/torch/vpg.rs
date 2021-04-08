@@ -1,4 +1,4 @@
-//! Policy-gradient agents
+//! Vanilla Policy Gradient
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use super::Policy;
 use crate::logging::{Event, Logger};
@@ -44,7 +44,7 @@ where
 {
     fn default() -> Self {
         Self {
-            steps_per_epoch: 1000,
+            steps_per_epoch: 4000,
             policy_config: Default::default(),
             optimizer_config: Default::default(),
         }
@@ -218,12 +218,14 @@ where
 
         // Epoch
         // Update the policy
-        let history_data: HistoryData<AS> = history_data(
-            &mut self.history,
-            &self.observation_space,
-            self.discount_factor,
-            self.max_unknown_return_discount,
-        );
+        let history_data: HistoryData<AS> = tch::no_grad(|| {
+            history_data(
+                &mut self.history,
+                &self.observation_space,
+                self.discount_factor,
+                self.max_unknown_return_discount,
+            )
+        });
 
         let output = self
             .policy
@@ -353,7 +355,7 @@ fn history_data<OS: FeatureSpace<Tensor>, AS: ParameterizedSampleSpace<Tensor>>(
             .collect::<Vec<_>>(),
     );
 
-    let observations: Vec<_> = history
+    let observations = history
         .iter()
         .zip(include_steps.iter())
         .filter_map(|(step, &include)| {
@@ -362,8 +364,7 @@ fn history_data<OS: FeatureSpace<Tensor>, AS: ParameterizedSampleSpace<Tensor>>(
             } else {
                 None
             }
-        })
-        .collect();
+        });
     // A tensor of shape [NUM_STEPS, NUM_OBSERVATION_FEATURES] containing one-hot feature vectors.
     let observation_features = observation_space.batch_features(observations);
 
@@ -391,7 +392,8 @@ mod policy_gradient {
     #[test]
     fn default_mlp_learns_derministic_bandit() {
         let mut config = PolicyGradientAgentConfig::<MlpConfig, AdamConfig>::default();
-        // Increase learning rate for the sake of quick testing on an easy environment
+        // Speed up learning for this simple environment
+        config.steps_per_epoch = 1000;
         config.optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
             |env_structure| config.build(env_structure, 0).unwrap(),
@@ -403,7 +405,8 @@ mod policy_gradient {
     #[test]
     fn default_gru_mlp_learns_derministic_bandit() {
         let mut config = PolicyGradientAgentConfig::<GruMlpConfig, AdamConfig>::default();
-        // Increase learning rate for the sake of quick testing on an easy environment
+        // Speed up learning for this simple environment
+        config.steps_per_epoch = 1000;
         config.optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
             |env_structure| config.build(env_structure, 0).unwrap(),
