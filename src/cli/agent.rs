@@ -98,6 +98,8 @@ impl Update<&Options> for GaePolicyGradientAgentDef {
     fn update(&mut self, opts: &Options) {
         self.policy.update(opts);
         self.policy_optimizer.update(opts);
+        self.value_fn.update(opts);
+        self.value_fn_optimizer.update(opts);
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
             self.steps_per_epoch = steps_per_epoch;
         }
