@@ -86,7 +86,7 @@ mod tests {
     /// Asserts that distribution samples do not violate its reported bounds
     fn check_bounded<T: PartialOrd, D: Distribution<T> + Bounded<T>>(
         d: &D,
-        num_samples: u64,
+        num_samples: usize,
         seed: u64,
     ) {
         let (lower_bound, upper_bound) = d.bounds();
@@ -109,14 +109,13 @@ mod tests {
     fn check_mean<D: Distribution<f64> + FromMean<f64>>(
         d: &D,
         expected_mean: f64,
-        num_samples: u64,
+        num_samples: usize,
         stddev_upper_bound: f64,
         seed: u64,
     ) {
-        let mut rng = StdRng::seed_from_u64(seed);
-        let empirical_mean = (0..num_samples)
-            .into_iter()
-            .map(|_| Distribution::<f64>::sample(&d, &mut rng))
+        let rng = StdRng::seed_from_u64(seed);
+        let empirical_mean = Distribution::<f64>::sample_iter(&d, rng)
+            .take(num_samples)
             .sum::<f64>()
             / (num_samples as f64);
         // Want to be close enough to the mean to have false positive probability < 1e-5
