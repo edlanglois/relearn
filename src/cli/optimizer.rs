@@ -1,15 +1,23 @@
-use super::{Options, Update, WithUpdate};
+use super::{Update, WithUpdate};
 use crate::defs::OptimizerDef;
 use crate::torch::optimizers::{AdamConfig, AdamWConfig, RmsPropConfig, SgdConfig};
 use clap::Clap;
 
 /// Optimizer name
-#[derive(Clap, Debug, PartialEq, Eq)]
+#[derive(Clap, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum OptimizerType {
     Sgd,
     RmsProp,
     Adam,
     AdamW,
+}
+
+/// Optimizer options
+pub trait OptimizerOptions {
+    fn type_(&self) -> Option<OptimizerType>;
+    fn learning_rate(&self) -> Option<f64>;
+    fn momentum(&self) -> Option<f64>;
+    fn weight_decay(&self) -> Option<f64>;
 }
 
 impl OptimizerDef {
@@ -24,10 +32,10 @@ impl OptimizerDef {
     }
 }
 
-impl From<&Options> for OptimizerDef {
-    fn from(opts: &Options) -> Self {
+impl<T: OptimizerOptions> From<&T> for OptimizerDef {
+    fn from(opts: &T) -> Self {
         use OptimizerType::*;
-        match opts.optimizer {
+        match opts.type_() {
             Some(Sgd) => OptimizerDef::Sgd(opts.into()),
             Some(RmsProp) => OptimizerDef::RmsProp(opts.into()),
             Some(Adam) | None => OptimizerDef::Adam(opts.into()),
@@ -36,9 +44,9 @@ impl From<&Options> for OptimizerDef {
     }
 }
 
-impl Update<&Options> for OptimizerDef {
-    fn update(&mut self, opts: &Options) {
-        if let Some(ref optimizer_type) = opts.optimizer {
+impl<T: OptimizerOptions> Update<&T> for OptimizerDef {
+    fn update(&mut self, opts: &T) {
+        if let Some(ref optimizer_type) = opts.type_() {
             if *optimizer_type != self.type_() {
                 // If the type is different, re-create the config entirely.
                 *self = opts.into();
@@ -56,75 +64,75 @@ impl Update<&Options> for OptimizerDef {
     }
 }
 
-impl From<&Options> for SgdConfig {
-    fn from(opts: &Options) -> Self {
+impl<T: OptimizerOptions> From<&T> for SgdConfig {
+    fn from(opts: &T) -> Self {
         Self::default().with_update(opts)
     }
 }
 
-impl Update<&Options> for SgdConfig {
-    fn update(&mut self, opts: &Options) {
-        if let Some(learning_rate) = opts.learning_rate {
+impl<T: OptimizerOptions> Update<&T> for SgdConfig {
+    fn update(&mut self, opts: &T) {
+        if let Some(learning_rate) = opts.learning_rate() {
             self.learning_rate = learning_rate;
         }
-        if let Some(momentum) = opts.momentum {
+        if let Some(momentum) = opts.momentum() {
             self.momentum = momentum;
         }
-        if let Some(weight_decay) = opts.weight_decay {
+        if let Some(weight_decay) = opts.weight_decay() {
             self.weight_decay = weight_decay;
         }
     }
 }
 
-impl From<&Options> for RmsPropConfig {
-    fn from(opts: &Options) -> Self {
+impl<T: OptimizerOptions> From<&T> for RmsPropConfig {
+    fn from(opts: &T) -> Self {
         Self::default().with_update(opts)
     }
 }
 
-impl Update<&Options> for RmsPropConfig {
-    fn update(&mut self, opts: &Options) {
-        if let Some(learning_rate) = opts.learning_rate {
+impl<T: OptimizerOptions> Update<&T> for RmsPropConfig {
+    fn update(&mut self, opts: &T) {
+        if let Some(learning_rate) = opts.learning_rate() {
             self.learning_rate = learning_rate;
         }
-        if let Some(momentum) = opts.momentum {
+        if let Some(momentum) = opts.momentum() {
             self.momentum = momentum;
         }
-        if let Some(weight_decay) = opts.weight_decay {
+        if let Some(weight_decay) = opts.weight_decay() {
             self.weight_decay = weight_decay;
         }
     }
 }
 
-impl From<&Options> for AdamConfig {
-    fn from(opts: &Options) -> Self {
+impl<T: OptimizerOptions> From<&T> for AdamConfig {
+    fn from(opts: &T) -> Self {
         Self::default().with_update(opts)
     }
 }
 
-impl Update<&Options> for AdamConfig {
-    fn update(&mut self, opts: &Options) {
-        if let Some(learning_rate) = opts.learning_rate {
+impl<T: OptimizerOptions> Update<&T> for AdamConfig {
+    fn update(&mut self, opts: &T) {
+        if let Some(learning_rate) = opts.learning_rate() {
             self.learning_rate = learning_rate;
         }
-        if let Some(weight_decay) = opts.weight_decay {
+        if let Some(weight_decay) = opts.weight_decay() {
             self.weight_decay = weight_decay;
         }
     }
 }
 
-impl From<&Options> for AdamWConfig {
-    fn from(opts: &Options) -> Self {
+impl<T: OptimizerOptions> From<&T> for AdamWConfig {
+    fn from(opts: &T) -> Self {
         Self::default().with_update(opts)
     }
 }
 
-impl Update<&Options> for AdamWConfig {
-    fn update(&mut self, opts: &Options) {
-        if let Some(learning_rate) = opts.learning_rate {
+impl<T: OptimizerOptions> Update<&T> for AdamWConfig {
+    fn update(&mut self, opts: &T) {
+        if let Some(learning_rate) = opts.learning_rate() {
             self.learning_rate = learning_rate;
         }
-        if let Some(weight_decay) = opts.weight_decay {
+        if let Some(weight_decay) = opts.weight_decay() {
             self.weight_decay = weight_decay;
         }
     }

@@ -6,7 +6,7 @@ use crate::defs::{AgentDef, GaePolicyGradientAgentDef, PolicyGradientAgentDef};
 use clap::Clap;
 
 /// Agent name
-#[derive(Clap, Debug)]
+#[derive(Clap, Debug, Eq, PartialEq, Clone, Copy)]
 pub enum AgentType {
     Random,
     TabularQLearning,
@@ -99,7 +99,7 @@ impl Update<&Options> for GaePolicyGradientAgentDef {
         self.policy.update(opts);
         self.policy_optimizer.update(opts);
         self.value_fn.update(opts);
-        self.value_fn_optimizer.update(opts);
+        self.value_fn_optimizer.update(&opts.value_fn_view());
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
             self.steps_per_epoch = steps_per_epoch;
         }

@@ -5,7 +5,7 @@ use clap::Clap;
 use tch::nn::RNN;
 
 /// Policy name
-#[derive(Clap, Debug, PartialEq, Eq)]
+#[derive(Clap, Debug, Eq, PartialEq, Clone, Copy)]
 pub enum PolicyType {
     Mlp,
     GruMlp,

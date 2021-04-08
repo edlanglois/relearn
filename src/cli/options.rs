@@ -1,7 +1,7 @@
 //! Command-line options
 use super::agent::AgentType;
 use super::env::{BanditArmPrior, EnvType};
-use super::optimizer::OptimizerType;
+use super::optimizer::{OptimizerOptions, OptimizerType};
 use super::policy::PolicyType;
 use crate::torch::Activation;
 use clap::{crate_authors, crate_description, crate_version, Clap};
@@ -87,20 +87,36 @@ pub struct Options {
 
     // Optimizer options
     #[clap(long, arg_enum, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
-    /// Optimizer type
+    /// Agent optimizer(s) type
     pub optimizer: Option<OptimizerType>,
 
     #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
-    /// Agent optimizer learning rate
+    /// Agent optimizer(s) learning rate
     pub learning_rate: Option<f64>,
 
     #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
-    /// Agent optimizer momentum
+    /// Agent optimizer(s) momentum
     pub momentum: Option<f64>,
 
     #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
-    /// Agent optimizer weight decay (L2 regularization)
+    /// Agent optimizer(s) weight decay (L2 regularization)
     pub weight_decay: Option<f64>,
+
+    #[clap(long, arg_enum, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
+    /// Agent value function optimizer type
+    pub value_fn_optimizer: Option<OptimizerType>,
+
+    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
+    /// Agent value function optimizer learning rate
+    pub value_fn_learning_rate: Option<f64>,
+
+    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
+    /// Agent value function optimizer momentum
+    pub value_fn_momentum: Option<f64>,
+
+    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
+    /// Agent value function optimizer weight decay (L2 regularization)
+    pub value_fn_weight_decay: Option<f64>,
 
     // Simulation options
     #[clap(long, default_value = "1", help_heading = Some("SIMULATION OPTIONS"))]
@@ -110,4 +126,43 @@ pub struct Options {
     #[clap(long, help_heading = Some("SIMULATION OPTIONS"))]
     /// Maximum number of experiment steps
     pub max_steps: Option<u64>,
+}
+
+impl Options {
+    pub fn value_fn_view(&self) -> ValueFnView {
+        ValueFnView(self)
+    }
+}
+
+impl OptimizerOptions for Options {
+    fn type_(&self) -> Option<OptimizerType> {
+        self.optimizer
+    }
+    fn learning_rate(&self) -> Option<f64> {
+        self.learning_rate
+    }
+    fn momentum(&self) -> Option<f64> {
+        self.momentum
+    }
+    fn weight_decay(&self) -> Option<f64> {
+        self.weight_decay
+    }
+}
+
+/// An option view that exposes value function options.
+pub struct ValueFnView<'a>(&'a Options);
+
+impl<'a> OptimizerOptions for ValueFnView<'a> {
+    fn type_(&self) -> Option<OptimizerType> {
+        self.0.value_fn_optimizer
+    }
+    fn learning_rate(&self) -> Option<f64> {
+        self.0.value_fn_learning_rate
+    }
+    fn momentum(&self) -> Option<f64> {
+        self.0.value_fn_momentum
+    }
+    fn weight_decay(&self) -> Option<f64> {
+        self.0.value_fn_weight_decay
+    }
 }

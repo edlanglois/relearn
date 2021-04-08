@@ -6,7 +6,7 @@ use clap::Clap;
 use rand::distributions::Standard;
 
 /// Environment name
-#[derive(Clap, Debug)]
+#[derive(Clap, Debug, Eq, PartialEq, Clone, Copy)]
 pub enum EnvType {
     DeterministicBandit,
     BernoulliBandit,
