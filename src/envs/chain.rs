@@ -104,12 +104,12 @@ impl Move {
 }
 
 #[cfg(test)]
-mod tests {
+mod chain {
     use super::super::testing;
     use super::*;
 
     #[test]
-    fn run_chain_default() {
+    fn run_default() {
         testing::run_stateless(Chain::default(), 1000, 0);
     }
 }

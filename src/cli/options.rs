@@ -28,6 +28,10 @@ pub struct Options {
     pub num_actions: Option<u64>,
 
     #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
+    /// Length of episodes in the environment
+    pub episode_len: Option<u64>,
+
+    #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
     /// Environment discount factor
     pub discount_factor: Option<f64>,
 

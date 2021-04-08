@@ -2,7 +2,7 @@ use super::AgentDef;
 use crate::agents::{Agent, BuildAgentError};
 use crate::envs::{
     Bandit, Chain as ChainEnv, EnvBuilder, EnvWithState, FixedMeansBanditConfig,
-    PriorMeansBanditConfig, StatefulEnvironment,
+    MemoryGame as MemoryGameEnv, PriorMeansBanditConfig, StatefulEnvironment,
 };
 use crate::error::RLError;
 use crate::logging::{Loggable, Logger};
@@ -22,6 +22,8 @@ pub enum EnvDef {
     UniformMeanBandit(DistributionType, PriorMeansBanditConfig<Standard>),
     /// The Chain environment,
     Chain(ChainEnv),
+    /// The Memory Game environment
+    MemoryGame(MemoryGameEnv),
 }
 
 #[derive(Debug)]
@@ -75,6 +77,10 @@ impl EnvDef {
             },
             Chain(config) => {
                 let env: EnvWithState<ChainEnv> = config.build(env_seed)?;
+                finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
+            }
+            MemoryGame(config) => {
+                let env: EnvWithState<MemoryGameEnv> = config.build(env_seed)?;
                 finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
             }
         })

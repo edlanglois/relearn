@@ -4,6 +4,7 @@ mod bandits;
 mod builder;
 mod chain;
 mod envs;
+mod memory;
 #[cfg(test)]
 pub mod testing;
 
@@ -14,3 +15,4 @@ pub use bandits::{
 pub use builder::{BuildEnvError, EnvBuilder};
 pub use chain::Chain;
 pub use envs::{EnvStructure, Environment, StatefulEnvironment};
+pub use memory::MemoryGame;

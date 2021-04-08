@@ -1,7 +1,7 @@
 //! Parse environment definition from Options
 use super::Options;
 use crate::defs::{env::DistributionType, EnvDef};
-use crate::envs::{Chain, FixedMeansBanditConfig, PriorMeansBanditConfig};
+use crate::envs::{Chain, FixedMeansBanditConfig, MemoryGame, PriorMeansBanditConfig};
 use clap::Clap;
 use rand::distributions::Standard;
 
@@ -11,6 +11,7 @@ pub enum EnvName {
     DeterministicBandit,
     BernoulliBandit,
     Chain,
+    MemoryGame,
 }
 
 #[derive(Clap, Debug)]
@@ -26,6 +27,7 @@ impl From<&Options> for EnvDef {
             DeterministicBandit => bandit_env_def(DistributionType::Deterministic, opts),
             BernoulliBandit => bandit_env_def(DistributionType::Bernoulli, opts),
             Chain => EnvDef::Chain(opts.into()),
+            MemoryGame => EnvDef::MemoryGame(opts.into()),
         }
     }
 }
@@ -65,6 +67,19 @@ impl From<&Options> for Chain {
         }
         if let Some(discount_factor) = opts.discount_factor {
             config.discount_factor = discount_factor;
+        }
+        config
+    }
+}
+
+impl From<&Options> for MemoryGame {
+    fn from(opts: &Options) -> Self {
+        let mut config = Self::default();
+        if let Some(num_actions) = opts.num_actions {
+            config.num_actions = num_actions as usize;
+        }
+        if let Some(episode_len) = opts.episode_len {
+            config.history_len = (episode_len - 1) as usize;
         }
         config
     }
