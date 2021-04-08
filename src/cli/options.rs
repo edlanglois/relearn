@@ -1,8 +1,8 @@
 //! Command-line options
-use super::agent::AgentName;
-use super::env::{BanditArmPrior, EnvName};
-use super::optimizer::OptimizerName;
-use super::policy::PolicyName;
+use super::agent::AgentType;
+use super::env::{BanditArmPrior, EnvType};
+use super::optimizer::OptimizerType;
+use super::policy::PolicyType;
 use crate::torch::Activation;
 use clap::{crate_authors, crate_description, crate_version, Clap};
 
@@ -16,8 +16,8 @@ use clap::{crate_authors, crate_description, crate_version, Clap};
 pub struct Options {
     // Environment options
     #[clap(arg_enum)]
-    /// Environment name
-    pub environment: EnvName,
+    /// Environment type
+    pub environment: EnvType,
 
     #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
     /// Number of states in the environment
@@ -45,8 +45,8 @@ pub struct Options {
 
     // Agent args
     #[clap(arg_enum)]
-    /// Agent name
-    pub agent: AgentName,
+    /// Agent type
+    pub agent: AgentType,
 
     #[clap(long, help_heading = Some("AGENT OPTIONS"))]
     /// Agent exploration rate
@@ -62,10 +62,10 @@ pub struct Options {
 
     // Policy options
     #[clap(long, arg_enum, default_value = "mlp", help_heading = Some("AGENT POLICY OPTIONS"))]
-    /// Policy name
-    // Note: If using Option<PolicyName> instead, PolicyDef::default() can't be used because
+    /// Policy type
+    // Note: If using Option<PolicyType> instead, PolicyDef::default() can't be used because
     // we need to read the inner attributes from Options if they are set.
-    pub policy: PolicyName,
+    pub policy: PolicyType,
 
     /// Policy MLP activation function
     #[clap(long, arg_enum, help_heading = Some("AGENT POLICY OPTIONS"))]
@@ -89,8 +89,8 @@ pub struct Options {
 
     // Optimizer options
     #[clap(long, arg_enum, default_value = "adam", help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
-    /// Optimizer name
-    pub optimizer: OptimizerName,
+    /// Optimizer type
+    pub optimizer: OptimizerType,
 
     #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
     /// Agent optimizer learning rate

@@ -5,7 +5,7 @@ use clap::Clap;
 
 /// Optimizer name
 #[derive(Clap, Debug)]
-pub enum OptimizerName {
+pub enum OptimizerType {
     Sgd,
     RmsProp,
     Adam,
@@ -14,7 +14,7 @@ pub enum OptimizerName {
 
 impl From<&Options> for OptimizerDef {
     fn from(opts: &Options) -> Self {
-        use OptimizerName::*;
+        use OptimizerType::*;
         match opts.optimizer {
             Sgd => OptimizerDef::Sgd(opts.into()),
             RmsProp => OptimizerDef::RmsProp(opts.into()),

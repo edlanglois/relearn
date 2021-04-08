@@ -7,7 +7,7 @@ use rand::distributions::Standard;
 
 /// Environment name
 #[derive(Clap, Debug)]
-pub enum EnvName {
+pub enum EnvType {
     DeterministicBandit,
     BernoulliBandit,
     Chain,
@@ -22,7 +22,7 @@ pub enum BanditArmPrior {
 
 impl From<&Options> for EnvDef {
     fn from(opts: &Options) -> Self {
-        use EnvName::*;
+        use EnvType::*;
         match opts.environment {
             DeterministicBandit => bandit_env_def(DistributionType::Deterministic, opts),
             BernoulliBandit => bandit_env_def(DistributionType::Bernoulli, opts),

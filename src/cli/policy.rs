@@ -6,7 +6,7 @@ use tch::nn::RNN;
 
 /// Policy name
 #[derive(Clap, Debug)]
-pub enum PolicyName {
+pub enum PolicyType {
     Mlp,
     GruMlp,
     LstmMlp,
@@ -14,7 +14,7 @@ pub enum PolicyName {
 
 impl From<&Options> for PolicyDef {
     fn from(opts: &Options) -> Self {
-        use PolicyName::*;
+        use PolicyType::*;
         match opts.policy {
             Mlp => PolicyDef::Mlp(opts.into()),
             GruMlp => PolicyDef::GruMlp(opts.into()),

@@ -7,7 +7,7 @@ use clap::Clap;
 
 /// Agent name
 #[derive(Clap, Debug)]
-pub enum AgentName {
+pub enum AgentType {
     Random,
     TabularQLearning,
     BetaThompsonSampling,
@@ -18,7 +18,7 @@ pub enum AgentName {
 
 impl From<&Options> for AgentDef {
     fn from(opts: &Options) -> Self {
-        use AgentName::*;
+        use AgentType::*;
         match opts.agent {
             Random => AgentDef::Random,
             TabularQLearning => AgentDef::TabularQLearning(opts.into()),
