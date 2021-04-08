@@ -61,11 +61,9 @@ pub struct Options {
     pub num_samples: Option<usize>,
 
     // Policy options
-    #[clap(long, arg_enum, default_value = "mlp", help_heading = Some("AGENT POLICY OPTIONS"))]
+    #[clap(long, arg_enum, help_heading = Some("AGENT POLICY OPTIONS"))]
     /// Policy type
-    // Note: If using Option<PolicyType> instead, PolicyDef::default() can't be used because
-    // we need to read the inner attributes from Options if they are set.
-    pub policy: PolicyType,
+    pub policy: Option<PolicyType>,
 
     /// Policy MLP activation function
     #[clap(long, arg_enum, help_heading = Some("AGENT POLICY OPTIONS"))]
@@ -88,9 +86,9 @@ pub struct Options {
     pub rnn_output_activation: Option<Activation>,
 
     // Optimizer options
-    #[clap(long, arg_enum, default_value = "adam", help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
+    #[clap(long, arg_enum, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
     /// Optimizer type
-    pub optimizer: OptimizerType,
+    pub optimizer: Option<OptimizerType>,
 
     #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
     /// Agent optimizer learning rate

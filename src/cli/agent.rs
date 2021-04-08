@@ -1,4 +1,4 @@
-use super::Options;
+use super::{Options, Update, WithUpdate};
 use crate::agents::{
     BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
@@ -32,54 +32,74 @@ impl From<&Options> for AgentDef {
 
 impl From<&Options> for TabularQLearningAgentConfig {
     fn from(opts: &Options) -> Self {
-        let mut config = TabularQLearningAgentConfig::default();
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for TabularQLearningAgentConfig {
+    fn update(&mut self, opts: &Options) {
         if let Some(exploration_rate) = opts.exploration_rate {
-            config.exploration_rate = exploration_rate;
+            self.exploration_rate = exploration_rate;
         }
-        config
     }
 }
 
 impl From<&Options> for BetaThompsonSamplingAgentConfig {
     fn from(opts: &Options) -> Self {
-        let mut config = BetaThompsonSamplingAgentConfig::default();
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for BetaThompsonSamplingAgentConfig {
+    fn update(&mut self, opts: &Options) {
         if let Some(num_samples) = opts.num_samples {
-            config.num_samples = num_samples;
+            self.num_samples = num_samples;
         }
-        config
     }
 }
 
 impl From<&Options> for UCB1AgentConfig {
     fn from(opts: &Options) -> Self {
-        let mut config = UCB1AgentConfig::default();
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for UCB1AgentConfig {
+    fn update(&mut self, opts: &Options) {
         if let Some(exploration_rate) = opts.exploration_rate {
-            config.exploration_rate = exploration_rate;
+            self.exploration_rate = exploration_rate;
         }
-        config
     }
 }
 
 impl From<&Options> for PolicyGradientAgentDef {
     fn from(opts: &Options) -> Self {
-        let mut config = PolicyGradientAgentDef::default();
-        config.policy = opts.into();
-        config.optimizer = opts.into();
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for PolicyGradientAgentDef {
+    fn update(&mut self, opts: &Options) {
+        self.policy.update(opts);
+        self.optimizer.update(opts);
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
-            config.steps_per_epoch = steps_per_epoch;
+            self.steps_per_epoch = steps_per_epoch;
         }
-        config
     }
 }
 
 impl From<&Options> for GaePolicyGradientAgentDef {
     fn from(opts: &Options) -> Self {
-        let mut config = GaePolicyGradientAgentDef::default();
-        config.policy = opts.into();
-        config.policy_optimizer = opts.into();
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for GaePolicyGradientAgentDef {
+    fn update(&mut self, opts: &Options) {
+        self.policy.update(opts);
+        self.policy_optimizer.update(opts);
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
-            config.steps_per_epoch = steps_per_epoch;
+            self.steps_per_epoch = steps_per_epoch;
         }
-        config
     }
 }

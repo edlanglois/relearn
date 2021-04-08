@@ -1,5 +1,5 @@
 //! Parse environment definition from Options
-use super::Options;
+use super::{Options, Update, WithUpdate};
 use crate::defs::{env::DistributionType, EnvDef};
 use crate::envs::{Chain, FixedMeansBanditConfig, MemoryGame, PriorMeansBanditConfig};
 use clap::Clap;
@@ -41,46 +41,62 @@ fn bandit_env_def(sample_distribution: DistributionType, opts: &Options) -> EnvD
 
 impl From<&Options> for FixedMeansBanditConfig {
     fn from(opts: &Options) -> Self {
-        let mut config = Self::default();
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for FixedMeansBanditConfig {
+    fn update(&mut self, opts: &Options) {
         if let Some(ref arm_rewards) = opts.arm_rewards {
-            config.means = arm_rewards.clone();
+            self.means = arm_rewards.clone();
         }
-        config
     }
 }
 
 impl From<&Options> for PriorMeansBanditConfig<Standard> {
     fn from(opts: &Options) -> Self {
-        let mut config = Self::default();
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for PriorMeansBanditConfig<Standard> {
+    fn update(&mut self, opts: &Options) {
         if let Some(num_actions) = opts.num_actions {
-            config.num_arms = num_actions as usize;
+            self.num_arms = num_actions as usize;
         }
-        config
     }
 }
 
 impl From<&Options> for Chain {
     fn from(opts: &Options) -> Self {
-        let mut config = Self::default();
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for Chain {
+    fn update(&mut self, opts: &Options) {
         if let Some(num_states) = opts.num_states {
-            config.size = num_states;
+            self.size = num_states;
         }
         if let Some(discount_factor) = opts.discount_factor {
-            config.discount_factor = discount_factor;
+            self.discount_factor = discount_factor;
         }
-        config
     }
 }
 
 impl From<&Options> for MemoryGame {
     fn from(opts: &Options) -> Self {
-        let mut config = Self::default();
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for MemoryGame {
+    fn update(&mut self, opts: &Options) {
         if let Some(num_actions) = opts.num_actions {
-            config.num_actions = num_actions as usize;
+            self.num_actions = num_actions as usize;
         }
         if let Some(episode_len) = opts.episode_len {
-            config.history_len = (episode_len - 1) as usize;
+            self.history_len = (episode_len - 1) as usize;
         }
-        config
     }
 }
