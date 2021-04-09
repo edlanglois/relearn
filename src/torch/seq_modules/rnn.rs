@@ -76,4 +76,16 @@ mod seq_mod_rnn {
         let (gru, in_dim, out_dim) = gru;
         testing::check_step(&gru, in_dim, out_dim);
     }
+
+    #[rstest]
+    fn gru_iter_map(gru: (SeqModRnn<nn::GRU>, usize, usize)) {
+        let (gru, in_dim, out_dim) = gru;
+        testing::check_iter_map(&gru, in_dim, out_dim);
+    }
+
+    #[rstest]
+    fn gru_iter_map_parallel(gru: (SeqModRnn<nn::GRU>, usize, usize)) {
+        let (gru, in_dim, out_dim) = gru;
+        testing::check_iter_map_parallel(&gru, in_dim, out_dim);
+    }
 }

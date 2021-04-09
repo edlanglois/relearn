@@ -96,4 +96,16 @@ mod mlp_config {
         let (default_mlp, in_dim, out_dim) = default_module;
         testing::check_step(&default_mlp, in_dim, out_dim);
     }
+
+    #[rstest]
+    fn default_module_iter_map(default_module: (MLP, usize, usize)) {
+        let (default_mlp, in_dim, out_dim) = default_module;
+        testing::check_iter_map(&default_mlp, in_dim, out_dim);
+    }
+
+    #[rstest]
+    fn default_module_iter_map_parallel(default_module: (MLP, usize, usize)) {
+        let (default_mlp, in_dim, out_dim) = default_module;
+        testing::check_iter_map(&default_mlp, in_dim, out_dim);
+    }
 }
