@@ -91,10 +91,4 @@ mod sequence_regressor {
         let (gru_relu_linear, in_dim, out_dim) = gru_relu_linear;
         testing::check_step(&gru_relu_linear, in_dim, out_dim);
     }
-
-    #[rstest]
-    fn gru_relu_linear_iter_map(gru_relu_linear: (GruMlp, usize, usize)) {
-        let (gru_relu_linear, in_dim, out_dim) = gru_relu_linear;
-        testing::check_iter_map(&gru_relu_linear, in_dim, out_dim);
-    }
 }

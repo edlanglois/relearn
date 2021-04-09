@@ -1,12 +1,10 @@
 //! Sequence modules. Like [tch::nn::Module] but operate on a sequence of data.
-mod iter_map;
 pub mod module;
 mod rnn;
 mod seq_regressor;
 #[cfg(test)]
 pub mod testing;
 
-pub use iter_map::{IterMapModule, TensorIterMap};
 pub use rnn::SeqModRnn;
 pub use seq_regressor::SequenceRegressor;
 

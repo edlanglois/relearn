@@ -1,5 +1,5 @@
 //! Sequence modules test utilities.
-use super::{IterMapModule, IterativeModule, SequenceModule, TensorIterMap};
+use super::{IterativeModule, SequenceModule};
 use std::iter;
 use tch::{kind::Kind, nn::Module, Device, IndexOp, Tensor};
 
@@ -71,44 +71,4 @@ pub fn check_step<M: IterativeModule>(module: &M, in_dim: usize, out_dim: usize)
     let input2 = -input1;
     let (output2, _) = module.step(&input2, &state2);
     assert_eq!(output2.size(), vec![batch_size as i64, out_dim as i64]);
-}
-
-/// Basic structural check of IterMapModule::iter_map
-///
-/// * Checks that the output size is correct.
-/// * Checks that multiple steps can be performed.
-pub fn check_iter_map<'a, M: IterMapModule<'a>>(module: &'a M, in_dim: usize, out_dim: usize) {
-    let batch_size = 4;
-
-    let input = Tensor::ones(
-        &[batch_size as i64, in_dim as i64],
-        (Kind::Float, Device::Cpu),
-    );
-
-    let mut map = module.iter_map(batch_size);
-    let output1 = map.step(&input);
-    assert_eq!(output1.size(), vec![batch_size as i64, out_dim as i64]);
-
-    let output2 = map.step(&input);
-    assert_eq!(output2.size(), vec![batch_size as i64, out_dim as i64]);
-}
-
-/// Check that multiple iter_maps can be used in parallel
-pub fn check_iter_map_parallel<'a, M: IterMapModule<'a>>(
-    module: &'a M,
-    in_dim: usize,
-    _out_dim: usize,
-) {
-    let batch_size = 4;
-
-    let input = Tensor::ones(
-        &[batch_size as i64, in_dim as i64],
-        (Kind::Float, Device::Cpu),
-    );
-
-    let mut map1 = module.iter_map(batch_size);
-    let mut map2 = module.iter_map(batch_size);
-    let _ = map1.step(&input);
-    let _ = map2.step(&input);
-    let _ = map1.step(&input);
 }

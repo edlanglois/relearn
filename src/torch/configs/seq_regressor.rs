@@ -95,12 +95,6 @@ mod sequence_regressor_config {
         testing::check_step(&gru_mlp, in_dim, out_dim);
     }
 
-    #[rstest]
-    fn gru_mlp_default_module_iter_map(gru_mlp_default_module: (GruMlp, usize, usize)) {
-        let (gru_mlp, in_dim, out_dim) = gru_mlp_default_module;
-        testing::check_iter_map(&gru_mlp, in_dim, out_dim);
-    }
-
     type LstmMlp = <LstmMlpConfig as ModuleBuilder>::Module;
 
     #[fixture]
@@ -123,11 +117,5 @@ mod sequence_regressor_config {
     fn lstm_mlp_default_module_step(lstm_mlp_default_module: (LstmMlp, usize, usize)) {
         let (lstm_mlp, in_dim, out_dim) = lstm_mlp_default_module;
         testing::check_step(&lstm_mlp, in_dim, out_dim);
-    }
-
-    #[rstest]
-    fn lstm_mlp_default_module_iter_map(lstm_mlp_default_module: (LstmMlp, usize, usize)) {
-        let (lstm_mlp, in_dim, out_dim) = lstm_mlp_default_module;
-        testing::check_iter_map(&lstm_mlp, in_dim, out_dim);
     }
 }
