@@ -70,3 +70,7 @@ pub trait StatefulIterativeModule {
     /// It is not necessary to call this at the start of the first sequence.
     fn reset(&mut self);
 }
+
+/// Sequence module with stateful iteration
+pub trait StatefulIterSeqModule: SequenceModule + StatefulIterativeModule {}
+impl<T: SequenceModule + StatefulIterativeModule> StatefulIterSeqModule for T {}
