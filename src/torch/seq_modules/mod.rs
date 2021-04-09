@@ -1,10 +1,12 @@
 //! Sequence modules. Like [tch::nn::Module] but operate on a sequence of data.
+mod as_stateful;
 pub mod module;
 mod rnn;
 mod seq_regressor;
 #[cfg(test)]
 pub mod testing;
 
+pub use as_stateful::AsStatefulIterator;
 pub use rnn::SeqModRnn;
 pub use seq_regressor::SequenceRegressor;
 
@@ -39,7 +41,7 @@ pub trait IterativeModule {
     /// Construct an initial state for the start of a new sequence.
     fn initial_state(&self, batch_size: usize) -> Self::State;
 
-    /// Apply one step of the network.
+    /// Apply one step of the module.
     ///
     /// # Args
     /// * `input` - The input for one (batched) step.
@@ -50,4 +52,21 @@ pub trait IterativeModule {
     /// * `output` - The output tensor. Has shape [BATCH_SIZE, NUM_OUT_FEATURES]
     /// * `state` - A new value for the hidden state.
     fn step(&self, input: &Tensor, state: &Self::State) -> (Tensor, Self::State);
+}
+
+/// A network module that operates iterative on a sequence of data and stores its own state.
+pub trait StatefulIterativeModule {
+    /// Apply one step of the module.
+    ///
+    /// # Args
+    /// * `input` - The input for one step. A tensor with shape [NUM_INPUT_FEATURES]
+    ///
+    /// # Returns
+    /// The output tensor. Has shape [NUM_OUT_FEATURES]
+    fn step(&mut self, input: &Tensor) -> Tensor;
+
+    /// Reset the inner state for the start of a new sequence.
+    ///
+    /// It is not necessary to call this at the start of the first sequence.
+    fn reset(&mut self);
 }
