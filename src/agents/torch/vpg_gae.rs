@@ -56,7 +56,7 @@ where
         Self {
             gamma: 0.99,
             lambda: 0.95,
-            steps_per_epoch: 4000,
+            steps_per_epoch: 1000,
             value_fn_train_iters: 80,
             policy_config: Default::default(),
             policy_optimizer_config: Default::default(),

@@ -32,7 +32,7 @@ where
 {
     fn default() -> Self {
         Self {
-            steps_per_epoch: 4000,
+            steps_per_epoch: 1000,
             policy_config: Default::default(),
             optimizer_config: Default::default(),
         }
