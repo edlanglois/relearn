@@ -1,9 +1,8 @@
-//! Vanilla Policy Gradient
+//! Vanilla SequenceModule + StatefulIterativeModule Gradient
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use super::Policy;
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
-use crate::torch::seq_modules::IterativeModule;
+use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
 use crate::torch::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use crate::EnvStructure;
 use tch::{kind::Kind, nn, Device, Tensor};
@@ -13,7 +12,7 @@ use tch::{kind::Kind, nn, Device, Tensor};
 pub struct PolicyGradientAgentConfig<PB, OB>
 where
     PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: Policy,
+    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
     OB: OptimizerBuilder,
 {
     pub steps_per_epoch: usize,
@@ -24,7 +23,7 @@ where
 impl<PB, OB> PolicyGradientAgentConfig<PB, OB>
 where
     PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: Policy,
+    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
     OB: OptimizerBuilder,
 {
     pub fn new(steps_per_epoch: usize, policy_config: PB, optimizer_config: OB) -> Self {
@@ -39,7 +38,7 @@ where
 impl<PB, OB> Default for PolicyGradientAgentConfig<PB, OB>
 where
     PB: ModuleBuilder + Default,
-    <PB as ModuleBuilder>::Module: Policy,
+    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
     OB: OptimizerBuilder + Default,
 {
     fn default() -> Self {
@@ -56,7 +55,7 @@ where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: Policy,
+    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
     OB: OptimizerBuilder,
 {
     type Agent = PolicyGradientAgent<OS, AS, <PB as ModuleBuilder>::Module, OB::Optimizer>;
@@ -80,7 +79,6 @@ pub struct PolicyGradientAgent<OS, AS, P, O>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: IterativeModule,
     O: Optimizer,
 {
     /// Environment observation space
@@ -111,11 +109,8 @@ where
     /// a non-terminal state then the unknown return discount is d^n.
     pub max_unknown_return_discount: f64,
 
-    /// The policy recurrent neural network.
+    /// The policy module.
     pub policy: P,
-
-    /// The RNN policy hidden state.
-    state: P::State,
 
     /// The recorded step history.
     history: Vec<Step<OS::Element, AS::Element>>,
@@ -128,7 +123,7 @@ impl<OS, AS, P, O> PolicyGradientAgent<OS, AS, P, O>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: IterativeModule,
+    P: StatefulIterativeModule,
     O: Optimizer,
 {
     pub fn new<PB, OB>(
@@ -150,7 +145,6 @@ where
             observation_space.num_features(),
             action_space.num_sample_params(),
         );
-        let state = policy.initial_state(1);
         let optimizer = optimizer_config.build(&vs).unwrap();
         Self {
             observation_space,
@@ -160,7 +154,6 @@ where
             max_steps_per_epoch: (steps_per_epoch as f64 * 1.1) as usize,
             max_unknown_return_discount: 0.1,
             policy,
-            state,
             // Slight excess in case of off-by-one errors.
             history: Vec::with_capacity(max_steps_per_epoch + 1),
             optimizer,
@@ -172,25 +165,19 @@ impl<OS, AS, P, O> Actor<OS::Element, AS::Element> for PolicyGradientAgent<OS, A
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: IterativeModule,
+    P: StatefulIterativeModule,
     O: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
-        let observation_features = self.observation_space.features(observation).unsqueeze(0);
+        let observation_features = self.observation_space.features(observation);
 
         if new_episode {
-            self.state = self.policy.initial_state(1);
+            self.policy.reset();
         }
-        let state = &self.state;
-
-        let (action, state) = tch::no_grad(|| {
-            let (output, state) = self.policy.step(&observation_features, &state);
-            let output = output.squeeze1(0); // Squeeze the batch dimension
-            let action = ParameterizedSampleSpace::sample(&self.action_space, &output);
-            (action, state)
-        });
-        self.state = state;
-        action
+        tch::no_grad(|| {
+            let output = self.policy.step(&observation_features);
+            ParameterizedSampleSpace::sample(&self.action_space, &output)
+        })
     }
 }
 
@@ -198,7 +185,7 @@ impl<OS, AS, P, O> Agent<OS::Element, AS::Element> for PolicyGradientAgent<OS, A
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: Policy,
+    P: SequenceModule + StatefulIterativeModule,
     O: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
@@ -386,7 +373,7 @@ fn history_data<OS: FeatureSpace<Tensor>, AS: ParameterizedSampleSpace<Tensor>>(
 mod policy_gradient {
     use super::super::super::testing;
     use super::*;
-    use crate::torch::configs::{GruMlpConfig, MlpConfig};
+    use crate::torch::configs::{AsStatefulIterConfig, GruMlpConfig, MlpConfig};
     use crate::torch::optimizers::AdamConfig;
 
     #[test]
@@ -404,7 +391,8 @@ mod policy_gradient {
 
     #[test]
     fn default_gru_mlp_learns_derministic_bandit() {
-        let mut config = PolicyGradientAgentConfig::<GruMlpConfig, AdamConfig>::default();
+        let mut config =
+            PolicyGradientAgentConfig::<AsStatefulIterConfig<GruMlpConfig>, AdamConfig>::default();
         // Speed up learning for this simple environment
         config.steps_per_epoch = 1000;
         config.optimizer_config.learning_rate = 0.1;

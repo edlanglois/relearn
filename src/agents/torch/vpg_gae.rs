@@ -1,9 +1,8 @@
-//! Vanilla Policy Gradient with Generalized Advantage Estimation
+//! Vanilla SequenceModule + StatefulIterativeModule Gradient with Generalized Advantage Estimation
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use super::Policy;
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace};
-use crate::torch::seq_modules::{IterativeModule, SequenceModule};
+use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
 use crate::torch::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use crate::EnvStructure;
 use std::iter;
@@ -17,7 +16,7 @@ use tch::{kind::Kind, nn, nn::Module, Device, Reduction, Tensor};
 pub struct GaePolicyGradientAgentConfig<PB, POB, VB, VOB>
 where
     PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: Policy,
+    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
     POB: OptimizerBuilder,
     VB: ModuleBuilder,
     <VB as ModuleBuilder>::Module: Module,
@@ -36,7 +35,7 @@ where
 impl<PB, POB, VB, VOB> GaePolicyGradientAgentConfig<PB, POB, VB, VOB>
 where
     PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: Policy,
+    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
     POB: OptimizerBuilder,
     VB: ModuleBuilder,
     <VB as ModuleBuilder>::Module: Module,
@@ -68,7 +67,7 @@ where
 impl<PB, POB, VB, VOB> Default for GaePolicyGradientAgentConfig<PB, POB, VB, VOB>
 where
     PB: ModuleBuilder + Default,
-    <PB as ModuleBuilder>::Module: Policy,
+    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
     POB: OptimizerBuilder + Default,
     VB: ModuleBuilder + Default,
     <VB as ModuleBuilder>::Module: Module,
@@ -94,7 +93,7 @@ where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: Policy,
+    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
     POB: OptimizerBuilder,
     VB: ModuleBuilder,
     <VB as ModuleBuilder>::Module: Module,
@@ -126,7 +125,7 @@ where
     }
 }
 
-/// Policy Gradient with Generalized Advantage Estimation
+/// SequenceModule + StatefulIterativeModule Gradient with Generalized Advantage Estimation
 ///
 /// Supports both recurrent and non-recurrent policies.
 ///
@@ -137,7 +136,7 @@ pub struct GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: IterativeModule,
+    P: StatefulIterativeModule,
     PO: Optimizer,
     V: Module,
     VO: Optimizer,
@@ -182,11 +181,8 @@ where
     /// The policy module.
     pub policy: P,
 
-    /// Policy optimizer
+    /// SequenceModule + StatefulIterativeModule optimizer
     policy_optimizer: PO,
-
-    /// The RNN policy hidden state.
-    state: P::State,
 
     /// The value estimator module.
     pub value_fn: V,
@@ -202,7 +198,7 @@ impl<OS, AS, P, PO, V, VO> GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: IterativeModule + SequenceModule,
+    P: StatefulIterativeModule + SequenceModule,
     PO: Optimizer,
     V: Module,
     VO: Optimizer,
@@ -235,7 +231,6 @@ where
             observation_space.num_features(),
             action_space.num_sample_params(),
         );
-        let state = policy.initial_state(1);
         let policy_optimizer = policy_optimizer_config.build(&policy_vs).unwrap();
 
         let value_fn_vs = nn::VarStore::new(Device::Cpu);
@@ -254,7 +249,6 @@ where
             max_unknown_return_discount: 0.1,
             policy,
             policy_optimizer,
-            state,
             value_fn,
             value_fn_optimizer,
             // Slight excess in case of off-by-one errors.
@@ -415,27 +409,21 @@ impl<OS, AS, P, PO, V, VO> Actor<OS::Element, AS::Element>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: IterativeModule,
+    P: StatefulIterativeModule,
     PO: Optimizer,
     V: Module,
     VO: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
-        let observation_features = self.observation_space.features(observation).unsqueeze(0);
+        let observation_features = self.observation_space.features(observation);
 
         if new_episode {
-            self.state = self.policy.initial_state(1);
+            self.policy.reset();
         }
-        let state = &self.state;
-
-        let (action, state) = tch::no_grad(|| {
-            let (output, state) = self.policy.step(&observation_features, &state);
-            let output = output.squeeze1(0); // Squeeze the batch dimension
-            let action = ParameterizedSampleSpace::sample(&self.action_space, &output);
-            (action, state)
-        });
-        self.state = state;
-        action
+        tch::no_grad(|| {
+            let output = self.policy.step(&observation_features);
+            ParameterizedSampleSpace::sample(&self.action_space, &output)
+        })
     }
 }
 
@@ -444,7 +432,7 @@ impl<OS, AS, P, PO, V, VO> Agent<OS::Element, AS::Element>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: Policy,
+    P: SequenceModule + StatefulIterativeModule,
     PO: Optimizer,
     V: Module,
     VO: Optimizer,
@@ -472,7 +460,7 @@ where
 mod gae_policy_gradient {
     use super::super::super::testing;
     use super::*;
-    use crate::torch::configs::{GruMlpConfig, MlpConfig};
+    use crate::torch::configs::{AsStatefulIterConfig, GruMlpConfig, MlpConfig};
     use crate::torch::optimizers::AdamConfig;
 
     #[test]
@@ -493,7 +481,7 @@ mod gae_policy_gradient {
     #[test]
     fn default_gru_mlp_learns_derministic_bandit() {
         let mut config = GaePolicyGradientAgentConfig::<
-            GruMlpConfig,
+            AsStatefulIterConfig<GruMlpConfig>,
             AdamConfig,
             MlpConfig,
             AdamConfig,

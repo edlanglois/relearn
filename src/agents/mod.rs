@@ -16,6 +16,6 @@ pub use builder::{AgentBuilder, BuildAgentError};
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 pub use torch::{
-    GaePolicyGradientAgent, GaePolicyGradientAgentConfig, Policy, PolicyGradientAgent,
+    GaePolicyGradientAgent, GaePolicyGradientAgentConfig, PolicyGradientAgent,
     PolicyGradientAgentConfig,
 };

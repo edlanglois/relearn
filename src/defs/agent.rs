@@ -5,7 +5,7 @@ use crate::agents::{
 };
 use crate::envs::EnvStructure;
 use crate::spaces::{FeatureSpace, FiniteSpace, ParameterizedSampleSpace, RLSpace};
-use crate::torch::configs::MlpConfig;
+use crate::torch::configs::{AsStatefulIterConfig, MlpConfig};
 use std::fmt::Debug;
 use tch::Tensor;
 
@@ -118,7 +118,7 @@ where
                 es.action_space,
                 es.discount_factor,
                 self.steps_per_epoch,
-                config,
+                &AsStatefulIterConfig::from(config),
                 &self.optimizer,
             )),
             LstmMlp(config) => Box::new(PolicyGradientAgent::new(
@@ -126,7 +126,7 @@ where
                 es.action_space,
                 es.discount_factor,
                 self.steps_per_epoch,
-                config,
+                &AsStatefulIterConfig::from(config),
                 &self.optimizer,
             )),
         })
@@ -192,7 +192,7 @@ where
                 self.lambda,
                 self.steps_per_epoch,
                 self.value_fn_train_iters,
-                policy_config,
+                &AsStatefulIterConfig::from(policy_config),
                 &self.policy_optimizer,
                 &self.value_fn,
                 &self.value_fn_optimizer,
@@ -205,7 +205,7 @@ where
                 self.lambda,
                 self.steps_per_epoch,
                 self.value_fn_train_iters,
-                policy_config,
+                &AsStatefulIterConfig::from(policy_config),
                 &self.policy_optimizer,
                 &self.value_fn,
                 &self.value_fn_optimizer,
