@@ -1,7 +1,7 @@
 use super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::envs::EnvStructure;
 use crate::logging::Logger;
-use crate::spaces::{SampleSpace, Space};
+use crate::spaces::SampleSpace;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::fmt;
@@ -22,7 +22,7 @@ impl Default for RandomAgentConfig {
     }
 }
 
-impl<OS: Space, AS: SampleSpace> AgentBuilder<OS, AS> for RandomAgentConfig {
+impl<OS, AS> AgentBuilder<OS, AS> for RandomAgentConfig {
     type Agent = RandomAgent<AS>;
 
     fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, BuildAgentError> {
@@ -31,12 +31,12 @@ impl<OS: Space, AS: SampleSpace> AgentBuilder<OS, AS> for RandomAgentConfig {
 }
 
 /// An agent that always acts randomly.
-pub struct RandomAgent<AS: SampleSpace> {
+pub struct RandomAgent<AS> {
     action_space: AS,
     rng: StdRng,
 }
 
-impl<AS: SampleSpace> RandomAgent<AS> {
+impl<AS> RandomAgent<AS> {
     pub fn new(action_space: AS, seed: u64) -> Self {
         Self {
             action_space,
@@ -59,7 +59,7 @@ impl<O, AS: SampleSpace> Agent<O, AS::Element> for RandomAgent<AS> {
     fn update(&mut self, _step: Step<O, AS::Element>, _logger: &mut dyn Logger) {}
 }
 
-impl<AS: SampleSpace + fmt::Display> fmt::Display for RandomAgent<AS> {
+impl<AS: fmt::Display> fmt::Display for RandomAgent<AS> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "RandomAgent({})", self.action_space)
     }

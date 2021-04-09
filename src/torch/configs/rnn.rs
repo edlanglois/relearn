@@ -5,13 +5,13 @@ use tch::nn;
 
 /// Configuration of a recurrent neural network.
 #[derive(Debug)]
-pub struct RnnConfig<R: nn::RNN> {
+pub struct RnnConfig<R> {
     pub has_biases: bool,
     pub num_layers: usize,
     type_: PhantomData<R>,
 }
 
-impl<R: nn::RNN> Default for RnnConfig<R> {
+impl<R> Default for RnnConfig<R> {
     fn default() -> Self {
         Self {
             num_layers: 1,

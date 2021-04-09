@@ -7,11 +7,11 @@ use std::cmp::{Ordering, PartialOrd};
 /// This is to ensure consistency between the [PartialOrd] methods
 /// and the [Ord] methods, as required by Ord.
 #[derive(Debug)]
-pub struct ExpectOrd<T: PartialOrd> {
+pub struct ExpectOrd<T> {
     value: T,
 }
 
-impl<T: PartialOrd> ExpectOrd<T> {
+impl<T> ExpectOrd<T> {
     pub fn new(value: T) -> Self {
         Self { value }
     }
@@ -39,7 +39,7 @@ impl<T: PartialOrd> Ord for ExpectOrd<T> {
     }
 }
 
-impl<T: PartialOrd> From<T> for ExpectOrd<T> {
+impl<T> From<T> for ExpectOrd<T> {
     fn from(value: T) -> Self {
         Self { value }
     }

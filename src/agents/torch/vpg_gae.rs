@@ -1,7 +1,7 @@
 //! Vanilla SequenceModule + StatefulIterativeModule Gradient with Generalized Advantage Estimation
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::{Event, Logger};
-use crate::spaces::{FeatureSpace, ParameterizedSampleSpace};
+use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
 use crate::torch::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use crate::EnvStructure;
@@ -113,10 +113,8 @@ where
 /// by Schulman et al. (2016)
 pub struct GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
-    OS: FeatureSpace<Tensor>,
-    AS: ParameterizedSampleSpace<Tensor>,
-    PO: Optimizer,
-    VO: Optimizer,
+    OS: Space,
+    AS: Space,
 {
     /// Environment observation space
     pub observation_space: OS,
@@ -176,9 +174,7 @@ where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     PO: Optimizer,
-    P: SequenceModule,
     VO: Optimizer,
-    V: SequenceModule + StatefulIterativeModule,
 {
     pub fn new<PB, VB, POB, VOB>(
         observation_space: OS,
@@ -232,7 +228,66 @@ where
             history: Vec::with_capacity(max_steps_per_epoch + 1),
         }
     }
+}
 
+impl<OS, AS, P, PO, V, VO> Actor<OS::Element, AS::Element>
+    for GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
+where
+    OS: FeatureSpace<Tensor>,
+    AS: ParameterizedSampleSpace<Tensor>,
+    P: StatefulIterativeModule,
+{
+    fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
+        let observation_features = self.observation_space.features(observation);
+
+        if new_episode {
+            self.policy.reset();
+        }
+        tch::no_grad(|| {
+            let output = self.policy.step(&observation_features);
+            ParameterizedSampleSpace::sample(&self.action_space, &output)
+        })
+    }
+}
+
+impl<OS, AS, P, PO, V, VO> Agent<OS::Element, AS::Element>
+    for GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
+where
+    OS: FeatureSpace<Tensor>,
+    AS: ParameterizedSampleSpace<Tensor>,
+    P: SequenceModule + StatefulIterativeModule,
+    PO: Optimizer,
+    V: SequenceModule + StatefulIterativeModule,
+    VO: Optimizer,
+{
+    fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
+        Actor::act(self, observation, new_episode)
+    }
+
+    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn Logger) {
+        let episode_done = step.episode_done;
+        self.history.push(step);
+
+        let history_len = self.history.len();
+        if history_len < self.steps_per_epoch
+            || (history_len < self.max_steps_per_epoch && !episode_done)
+        {
+            return;
+        }
+
+        self.epoch_update(logger);
+    }
+}
+
+impl<OS, AS, P, PO, V, VO> GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
+where
+    OS: FeatureSpace<Tensor>,
+    AS: ParameterizedSampleSpace<Tensor>,
+    P: SequenceModule,
+    PO: Optimizer,
+    V: SequenceModule + StatefulIterativeModule,
+    VO: Optimizer,
+{
     /// Perform an epoch update: update the policy and value function and clear history.
     fn epoch_update(&mut self, logger: &mut dyn Logger) {
         let mut episode_length = 0;
@@ -379,58 +434,6 @@ where
             )
             .unwrap();
         logger.done(Event::Epoch);
-    }
-}
-
-impl<OS, AS, P, PO, V, VO> Actor<OS::Element, AS::Element>
-    for GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
-where
-    OS: FeatureSpace<Tensor>,
-    AS: ParameterizedSampleSpace<Tensor>,
-    P: StatefulIterativeModule,
-    PO: Optimizer,
-    V: SequenceModule + StatefulIterativeModule,
-    VO: Optimizer,
-{
-    fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
-        let observation_features = self.observation_space.features(observation);
-
-        if new_episode {
-            self.policy.reset();
-        }
-        tch::no_grad(|| {
-            let output = self.policy.step(&observation_features);
-            ParameterizedSampleSpace::sample(&self.action_space, &output)
-        })
-    }
-}
-
-impl<OS, AS, P, PO, V, VO> Agent<OS::Element, AS::Element>
-    for GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
-where
-    OS: FeatureSpace<Tensor>,
-    AS: ParameterizedSampleSpace<Tensor>,
-    P: SequenceModule + StatefulIterativeModule,
-    PO: Optimizer,
-    V: SequenceModule + StatefulIterativeModule,
-    VO: Optimizer,
-{
-    fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
-        Actor::act(self, observation, new_episode)
-    }
-
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn Logger) {
-        let episode_done = step.episode_done;
-        self.history.push(step);
-
-        let history_len = self.history.len();
-        if history_len < self.steps_per_epoch
-            || (history_len < self.max_steps_per_epoch && !episode_done)
-        {
-            return;
-        }
-
-        self.epoch_update(logger);
     }
 }
 

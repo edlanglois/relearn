@@ -2,8 +2,8 @@ use super::hooks::SimulationHook;
 /// Simulation trait and Simulator structs.
 use crate::agents::{Actor, Agent, Step};
 use crate::envs::StatefulEnvironment;
-use crate::logging::{Loggable, Logger};
-use crate::spaces::{ElementRefInto, Space};
+use crate::logging::Logger;
+use crate::spaces::Space;
 
 /// Runs a simulation.
 pub trait Simulation {
@@ -13,46 +13,14 @@ pub trait Simulation {
 
 /// An agent-environment simulator with logging.
 #[derive(Debug)]
-pub struct Simulator<E, A, L, H>
-where
-    E: StatefulEnvironment,
-    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
-    A: Agent<
-        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
-    >,
-    <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
-    <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
-    L: Logger,
-    H: SimulationHook<
-        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
-        L,
-    >,
-{
+pub struct Simulator<E, A, L, H> {
     environment: E,
     agent: A,
     logger: L,
     hook: H,
 }
 
-impl<E, A, L, H> Simulator<E, A, L, H>
-where
-    E: StatefulEnvironment,
-    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
-    A: Agent<
-        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
-    >,
-    <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
-    <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
-    L: Logger,
-    H: SimulationHook<
-        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
-        L,
-    >,
-{
+impl<E, A, L, H> Simulator<E, A, L, H> {
     pub fn new(environment: E, agent: A, logger: L, hook: H) -> Self {
         Self {
             environment,
@@ -71,8 +39,6 @@ where
         <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
         <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
     >,
-    <E as StatefulEnvironment>::ObservationSpace: ElementRefInto<Loggable>,
-    <E as StatefulEnvironment>::ActionSpace: ElementRefInto<Loggable>,
     L: Logger,
     H: SimulationHook<
         <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
@@ -95,8 +61,6 @@ pub struct BoxedSimulator<OS, AS, L, H>
 where
     OS: Space,
     AS: Space,
-    L: Logger,
-    H: SimulationHook<OS::Element, AS::Element, L>,
 {
     environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
     agent: Box<dyn Agent<OS::Element, AS::Element>>,
@@ -107,10 +71,7 @@ where
 impl<OS, AS, L, H> BoxedSimulator<OS, AS, L, H>
 where
     OS: Space,
-    <OS as Space>::Element: Clone,
     AS: Space,
-    L: Logger,
-    H: SimulationHook<OS::Element, AS::Element, L>,
 {
     pub fn new(
         environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
@@ -129,9 +90,9 @@ where
 
 impl<OS, AS, L, H> Simulation for BoxedSimulator<OS, AS, L, H>
 where
-    OS: Space + ElementRefInto<Loggable>,
+    OS: Space,
     <OS as Space>::Element: Clone,
-    AS: Space + ElementRefInto<Loggable>,
+    AS: Space,
     L: Logger,
     H: SimulationHook<OS::Element, AS::Element, L>,
 {

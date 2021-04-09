@@ -30,7 +30,11 @@ impl Default for BetaThompsonSamplingAgentConfig {
     }
 }
 
-impl<OS: FiniteSpace, AS: FiniteSpace> AgentBuilder<OS, AS> for BetaThompsonSamplingAgentConfig {
+impl<OS, AS> AgentBuilder<OS, AS> for BetaThompsonSamplingAgentConfig
+where
+    OS: FiniteSpace,
+    AS: FiniteSpace,
+{
     type Agent = BetaThompsonSamplingAgent<OS, AS>;
 
     fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, BuildAgentError> {
@@ -46,11 +50,7 @@ impl<OS: FiniteSpace, AS: FiniteSpace> AgentBuilder<OS, AS> for BetaThompsonSamp
 
 /// A Thompson sampling agent for Bernoulli rewards with a Beta prior.
 #[derive(Debug)]
-pub struct BetaThompsonSamplingAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
+pub struct BetaThompsonSamplingAgent<OS, AS> {
     /// Environment observation space
     pub observation_space: OS,
     /// Environment action space
@@ -96,8 +96,8 @@ where
 
 impl<OS, AS> fmt::Display for BetaThompsonSamplingAgent<OS, AS>
 where
-    OS: FiniteSpace + fmt::Display,
-    AS: FiniteSpace + fmt::Display,
+    OS: fmt::Display,
+    AS: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

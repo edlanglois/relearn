@@ -1,10 +1,9 @@
 use crate::envs::EnvStructure;
-use crate::spaces::Space;
 use tch::TchError;
 use thiserror::Error;
 
 /// Build an agent instance.
-pub trait AgentBuilder<OS: Space, AS: Space> {
+pub trait AgentBuilder<OS, AS> {
     type Agent;
 
     /// Build an agent for the given environment structure.

@@ -4,13 +4,13 @@ use tch::{nn::Func, nn::Module, Tensor};
 /// A sequence regressor module.
 ///
 /// A sequence module followed by a nonlinearity then a feed-forward module.
-pub struct SequenceRegressor<'a, S, M: Module> {
+pub struct SequenceRegressor<'a, S, M> {
     seq: S,
     activation: Option<Func<'a>>,
     post_transform: M,
 }
 
-impl<'a, S, M: Module> SequenceRegressor<'a, S, M> {
+impl<'a, S, M> SequenceRegressor<'a, S, M> {
     pub fn new(seq: S, activation: Option<Func<'a>>, post_transform: M) -> Self {
         Self {
             seq,

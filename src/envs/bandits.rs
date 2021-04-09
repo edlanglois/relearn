@@ -70,11 +70,11 @@ where
 ///
 /// The distribution of each arm has type `D`.
 #[derive(Debug)]
-pub struct Bandit<D: Distribution<f64>> {
+pub struct Bandit<D> {
     distributions: Vec<D>,
 }
 
-impl<D: Distribution<f64>> Bandit<D> {
+impl<D> Bandit<D> {
     pub fn new(distributions: Vec<D>) -> Self {
         Self { distributions }
     }
@@ -129,7 +129,7 @@ impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
     }
 }
 
-impl<D: Distribution<f64> + FromMean<f64>> Bandit<D> {
+impl<D: FromMean<f64>> Bandit<D> {
     /// Create a new Bandit from a list of means.
     pub fn from_means<I: IntoIterator<Item = T>, T: Borrow<f64>>(
         means: I,

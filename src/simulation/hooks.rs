@@ -2,7 +2,6 @@
 use crate::agents::Step;
 use crate::logging::{Event, Loggable, Logger};
 use crate::spaces::{ElementRefInto, FiniteSpace};
-use std::marker::PhantomData;
 
 /// A simulation hook.
 ///
@@ -94,27 +93,17 @@ impl GenericSimulationHook for EpisodeLimit {
 }
 
 /// A simulation hook defined from a closure.
-pub struct ClosureHook<O, A, F>
-where
-    F: FnMut(&Step<O, A>) -> bool,
-{
+pub struct ClosureHook<F> {
     f: F,
-    _step: PhantomData<Step<O, A>>,
 }
 
-impl<O, A, F> From<F> for ClosureHook<O, A, F>
-where
-    F: FnMut(&Step<O, A>) -> bool,
-{
+impl<F> From<F> for ClosureHook<F> {
     fn from(f: F) -> Self {
-        Self {
-            f,
-            _step: PhantomData,
-        }
+        Self { f }
     }
 }
 
-impl<O, A, L, F> SimulationHook<O, A, L> for ClosureHook<O, A, F>
+impl<O, A, L, F> SimulationHook<O, A, L> for ClosureHook<F>
 where
     L: Logger + ?Sized,
     F: FnMut(&Step<O, A>) -> bool,
@@ -126,11 +115,7 @@ where
 
 /// A hook that logs step and episode statistics.
 #[derive(Debug)]
-pub struct StepLogger<OS, AS>
-where
-    OS: ElementRefInto<Loggable>,
-    AS: ElementRefInto<Loggable>,
-{
+pub struct StepLogger<OS, AS> {
     pub observation_space: OS,
     pub action_space: AS,
 
@@ -139,11 +124,7 @@ where
     episode_reward: f64,
 }
 
-impl<OS, AS> StepLogger<OS, AS>
-where
-    OS: ElementRefInto<Loggable>,
-    AS: ElementRefInto<Loggable>,
-{
+impl<OS, AS> StepLogger<OS, AS> {
     pub fn new(observation_space: OS, action_space: AS) -> Self {
         Self {
             observation_space,
@@ -228,7 +209,7 @@ where
 }
 
 /// Count occurrences of each action by index.
-pub struct IndexedActionCounter<AS: FiniteSpace> {
+pub struct IndexedActionCounter<AS> {
     pub action_space: AS,
     pub counts: Vec<u64>,
 }

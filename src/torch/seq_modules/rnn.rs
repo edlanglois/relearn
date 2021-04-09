@@ -3,7 +3,7 @@ use super::{IterativeModule, SequenceModule};
 use tch::{nn::RNN, IndexOp, Tensor};
 
 /// Wrapper that implements the Sequence/Iterative Module tratis for [tch::nn::RNN].
-pub struct SeqModRnn<R: RNN>(R);
+pub struct SeqModRnn<R>(R);
 
 impl<R: RNN> SequenceModule for SeqModRnn<R> {
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
@@ -38,7 +38,7 @@ impl<R: RNN> IterativeModule for SeqModRnn<R> {
     }
 }
 
-impl<R: RNN> From<R> for SeqModRnn<R> {
+impl<R> From<R> for SeqModRnn<R> {
     fn from(rnn: R) -> Self {
         SeqModRnn(rnn)
     }

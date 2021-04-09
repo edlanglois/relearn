@@ -30,7 +30,11 @@ impl Default for UCB1AgentConfig {
     }
 }
 
-impl<OS: FiniteSpace, AS: FiniteSpace> AgentBuilder<OS, AS> for UCB1AgentConfig {
+impl<OS, AS> AgentBuilder<OS, AS> for UCB1AgentConfig
+where
+    OS: FiniteSpace,
+    AS: FiniteSpace,
+{
     type Agent = UCB1Agent<OS, AS>;
 
     fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, BuildAgentError> {
@@ -47,11 +51,7 @@ impl<OS: FiniteSpace, AS: FiniteSpace> AgentBuilder<OS, AS> for UCB1AgentConfig 
 ///
 /// Applies UCB1 (Auer 2002) independently to each state.
 #[derive(Debug)]
-pub struct UCB1Agent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
+pub struct UCB1Agent<OS, AS> {
     /// Environment observation space
     pub observation_space: OS,
     /// Environment action space
@@ -118,8 +118,8 @@ where
 
 impl<OS, AS> fmt::Display for UCB1Agent<OS, AS>
 where
-    OS: FiniteSpace + fmt::Display,
-    AS: FiniteSpace + fmt::Display,
+    OS: fmt::Display,
+    AS: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

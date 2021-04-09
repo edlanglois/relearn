@@ -4,38 +4,25 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use tch::nn::Path;
 
-pub struct AsStatefulIterConfig<M, T = M>(T, PhantomData<M>)
-where
-    M: ModuleBuilder,
-    <M as ModuleBuilder>::Module: IterativeModule,
-    T: Borrow<M>;
+pub struct AsStatefulIterConfig<M, T = M>(T, PhantomData<M>);
 
 impl<M> Default for AsStatefulIterConfig<M>
 where
-    M: ModuleBuilder + Default,
-    <M as ModuleBuilder>::Module: IterativeModule,
+    M: Default,
 {
     fn default() -> Self {
         Self(Default::default(), PhantomData)
     }
 }
 
-impl<'a, M> From<&'a M> for AsStatefulIterConfig<M, &'a M>
-where
-    M: ModuleBuilder,
-    <M as ModuleBuilder>::Module: IterativeModule,
-{
-    fn from(module: &'a M) -> Self {
+impl<M> From<M> for AsStatefulIterConfig<M, M> {
+    fn from(module: M) -> Self {
         Self(module, PhantomData)
     }
 }
 
-impl<M> From<M> for AsStatefulIterConfig<M, M>
-where
-    M: ModuleBuilder,
-    <M as ModuleBuilder>::Module: IterativeModule,
-{
-    fn from(module: M) -> Self {
+impl<'a, M> From<&'a M> for AsStatefulIterConfig<M, &'a M> {
+    fn from(module: &'a M) -> Self {
         Self(module, PhantomData)
     }
 }

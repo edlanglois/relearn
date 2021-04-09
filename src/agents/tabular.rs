@@ -46,11 +46,7 @@ impl<OS: FiniteSpace, AS: FiniteSpace + SampleSpace> AgentBuilder<OS, AS>
 
 /// An epsilon-greedy tabular Q learning.
 #[derive(Debug)]
-pub struct TabularQLearningAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
+pub struct TabularQLearningAgent<OS, AS> {
     pub observation_space: OS,
     pub action_space: AS,
     pub discount_factor: f64,
@@ -91,8 +87,8 @@ where
 
 impl<OS, AS> fmt::Display for TabularQLearningAgent<OS, AS>
 where
-    OS: FiniteSpace + fmt::Display,
-    AS: FiniteSpace + fmt::Display,
+    OS: fmt::Display,
+    AS: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

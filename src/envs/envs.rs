@@ -88,7 +88,7 @@ pub trait StatefulEnvironment {
 
 /// The external structure of an environment.
 #[derive(Debug)]
-pub struct EnvStructure<OS: Space, AS: Space> {
+pub struct EnvStructure<OS, AS> {
     /// Space containing all possible observations.
     ///
     /// This is not required to be tight:

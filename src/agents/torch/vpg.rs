@@ -44,10 +44,9 @@ where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
     OB: OptimizerBuilder,
 {
-    type Agent = PolicyGradientAgent<OS, AS, <PB as ModuleBuilder>::Module, OB::Optimizer>;
+    type Agent = PolicyGradientAgent<OS, AS, PB::Module, OB::Optimizer>;
 
     fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, BuildAgentError> {
         Ok(Self::Agent::new(
@@ -66,9 +65,8 @@ where
 /// Supports both recurrent and non-recurrent policies.
 pub struct PolicyGradientAgent<OS, AS, P, O>
 where
-    OS: FeatureSpace<Tensor>,
-    AS: ParameterizedSampleSpace<Tensor>,
-    O: Optimizer,
+    OS: Space,
+    AS: Space,
 {
     /// Environment observation space
     pub observation_space: OS,
@@ -154,7 +152,6 @@ where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     P: StatefulIterativeModule,
-    O: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
         let observation_features = self.observation_space.features(observation);
@@ -164,7 +161,7 @@ where
         }
         tch::no_grad(|| {
             let output = self.policy.step(&observation_features);
-            ParameterizedSampleSpace::sample(&self.action_space, &output)
+            self.action_space.sample(&output)
         })
     }
 }
@@ -193,7 +190,7 @@ where
 
         // Epoch
         // Update the policy
-        let history_data: HistoryData<AS> = tch::no_grad(|| {
+        let history_data = tch::no_grad(|| {
             history_data(
                 &mut self.history,
                 &self.observation_space,
@@ -242,11 +239,11 @@ where
 }
 
 // TODO: Do something like packed sequence so that batch processing is possible.
-struct HistoryData<AS: Space> {
+struct HistoryData<A> {
     /// Observation features. A f32 tensor of shape [NUM_STEPS, NUM_OBS_FEATURES]
     observation_features: Tensor,
     /// Actions.
-    actions: Vec<AS::Element>,
+    actions: Vec<A>,
     // /// Log probabilities of the selected actions. A f32 tensor of shape [NUM_STEPS]
     // action_log_probs: Tensor,
     /// Cumulative discounted observed episode returns. A f32 tensor of shape [NUM_STEPS]
@@ -267,12 +264,12 @@ struct HistoryData<AS: Space> {
 /// Therefore, when an episode ends in a non-terminal state, the steps close to the end of the
 /// episode are dropped. Specifically a step is dropped if the discounting applied to the unknown
 /// part of the return is > max_unknown_return_discount.
-fn history_data<OS: FeatureSpace<Tensor>, AS: ParameterizedSampleSpace<Tensor>>(
-    history: &mut Vec<Step<OS::Element, AS::Element>>,
+fn history_data<OS: FeatureSpace<Tensor>, A>(
+    history: &mut Vec<Step<OS::Element, A>>,
     observation_space: &OS,
     discount_factor: f64,
     max_unknown_return_discount: f64,
-) -> HistoryData<AS> {
+) -> HistoryData<A> {
     // For each step, calculate state = (known_return, unknown_return_discount)
     // * known_return is the discounted sum of rewards in all future observed steps of the episode.
     // * unknown_return_scale is the discounting applied to any unknown rewards that might appear
