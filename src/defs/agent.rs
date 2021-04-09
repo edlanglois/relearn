@@ -1,4 +1,4 @@
-use super::{OptimizerDef, PolicyDef};
+use super::{OptimizerDef, SeqModDef};
 use crate::agents::{
     Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError,
     GaePolicyGradientAgentConfig, PolicyGradientAgentConfig, RandomAgentConfig,
@@ -6,7 +6,6 @@ use crate::agents::{
 };
 use crate::envs::EnvStructure;
 use crate::spaces::{FiniteSpace, RLSpace};
-use crate::torch::configs::MlpConfig;
 use std::fmt::Debug;
 
 /// Agent definition
@@ -23,10 +22,10 @@ pub enum AgentDef {
     /// UCB1 agent from Auer 2002
     UCB1(UCB1AgentConfig),
     /// Policy gradient.
-    PolicyGradient(PolicyGradientAgentConfig<PolicyDef, OptimizerDef>),
+    PolicyGradient(PolicyGradientAgentConfig<SeqModDef, OptimizerDef>),
     /// Policy gradient with Generalized Advantage Estimation.
     GaePolicyGradient(
-        GaePolicyGradientAgentConfig<PolicyDef, OptimizerDef, MlpConfig, OptimizerDef>,
+        GaePolicyGradientAgentConfig<SeqModDef, OptimizerDef, SeqModDef, OptimizerDef>,
     ),
 }
 

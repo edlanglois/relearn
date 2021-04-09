@@ -6,10 +6,7 @@ use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
 use crate::torch::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use crate::EnvStructure;
 use std::iter;
-use tch::{kind::Kind, nn, nn::Module, Device, Reduction, Tensor};
-
-// TODO: Support V: SequenceModule
-// The blocker is calculating the next step value in residuals.
+use tch::{kind::Kind, nn, Device, Reduction, Tensor};
 
 /// Configuration for GaePolicyGradientAgent
 #[derive(Debug)]
@@ -78,7 +75,7 @@ where
     <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
     POB: OptimizerBuilder,
     VB: ModuleBuilder,
-    <VB as ModuleBuilder>::Module: Module,
+    <VB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
     VOB: OptimizerBuilder,
 {
     type Agent = GaePolicyGradientAgent<
@@ -118,9 +115,7 @@ pub struct GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: StatefulIterativeModule,
     PO: Optimizer,
-    V: Module,
     VO: Optimizer,
 {
     /// Environment observation space
@@ -180,10 +175,10 @@ impl<OS, AS, P, PO, V, VO> GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: StatefulIterativeModule + SequenceModule,
     PO: Optimizer,
-    V: Module,
+    P: SequenceModule,
     VO: Optimizer,
+    V: SequenceModule + StatefulIterativeModule,
 {
     pub fn new<PB, VB, POB, VOB>(
         observation_space: OS,
@@ -259,9 +254,12 @@ where
         let observation_features = self
             .observation_space
             .batch_features(self.history.iter().map(|step| &step.observation));
+        let batched_observation_features = observation_features.unsqueeze(0);
 
-        let estimated_values = observation_features.apply(&self.value_fn);
-        // self.value_fn.seq_serial(&observation_features, &episode_lengths);
+        let estimated_values = self
+            .value_fn
+            .seq_serial(&batched_observation_features, &episode_lengths)
+            .squeeze1(0);
 
         // Tensor::iter looks slow, insert into a vector first
         let estimated_values_vec: Vec<_> = estimated_values.into();
@@ -280,12 +278,11 @@ where
                 let next_value = match (&step.next_observation, next_value) {
                     (None, _) => 0.0,                         // terminal
                     (_, Some(&v)) if !step.episode_done => v, // episode continues
-                    (Some(next_obs), _) => {
+                    (Some(_next_obs), _) => {
                         // episode done with a non-terminal step
-                        self.observation_space
-                            .features(next_obs)
-                            .apply(&self.value_fn)
-                            .into()
+                        // should use the estimated value of next_obs
+                        // which may require iterating over the whole episode
+                        panic!("non-terminal end-of-episode not yet supported");
                     }
                 };
                 let residual = step.reward + self.discount_factor * next_value - value;
@@ -325,10 +322,7 @@ where
 
         let policy_output = self
             .policy
-            .seq_serial(
-                &observation_features.unsqueeze(0), // Batch dimension
-                &episode_lengths,
-            )
+            .seq_serial(&batched_observation_features, &episode_lengths)
             .squeeze1(0);
         let (log_probs, entropies) = self.action_space.batch_statistics(&policy_output, &actions);
 
@@ -336,9 +330,11 @@ where
         self.policy_optimizer.backward_step(&policy_loss);
 
         for i in 0..self.value_fn_train_iters {
-            let value_fn_loss = observation_features
-                .apply(&self.value_fn)
-                .squeeze1(-1)
+            let value_fn_loss = self
+                .value_fn
+                .seq_serial(&batched_observation_features, &episode_lengths)
+                .squeeze1(-1) // feature dim
+                .squeeze1(0) // batch dim
                 .mse_loss(&returns, Reduction::Mean);
             if i == 0 {
                 logger
@@ -393,7 +389,7 @@ where
     AS: ParameterizedSampleSpace<Tensor>,
     P: StatefulIterativeModule,
     PO: Optimizer,
-    V: Module,
+    V: SequenceModule + StatefulIterativeModule,
     VO: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
@@ -416,7 +412,7 @@ where
     AS: ParameterizedSampleSpace<Tensor>,
     P: SequenceModule + StatefulIterativeModule,
     PO: Optimizer,
-    V: Module,
+    V: SequenceModule + StatefulIterativeModule,
     VO: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
@@ -461,11 +457,31 @@ mod gae_policy_gradient {
     }
 
     #[test]
-    fn default_gru_mlp_learns_derministic_bandit() {
+    fn default_gru_mlp_v_mlp_learns_derministic_bandit() {
         let mut config = GaePolicyGradientAgentConfig::<
             AsStatefulIterConfig<GruMlpConfig>,
             AdamConfig,
             MlpConfig,
+            AdamConfig,
+        >::default();
+        // Speed up learning for this simple environment
+        config.steps_per_epoch = 1000;
+        config.policy_optimizer_config.learning_rate = 0.1;
+        config.value_fn_optimizer_config.learning_rate = 0.1;
+        testing::train_deterministic_bandit(
+            |env_structure| config.build(env_structure, 0).unwrap(),
+            1_000,
+            0.9,
+        );
+    }
+
+    #[test]
+    #[ignore] // Recurrent training is currently very slow
+    fn default_gru_mlp_v_gru_mlp_learns_derministic_bandit() {
+        let mut config = GaePolicyGradientAgentConfig::<
+            AsStatefulIterConfig<GruMlpConfig>,
+            AdamConfig,
+            AsStatefulIterConfig<GruMlpConfig>,
             AdamConfig,
         >::default();
         // Speed up learning for this simple environment

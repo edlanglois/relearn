@@ -2,7 +2,7 @@
 use super::agent::AgentType;
 use super::env::{BanditArmPrior, EnvType};
 use super::optimizer::{OptimizerOptions, OptimizerType};
-use super::policy::PolicyType;
+use super::seq_mod::SeqModType;
 use crate::torch::Activation;
 use clap::{crate_authors, crate_description, crate_version, Clap};
 
@@ -63,7 +63,7 @@ pub struct Options {
     // Policy options
     #[clap(long, arg_enum, help_heading = Some("AGENT POLICY OPTIONS"))]
     /// Policy type
-    pub policy: Option<PolicyType>,
+    pub policy: Option<SeqModType>,
 
     /// Policy MLP activation function
     #[clap(long, arg_enum, help_heading = Some("AGENT POLICY OPTIONS"))]

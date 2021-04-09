@@ -11,7 +11,7 @@ pub mod torch;
 pub mod utils;
 
 pub use agents::{Actor, Agent, Step};
-pub use defs::{AgentDef, EnvDef, OptimizerDef, PolicyDef};
+pub use defs::{AgentDef, EnvDef, OptimizerDef, SeqModDef};
 pub use envs::{EnvStructure, Environment, StatefulEnvironment};
 pub use error::RLError;
 pub use simulation::{run_actor, run_agent, Simulation};

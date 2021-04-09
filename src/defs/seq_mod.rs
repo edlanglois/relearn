@@ -4,39 +4,39 @@ use crate::torch::ModuleBuilder;
 use std::borrow::Borrow;
 use tch::nn::Path;
 
-/// Torch policy definition.
+/// Sequence module definition
 #[derive(Debug)]
-pub enum PolicyDef {
+pub enum SeqModDef {
     Mlp(MlpConfig),
     GruMlp(GruMlpConfig),
     LstmMlp(LstmMlpConfig),
 }
 
-impl Default for PolicyDef {
+impl Default for SeqModDef {
     fn default() -> Self {
-        PolicyDef::Mlp(Default::default())
+        SeqModDef::Mlp(Default::default())
     }
 }
 
-impl From<MlpConfig> for PolicyDef {
+impl From<MlpConfig> for SeqModDef {
     fn from(c: MlpConfig) -> Self {
-        PolicyDef::Mlp(c)
+        SeqModDef::Mlp(c)
     }
 }
 
-impl From<GruMlpConfig> for PolicyDef {
+impl From<GruMlpConfig> for SeqModDef {
     fn from(c: GruMlpConfig) -> Self {
-        PolicyDef::GruMlp(c)
+        SeqModDef::GruMlp(c)
     }
 }
 
-impl From<LstmMlpConfig> for PolicyDef {
+impl From<LstmMlpConfig> for SeqModDef {
     fn from(c: LstmMlpConfig) -> Self {
-        PolicyDef::LstmMlp(c)
+        SeqModDef::LstmMlp(c)
     }
 }
 
-impl ModuleBuilder for PolicyDef {
+impl ModuleBuilder for SeqModDef {
     type Module = Box<dyn StatefulIterSeqModule>;
     fn build<'a, T: Borrow<Path<'a>>>(
         &self,
@@ -44,7 +44,7 @@ impl ModuleBuilder for PolicyDef {
         input_dim: usize,
         output_dim: usize,
     ) -> Self::Module {
-        use PolicyDef::*;
+        use SeqModDef::*;
         match self {
             Mlp(config) => Box::new(config.build(vs, input_dim, output_dim)),
             GruMlp(config) => Box::new(AsStatefulIterator::from(

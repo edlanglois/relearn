@@ -3,7 +3,7 @@ mod agent;
 mod env;
 mod optimizer;
 mod options;
-mod policy;
+mod seq_mod;
 
 pub use options::Options;
 

@@ -2,9 +2,9 @@
 mod agent;
 pub mod env;
 mod optimizer;
-mod policy;
+mod seq_mod;
 
 pub use agent::AgentDef;
 pub use env::EnvDef;
 pub use optimizer::OptimizerDef;
-pub use policy::PolicyDef;
+pub use seq_mod::SeqModDef;

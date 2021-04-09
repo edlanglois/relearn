@@ -1,40 +1,40 @@
 use super::{Options, Update, WithUpdate};
-use crate::defs::PolicyDef;
+use crate::defs::SeqModDef;
 use crate::torch::configs::{MlpConfig, RnnConfig, SequenceRegressorConfig};
 use clap::Clap;
 use tch::nn::RNN;
 
-/// Policy name
+/// Sequence module type
 #[derive(Clap, Debug, Eq, PartialEq, Clone, Copy)]
-pub enum PolicyType {
+pub enum SeqModType {
     Mlp,
     GruMlp,
     LstmMlp,
 }
 
-impl PolicyDef {
-    pub fn type_(&self) -> PolicyType {
-        use PolicyDef::*;
+impl SeqModDef {
+    pub fn type_(&self) -> SeqModType {
+        use SeqModDef::*;
         match self {
-            Mlp(_) => PolicyType::Mlp,
-            GruMlp(_) => PolicyType::GruMlp,
-            LstmMlp(_) => PolicyType::LstmMlp,
+            Mlp(_) => SeqModType::Mlp,
+            GruMlp(_) => SeqModType::GruMlp,
+            LstmMlp(_) => SeqModType::LstmMlp,
         }
     }
 }
 
-impl From<&Options> for PolicyDef {
+impl From<&Options> for SeqModDef {
     fn from(opts: &Options) -> Self {
-        use PolicyType::*;
+        use SeqModType::*;
         match opts.policy {
-            Some(Mlp) | None => PolicyDef::Mlp(opts.into()),
-            Some(GruMlp) => PolicyDef::GruMlp(opts.into()),
-            Some(LstmMlp) => PolicyDef::LstmMlp(opts.into()),
+            Some(Mlp) | None => SeqModDef::Mlp(opts.into()),
+            Some(GruMlp) => SeqModDef::GruMlp(opts.into()),
+            Some(LstmMlp) => SeqModDef::LstmMlp(opts.into()),
         }
     }
 }
 
-impl Update<&Options> for PolicyDef {
+impl Update<&Options> for SeqModDef {
     fn update(&mut self, opts: &Options) {
         if let Some(ref policy_type) = opts.policy {
             if *policy_type != self.type_() {
@@ -44,7 +44,7 @@ impl Update<&Options> for PolicyDef {
             }
         }
 
-        use PolicyDef::*;
+        use SeqModDef::*;
         match self {
             Mlp(ref mut config) => config.update(opts),
             GruMlp(ref mut config) => config.update(opts),

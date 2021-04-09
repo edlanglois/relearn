@@ -112,7 +112,6 @@ impl<OS, AS, P, O> PolicyGradientAgent<OS, AS, P, O>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: StatefulIterativeModule,
     O: Optimizer,
 {
     pub fn new<PB, OB>(
