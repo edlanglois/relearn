@@ -1,5 +1,6 @@
 //! Sequence modules. Like [tch::nn::Module] but operate on a sequence of data.
 mod as_stateful;
+mod r#box;
 pub mod module;
 mod rnn;
 mod seq_regressor;

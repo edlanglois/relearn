@@ -1,13 +1,13 @@
 use super::{OptimizerDef, PolicyDef};
 use crate::agents::{
-    Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError, GaePolicyGradientAgent,
-    PolicyGradientAgent, RandomAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
+    Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError,
+    GaePolicyGradientAgentConfig, PolicyGradientAgentConfig, RandomAgentConfig,
+    TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::EnvStructure;
-use crate::spaces::{FeatureSpace, FiniteSpace, ParameterizedSampleSpace, RLSpace};
-use crate::torch::configs::{AsStatefulIterConfig, MlpConfig};
+use crate::spaces::{FiniteSpace, RLSpace};
+use crate::torch::configs::MlpConfig;
 use std::fmt::Debug;
-use tch::Tensor;
 
 /// Agent definition
 #[derive(Debug)]
@@ -23,9 +23,11 @@ pub enum AgentDef {
     /// UCB1 agent from Auer 2002
     UCB1(UCB1AgentConfig),
     /// Policy gradient.
-    PolicyGradient(PolicyGradientAgentDef),
+    PolicyGradient(PolicyGradientAgentConfig<PolicyDef, OptimizerDef>),
     /// Policy gradient with Generalized Advantage Estimation.
-    GaePolicyGradient(GaePolicyGradientAgentDef),
+    GaePolicyGradient(
+        GaePolicyGradientAgentConfig<PolicyDef, OptimizerDef, MlpConfig, OptimizerDef>,
+    ),
 }
 
 // TODO: Return Box<dyn ActorAgent> where ActorAgent: Actor + Agent instead of Box<dyn Agent>
@@ -70,146 +72,9 @@ impl AgentDef {
             Random => RandomAgentConfig::new()
                 .build(es, seed)
                 .map(|a| Box::new(a) as _),
-            PolicyGradient(config) => config.build(es, seed),
-            GaePolicyGradient(config) => config.build(es, seed),
+            PolicyGradient(config) => config.build(es, seed).map(|a| Box::new(a) as _),
+            GaePolicyGradient(config) => config.build(es, seed).map(|a| Box::new(a) as _),
             _ => Err(BuildAgentError::InvalidSpaceBounds),
         }
-    }
-}
-
-/// Definition of a policy-gradient agent
-#[derive(Debug)]
-pub struct PolicyGradientAgentDef {
-    pub steps_per_epoch: usize,
-    pub policy: PolicyDef,
-    pub optimizer: OptimizerDef,
-}
-
-impl Default for PolicyGradientAgentDef {
-    fn default() -> Self {
-        Self {
-            steps_per_epoch: 4000,
-            policy: Default::default(),
-            optimizer: Default::default(),
-        }
-    }
-}
-
-impl<OS, AS> AgentBuilder<OS, AS> for PolicyGradientAgentDef
-where
-    OS: FeatureSpace<Tensor> + 'static,
-    AS: ParameterizedSampleSpace<Tensor> + 'static,
-{
-    type Agent = Box<dyn Agent<OS::Element, AS::Element>>;
-
-    fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, BuildAgentError> {
-        use PolicyDef::*;
-        Ok(match &self.policy {
-            Mlp(config) => Box::new(PolicyGradientAgent::new(
-                es.observation_space,
-                es.action_space,
-                es.discount_factor,
-                self.steps_per_epoch,
-                config,
-                &self.optimizer,
-            )),
-            GruMlp(config) => Box::new(PolicyGradientAgent::new(
-                es.observation_space,
-                es.action_space,
-                es.discount_factor,
-                self.steps_per_epoch,
-                &AsStatefulIterConfig::from(config),
-                &self.optimizer,
-            )),
-            LstmMlp(config) => Box::new(PolicyGradientAgent::new(
-                es.observation_space,
-                es.action_space,
-                es.discount_factor,
-                self.steps_per_epoch,
-                &AsStatefulIterConfig::from(config),
-                &self.optimizer,
-            )),
-        })
-    }
-}
-
-/// Definition of a policy-gradient agent with GAE
-#[derive(Debug)]
-pub struct GaePolicyGradientAgentDef {
-    pub gamma: f64,
-    pub lambda: f64,
-    pub steps_per_epoch: usize,
-    pub value_fn_train_iters: u64,
-    pub policy: PolicyDef,
-    pub policy_optimizer: OptimizerDef,
-    pub value_fn: MlpConfig, // TODO: Any module
-    pub value_fn_optimizer: OptimizerDef,
-}
-
-impl Default for GaePolicyGradientAgentDef {
-    fn default() -> Self {
-        Self {
-            gamma: 0.99,
-            lambda: 0.95,
-            steps_per_epoch: 4000,
-            value_fn_train_iters: 80,
-            policy: Default::default(),
-            policy_optimizer: Default::default(),
-            value_fn: Default::default(),
-            value_fn_optimizer: Default::default(),
-        }
-    }
-}
-
-impl<OS, AS> AgentBuilder<OS, AS> for GaePolicyGradientAgentDef
-where
-    OS: FeatureSpace<Tensor> + 'static,
-    AS: ParameterizedSampleSpace<Tensor> + 'static,
-{
-    type Agent = Box<dyn Agent<OS::Element, AS::Element>>;
-
-    fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, BuildAgentError> {
-        use PolicyDef::*;
-        Ok(match &self.policy {
-            Mlp(policy_config) => Box::new(GaePolicyGradientAgent::new(
-                es.observation_space,
-                es.action_space,
-                es.discount_factor,
-                self.gamma,
-                self.lambda,
-                self.steps_per_epoch,
-                self.value_fn_train_iters,
-                policy_config,
-                &self.policy_optimizer,
-                &self.value_fn,
-                &self.value_fn_optimizer,
-            )),
-            GruMlp(policy_config) => Box::new(GaePolicyGradientAgent::new(
-                es.observation_space,
-                es.action_space,
-                es.discount_factor,
-                self.gamma,
-                self.lambda,
-                self.steps_per_epoch,
-                self.value_fn_train_iters,
-                &AsStatefulIterConfig::from(policy_config),
-                &self.policy_optimizer,
-                &self.value_fn,
-                &self.value_fn_optimizer,
-            )),
-            LstmMlp(policy_config) => Box::new(GaePolicyGradientAgent::new(
-                es.observation_space,
-                es.action_space,
-                es.discount_factor,
-                self.gamma,
-                self.lambda,
-                self.steps_per_epoch,
-                self.value_fn_train_iters,
-                &AsStatefulIterConfig::from(policy_config),
-                &self.policy_optimizer,
-                &self.value_fn,
-                &self.value_fn_optimizer,
-            )),
-        })
     }
 }

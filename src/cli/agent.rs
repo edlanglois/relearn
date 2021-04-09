@@ -1,8 +1,9 @@
-use super::{Options, Update, WithUpdate};
+use super::{options::ValueFnView, Options, Update, WithUpdate};
 use crate::agents::{
-    BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
+    BetaThompsonSamplingAgentConfig, GaePolicyGradientAgentConfig, PolicyGradientAgentConfig,
+    TabularQLearningAgentConfig, UCB1AgentConfig,
 };
-use crate::defs::{AgentDef, GaePolicyGradientAgentDef, PolicyGradientAgentDef};
+use crate::defs::AgentDef;
 use clap::Clap;
 
 /// Agent name
@@ -72,34 +73,50 @@ impl Update<&Options> for UCB1AgentConfig {
     }
 }
 
-impl From<&Options> for PolicyGradientAgentDef {
-    fn from(opts: &Options) -> Self {
+impl<'a, PB, OB> From<&'a Options> for PolicyGradientAgentConfig<PB, OB>
+where
+    PolicyGradientAgentConfig<PB, OB>: Default + Update<&'a Options>,
+{
+    fn from(opts: &'a Options) -> Self {
         Self::default().with_update(opts)
     }
 }
 
-impl Update<&Options> for PolicyGradientAgentDef {
-    fn update(&mut self, opts: &Options) {
-        self.policy.update(opts);
-        self.optimizer.update(opts);
+impl<'a, PB, OB> Update<&'a Options> for PolicyGradientAgentConfig<PB, OB>
+where
+    PB: Update<&'a Options>,
+    OB: Update<&'a Options>,
+{
+    fn update(&mut self, opts: &'a Options) {
+        self.policy_config.update(opts);
+        self.optimizer_config.update(opts);
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
             self.steps_per_epoch = steps_per_epoch;
         }
     }
 }
 
-impl From<&Options> for GaePolicyGradientAgentDef {
-    fn from(opts: &Options) -> Self {
+impl<'a, PB, POB, VB, VOB> From<&'a Options> for GaePolicyGradientAgentConfig<PB, POB, VB, VOB>
+where
+    GaePolicyGradientAgentConfig<PB, POB, VB, VOB>: Default + Update<&'a Options>,
+{
+    fn from(opts: &'a Options) -> Self {
         Self::default().with_update(opts)
     }
 }
 
-impl Update<&Options> for GaePolicyGradientAgentDef {
-    fn update(&mut self, opts: &Options) {
-        self.policy.update(opts);
-        self.policy_optimizer.update(opts);
-        self.value_fn.update(opts);
-        self.value_fn_optimizer.update(&opts.value_fn_view());
+impl<'a, PB, POB, VB, VOB> Update<&'a Options> for GaePolicyGradientAgentConfig<PB, POB, VB, VOB>
+where
+    PB: Update<&'a Options>,
+    POB: Update<&'a Options>,
+    VB: Update<&'a Options>,
+    VOB: for<'b> Update<&'b ValueFnView<'a>>,
+{
+    fn update(&mut self, opts: &'a Options) {
+        self.policy_config.update(opts);
+        self.policy_optimizer_config.update(opts);
+        self.value_fn_config.update(opts);
+        self.value_fn_optimizer_config.update(&opts.value_fn_view());
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
             self.steps_per_epoch = steps_per_epoch;
         }

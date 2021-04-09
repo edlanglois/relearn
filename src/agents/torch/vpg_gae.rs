@@ -13,15 +13,7 @@ use tch::{kind::Kind, nn, nn::Module, Device, Reduction, Tensor};
 
 /// Configuration for GaePolicyGradientAgent
 #[derive(Debug)]
-pub struct GaePolicyGradientAgentConfig<PB, POB, VB, VOB>
-where
-    PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
-    POB: OptimizerBuilder,
-    VB: ModuleBuilder,
-    <VB as ModuleBuilder>::Module: Module,
-    VOB: OptimizerBuilder,
-{
+pub struct GaePolicyGradientAgentConfig<PB, POB, VB, VOB> {
     pub gamma: f64,
     pub lambda: f64,
     pub steps_per_epoch: usize,
@@ -32,15 +24,7 @@ where
     pub value_fn_optimizer_config: VOB,
 }
 
-impl<PB, POB, VB, VOB> GaePolicyGradientAgentConfig<PB, POB, VB, VOB>
-where
-    PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
-    POB: OptimizerBuilder,
-    VB: ModuleBuilder,
-    <VB as ModuleBuilder>::Module: Module,
-    VOB: OptimizerBuilder,
-{
+impl<PB, POB, VB, VOB> GaePolicyGradientAgentConfig<PB, POB, VB, VOB> {
     pub fn new(
         gamma: f64,
         lambda: f64,
@@ -66,12 +50,10 @@ where
 
 impl<PB, POB, VB, VOB> Default for GaePolicyGradientAgentConfig<PB, POB, VB, VOB>
 where
-    PB: ModuleBuilder + Default,
-    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
-    POB: OptimizerBuilder + Default,
-    VB: ModuleBuilder + Default,
-    <VB as ModuleBuilder>::Module: Module,
-    VOB: OptimizerBuilder + Default,
+    PB: Default,
+    POB: Default,
+    VB: Default,
+    VOB: Default,
 {
     fn default() -> Self {
         Self {

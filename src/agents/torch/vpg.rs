@@ -9,23 +9,13 @@ use tch::{kind::Kind, nn, Device, Tensor};
 
 /// Configuration for PolicyGradientAgent
 #[derive(Debug)]
-pub struct PolicyGradientAgentConfig<PB, OB>
-where
-    PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
-    OB: OptimizerBuilder,
-{
+pub struct PolicyGradientAgentConfig<PB, OB> {
     pub steps_per_epoch: usize,
     pub policy_config: PB,
     pub optimizer_config: OB,
 }
 
-impl<PB, OB> PolicyGradientAgentConfig<PB, OB>
-where
-    PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
-    OB: OptimizerBuilder,
-{
+impl<PB, OB> PolicyGradientAgentConfig<PB, OB> {
     pub fn new(steps_per_epoch: usize, policy_config: PB, optimizer_config: OB) -> Self {
         Self {
             steps_per_epoch,
@@ -37,9 +27,8 @@ where
 
 impl<PB, OB> Default for PolicyGradientAgentConfig<PB, OB>
 where
-    PB: ModuleBuilder + Default,
-    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
-    OB: OptimizerBuilder + Default,
+    PB: Default,
+    OB: Default,
 {
     fn default() -> Self {
         Self {
