@@ -33,7 +33,7 @@ impl TryFrom<&OptimizerDef> for COptimizer {
 
 impl OptimizerDef {
     /// Set the learning rate
-    pub fn set_learning_rate(&mut self, learning_rate: f64) {
+    pub fn with_learning_rate(&mut self, learning_rate: f64) -> &mut Self {
         use OptimizerDef::*;
         match self {
             Sgd(ref mut c) => {
@@ -49,11 +49,6 @@ impl OptimizerDef {
                 c.learning_rate = learning_rate;
             }
         }
-    }
-
-    /// Set the learning rate
-    pub fn with_learning_rate(mut self, learning_rate: f64) -> Self {
-        self.set_learning_rate(learning_rate);
         self
     }
 }
