@@ -1,15 +1,15 @@
 //! Sequence modules. Like [tch::nn::Module] but operate on a sequence of data.
-mod as_stateful;
 mod r#box;
 pub mod module;
 mod rnn;
 mod seq_regressor;
 #[cfg(test)]
 pub mod testing;
+mod with_state;
 
-pub use as_stateful::AsStatefulIterator;
 pub use rnn::SeqModRnn;
 pub use seq_regressor::SequenceRegressor;
+pub use with_state::WithState;
 
 use tch::{nn, Tensor};
 

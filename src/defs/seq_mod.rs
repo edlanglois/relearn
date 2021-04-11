@@ -1,5 +1,5 @@
 use crate::torch::configs::{MlpConfig, RnnMlpConfig};
-use crate::torch::seq_modules::{AsStatefulIterator, GruMlp, LstmMlp, StatefulIterSeqModule};
+use crate::torch::seq_modules::{GruMlp, LstmMlp, StatefulIterSeqModule, WithState};
 use crate::torch::ModuleBuilder;
 use std::borrow::Borrow;
 use tch::nn::{Path, Sequential};
@@ -37,11 +37,11 @@ impl ModuleBuilder<Box<dyn StatefulIterSeqModule>> for SeqModDef {
                 Box::new(m)
             }
             SeqModDef::GruMlp(config) => {
-                let m: AsStatefulIterator<GruMlp> = config.build(vs, input_dim, output_dim);
+                let m: WithState<GruMlp> = config.build(vs, input_dim, output_dim);
                 Box::new(m)
             }
             SeqModDef::LstmMlp(config) => {
-                let m: AsStatefulIterator<LstmMlp> = config.build(vs, input_dim, output_dim);
+                let m: WithState<LstmMlp> = config.build(vs, input_dim, output_dim);
                 Box::new(m)
             }
         }

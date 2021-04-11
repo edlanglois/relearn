@@ -2,58 +2,61 @@ use super::{IterativeModule, SequenceModule, StatefulIterativeModule};
 use std::borrow::Borrow;
 use tch::Tensor;
 
-/// Wraps an IterativeModule as a StatefulIterativeModule
+/// IterativeModule wrapper that also stores the state.
 #[derive(Debug)]
-pub struct AsStatefulIterator<M: IterativeModule, T: Borrow<M> = M> {
+pub struct WithState<T: IterativeModule> {
     pub module: T,
-    pub state: M::State,
+    pub state: T::State,
 }
 
-impl<M: IterativeModule, T: Borrow<M>> AsStatefulIterator<M, T> {
+impl<T: IterativeModule> WithState<T> {
     pub fn new(module: T) -> Self {
-        let state = module.borrow().initial_state(1);
+        let state = module.initial_state(1); // batch size of 1
         Self { module, state }
     }
 }
 
-impl<M: IterativeModule> From<M> for AsStatefulIterator<M> {
-    fn from(module: M) -> Self {
+impl<T: IterativeModule> From<T> for WithState<T> {
+    fn from(module: T) -> Self {
         Self::new(module)
     }
 }
 
-impl<M: IterativeModule, T: Borrow<M>> StatefulIterativeModule for AsStatefulIterator<M, T> {
+impl<T: IterativeModule> StatefulIterativeModule for WithState<T> {
     fn step(&mut self, input: &Tensor) -> Tensor {
-        let (output, new_state) = self.module.borrow().step(&input.unsqueeze(0), &self.state);
+        let (output, new_state) = self.module.step(&input.unsqueeze(0), &self.state);
         self.state = new_state;
         output.squeeze1(0)
     }
     fn reset(&mut self) {
-        self.state = self.module.borrow().initial_state(1);
+        self.state = self.module.initial_state(1);
     }
 }
 
-impl<M, T> SequenceModule for AsStatefulIterator<M, T>
+impl<T> SequenceModule for WithState<T>
 where
-    M: IterativeModule + SequenceModule,
-    T: Borrow<M>,
+    T: IterativeModule + SequenceModule,
 {
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         self.module.borrow().seq_serial(inputs, seq_lengths)
     }
 }
 
-impl<M, T> IterativeModule for AsStatefulIterator<M, T>
+// Note: Consider deleting this.
+// It is currently unused and can lead the compiler to try
+// an infinite regression of WithState<WithState<...>>
+//
+// As an alternative, could implement Deref<T> for WithState<T>.
+impl<T> IterativeModule for WithState<T>
 where
-    M: IterativeModule,
-    T: Borrow<M>,
+    T: IterativeModule,
 {
-    type State = M::State;
+    type State = T::State;
     fn initial_state(&self, batch_size: usize) -> Self::State {
-        self.module.borrow().initial_state(batch_size)
+        self.module.initial_state(batch_size)
     }
     fn step(&self, input: &Tensor, state: &Self::State) -> (Tensor, Self::State) {
-        self.module.borrow().step(input, state)
+        self.module.step(input, state)
     }
 }
 
@@ -65,7 +68,7 @@ mod as_stateful_module {
     use tch::{nn, Device};
 
     #[fixture]
-    fn linear() -> (AsStatefulIterator<nn::Linear>, usize, usize) {
+    fn linear() -> (WithState<nn::Linear>, usize, usize) {
         let in_dim: usize = 3;
         let out_dim: usize = 2;
         let vs = nn::VarStore::new(Device::Cpu);
@@ -79,7 +82,7 @@ mod as_stateful_module {
     }
 
     #[fixture]
-    fn gru() -> (AsStatefulIterator<SeqModRnn<nn::GRU>>, usize, usize) {
+    fn gru() -> (WithState<SeqModRnn<nn::GRU>>, usize, usize) {
         let in_dim: usize = 3;
         let out_dim: usize = 2;
         let vs = nn::VarStore::new(Device::Cpu);
@@ -93,35 +96,35 @@ mod as_stateful_module {
     }
 
     #[rstest]
-    fn linear_stateful_step(linear: (AsStatefulIterator<nn::Linear>, usize, usize)) {
+    fn linear_stateful_step(linear: (WithState<nn::Linear>, usize, usize)) {
         let (mut linear, in_dim, out_dim) = linear;
         testing::check_stateful_step(&mut linear, in_dim, out_dim);
     }
     #[rstest]
-    fn linear_seq_serial(linear: (AsStatefulIterator<nn::Linear>, usize, usize)) {
+    fn linear_seq_serial(linear: (WithState<nn::Linear>, usize, usize)) {
         let (linear, in_dim, out_dim) = linear;
         testing::check_seq_serial(&linear, in_dim, out_dim);
     }
 
     #[rstest]
-    fn linear_step(linear: (AsStatefulIterator<nn::Linear>, usize, usize)) {
+    fn linear_step(linear: (WithState<nn::Linear>, usize, usize)) {
         let (linear, in_dim, out_dim) = linear;
         testing::check_step(&linear, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_stateful_step(gru: (AsStatefulIterator<SeqModRnn<nn::GRU>>, usize, usize)) {
+    fn gru_stateful_step(gru: (WithState<SeqModRnn<nn::GRU>>, usize, usize)) {
         let (mut gru, in_dim, out_dim) = gru;
         testing::check_stateful_step(&mut gru, in_dim, out_dim);
     }
     #[rstest]
-    fn gru_seq_serial(gru: (AsStatefulIterator<SeqModRnn<nn::GRU>>, usize, usize)) {
+    fn gru_seq_serial(gru: (WithState<SeqModRnn<nn::GRU>>, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_seq_serial(&gru, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_step(gru: (AsStatefulIterator<SeqModRnn<nn::GRU>>, usize, usize)) {
+    fn gru_step(gru: (WithState<SeqModRnn<nn::GRU>>, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_step(&gru, in_dim, out_dim);
     }

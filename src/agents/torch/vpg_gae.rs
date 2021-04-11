@@ -437,7 +437,7 @@ mod gae_policy_gradient {
     use super::*;
     use crate::torch::configs::{MlpConfig, RnnMlpConfig};
     use crate::torch::optimizers::AdamConfig;
-    use crate::torch::seq_modules::{AsStatefulIterator, GruMlp};
+    use crate::torch::seq_modules::{GruMlp, WithState};
     use tch::nn::Sequential;
 
     #[test]
@@ -470,8 +470,8 @@ mod gae_policy_gradient {
         config.policy_optimizer_config.learning_rate = 0.1;
         config.value_fn_optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
-            |env_structure| -> GaePolicyGradientAgent<_, _, AsStatefulIterator<GruMlp>, _, Sequential, _> {
-                AgentBuilder::build(&config,env_structure, 0).unwrap()
+            |env_structure| -> GaePolicyGradientAgent<_, _, WithState<GruMlp>, _, Sequential, _> {
+                AgentBuilder::build(&config, env_structure, 0).unwrap()
             },
             1_000,
             0.9,
@@ -495,9 +495,9 @@ mod gae_policy_gradient {
             |env_structure| -> GaePolicyGradientAgent<
                 _,
                 _,
-                AsStatefulIterator<GruMlp>,
+                WithState<GruMlp>,
                 _,
-                AsStatefulIterator<GruMlp>,
+                WithState<GruMlp>,
                 _,
             > { AgentBuilder::build(&config, env_structure, 0).unwrap() },
             1_000,

@@ -362,7 +362,7 @@ mod policy_gradient {
     use super::*;
     use crate::torch::configs::{MlpConfig, RnnMlpConfig};
     use crate::torch::optimizers::AdamConfig;
-    use crate::torch::seq_modules::{AsStatefulIterator, GruMlp};
+    use crate::torch::seq_modules::{GruMlp, WithState};
     use tch::nn::Sequential;
 
     #[test]
@@ -387,7 +387,7 @@ mod policy_gradient {
         config.steps_per_epoch = 1000;
         config.optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
-            |env_structure| -> PolicyGradientAgent<_, _, AsStatefulIterator<GruMlp>, _> {
+            |env_structure| -> PolicyGradientAgent<_, _, WithState<GruMlp>, _> {
                 AgentBuilder::build(&config, env_structure, 0).unwrap()
             },
             1_000,
