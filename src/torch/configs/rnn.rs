@@ -1,35 +1,30 @@
-use super::super::ModuleBuilder;
+use super::super::{seq_modules::SeqModRnn, ModuleBuilder};
 use std::borrow::Borrow;
-use std::marker::PhantomData;
 use tch::nn;
 
 /// Configuration of a recurrent neural network.
-#[derive(Debug)]
-pub struct RnnConfig<R> {
+#[derive(Debug, Clone)]
+pub struct RnnConfig {
     pub has_biases: bool,
     pub num_layers: usize,
-    type_: PhantomData<R>,
 }
 
-impl<R> Default for RnnConfig<R> {
+impl Default for RnnConfig {
     fn default() -> Self {
         Self {
             num_layers: 1,
             has_biases: true,
-            type_: PhantomData,
         }
     }
 }
 
-impl ModuleBuilder for RnnConfig<nn::GRU> {
-    type Module = nn::GRU;
-
-    fn build<'a, T: Borrow<nn::Path<'a>>>(
+impl ModuleBuilder<nn::GRU> for RnnConfig {
+    fn build<'a, P: Borrow<nn::Path<'a>>>(
         &self,
-        vs: T,
+        vs: P,
         input_dim: usize,
         output_dim: usize,
-    ) -> Self::Module {
+    ) -> nn::GRU {
         let rnn_config = nn::RNNConfig {
             has_biases: self.has_biases,
             num_layers: self.num_layers as i64,
@@ -42,15 +37,13 @@ impl ModuleBuilder for RnnConfig<nn::GRU> {
     }
 }
 
-impl ModuleBuilder for RnnConfig<nn::LSTM> {
-    type Module = nn::LSTM;
-
-    fn build<'a, T: Borrow<nn::Path<'a>>>(
+impl ModuleBuilder<nn::LSTM> for RnnConfig {
+    fn build<'a, P: Borrow<nn::Path<'a>>>(
         &self,
-        vs: T,
+        vs: P,
         input_dim: usize,
         output_dim: usize,
-    ) -> Self::Module {
+    ) -> nn::LSTM {
         let rnn_config = nn::RNNConfig {
             has_biases: self.has_biases,
             num_layers: self.num_layers as i64,
@@ -63,6 +56,20 @@ impl ModuleBuilder for RnnConfig<nn::LSTM> {
     }
 }
 
+impl<R> ModuleBuilder<SeqModRnn<R>> for RnnConfig
+where
+    RnnConfig: ModuleBuilder<R>,
+{
+    fn build<'a, P: Borrow<nn::Path<'a>>>(
+        &self,
+        vs: P,
+        input_dim: usize,
+        output_dim: usize,
+    ) -> SeqModRnn<R> {
+        self.build(vs, input_dim, output_dim).into()
+    }
+}
+
 #[cfg(test)]
 mod rnn_config {
     use super::*;
@@ -71,16 +78,24 @@ mod rnn_config {
     /// Check that the default GRU Config builds successfully
     #[test]
     fn default_gru_builds() {
-        let config: RnnConfig<nn::GRU> = Default::default();
+        let config = RnnConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _ = config.build(&vs.root(), 3, 2);
+        let _: nn::GRU = config.build(&vs.root(), 3, 2);
+    }
+
+    /// Check that SeqModRnn<GRU> builds successfully
+    #[test]
+    fn default_seq_mod_gru_builds() {
+        let config = RnnConfig::default();
+        let vs = nn::VarStore::new(Device::Cpu);
+        let _: SeqModRnn<nn::GRU> = config.build(&vs.root(), 3, 2);
     }
 
     /// Check that the default LSTM Config builds successfully
     #[test]
     fn default_lstm_builds() {
-        let config: RnnConfig<nn::LSTM> = Default::default();
+        let config = RnnConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _ = config.build(&vs.root(), 3, 2);
+        let _: nn::LSTM = config.build(&vs.root(), 3, 2);
     }
 }

@@ -2,7 +2,6 @@ use super::{Options, Update, WithUpdate};
 use crate::defs::SeqModDef;
 use crate::torch::configs::{MlpConfig, RnnConfig, SequenceRegressorConfig};
 use clap::Clap;
-use tch::nn::RNN;
 
 /// Sequence module type
 #[derive(Clap, Debug, Eq, PartialEq, Clone, Copy)]
@@ -97,13 +96,13 @@ where
     }
 }
 
-impl<R: RNN> From<&Options> for RnnConfig<R> {
+impl From<&Options> for RnnConfig {
     fn from(opts: &Options) -> Self {
         Self::default().with_update(opts)
     }
 }
 
-impl<R: RNN> Update<&Options> for RnnConfig<R> {
+impl Update<&Options> for RnnConfig {
     fn update(&mut self, opts: &Options) {
         if let Some(num_layers) = opts.rnn_num_layers {
             self.num_layers = num_layers

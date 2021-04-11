@@ -1,8 +1,8 @@
 use super::{OptimizerDef, SeqModDef};
 use crate::agents::{
     Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError,
-    GaePolicyGradientAgentConfig, PolicyGradientAgentConfig, RandomAgentConfig,
-    TabularQLearningAgentConfig, UCB1AgentConfig,
+    GaePolicyGradientAgentConfig, GaePolicyGradientBoxedAgent, PolicyGradientAgentConfig,
+    PolicyGradientBoxedAgent, RandomAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::EnvStructure;
 use crate::spaces::{FiniteSpace, RLSpace};
@@ -71,8 +71,12 @@ impl AgentDef {
             Random => RandomAgentConfig::new()
                 .build(es, seed)
                 .map(|a| Box::new(a) as _),
-            PolicyGradient(config) => config.build(es, seed).map(|a| Box::new(a) as _),
-            GaePolicyGradient(config) => config.build(es, seed).map(|a| Box::new(a) as _),
+            PolicyGradient(config) => config
+                .build(es, seed)
+                .map(|a: PolicyGradientBoxedAgent<_, _>| Box::new(a) as _),
+            GaePolicyGradient(config) => config
+                .build(es, seed)
+                .map(|a: GaePolicyGradientBoxedAgent<_, _>| Box::new(a) as _),
             _ => Err(BuildAgentError::InvalidSpaceBounds),
         }
     }

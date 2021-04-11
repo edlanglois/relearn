@@ -1,27 +1,21 @@
-use super::super::seq_modules::{SeqModRnn, SequenceRegressor};
+use super::super::seq_modules::SequenceRegressor;
 use super::super::{Activation, ModuleBuilder};
-use super::{MlpConfig, RnnConfig};
 use std::borrow::Borrow;
 use tch::nn;
 
-/// Configuration for an RNN followed by a feed-forward network.
+/// Configuration for a sequence module followed by a regular module
 #[derive(Debug, Clone)]
-pub struct SequenceRegressorConfig<R, P> {
-    pub rnn_config: R,
+pub struct SequenceRegressorConfig<SC, MC> {
+    pub rnn_config: SC,
     pub rnn_hidden_size: usize,
     pub rnn_output_activation: Activation,
-    pub post_config: P,
+    pub post_config: MC,
 }
 
-/// Configuration for an MLP stacked on top of a GRU.
-pub type GruMlpConfig = SequenceRegressorConfig<RnnConfig<nn::GRU>, MlpConfig>;
-/// Configuration for an MLP stacked on top of an LSTM.
-pub type LstmMlpConfig = SequenceRegressorConfig<RnnConfig<nn::LSTM>, MlpConfig>;
-
-impl<R, P> Default for SequenceRegressorConfig<R, P>
+impl<SC, MC> Default for SequenceRegressorConfig<SC, MC>
 where
-    R: Default,
-    P: Default,
+    SC: Default,
+    MC: Default,
 {
     fn default() -> Self {
         Self {
@@ -33,25 +27,18 @@ where
     }
 }
 
-impl<R, P> ModuleBuilder for SequenceRegressorConfig<R, P>
+impl<S, SC, M, MC> ModuleBuilder<SequenceRegressor<'static, S, M>>
+    for SequenceRegressorConfig<SC, MC>
 where
-    R: ModuleBuilder,
-    <R as ModuleBuilder>::Module: nn::RNN,
-    P: ModuleBuilder,
-    <P as ModuleBuilder>::Module: nn::Module,
+    SC: ModuleBuilder<S>,
+    MC: ModuleBuilder<M>,
 {
-    type Module = SequenceRegressor<
-        'static,
-        SeqModRnn<<R as ModuleBuilder>::Module>,
-        <P as ModuleBuilder>::Module,
-    >;
-
-    fn build<'a, T: Borrow<nn::Path<'a>>>(
+    fn build<'a, P: Borrow<nn::Path<'a>>>(
         &self,
-        vs: T,
+        vs: P,
         input_dim: usize,
         output_dim: usize,
-    ) -> Self::Module {
+    ) -> SequenceRegressor<'static, S, M> {
         let vs = vs.borrow();
         SequenceRegressor::new(
             self.rnn_config
@@ -66,18 +53,17 @@ where
 
 #[cfg(test)]
 mod sequence_regressor_config {
-    use super::super::super::seq_modules::testing;
+    use super::super::super::seq_modules::{testing, GruMlp, LstmMlp};
+    use super::super::RnnMlpConfig;
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{nn, Device};
-
-    type GruMlp = <GruMlpConfig as ModuleBuilder>::Module;
 
     #[fixture]
     fn gru_mlp_default_module() -> (GruMlp, usize, usize) {
         let in_dim = 3;
         let out_dim = 2;
-        let config = GruMlpConfig::default();
+        let config = RnnMlpConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
         let module = config.build(&vs.root(), in_dim, out_dim);
         (module, in_dim, out_dim)
@@ -95,13 +81,11 @@ mod sequence_regressor_config {
         testing::check_step(&gru_mlp, in_dim, out_dim);
     }
 
-    type LstmMlp = <LstmMlpConfig as ModuleBuilder>::Module;
-
     #[fixture]
     fn lstm_mlp_default_module() -> (LstmMlp, usize, usize) {
         let in_dim = 3;
         let out_dim = 2;
-        let config = LstmMlpConfig::default();
+        let config = RnnMlpConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
         let module = config.build(&vs.root(), in_dim, out_dim);
         (module, in_dim, out_dim)

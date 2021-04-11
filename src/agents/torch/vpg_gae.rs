@@ -66,29 +66,25 @@ where
     }
 }
 
-impl<OS, AS, PB, POB, VB, VOB> AgentBuilder<OS, AS>
+impl<OS, AS, PB, P, POB, PO, VB, V, VOB, VO>
+    AgentBuilder<GaePolicyGradientAgent<OS, AS, P, PO, V, VO>, OS, AS>
     for GaePolicyGradientAgentConfig<PB, POB, VB, VOB>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    PB: ModuleBuilder,
-    <PB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
-    POB: OptimizerBuilder,
-    VB: ModuleBuilder,
-    <VB as ModuleBuilder>::Module: SequenceModule + StatefulIterativeModule,
-    VOB: OptimizerBuilder,
+    PB: ModuleBuilder<P>,
+    P: SequenceModule + StatefulIterativeModule,
+    POB: OptimizerBuilder<PO>,
+    VB: ModuleBuilder<V>,
+    V: SequenceModule + StatefulIterativeModule,
+    VOB: OptimizerBuilder<VO>,
 {
-    type Agent = GaePolicyGradientAgent<
-        OS,
-        AS,
-        <PB as ModuleBuilder>::Module,
-        POB::Optimizer,
-        <VB as ModuleBuilder>::Module,
-        VOB::Optimizer,
-    >;
-
-    fn build(&self, es: EnvStructure<OS, AS>, _seed: u64) -> Result<Self::Agent, BuildAgentError> {
-        Ok(Self::Agent::new(
+    fn build(
+        &self,
+        es: EnvStructure<OS, AS>,
+        _seed: u64,
+    ) -> Result<GaePolicyGradientAgent<OS, AS, P, PO, V, VO>, BuildAgentError> {
+        Ok(GaePolicyGradientAgent::new(
             es.observation_space,
             es.action_space,
             es.discount_factor,
@@ -173,8 +169,6 @@ impl<OS, AS, P, PO, V, VO> GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    PO: Optimizer,
-    VO: Optimizer,
 {
     pub fn new<PB, VB, POB, VOB>(
         observation_space: OS,
@@ -190,10 +184,10 @@ where
         value_fn_optimizer_config: &VOB,
     ) -> Self
     where
-        PB: ModuleBuilder<Module = P>,
-        VB: ModuleBuilder<Module = V>,
-        POB: OptimizerBuilder<Optimizer = PO>,
-        VOB: OptimizerBuilder<Optimizer = VO>,
+        PB: ModuleBuilder<P>,
+        VB: ModuleBuilder<V>,
+        POB: OptimizerBuilder<PO>,
+        VOB: OptimizerBuilder<VO>,
     {
         let max_steps_per_epoch = (steps_per_epoch as f64 * 1.1) as usize;
         let discount_factor = env_discount_factor.min(gamma);
@@ -441,8 +435,10 @@ where
 mod gae_policy_gradient {
     use super::super::super::testing;
     use super::*;
-    use crate::torch::configs::{AsStatefulIterConfig, GruMlpConfig, MlpConfig};
+    use crate::torch::configs::{MlpConfig, RnnMlpConfig};
     use crate::torch::optimizers::AdamConfig;
+    use crate::torch::seq_modules::{AsStatefulIterator, GruMlp};
+    use tch::nn::Sequential;
 
     #[test]
     fn default_mlp_learns_derministic_bandit() {
@@ -453,7 +449,9 @@ mod gae_policy_gradient {
         config.policy_optimizer_config.learning_rate = 0.1;
         config.value_fn_optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
-            |env_structure| config.build(env_structure, 0).unwrap(),
+            |env_structure| -> GaePolicyGradientAgent<_, _, Sequential, _, Sequential, _> {
+                AgentBuilder::build(&config, env_structure, 0).unwrap()
+            },
             1_000,
             0.9,
         );
@@ -462,7 +460,7 @@ mod gae_policy_gradient {
     #[test]
     fn default_gru_mlp_v_mlp_learns_derministic_bandit() {
         let mut config = GaePolicyGradientAgentConfig::<
-            AsStatefulIterConfig<GruMlpConfig>,
+            RnnMlpConfig,
             AdamConfig,
             MlpConfig,
             AdamConfig,
@@ -472,7 +470,9 @@ mod gae_policy_gradient {
         config.policy_optimizer_config.learning_rate = 0.1;
         config.value_fn_optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
-            |env_structure| config.build(env_structure, 0).unwrap(),
+            |env_structure| -> GaePolicyGradientAgent<_, _, AsStatefulIterator<GruMlp>, _, Sequential, _> {
+                AgentBuilder::build(&config,env_structure, 0).unwrap()
+            },
             1_000,
             0.9,
         );
@@ -482,9 +482,9 @@ mod gae_policy_gradient {
     #[ignore] // Recurrent training is currently very slow
     fn default_gru_mlp_v_gru_mlp_learns_derministic_bandit() {
         let mut config = GaePolicyGradientAgentConfig::<
-            AsStatefulIterConfig<GruMlpConfig>,
+            RnnMlpConfig,
             AdamConfig,
-            AsStatefulIterConfig<GruMlpConfig>,
+            RnnMlpConfig,
             AdamConfig,
         >::default();
         // Speed up learning for this simple environment
@@ -492,7 +492,14 @@ mod gae_policy_gradient {
         config.policy_optimizer_config.learning_rate = 0.1;
         config.value_fn_optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
-            |env_structure| config.build(env_structure, 0).unwrap(),
+            |env_structure| -> GaePolicyGradientAgent<
+                _,
+                _,
+                AsStatefulIterator<GruMlp>,
+                _,
+                AsStatefulIterator<GruMlp>,
+                _,
+            > { AgentBuilder::build(&config, env_structure, 0).unwrap() },
             1_000,
             0.9,
         );

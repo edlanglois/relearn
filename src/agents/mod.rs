@@ -19,3 +19,19 @@ pub use torch::{
     GaePolicyGradientAgent, GaePolicyGradientAgentConfig, PolicyGradientAgent,
     PolicyGradientAgentConfig,
 };
+
+use crate::torch::seq_modules::StatefulIterSeqModule;
+use tch::COptimizer;
+
+/// Policy gradient with a boxed policy.
+pub type PolicyGradientBoxedAgent<OS, AS> =
+    PolicyGradientAgent<OS, AS, Box<dyn StatefulIterSeqModule>, COptimizer>;
+/// GAE policy gradient with a boxed policy and value function.
+pub type GaePolicyGradientBoxedAgent<OS, AS> = GaePolicyGradientAgent<
+    OS,
+    AS,
+    Box<dyn StatefulIterSeqModule>,
+    COptimizer,
+    Box<dyn StatefulIterSeqModule>,
+    COptimizer,
+>;

@@ -30,15 +30,18 @@ impl Default for BetaThompsonSamplingAgentConfig {
     }
 }
 
-impl<OS, AS> AgentBuilder<OS, AS> for BetaThompsonSamplingAgentConfig
+impl<OS, AS> AgentBuilder<BetaThompsonSamplingAgent<OS, AS>, OS, AS>
+    for BetaThompsonSamplingAgentConfig
 where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    type Agent = BetaThompsonSamplingAgent<OS, AS>;
-
-    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, BuildAgentError> {
-        Ok(Self::Agent::new(
+    fn build(
+        &self,
+        es: EnvStructure<OS, AS>,
+        seed: u64,
+    ) -> Result<BetaThompsonSamplingAgent<OS, AS>, BuildAgentError> {
+        Ok(BetaThompsonSamplingAgent::new(
             es.observation_space,
             es.action_space,
             es.reward_range,

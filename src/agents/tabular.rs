@@ -28,13 +28,17 @@ impl Default for TabularQLearningAgentConfig {
     }
 }
 
-impl<OS: FiniteSpace, AS: FiniteSpace + SampleSpace> AgentBuilder<OS, AS>
-    for TabularQLearningAgentConfig
+impl<OS, AS> AgentBuilder<TabularQLearningAgent<OS, AS>, OS, AS> for TabularQLearningAgentConfig
+where
+    OS: FiniteSpace,
+    AS: FiniteSpace,
 {
-    type Agent = TabularQLearningAgent<OS, AS>;
-
-    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, BuildAgentError> {
-        Ok(Self::Agent::new(
+    fn build(
+        &self,
+        es: EnvStructure<OS, AS>,
+        seed: u64,
+    ) -> Result<TabularQLearningAgent<OS, AS>, BuildAgentError> {
+        Ok(TabularQLearningAgent::new(
             es.observation_space,
             es.action_space,
             es.discount_factor,

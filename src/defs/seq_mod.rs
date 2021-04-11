@@ -1,15 +1,15 @@
-use crate::torch::configs::{GruMlpConfig, LstmMlpConfig, MlpConfig};
-use crate::torch::seq_modules::{AsStatefulIterator, StatefulIterSeqModule};
+use crate::torch::configs::{MlpConfig, RnnMlpConfig};
+use crate::torch::seq_modules::{AsStatefulIterator, GruMlp, LstmMlp, StatefulIterSeqModule};
 use crate::torch::ModuleBuilder;
 use std::borrow::Borrow;
-use tch::nn::Path;
+use tch::nn::{Path, Sequential};
 
 /// Sequence module definition
 #[derive(Debug)]
 pub enum SeqModDef {
     Mlp(MlpConfig),
-    GruMlp(GruMlpConfig),
-    LstmMlp(LstmMlpConfig),
+    GruMlp(RnnMlpConfig),
+    LstmMlp(RnnMlpConfig),
 }
 
 impl Default for SeqModDef {
@@ -24,35 +24,26 @@ impl From<MlpConfig> for SeqModDef {
     }
 }
 
-impl From<GruMlpConfig> for SeqModDef {
-    fn from(c: GruMlpConfig) -> Self {
-        SeqModDef::GruMlp(c)
-    }
-}
-
-impl From<LstmMlpConfig> for SeqModDef {
-    fn from(c: LstmMlpConfig) -> Self {
-        SeqModDef::LstmMlp(c)
-    }
-}
-
-impl ModuleBuilder for SeqModDef {
-    type Module = Box<dyn StatefulIterSeqModule>;
+impl ModuleBuilder<Box<dyn StatefulIterSeqModule>> for SeqModDef {
     fn build<'a, T: Borrow<Path<'a>>>(
         &self,
         vs: T,
         input_dim: usize,
         output_dim: usize,
-    ) -> Self::Module {
-        use SeqModDef::*;
+    ) -> Box<dyn StatefulIterSeqModule> {
         match self {
-            Mlp(config) => Box::new(config.build(vs, input_dim, output_dim)),
-            GruMlp(config) => Box::new(AsStatefulIterator::from(
-                config.build(vs, input_dim, output_dim),
-            )),
-            LstmMlp(config) => Box::new(AsStatefulIterator::from(
-                config.build(vs, input_dim, output_dim),
-            )),
+            SeqModDef::Mlp(config) => {
+                let m: Sequential = config.build(vs, input_dim, output_dim);
+                Box::new(m)
+            }
+            SeqModDef::GruMlp(config) => {
+                let m: AsStatefulIterator<GruMlp> = config.build(vs, input_dim, output_dim);
+                Box::new(m)
+            }
+            SeqModDef::LstmMlp(config) => {
+                let m: AsStatefulIterator<LstmMlp> = config.build(vs, input_dim, output_dim);
+                Box::new(m)
+            }
         }
     }
 }

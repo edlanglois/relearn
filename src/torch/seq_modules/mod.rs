@@ -11,7 +11,12 @@ pub use as_stateful::AsStatefulIterator;
 pub use rnn::SeqModRnn;
 pub use seq_regressor::SequenceRegressor;
 
-use tch::Tensor;
+use tch::{nn, Tensor};
+
+/// An MLP stacked on top of a GRU.
+pub type GruMlp = SequenceRegressor<'static, SeqModRnn<nn::GRU>, nn::Sequential>;
+/// An MLP stacked on top of an LSTM.
+pub type LstmMlp = SequenceRegressor<'static, SeqModRnn<nn::LSTM>, nn::Sequential>;
 
 /// A network module that operates on a sequence of data.
 pub trait SequenceModule {

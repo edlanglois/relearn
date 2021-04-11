@@ -8,11 +8,11 @@ use std::fmt;
 
 /// Configuration setttings for a random agent.
 #[derive(Debug)]
-pub struct RandomAgentConfig {}
+pub struct RandomAgentConfig;
 
 impl RandomAgentConfig {
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
@@ -22,10 +22,12 @@ impl Default for RandomAgentConfig {
     }
 }
 
-impl<OS, AS> AgentBuilder<OS, AS> for RandomAgentConfig {
-    type Agent = RandomAgent<AS>;
-
-    fn build(&self, es: EnvStructure<OS, AS>, seed: u64) -> Result<Self::Agent, BuildAgentError> {
+impl<OS, AS> AgentBuilder<RandomAgent<AS>, OS, AS> for RandomAgentConfig {
+    fn build(
+        &self,
+        es: EnvStructure<OS, AS>,
+        seed: u64,
+    ) -> Result<RandomAgent<AS>, BuildAgentError> {
         Ok(RandomAgent::new(es.action_space, seed))
     }
 }

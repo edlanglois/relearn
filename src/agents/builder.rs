@@ -3,20 +3,14 @@ use tch::TchError;
 use thiserror::Error;
 
 /// Build an agent instance.
-pub trait AgentBuilder<OS, AS> {
-    type Agent;
-
+pub trait AgentBuilder<T, OS, AS> {
     /// Build an agent for the given environment structure.
     ///
     /// # Args:
     /// `env_structure` - The structure of the environment in which the agent is to operate.
     /// `seed` - A number used to seed the agent's random state,
     ///          for those agents that use deterministic pseudo-random number generation.
-    fn build(
-        &self,
-        env_structure: EnvStructure<OS, AS>,
-        seed: u64,
-    ) -> Result<Self::Agent, BuildAgentError>;
+    fn build(&self, env_structure: EnvStructure<OS, AS>, seed: u64) -> Result<T, BuildAgentError>;
 }
 
 /// Error building an agent

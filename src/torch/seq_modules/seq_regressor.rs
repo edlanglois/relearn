@@ -1,6 +1,8 @@
 use super::{IterativeModule, SequenceModule};
 use tch::{nn::Func, nn::Module, Tensor};
 
+// TODO: Convert to Stacked<T, U>
+
 /// A sequence regressor module.
 ///
 /// A sequence module followed by a nonlinearity then a feed-forward module.

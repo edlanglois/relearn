@@ -1,11 +1,11 @@
 //! Optimizers
 use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
+use std::error::Error;
 use tch::{nn::VarStore, COptimizer, TchError, Tensor};
 
 /// Torch optimizer interface
 pub trait Optimizer {
-    type Error: Debug;
+    type Error: Error;
 
     /// Zero out the gradients of all optimized tensors
     fn f_zero_grad(&self) -> Result<(), Self::Error>;
@@ -52,19 +52,17 @@ impl Optimizer for COptimizer {
 }
 
 /// Build an optimizer
-pub trait OptimizerBuilder {
-    type Optimizer: Optimizer;
-    type Error: Debug;
+pub trait OptimizerBuilder<T> {
+    type Error: Error;
 
     /// Build an optimizer for the trainable variables in a variable store.
-    fn build(&self, vs: &VarStore) -> Result<Self::Optimizer, Self::Error>;
+    fn build(&self, vs: &VarStore) -> Result<T, Self::Error>;
 }
 
-impl<T> OptimizerBuilder for T
+impl<T> OptimizerBuilder<COptimizer> for T
 where
     for<'a> &'a T: TryInto<COptimizer, Error = TchError>,
 {
-    type Optimizer = COptimizer;
     type Error = TchError;
 
     fn build(&self, vs: &VarStore) -> Result<COptimizer, TchError> {

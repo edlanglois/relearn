@@ -1,46 +1,41 @@
 use super::super::seq_modules::{AsStatefulIterator, IterativeModule};
 use super::super::ModuleBuilder;
 use std::borrow::Borrow;
-use std::marker::PhantomData;
 use tch::nn::Path;
 
-pub struct AsStatefulIterConfig<M, T = M>(T, PhantomData<M>);
-
-impl<M> Default for AsStatefulIterConfig<M>
+impl<M, MB> ModuleBuilder<AsStatefulIterator<M>> for MB
 where
-    M: Default,
+    MB: ModuleBuilder<M>,
+    M: IterativeModule,
 {
-    fn default() -> Self {
-        Self(Default::default(), PhantomData)
-    }
-}
-
-impl<M> From<M> for AsStatefulIterConfig<M, M> {
-    fn from(module: M) -> Self {
-        Self(module, PhantomData)
-    }
-}
-
-impl<'a, M> From<&'a M> for AsStatefulIterConfig<M, &'a M> {
-    fn from(module: &'a M) -> Self {
-        Self(module, PhantomData)
-    }
-}
-
-impl<M, T> ModuleBuilder for AsStatefulIterConfig<M, T>
-where
-    M: ModuleBuilder,
-    <M as ModuleBuilder>::Module: IterativeModule,
-    T: Borrow<M>,
-{
-    type Module = AsStatefulIterator<M::Module>;
-
     fn build<'a, U: Borrow<Path<'a>>>(
         &self,
         vs: U,
         input_dim: usize,
         output_dim: usize,
-    ) -> Self::Module {
-        self.0.borrow().build(vs, input_dim, output_dim).into()
+    ) -> AsStatefulIterator<M> {
+        self.build(vs, input_dim, output_dim).into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::super::seq_modules::SeqModRnn;
+    use super::super::{MlpConfig, RnnConfig};
+    use super::*;
+    use tch::{nn, Device};
+
+    #[test]
+    fn linear_builds() {
+        let config = MlpConfig::default();
+        let vs = nn::VarStore::new(Device::Cpu);
+        let _: AsStatefulIterator<nn::Sequential> = config.build(vs.root(), 1, 1);
+    }
+
+    #[test]
+    fn gru_builds() {
+        let config = RnnConfig::default();
+        let vs = nn::VarStore::new(Device::Cpu);
+        let _: AsStatefulIterator<SeqModRnn<nn::GRU>> = config.build(vs.root(), 1, 1);
     }
 }

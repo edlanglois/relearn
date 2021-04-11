@@ -4,7 +4,9 @@ mod mlp;
 mod rnn;
 mod seq_regressor;
 
-pub use as_stateful::AsStatefulIterConfig;
 pub use mlp::MlpConfig;
 pub use rnn::RnnConfig;
-pub use seq_regressor::{GruMlpConfig, LstmMlpConfig, SequenceRegressorConfig};
+pub use seq_regressor::SequenceRegressorConfig;
+
+/// Configuration for an MLP stacked on top of an RNN.
+pub type RnnMlpConfig = SequenceRegressorConfig<RnnConfig, MlpConfig>;
