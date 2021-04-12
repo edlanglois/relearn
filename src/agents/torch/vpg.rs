@@ -47,15 +47,15 @@ where
     PB: ModuleBuilder<P>,
     OB: OptimizerBuilder<O>,
 {
-    fn build(
+    fn build_agent(
         &self,
-        es: EnvStructure<OS, AS>,
+        env: EnvStructure<OS, AS>,
         _seed: u64,
     ) -> Result<PolicyGradientAgent<OS, AS, P, O>, BuildAgentError> {
         Ok(PolicyGradientAgent::new(
-            es.observation_space,
-            es.action_space,
-            es.discount_factor,
+            env.observation_space,
+            env.action_space,
+            env.discount_factor,
             self.steps_per_epoch,
             &self.policy_config,
             &self.optimizer_config,
@@ -373,7 +373,7 @@ mod policy_gradient {
         config.optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
             |env_structure| -> PolicyGradientAgent<_, _, Sequential, _> {
-                AgentBuilder::build(&config, env_structure, 0).unwrap()
+                config.build_agent(env_structure, 0).unwrap()
             },
             1_000,
             0.9,
@@ -388,7 +388,7 @@ mod policy_gradient {
         config.optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
             |env_structure| -> PolicyGradientAgent<_, _, WithState<GruMlp>, _> {
-                AgentBuilder::build(&config, env_structure, 0).unwrap()
+                config.build_agent(env_structure, 0).unwrap()
             },
             1_000,
             0.9,

@@ -36,15 +36,15 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn build(
+    fn build_agent(
         &self,
-        es: EnvStructure<OS, AS>,
+        env: EnvStructure<OS, AS>,
         seed: u64,
     ) -> Result<BetaThompsonSamplingAgent<OS, AS>, BuildAgentError> {
         Ok(BetaThompsonSamplingAgent::new(
-            es.observation_space,
-            es.action_space,
-            es.reward_range,
+            env.observation_space,
+            env.action_space,
+            env.reward_range,
             self.num_samples,
             seed,
         ))
@@ -194,7 +194,7 @@ mod beta_thompson_sampling {
     fn learns_determinstic_bandit() {
         let config = BetaThompsonSamplingAgentConfig::default();
         testing::train_deterministic_bandit(
-            |env_structure| config.build(env_structure, 0).unwrap(),
+            |env_structure| config.build_agent(env_structure, 0).unwrap(),
             1000,
             0.9,
         );

@@ -35,15 +35,15 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn build(
+    fn build_agent(
         &self,
-        es: EnvStructure<OS, AS>,
+        env: EnvStructure<OS, AS>,
         _seed: u64,
     ) -> Result<UCB1Agent<OS, AS>, BuildAgentError> {
         UCB1Agent::new(
-            es.observation_space,
-            es.action_space,
-            es.reward_range,
+            env.observation_space,
+            env.action_space,
+            env.reward_range,
             self.exploration_rate,
         )
     }
@@ -197,7 +197,7 @@ mod ucb1_agent {
     fn learns_determinstic_bandit() {
         let config = UCB1AgentConfig::default();
         testing::train_deterministic_bandit(
-            |env_structure| config.build(env_structure, 0).unwrap(),
+            |env_structure| config.build_agent(env_structure, 0).unwrap(),
             1000,
             0.9,
         );

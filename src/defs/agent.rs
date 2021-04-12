@@ -46,9 +46,9 @@ impl AgentDef {
     {
         use AgentDef::*;
         match self {
-            TabularQLearning(config) => config.build(es, seed).map(|a| Box::new(a) as _),
-            BetaThompsonSampling(config) => config.build(es, seed).map(|a| Box::new(a) as _),
-            UCB1(config) => config.build(es, seed).map(|a| Box::new(a) as _),
+            TabularQLearning(config) => config.build_agent(es, seed).map(|a| Box::new(a) as _),
+            BetaThompsonSampling(config) => config.build_agent(es, seed).map(|a| Box::new(a) as _),
+            UCB1(config) => config.build_agent(es, seed).map(|a| Box::new(a) as _),
             _ => self.build_any_any(es, seed),
         }
     }
@@ -69,13 +69,13 @@ impl AgentDef {
         use AgentDef::*;
         match self {
             Random => RandomAgentConfig::new()
-                .build(es, seed)
+                .build_agent(es, seed)
                 .map(|a| Box::new(a) as _),
             PolicyGradient(config) => config
-                .build(es, seed)
+                .build_agent(es, seed)
                 .map(|a: PolicyGradientBoxedAgent<_, _>| Box::new(a) as _),
             GaePolicyGradient(config) => config
-                .build(es, seed)
+                .build_agent(es, seed)
                 .map(|a: GaePolicyGradientBoxedAgent<_, _>| Box::new(a) as _),
             _ => Err(BuildAgentError::InvalidSpaceBounds),
         }

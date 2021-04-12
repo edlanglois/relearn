@@ -33,15 +33,15 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn build(
+    fn build_agent(
         &self,
-        es: EnvStructure<OS, AS>,
+        env: EnvStructure<OS, AS>,
         seed: u64,
     ) -> Result<TabularQLearningAgent<OS, AS>, BuildAgentError> {
         Ok(TabularQLearningAgent::new(
-            es.observation_space,
-            es.action_space,
-            es.discount_factor,
+            env.observation_space,
+            env.action_space,
+            env.discount_factor,
             self.exploration_rate,
             seed,
         ))
@@ -169,7 +169,7 @@ mod tabular_q_learning {
     fn learns_determinstic_bandit() {
         let config = TabularQLearningAgentConfig::default();
         testing::train_deterministic_bandit(
-            |env_structure| config.build(env_structure, 0).unwrap(),
+            |env_structure| config.build_agent(env_structure, 0).unwrap(),
             1000,
             0.9,
         );
@@ -183,7 +183,7 @@ mod tabular_q_learning {
 
         // The agent explores
         let config = TabularQLearningAgentConfig::new(0.95);
-        let mut agent = config.build(env_structure, 0).unwrap();
+        let mut agent = config.build_agent(env_structure, 0).unwrap();
         let mut explore_hooks = (
             IndexedActionCounter::new(action_space.clone()),
             StepLimit::new(1000),

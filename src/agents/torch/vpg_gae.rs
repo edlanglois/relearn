@@ -79,15 +79,15 @@ where
     V: SequenceModule + StatefulIterativeModule,
     VOB: OptimizerBuilder<VO>,
 {
-    fn build(
+    fn build_agent(
         &self,
-        es: EnvStructure<OS, AS>,
+        env: EnvStructure<OS, AS>,
         _seed: u64,
     ) -> Result<GaePolicyGradientAgent<OS, AS, P, PO, V, VO>, BuildAgentError> {
         Ok(GaePolicyGradientAgent::new(
-            es.observation_space,
-            es.action_space,
-            es.discount_factor,
+            env.observation_space,
+            env.action_space,
+            env.discount_factor,
             self.gamma,
             self.lambda,
             self.steps_per_epoch,
@@ -450,7 +450,7 @@ mod gae_policy_gradient {
         config.value_fn_optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
             |env_structure| -> GaePolicyGradientAgent<_, _, Sequential, _, Sequential, _> {
-                AgentBuilder::build(&config, env_structure, 0).unwrap()
+                config.build_agent(env_structure, 0).unwrap()
             },
             1_000,
             0.9,
@@ -471,7 +471,7 @@ mod gae_policy_gradient {
         config.value_fn_optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
             |env_structure| -> GaePolicyGradientAgent<_, _, WithState<GruMlp>, _, Sequential, _> {
-                AgentBuilder::build(&config, env_structure, 0).unwrap()
+                config.build_agent(env_structure, 0).unwrap()
             },
             1_000,
             0.9,
@@ -499,7 +499,7 @@ mod gae_policy_gradient {
                 _,
                 WithState<GruMlp>,
                 _,
-            > { AgentBuilder::build(&config, env_structure, 0).unwrap() },
+            > { config.build_agent(env_structure, 0).unwrap() },
             1_000,
             0.9,
         );
