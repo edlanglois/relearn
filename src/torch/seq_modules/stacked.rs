@@ -1,39 +1,46 @@
 use super::{IterativeModule, SequenceModule};
 use tch::{nn::Func, nn::Module, Tensor};
 
-// TODO: Convert to Stacked<T, U>
-
-/// A sequence regressor module.
-///
-/// A sequence module followed by a nonlinearity then a feed-forward module.
-pub struct SequenceRegressor<'a, S, M> {
-    seq: S,
-    activation: Option<Func<'a>>,
-    post_transform: M,
+/// A module stacked on top of a sequence.
+pub struct Stacked<'a, T, U> {
+    /// The sequence module.
+    pub seq: T,
+    /// An optional activation function in between
+    pub activation: Option<Func<'a>>,
+    /// A module applied to the sequence module outputs.
+    pub top: U,
 }
 
-impl<'a, S, M> SequenceRegressor<'a, S, M> {
-    pub fn new(seq: S, activation: Option<Func<'a>>, post_transform: M) -> Self {
+impl<'a, T, U> Stacked<'a, T, U> {
+    pub fn new(seq: T, activation: Option<Func<'a>>, top: U) -> Self {
         Self {
             seq,
             activation,
-            post_transform,
+            top,
         }
     }
 }
 
-impl<'a, S: SequenceModule, M: Module> SequenceModule for SequenceRegressor<'a, S, M> {
+impl<'a, T, U> SequenceModule for Stacked<'a, T, U>
+where
+    T: SequenceModule,
+    U: Module,
+{
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         let mut data = self.seq.seq_serial(inputs, seq_lengths);
         if let Some(ref m) = self.activation {
             data = data.apply(m);
         }
-        data.apply(&self.post_transform)
+        data.apply(&self.top)
     }
 }
 
-impl<'a, S: IterativeModule, M: Module> IterativeModule for SequenceRegressor<'a, S, M> {
-    type State = S::State;
+impl<'a, T, U> IterativeModule for Stacked<'a, T, U>
+where
+    T: IterativeModule,
+    U: Module,
+{
+    type State = T::State;
 
     fn initial_state(&self, batch_size: usize) -> Self::State {
         self.seq.initial_state(batch_size)
@@ -44,7 +51,7 @@ impl<'a, S: IterativeModule, M: Module> IterativeModule for SequenceRegressor<'a
         if let Some(ref m) = self.activation {
             data = data.apply(m)
         }
-        data = data.apply(&self.post_transform);
+        data = data.apply(&self.top);
         (data, state)
     }
 }
@@ -56,7 +63,7 @@ mod sequence_regressor {
     use rstest::{fixture, rstest};
     use tch::{nn, Device};
 
-    type GruMlp = SequenceRegressor<'static, SeqModRnn<nn::GRU>, nn::Linear>;
+    type GruMlp = Stacked<'static, SeqModRnn<nn::GRU>, nn::Linear>;
 
     /// GRU followed by a relu then a linear layer.
     #[fixture]
@@ -78,7 +85,7 @@ mod sequence_regressor {
             out_dim as i64,
             Default::default(),
         );
-        let sr = SequenceRegressor::new(gru, Some(nn::func(Tensor::relu)), linear);
+        let sr = Stacked::new(gru, Some(nn::func(Tensor::relu)), linear);
         (sr, in_dim, out_dim)
     }
 

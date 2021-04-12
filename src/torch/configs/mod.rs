@@ -2,11 +2,11 @@
 mod as_stateful;
 mod mlp;
 mod rnn;
-mod seq_regressor;
+mod stacked;
 
 pub use mlp::MlpConfig;
 pub use rnn::RnnConfig;
-pub use seq_regressor::SequenceRegressorConfig;
+pub use stacked::StackedConfig;
 
 /// Configuration for an MLP stacked on top of an RNN.
-pub type RnnMlpConfig = SequenceRegressorConfig<RnnConfig, MlpConfig>;
+pub type RnnMlpConfig = StackedConfig<RnnConfig, MlpConfig>;

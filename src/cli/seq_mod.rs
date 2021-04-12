@@ -1,6 +1,6 @@
 use super::{Options, Update, WithUpdate};
 use crate::defs::SeqModDef;
-use crate::torch::configs::{MlpConfig, RnnConfig, SequenceRegressorConfig};
+use crate::torch::configs::{MlpConfig, RnnConfig, StackedConfig};
 use clap::Clap;
 
 /// Sequence module type
@@ -69,7 +69,7 @@ impl Update<&Options> for MlpConfig {
     }
 }
 
-impl<R, P> From<&Options> for SequenceRegressorConfig<R, P>
+impl<R, P> From<&Options> for StackedConfig<R, P>
 where
     R: Default + for<'a> Update<&'a Options>,
     P: Default + for<'a> Update<&'a Options>,
@@ -79,19 +79,19 @@ where
     }
 }
 
-impl<R, P> Update<&Options> for SequenceRegressorConfig<R, P>
+impl<R, P> Update<&Options> for StackedConfig<R, P>
 where
     R: for<'a> Update<&'a Options>,
     P: for<'a> Update<&'a Options>,
 {
     fn update(&mut self, opts: &Options) {
-        self.rnn_config.update(opts);
-        self.post_config.update(opts);
-        if let Some(rnn_hidden_size) = opts.rnn_hidden_size {
-            self.rnn_hidden_size = rnn_hidden_size;
+        self.seq_config.update(opts);
+        self.top_config.update(opts);
+        if let Some(seq_output_dim) = opts.rnn_hidden_size {
+            self.seq_output_dim = seq_output_dim;
         }
-        if let Some(rnn_output_activation) = opts.rnn_output_activation {
-            self.rnn_output_activation = rnn_output_activation;
+        if let Some(seq_output_activation) = opts.rnn_output_activation {
+            self.seq_output_activation = seq_output_activation;
         }
     }
 }

@@ -2,21 +2,21 @@
 mod r#box;
 pub mod module;
 mod rnn;
-mod seq_regressor;
+mod stacked;
 #[cfg(test)]
 pub mod testing;
 mod with_state;
 
 pub use rnn::SeqModRnn;
-pub use seq_regressor::SequenceRegressor;
+pub use stacked::Stacked;
 pub use with_state::WithState;
 
 use tch::{nn, Tensor};
 
 /// An MLP stacked on top of a GRU.
-pub type GruMlp = SequenceRegressor<'static, SeqModRnn<nn::GRU>, nn::Sequential>;
+pub type GruMlp = Stacked<'static, SeqModRnn<nn::GRU>, nn::Sequential>;
 /// An MLP stacked on top of an LSTM.
-pub type LstmMlp = SequenceRegressor<'static, SeqModRnn<nn::LSTM>, nn::Sequential>;
+pub type LstmMlp = Stacked<'static, SeqModRnn<nn::LSTM>, nn::Sequential>;
 
 /// A network module that operates on a sequence of data.
 pub trait SequenceModule {

@@ -1,52 +1,55 @@
-use super::super::seq_modules::SequenceRegressor;
+use super::super::seq_modules::Stacked;
 use super::super::{Activation, ModuleBuilder};
 use std::borrow::Borrow;
 use tch::nn;
 
-/// Configuration for a sequence module followed by a regular module
+/// Configuration of stacked modules.
 #[derive(Debug, Clone)]
-pub struct SequenceRegressorConfig<SC, MC> {
-    pub rnn_config: SC,
-    pub rnn_hidden_size: usize,
-    pub rnn_output_activation: Activation,
-    pub post_config: MC,
+pub struct StackedConfig<TC, UC> {
+    /// Configuration for the initial sequence module layer.
+    pub seq_config: TC,
+    /// Output dimension of the sequence module layer.
+    pub seq_output_dim: usize,
+    /// Activation function applied to the sequence module outputs
+    pub seq_output_activation: Activation,
+    /// Configuration for the module applied on top of the (transformed) sequence outputs.
+    pub top_config: UC,
 }
 
-impl<SC, MC> Default for SequenceRegressorConfig<SC, MC>
+impl<TC, UC> Default for StackedConfig<TC, UC>
 where
-    SC: Default,
-    MC: Default,
+    TC: Default,
+    UC: Default,
 {
     fn default() -> Self {
         Self {
-            rnn_config: Default::default(),
-            rnn_hidden_size: 128,
-            rnn_output_activation: Activation::Relu,
-            post_config: Default::default(),
+            seq_config: Default::default(),
+            seq_output_dim: 128,
+            seq_output_activation: Activation::Relu,
+            top_config: Default::default(),
         }
     }
 }
 
-impl<S, SC, M, MC> ModuleBuilder<SequenceRegressor<'static, S, M>>
-    for SequenceRegressorConfig<SC, MC>
+impl<T, TC, U, UC> ModuleBuilder<Stacked<'static, T, U>> for StackedConfig<TC, UC>
 where
-    SC: ModuleBuilder<S>,
-    MC: ModuleBuilder<M>,
+    TC: ModuleBuilder<T>,
+    UC: ModuleBuilder<U>,
 {
     fn build<'a, P: Borrow<nn::Path<'a>>>(
         &self,
         vs: P,
         input_dim: usize,
         output_dim: usize,
-    ) -> SequenceRegressor<'static, S, M> {
+    ) -> Stacked<'static, T, U> {
         let vs = vs.borrow();
-        SequenceRegressor::new(
-            self.rnn_config
-                .build(vs / "rnn", input_dim, self.rnn_hidden_size)
+        Stacked::new(
+            self.seq_config
+                .build(vs / "rnn", input_dim, self.seq_output_dim)
                 .into(),
-            self.rnn_output_activation.maybe_module(),
-            self.post_config
-                .build(vs / "post", self.rnn_hidden_size, output_dim),
+            self.seq_output_activation.maybe_module(),
+            self.top_config
+                .build(vs / "post", self.seq_output_dim, output_dim),
         )
     }
 }
