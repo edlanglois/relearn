@@ -63,6 +63,6 @@ mod optimizer_def {
     fn build_default() {
         let opt_def = OptimizerDef::default();
         let vs = VarStore::new(Device::Cpu);
-        let _ = opt_def.build(&vs);
+        let _ = opt_def.build_optimizer(&vs);
     }
 }

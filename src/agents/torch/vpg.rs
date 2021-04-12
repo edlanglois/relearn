@@ -133,7 +133,7 @@ where
             observation_space.num_features(),
             action_space.num_sample_params(),
         );
-        let optimizer = optimizer_config.build(&vs).unwrap();
+        let optimizer = optimizer_config.build_optimizer(&vs).unwrap();
         Self {
             observation_space,
             action_space,

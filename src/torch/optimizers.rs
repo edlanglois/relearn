@@ -56,7 +56,7 @@ pub trait OptimizerBuilder<T> {
     type Error: Error;
 
     /// Build an optimizer for the trainable variables in a variable store.
-    fn build(&self, vs: &VarStore) -> Result<T, Self::Error>;
+    fn build_optimizer(&self, vs: &VarStore) -> Result<T, Self::Error>;
 }
 
 impl<T> OptimizerBuilder<COptimizer> for T
@@ -65,7 +65,7 @@ where
 {
     type Error = TchError;
 
-    fn build(&self, vs: &VarStore) -> Result<COptimizer, TchError> {
+    fn build_optimizer(&self, vs: &VarStore) -> Result<COptimizer, TchError> {
         let mut optimizer: COptimizer = self.try_into()?;
         let variables = vs.variables_.lock().unwrap();
         for var in &variables.trainable_variables {
