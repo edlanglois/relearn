@@ -2,7 +2,7 @@
 use super::{IterativeModule, SequenceModule};
 use tch::{nn::RNN, IndexOp, Tensor};
 
-/// Wrapper that implements the Sequence/Iterative Module tratis for [tch::nn::RNN].
+/// Wrapper that implements the Sequence/Iterative Module traits for [tch::nn::RNN].
 pub struct SeqModRnn<R>(R);
 
 impl<R: RNN> SequenceModule for SeqModRnn<R> {
