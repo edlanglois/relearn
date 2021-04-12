@@ -18,7 +18,7 @@ impl Default for RnnConfig {
 }
 
 impl ModuleBuilder<nn::GRU> for RnnConfig {
-    fn build(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> nn::GRU {
+    fn build_module(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> nn::GRU {
         let rnn_config = nn::RNNConfig {
             has_biases: self.has_biases,
             num_layers: self.num_layers as i64,
@@ -32,7 +32,7 @@ impl ModuleBuilder<nn::GRU> for RnnConfig {
 }
 
 impl ModuleBuilder<nn::LSTM> for RnnConfig {
-    fn build(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> nn::LSTM {
+    fn build_module(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> nn::LSTM {
         let rnn_config = nn::RNNConfig {
             has_biases: self.has_biases,
             num_layers: self.num_layers as i64,
@@ -49,8 +49,8 @@ impl<R> ModuleBuilder<SeqModRnn<R>> for RnnConfig
 where
     RnnConfig: ModuleBuilder<R>,
 {
-    fn build(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> SeqModRnn<R> {
-        self.build(vs, in_dim, out_dim).into()
+    fn build_module(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> SeqModRnn<R> {
+        self.build_module(vs, in_dim, out_dim).into()
     }
 }
 
@@ -64,7 +64,7 @@ mod rnn_config {
     fn default_gru_builds() {
         let config = RnnConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: nn::GRU = config.build(&vs.root(), 3, 2);
+        let _: nn::GRU = config.build_module(&vs.root(), 3, 2);
     }
 
     /// Check that SeqModRnn<GRU> builds successfully
@@ -72,7 +72,7 @@ mod rnn_config {
     fn default_seq_mod_gru_builds() {
         let config = RnnConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: SeqModRnn<nn::GRU> = config.build(&vs.root(), 3, 2);
+        let _: SeqModRnn<nn::GRU> = config.build_module(&vs.root(), 3, 2);
     }
 
     /// Check that the default LSTM Config builds successfully
@@ -80,6 +80,6 @@ mod rnn_config {
     fn default_lstm_builds() {
         let config = RnnConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: nn::LSTM = config.build(&vs.root(), 3, 2);
+        let _: nn::LSTM = config.build_module(&vs.root(), 3, 2);
     }
 }

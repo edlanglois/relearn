@@ -128,7 +128,7 @@ where
     {
         let max_steps_per_epoch = (steps_per_epoch as f64 * 1.1) as usize;
         let vs = nn::VarStore::new(Device::Cpu);
-        let policy = policy_config.build(
+        let policy = policy_config.build_module(
             &vs.root(),
             observation_space.num_features(),
             action_space.num_sample_params(),

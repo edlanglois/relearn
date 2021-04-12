@@ -193,7 +193,7 @@ where
         let discount_factor = env_discount_factor.min(gamma);
 
         let policy_vs = nn::VarStore::new(Device::Cpu);
-        let policy = policy_config.build(
+        let policy = policy_config.build_module(
             &policy_vs.root(),
             observation_space.num_features(),
             action_space.num_sample_params(),
@@ -202,7 +202,7 @@ where
 
         let value_fn_vs = nn::VarStore::new(Device::Cpu);
         let value_fn =
-            value_fn_config.build(&value_fn_vs.root(), observation_space.num_features(), 1);
+            value_fn_config.build_module(&value_fn_vs.root(), observation_space.num_features(), 1);
         let value_fn_optimizer = value_fn_optimizer_config
             .build_optimizer(&value_fn_vs)
             .unwrap();

@@ -7,8 +7,8 @@ where
     MB: ModuleBuilder<T>,
     T: IterativeModule,
 {
-    fn build(&self, vs: &Path, in_dim: usize, out_dim: usize) -> WithState<T> {
-        self.build(vs, in_dim, out_dim).into()
+    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> WithState<T> {
+        self.build_module(vs, in_dim, out_dim).into()
     }
 }
 
@@ -23,13 +23,13 @@ mod tests {
     fn linear_builds() {
         let config = MlpConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: WithState<nn::Sequential> = config.build(&vs.root(), 1, 1);
+        let _: WithState<nn::Sequential> = config.build_module(&vs.root(), 1, 1);
     }
 
     #[test]
     fn gru_builds() {
         let config = RnnConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: WithState<SeqModRnn<nn::GRU>> = config.build(&vs.root(), 1, 1);
+        let _: WithState<SeqModRnn<nn::GRU>> = config.build_module(&vs.root(), 1, 1);
     }
 }

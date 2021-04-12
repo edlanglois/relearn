@@ -8,5 +8,5 @@ pub trait ModuleBuilder<T> {
     /// * `vs` - Variable store and namespace.
     /// * `in_dim` - Number of input feature dimensions.
     /// * `out_dim` - Nuber of output feature dimensions.
-    fn build(&self, vs: &Path, in_dim: usize, out_dim: usize) -> T;
+    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> T;
 }

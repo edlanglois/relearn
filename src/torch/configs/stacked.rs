@@ -35,14 +35,14 @@ where
     TC: ModuleBuilder<T>,
     UC: ModuleBuilder<U>,
 {
-    fn build(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> Stacked<'static, T, U> {
+    fn build_module(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> Stacked<'static, T, U> {
         Stacked::new(
             self.seq_config
-                .build(&(vs / "rnn"), in_dim, self.seq_output_dim)
+                .build_module(&(vs / "rnn"), in_dim, self.seq_output_dim)
                 .into(),
             self.seq_output_activation.maybe_module(),
             self.top_config
-                .build(&(vs / "post"), self.seq_output_dim, out_dim),
+                .build_module(&(vs / "post"), self.seq_output_dim, out_dim),
         )
     }
 }
@@ -61,7 +61,7 @@ mod sequence_regressor_config {
         let out_dim = 2;
         let config = RnnMlpConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let module = config.build(&vs.root(), in_dim, out_dim);
+        let module = config.build_module(&vs.root(), in_dim, out_dim);
         (module, in_dim, out_dim)
     }
 
@@ -83,7 +83,7 @@ mod sequence_regressor_config {
         let out_dim = 2;
         let config = RnnMlpConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let module = config.build(&vs.root(), in_dim, out_dim);
+        let module = config.build_module(&vs.root(), in_dim, out_dim);
         (module, in_dim, out_dim)
     }
 

@@ -24,18 +24,23 @@ impl From<MlpConfig> for SeqModDef {
 }
 
 impl ModuleBuilder<Box<dyn StatefulIterSeqModule>> for SeqModDef {
-    fn build(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Box<dyn StatefulIterSeqModule> {
+    fn build_module(
+        &self,
+        vs: &Path,
+        in_dim: usize,
+        out_dim: usize,
+    ) -> Box<dyn StatefulIterSeqModule> {
         match self {
             SeqModDef::Mlp(config) => {
-                let m: Sequential = config.build(vs, in_dim, out_dim);
+                let m: Sequential = config.build_module(vs, in_dim, out_dim);
                 Box::new(m)
             }
             SeqModDef::GruMlp(config) => {
-                let m: WithState<GruMlp> = config.build(vs, in_dim, out_dim);
+                let m: WithState<GruMlp> = config.build_module(vs, in_dim, out_dim);
                 Box::new(m)
             }
             SeqModDef::LstmMlp(config) => {
-                let m: WithState<LstmMlp> = config.build(vs, in_dim, out_dim);
+                let m: WithState<LstmMlp> = config.build_module(vs, in_dim, out_dim);
                 Box::new(m)
             }
         }

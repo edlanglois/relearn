@@ -24,7 +24,7 @@ impl Default for MlpConfig {
 }
 
 impl ModuleBuilder<nn::Sequential> for MlpConfig {
-    fn build(&self, vs: &nn::Path, input_dim: usize, output_dim: usize) -> nn::Sequential {
+    fn build_module(&self, vs: &nn::Path, input_dim: usize, output_dim: usize) -> nn::Sequential {
         let iter_in_dim = iter::once(&input_dim).chain(self.hidden_sizes.iter());
         let iter_out_dim = self.hidden_sizes.iter().chain(iter::once(&output_dim));
 
@@ -65,7 +65,7 @@ mod mlp_config {
         let out_dim = 2;
         let config = MlpConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let module = config.build(&vs.root(), in_dim, out_dim);
+        let module = config.build_module(&vs.root(), in_dim, out_dim);
         (module, in_dim, out_dim)
     }
 
