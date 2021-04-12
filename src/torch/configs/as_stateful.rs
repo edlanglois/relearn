@@ -7,8 +7,8 @@ where
     MB: ModuleBuilder<T>,
     T: IterativeModule,
 {
-    fn build(&self, vs: &Path, input_dim: usize, output_dim: usize) -> WithState<T> {
-        self.build(vs, input_dim, output_dim).into()
+    fn build(&self, vs: &Path, in_dim: usize, out_dim: usize) -> WithState<T> {
+        self.build(vs, in_dim, out_dim).into()
     }
 }
 

@@ -6,7 +6,7 @@ pub trait ModuleBuilder<T> {
     ///
     /// # Args
     /// * `vs` - Variable store and namespace.
-    /// * `input_dim` - Number of input feature dimensions.
-    /// * `output_dim` - Nuber of output feature dimensions.
-    fn build(&self, vs: &Path, input_dim: usize, output_dim: usize) -> T;
+    /// * `in_dim` - Number of input feature dimensions.
+    /// * `out_dim` - Nuber of output feature dimensions.
+    fn build(&self, vs: &Path, in_dim: usize, out_dim: usize) -> T;
 }

@@ -35,14 +35,14 @@ where
     TC: ModuleBuilder<T>,
     UC: ModuleBuilder<U>,
 {
-    fn build(&self, vs: &nn::Path, input_dim: usize, output_dim: usize) -> Stacked<'static, T, U> {
+    fn build(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> Stacked<'static, T, U> {
         Stacked::new(
             self.seq_config
-                .build(&(vs / "rnn"), input_dim, self.seq_output_dim)
+                .build(&(vs / "rnn"), in_dim, self.seq_output_dim)
                 .into(),
             self.seq_output_activation.maybe_module(),
             self.top_config
-                .build(&(vs / "post"), self.seq_output_dim, output_dim),
+                .build(&(vs / "post"), self.seq_output_dim, out_dim),
         )
     }
 }
