@@ -57,30 +57,32 @@ impl EnvDef {
         Ok(match self {
             FixedMeanBandit(dist_type, config) => match dist_type {
                 DistributionType::Deterministic => {
-                    let env: EnvWithState<Bandit<Deterministic<f64>>> = config.build(env_seed)?;
+                    let env: EnvWithState<Bandit<Deterministic<f64>>> =
+                        config.build_env(env_seed)?;
                     finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
                 }
                 DistributionType::Bernoulli => {
-                    let env: EnvWithState<Bandit<Bernoulli>> = config.build(env_seed)?;
+                    let env: EnvWithState<Bandit<Bernoulli>> = config.build_env(env_seed)?;
                     finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
                 }
             },
             UniformMeanBandit(dist_type, config) => match dist_type {
                 DistributionType::Deterministic => {
-                    let env: EnvWithState<Bandit<Deterministic<f64>>> = config.build(env_seed)?;
+                    let env: EnvWithState<Bandit<Deterministic<f64>>> =
+                        config.build_env(env_seed)?;
                     finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
                 }
                 DistributionType::Bernoulli => {
-                    let env: EnvWithState<Bandit<Bernoulli>> = config.build(env_seed)?;
+                    let env: EnvWithState<Bandit<Bernoulli>> = config.build_env(env_seed)?;
                     finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
                 }
             },
             Chain(config) => {
-                let env: EnvWithState<ChainEnv> = config.build(env_seed)?;
+                let env: EnvWithState<ChainEnv> = config.build_env(env_seed)?;
                 finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
             }
             MemoryGame(config) => {
-                let env: EnvWithState<MemoryGameEnv> = config.build(env_seed)?;
+                let env: EnvWithState<MemoryGameEnv> = config.build_env(env_seed)?;
                 finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
             }
         })

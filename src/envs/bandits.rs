@@ -26,7 +26,7 @@ where
     D: Distribution<f64> + FromMean<f64>,
     <D as FromMean<f64>>::Error: Into<BuildEnvError>,
 {
-    fn build(&self, _seed: u64) -> Result<Bandit<D>, BuildEnvError> {
+    fn build_env(&self, _seed: u64) -> Result<Bandit<D>, BuildEnvError> {
         Bandit::from_means(&self.means).map_err(|e: <D as FromMean<f64>>::Error| e.into())
     }
 }
@@ -54,7 +54,7 @@ where
     <DR as FromMean<f64>>::Error: Into<BuildEnvError>,
     DM: Distribution<f64>,
 {
-    fn build(&self, seed: u64) -> Result<Bandit<DR>, BuildEnvError> {
+    fn build_env(&self, seed: u64) -> Result<Bandit<DR>, BuildEnvError> {
         let mut rng = StdRng::seed_from_u64(seed);
         let mean_prior = &self.mean_prior;
         Bandit::from_means(

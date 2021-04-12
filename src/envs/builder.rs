@@ -10,7 +10,7 @@ pub trait EnvBuilder<E> {
     /// * `seed` - Seed for pseudo-randomness used by the environment.
     ///     Includes both randomization of the environment structure, and
     ///     random sampling of step outcomes within this structure.
-    fn build(&self, seed: u64) -> Result<E, BuildEnvError>;
+    fn build_env(&self, seed: u64) -> Result<E, BuildEnvError>;
 }
 
 /// Error building an environment
@@ -26,7 +26,7 @@ pub enum BuildEnvError {
 /// avoiding the need for a duplicate structure to hold the same content,
 /// and is useful for specifying wrapped environment configurations.
 impl<E: Environment + Clone> EnvBuilder<E> for E {
-    fn build(&self, _seed: u64) -> Result<E, BuildEnvError> {
+    fn build_env(&self, _seed: u64) -> Result<E, BuildEnvError> {
         Ok(self.clone())
     }
 }
