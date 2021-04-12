@@ -1,6 +1,5 @@
 use super::super::seq_modules::{IterativeModule, WithState};
 use super::super::ModuleBuilder;
-use std::borrow::Borrow;
 use tch::nn::Path;
 
 impl<T, MB> ModuleBuilder<WithState<T>> for MB
@@ -8,12 +7,7 @@ where
     MB: ModuleBuilder<T>,
     T: IterativeModule,
 {
-    fn build<'a, U: Borrow<Path<'a>>>(
-        &self,
-        vs: U,
-        input_dim: usize,
-        output_dim: usize,
-    ) -> WithState<T> {
+    fn build(&self, vs: &Path, input_dim: usize, output_dim: usize) -> WithState<T> {
         self.build(vs, input_dim, output_dim).into()
     }
 }
@@ -29,13 +23,13 @@ mod tests {
     fn linear_builds() {
         let config = MlpConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: WithState<nn::Sequential> = config.build(vs.root(), 1, 1);
+        let _: WithState<nn::Sequential> = config.build(&vs.root(), 1, 1);
     }
 
     #[test]
     fn gru_builds() {
         let config = RnnConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: WithState<SeqModRnn<nn::GRU>> = config.build(vs.root(), 1, 1);
+        let _: WithState<SeqModRnn<nn::GRU>> = config.build(&vs.root(), 1, 1);
     }
 }

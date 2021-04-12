@@ -1,7 +1,6 @@
 use crate::torch::configs::{MlpConfig, RnnMlpConfig};
 use crate::torch::seq_modules::{GruMlp, LstmMlp, StatefulIterSeqModule, WithState};
 use crate::torch::ModuleBuilder;
-use std::borrow::Borrow;
 use tch::nn::{Path, Sequential};
 
 /// Sequence module definition
@@ -25,9 +24,9 @@ impl From<MlpConfig> for SeqModDef {
 }
 
 impl ModuleBuilder<Box<dyn StatefulIterSeqModule>> for SeqModDef {
-    fn build<'a, T: Borrow<Path<'a>>>(
+    fn build(
         &self,
-        vs: T,
+        vs: &Path,
         input_dim: usize,
         output_dim: usize,
     ) -> Box<dyn StatefulIterSeqModule> {

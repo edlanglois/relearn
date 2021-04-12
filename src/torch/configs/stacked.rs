@@ -1,6 +1,5 @@
 use super::super::seq_modules::Stacked;
 use super::super::{Activation, ModuleBuilder};
-use std::borrow::Borrow;
 use tch::nn;
 
 /// Configuration of stacked modules.
@@ -36,20 +35,14 @@ where
     TC: ModuleBuilder<T>,
     UC: ModuleBuilder<U>,
 {
-    fn build<'a, P: Borrow<nn::Path<'a>>>(
-        &self,
-        vs: P,
-        input_dim: usize,
-        output_dim: usize,
-    ) -> Stacked<'static, T, U> {
-        let vs = vs.borrow();
+    fn build(&self, vs: &nn::Path, input_dim: usize, output_dim: usize) -> Stacked<'static, T, U> {
         Stacked::new(
             self.seq_config
-                .build(vs / "rnn", input_dim, self.seq_output_dim)
+                .build(&(vs / "rnn"), input_dim, self.seq_output_dim)
                 .into(),
             self.seq_output_activation.maybe_module(),
             self.top_config
-                .build(vs / "post", self.seq_output_dim, output_dim),
+                .build(&(vs / "post"), self.seq_output_dim, output_dim),
         )
     }
 }

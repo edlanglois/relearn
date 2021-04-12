@@ -1,5 +1,4 @@
 use super::super::{Activation, ModuleBuilder};
-use std::borrow::Borrow;
 use std::iter;
 use tch::nn;
 
@@ -25,14 +24,7 @@ impl Default for MlpConfig {
 }
 
 impl ModuleBuilder<nn::Sequential> for MlpConfig {
-    fn build<'a, T: Borrow<nn::Path<'a>>>(
-        &self,
-        vs: T,
-        input_dim: usize,
-        output_dim: usize,
-    ) -> nn::Sequential {
-        let vs = vs.borrow();
-
+    fn build(&self, vs: &nn::Path, input_dim: usize, output_dim: usize) -> nn::Sequential {
         let iter_in_dim = iter::once(&input_dim).chain(self.hidden_sizes.iter());
         let iter_out_dim = self.hidden_sizes.iter().chain(iter::once(&output_dim));
 

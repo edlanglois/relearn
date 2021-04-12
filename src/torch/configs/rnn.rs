@@ -1,5 +1,4 @@
 use super::super::{seq_modules::SeqModRnn, ModuleBuilder};
-use std::borrow::Borrow;
 use tch::nn;
 
 /// Configuration of a recurrent neural network.
@@ -19,12 +18,7 @@ impl Default for RnnConfig {
 }
 
 impl ModuleBuilder<nn::GRU> for RnnConfig {
-    fn build<'a, P: Borrow<nn::Path<'a>>>(
-        &self,
-        vs: P,
-        input_dim: usize,
-        output_dim: usize,
-    ) -> nn::GRU {
+    fn build(&self, vs: &nn::Path, input_dim: usize, output_dim: usize) -> nn::GRU {
         let rnn_config = nn::RNNConfig {
             has_biases: self.has_biases,
             num_layers: self.num_layers as i64,
@@ -33,17 +27,12 @@ impl ModuleBuilder<nn::GRU> for RnnConfig {
             bidirectional: false,
             batch_first: true,
         };
-        nn::gru(vs.borrow(), input_dim as i64, output_dim as i64, rnn_config)
+        nn::gru(vs, input_dim as i64, output_dim as i64, rnn_config)
     }
 }
 
 impl ModuleBuilder<nn::LSTM> for RnnConfig {
-    fn build<'a, P: Borrow<nn::Path<'a>>>(
-        &self,
-        vs: P,
-        input_dim: usize,
-        output_dim: usize,
-    ) -> nn::LSTM {
+    fn build(&self, vs: &nn::Path, input_dim: usize, output_dim: usize) -> nn::LSTM {
         let rnn_config = nn::RNNConfig {
             has_biases: self.has_biases,
             num_layers: self.num_layers as i64,
@@ -52,7 +41,7 @@ impl ModuleBuilder<nn::LSTM> for RnnConfig {
             bidirectional: false,
             batch_first: true,
         };
-        nn::lstm(vs.borrow(), input_dim as i64, output_dim as i64, rnn_config)
+        nn::lstm(vs, input_dim as i64, output_dim as i64, rnn_config)
     }
 }
 
@@ -60,12 +49,7 @@ impl<R> ModuleBuilder<SeqModRnn<R>> for RnnConfig
 where
     RnnConfig: ModuleBuilder<R>,
 {
-    fn build<'a, P: Borrow<nn::Path<'a>>>(
-        &self,
-        vs: P,
-        input_dim: usize,
-        output_dim: usize,
-    ) -> SeqModRnn<R> {
+    fn build(&self, vs: &nn::Path, input_dim: usize, output_dim: usize) -> SeqModRnn<R> {
         self.build(vs, input_dim, output_dim).into()
     }
 }
