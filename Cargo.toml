@@ -22,3 +22,8 @@ thiserror = "1.0"
 
 [dev-dependencies]
 rstest = "0.7.0"
+criterion = { version = "0.3", features = ["html_reports"] }
+
+[[bench]]
+name = "rnn"
+harness = false
