@@ -103,9 +103,5 @@ impl From<&Options> for RnnConfig {
 }
 
 impl Update<&Options> for RnnConfig {
-    fn update(&mut self, opts: &Options) {
-        if let Some(num_layers) = opts.rnn_num_layers {
-            self.num_layers = num_layers
-        }
-    }
+    fn update(&mut self, _opts: &Options) {}
 }

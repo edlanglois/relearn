@@ -1,17 +1,16 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use rust_rl::torch::configs::RnnConfig;
-use rust_rl::torch::seq_modules::{SeqModRnn, SequenceModule};
+use rust_rl::torch::seq_modules::{Gru, SequenceModule};
 use rust_rl::torch::ModuleBuilder;
 use std::array::IntoIter;
-use tch::{nn::VarStore, nn::GRU, Device, Kind, Tensor};
+use tch::{nn::VarStore, Device, Kind, Tensor};
 
 fn gru_seq_serial(c: &mut Criterion) {
     let batch_size = 1;
     let in_features = 3;
     let out_features = 4;
     let vs = VarStore::new(Device::Cpu);
-    let gru: SeqModRnn<GRU> =
-        RnnConfig::default().build_module(&vs.root(), in_features, out_features);
+    let gru: Gru = RnnConfig::default().build_module(&vs.root(), in_features, out_features);
 
     // n episodes of length 1 in serial
     let mut ep_group = c.benchmark_group("gru_seq_serial_n_episodes");

@@ -14,7 +14,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::seq_modules::SeqModRnn;
+    use super::super::super::seq_modules::Gru;
     use super::super::{MlpConfig, RnnConfig};
     use super::*;
     use tch::{nn, Device};
@@ -30,6 +30,6 @@ mod tests {
     fn gru_builds() {
         let config = RnnConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: WithState<SeqModRnn<nn::GRU>> = config.build_module(&vs.root(), 1, 1);
+        let _: WithState<Gru> = config.build_module(&vs.root(), 1, 1);
     }
 }

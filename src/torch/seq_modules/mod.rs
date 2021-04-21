@@ -7,16 +7,16 @@ mod stacked;
 pub mod testing;
 mod with_state;
 
-pub use rnn::SeqModRnn;
+pub use rnn::{Gru, Lstm};
 pub use stacked::Stacked;
 pub use with_state::WithState;
 
-use tch::{nn, Tensor};
+use tch::{nn, IndexOp, Tensor};
 
 /// An MLP stacked on top of a GRU.
-pub type GruMlp = Stacked<'static, SeqModRnn<nn::GRU>, nn::Sequential>;
+pub type GruMlp = Stacked<'static, Gru, nn::Sequential>;
 /// An MLP stacked on top of an LSTM.
-pub type LstmMlp = Stacked<'static, SeqModRnn<nn::LSTM>, nn::Sequential>;
+pub type LstmMlp = Stacked<'static, Lstm, nn::Sequential>;
 
 /// A network module that operates on a sequence of data.
 pub trait SequenceModule {
@@ -27,7 +27,7 @@ pub trait SequenceModule {
     ///
     /// # Args:
     /// * `inputs` - Batched input sequences arranged in series.
-    ///     A tensor of shape [BATCH_SIZE, TOTAL_SEQ_LENGTH, NUM_INPUT_FEATURES]
+    ///     An f32 tensor of shape [BATCH_SIZE, TOTAL_SEQ_LENGTH, NUM_INPUT_FEATURES]
     /// * `seq_lengths` - Length of each sequence.
     ///     The sequence length is the same across the batch dimension.
     ///
@@ -80,3 +80,32 @@ pub trait StatefulIterativeModule {
 /// Sequence module with stateful iteration
 pub trait StatefulIterSeqModule: SequenceModule + StatefulIterativeModule {}
 impl<T: SequenceModule + StatefulIterativeModule> StatefulIterSeqModule for T {}
+
+/// Helper function to implement SequenceModule::seq_serial from a single-sequence closure.
+///
+/// # Args:
+/// * `inputs` - Batched input sequences arranged in series.
+///     An f32 tensor of shape [BATCH_SIZE, TOTAL_SEQ_LENGTH, NUM_INPUT_FEATURES]
+/// * `seq_lengths` - Length of each sequence.
+///     The sequence length is the same across the batch dimension.
+/// * `f_seq` - A closure that applies a module to a single sequence.
+///     Takes an input f32 tensor of shape [BATCH_SIZE, SEQ_LENGTH, NUM_INPUT_FEATURES]
+///     to an output f32 tensor of shape [BATCH_SIZE, SEQ_LENGTH, NUM_OUTPUT_FEATURES].
+///
+fn seq_serial_map<F>(inputs: &Tensor, seq_lengths: &[usize], f_seq: F) -> Tensor
+where
+    F: Fn(Tensor) -> Tensor,
+{
+    Tensor::cat(
+        &seq_lengths
+            .into_iter()
+            .scan(0, |offset, &length| {
+                let length = length as i64;
+                let seq_input = inputs.i((.., *offset..(*offset + length), ..));
+                *offset += length;
+                Some(f_seq(seq_input))
+            })
+            .collect::<Vec<_>>(),
+        -2,
+    )
+}

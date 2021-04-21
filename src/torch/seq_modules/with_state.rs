@@ -62,7 +62,7 @@ where
 
 #[cfg(test)]
 mod as_stateful_module {
-    use super::super::{testing, SeqModRnn};
+    use super::super::{testing, Gru};
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{nn, Device};
@@ -82,16 +82,11 @@ mod as_stateful_module {
     }
 
     #[fixture]
-    fn gru() -> (WithState<SeqModRnn<nn::GRU>>, usize, usize) {
+    fn gru() -> (WithState<Gru>, usize, usize) {
         let in_dim: usize = 3;
         let out_dim: usize = 2;
         let vs = nn::VarStore::new(Device::Cpu);
-        let gru = SeqModRnn::from(nn::gru(
-            &vs.root(),
-            in_dim as i64,
-            out_dim as i64,
-            Default::default(),
-        ));
+        let gru = Gru::new(&vs.root(), in_dim, out_dim, true, 0.0);
         (gru.into(), in_dim, out_dim)
     }
 
@@ -113,18 +108,18 @@ mod as_stateful_module {
     }
 
     #[rstest]
-    fn gru_stateful_step(gru: (WithState<SeqModRnn<nn::GRU>>, usize, usize)) {
+    fn gru_stateful_step(gru: (WithState<Gru>, usize, usize)) {
         let (mut gru, in_dim, out_dim) = gru;
         testing::check_stateful_step(&mut gru, in_dim, out_dim);
     }
     #[rstest]
-    fn gru_seq_serial(gru: (WithState<SeqModRnn<nn::GRU>>, usize, usize)) {
+    fn gru_seq_serial(gru: (WithState<Gru>, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_seq_serial(&gru, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_step(gru: (WithState<SeqModRnn<nn::GRU>>, usize, usize)) {
+    fn gru_step(gru: (WithState<Gru>, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_step(&gru, in_dim, out_dim);
     }

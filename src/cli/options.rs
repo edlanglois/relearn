@@ -77,10 +77,6 @@ pub struct Options {
     /// Policy rnn hidden layer size
     pub rnn_hidden_size: Option<usize>,
 
-    #[clap(long, help_heading = Some("AGENT POLICY OPTIONS"))]
-    /// Policy rnn number of hidden layers
-    pub rnn_num_layers: Option<usize>,
-
     #[clap(long, arg_enum, help_heading = Some("AGENT POLICY OPTIONS"))]
     /// Policy rnn output activation function
     pub rnn_output_activation: Option<Activation>,

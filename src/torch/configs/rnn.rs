@@ -1,56 +1,39 @@
-use super::super::{seq_modules::SeqModRnn, ModuleBuilder};
-use tch::nn;
+use super::super::{Gru, Lstm, ModuleBuilder};
+use tch::nn::Path;
 
 /// Configuration of a recurrent neural network.
 #[derive(Debug, Clone)]
 pub struct RnnConfig {
     pub has_biases: bool,
-    pub num_layers: usize,
 }
 
 impl Default for RnnConfig {
     fn default() -> Self {
-        Self {
-            num_layers: 1,
-            has_biases: true,
-        }
+        Self { has_biases: true }
     }
 }
 
-impl ModuleBuilder<nn::GRU> for RnnConfig {
-    fn build_module(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> nn::GRU {
-        let rnn_config = nn::RNNConfig {
-            has_biases: self.has_biases,
-            num_layers: self.num_layers as i64,
-            dropout: 0.0,
-            train: true,
-            bidirectional: false,
-            batch_first: true,
-        };
-        nn::gru(vs, in_dim as i64, out_dim as i64, rnn_config)
+impl ModuleBuilder<Gru> for RnnConfig {
+    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Gru {
+        Gru::new(
+            vs,
+            in_dim,
+            out_dim,
+            self.has_biases,
+            0.0, // dropout
+        )
     }
 }
 
-impl ModuleBuilder<nn::LSTM> for RnnConfig {
-    fn build_module(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> nn::LSTM {
-        let rnn_config = nn::RNNConfig {
-            has_biases: self.has_biases,
-            num_layers: self.num_layers as i64,
-            dropout: 0.0,
-            train: true,
-            bidirectional: false,
-            batch_first: true,
-        };
-        nn::lstm(vs, in_dim as i64, out_dim as i64, rnn_config)
-    }
-}
-
-impl<R> ModuleBuilder<SeqModRnn<R>> for RnnConfig
-where
-    RnnConfig: ModuleBuilder<R>,
-{
-    fn build_module(&self, vs: &nn::Path, in_dim: usize, out_dim: usize) -> SeqModRnn<R> {
-        self.build_module(vs, in_dim, out_dim).into()
+impl ModuleBuilder<Lstm> for RnnConfig {
+    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Lstm {
+        Lstm::new(
+            vs,
+            in_dim,
+            out_dim,
+            self.has_biases,
+            0.0, // dropout
+        )
     }
 }
 
@@ -64,15 +47,7 @@ mod rnn_config {
     fn default_gru_builds() {
         let config = RnnConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: nn::GRU = config.build_module(&vs.root(), 3, 2);
-    }
-
-    /// Check that SeqModRnn<GRU> builds successfully
-    #[test]
-    fn default_seq_mod_gru_builds() {
-        let config = RnnConfig::default();
-        let vs = nn::VarStore::new(Device::Cpu);
-        let _: SeqModRnn<nn::GRU> = config.build_module(&vs.root(), 3, 2);
+        let _: Gru = config.build_module(&vs.root(), 3, 2);
     }
 
     /// Check that the default LSTM Config builds successfully
@@ -80,6 +55,6 @@ mod rnn_config {
     fn default_lstm_builds() {
         let config = RnnConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: nn::LSTM = config.build_module(&vs.root(), 3, 2);
+        let _: Lstm = config.build_module(&vs.root(), 3, 2);
     }
 }

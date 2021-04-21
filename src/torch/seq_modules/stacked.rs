@@ -58,12 +58,12 @@ where
 
 #[cfg(test)]
 mod sequence_regressor {
-    use super::super::{testing, SeqModRnn};
+    use super::super::{testing, Gru};
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{nn, Device};
 
-    type GruMlp = Stacked<'static, SeqModRnn<nn::GRU>, nn::Linear>;
+    type GruMlp = Stacked<'static, Gru, nn::Linear>;
 
     /// GRU followed by a relu then a linear layer.
     #[fixture]
@@ -73,12 +73,7 @@ mod sequence_regressor {
         let out_dim: usize = 2;
         let vs = nn::VarStore::new(Device::Cpu);
         let path = &vs.root();
-        let gru = SeqModRnn::from(nn::gru(
-            &(path / "rnn"),
-            in_dim as i64,
-            hidden_dim as i64,
-            Default::default(),
-        ));
+        let gru = Gru::new(&(path / "rnn"), in_dim, hidden_dim, true, 0.0);
         let linear = nn::linear(
             &(path / "linear"),
             hidden_dim as i64,

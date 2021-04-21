@@ -9,3 +9,4 @@ pub mod utils;
 pub use activations::Activation;
 pub use builder::ModuleBuilder;
 pub use optimizers::{Optimizer, OptimizerBuilder};
+pub use seq_modules::{Gru, Lstm};
