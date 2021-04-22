@@ -1,7 +1,7 @@
 //! Gated Recurrent Unit
 use super::super::{seq_serial_map, IterativeModule, SequenceModule};
 use super::{initialize_rnn_params, CudnnRnnMode};
-use tch::{nn::Path, Device, Kind, Tensor};
+use tch::{nn::Path, Device, IndexOp, Kind, Tensor};
 
 /// A single-layer Gated Recurrent Unit Network
 #[derive(Debug)]
@@ -65,8 +65,9 @@ impl SequenceModule for Gru {
             "Input must have 3 dimensions: [BATCH_SIZE, SEQ_LEN, NUM_FEATURES]"
         );
         let batch_size = shape[0];
+        let num_layers = 1;
         let initial_state = Tensor::zeros(
-            &[1, batch_size as i64, self.hidden_size],
+            &[num_layers, batch_size as i64, self.hidden_size],
             (inputs.kind(), inputs.device()),
         );
         let has_biases = self.params.len() > 2;
@@ -75,7 +76,7 @@ impl SequenceModule for Gru {
                 &initial_state,
                 &self.params,
                 has_biases,
-                1, // num_layers
+                num_layers,
                 self.dropout,
                 true,  // train
                 false, // bidirectional
@@ -83,6 +84,28 @@ impl SequenceModule for Gru {
             );
             seq_output
         })
+    }
+
+    fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
+        let initial_batch_size: i64 = batch_sizes.i(0).into();
+        let num_layers = 1;
+        let initial_state = Tensor::zeros(
+            &[num_layers, initial_batch_size, self.hidden_size],
+            (inputs.kind(), inputs.device()),
+        );
+        let has_biases = self.params.len() > 2;
+        let (outputs, _) = Tensor::gru1(
+            inputs,
+            batch_sizes,
+            &initial_state,
+            &self.params,
+            has_biases,
+            num_layers,
+            self.dropout,
+            true,  // train
+            false, // bidirectional
+        );
+        outputs
     }
 }
 
@@ -106,6 +129,12 @@ mod gru {
     fn gru_seq_serial(gru: (Gru, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_seq_serial(&gru, in_dim, out_dim);
+    }
+
+    #[rstest]
+    fn gru_seq_packed(gru: (Gru, usize, usize)) {
+        let (gru, in_dim, out_dim) = gru;
+        testing::check_seq_packed(&gru, in_dim, out_dim);
     }
 
     #[rstest]

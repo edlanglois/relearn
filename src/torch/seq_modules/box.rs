@@ -5,6 +5,10 @@ impl SequenceModule for Box<dyn StatefulIterSeqModule> {
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         self.as_ref().seq_serial(inputs, seq_lengths)
     }
+
+    fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
+        self.as_ref().seq_packed(inputs, batch_sizes)
+    }
 }
 
 impl StatefulIterativeModule for Box<dyn StatefulIterSeqModule> {

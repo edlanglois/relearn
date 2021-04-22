@@ -1,7 +1,7 @@
 //! Long Short-Term Memory
 use super::super::{seq_serial_map, IterativeModule, SequenceModule};
 use super::{initialize_rnn_params, CudnnRnnMode};
-use tch::{nn::Path, Device, Kind, Tensor};
+use tch::{nn::Path, Device, IndexOp, Kind, Tensor};
 
 /// A Single-layer Long Short-Term Memory Network.
 #[derive(Debug)]
@@ -96,6 +96,30 @@ impl SequenceModule for Lstm {
             seq_output
         })
     }
+
+    fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
+        let initial_batch_size: i64 = batch_sizes.i(0).into();
+        let num_layers = 1;
+        let zeros = Tensor::zeros(
+            &[num_layers, initial_batch_size, self.hidden_size],
+            (inputs.kind(), inputs.device()),
+        );
+        let initial_state = [zeros.shallow_clone(), zeros];
+
+        let has_biases = self.params.len() > 2;
+        let (outputs, _, _) = Tensor::lstm1(
+            inputs,
+            batch_sizes,
+            &initial_state,
+            &self.params,
+            has_biases,
+            num_layers,
+            self.dropout,
+            true,  // train
+            false, // bidirectional
+        );
+        outputs
+    }
 }
 
 #[cfg(test)]
@@ -118,6 +142,12 @@ mod lstm {
     fn lstm_seq_serial(lstm: (Lstm, usize, usize)) {
         let (lstm, in_dim, out_dim) = lstm;
         testing::check_seq_serial(&lstm, in_dim, out_dim);
+    }
+
+    #[rstest]
+    fn lstm_seq_packed(lstm: (Lstm, usize, usize)) {
+        let (lstm, in_dim, out_dim) = lstm;
+        testing::check_seq_packed(&lstm, in_dim, out_dim);
     }
 
     #[rstest]

@@ -33,6 +33,14 @@ where
         }
         data.apply(&self.top)
     }
+
+    fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
+        let mut data = self.seq.seq_packed(inputs, batch_sizes);
+        if let Some(ref m) = self.activation {
+            data = data.apply(m);
+        }
+        data.apply(&self.top)
+    }
 }
 
 impl<'a, T, U> IterativeModule for Stacked<'a, T, U>
@@ -88,6 +96,12 @@ mod sequence_regressor {
     fn gru_relu_linear_seq_serial(gru_relu_linear: (GruMlp, usize, usize)) {
         let (gru_relu_linear, in_dim, out_dim) = gru_relu_linear;
         testing::check_seq_serial(&gru_relu_linear, in_dim, out_dim);
+    }
+
+    #[rstest]
+    fn gru_relu_linear_seq_packed(gru_relu_linear: (GruMlp, usize, usize)) {
+        let (gru_relu_linear, in_dim, out_dim) = gru_relu_linear;
+        testing::check_seq_packed(&gru_relu_linear, in_dim, out_dim);
     }
 
     #[rstest]

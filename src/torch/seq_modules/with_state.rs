@@ -40,6 +40,10 @@ where
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         self.module.borrow().seq_serial(inputs, seq_lengths)
     }
+
+    fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
+        self.module.borrow().seq_packed(inputs, batch_sizes)
+    }
 }
 
 // Note: Consider deleting this.
@@ -100,6 +104,11 @@ mod as_stateful_module {
         let (linear, in_dim, out_dim) = linear;
         testing::check_seq_serial(&linear, in_dim, out_dim);
     }
+    #[rstest]
+    fn linear_seq_packed(linear: (WithState<nn::Linear>, usize, usize)) {
+        let (linear, in_dim, out_dim) = linear;
+        testing::check_seq_packed(&linear, in_dim, out_dim);
+    }
 
     #[rstest]
     fn linear_step(linear: (WithState<nn::Linear>, usize, usize)) {
@@ -116,6 +125,11 @@ mod as_stateful_module {
     fn gru_seq_serial(gru: (WithState<Gru>, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_seq_serial(&gru, in_dim, out_dim);
+    }
+    #[rstest]
+    fn gru_seq_packed(gru: (WithState<Gru>, usize, usize)) {
+        let (gru, in_dim, out_dim) = gru;
+        testing::check_seq_packed(&gru, in_dim, out_dim);
     }
 
     #[rstest]
