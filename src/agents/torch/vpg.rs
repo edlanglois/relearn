@@ -1,5 +1,6 @@
 //! Vanilla SequenceModule + StatefulIterativeModule Gradient
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
+use super::HistoryBuffer;
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
@@ -103,7 +104,7 @@ where
     pub policy: P,
 
     /// The recorded step history.
-    history: Vec<Step<OS::Element, AS::Element>>,
+    history: HistoryBuffer<OS::Element, AS::Element>,
 
     /// Optimizer
     optimizer: O,
@@ -142,8 +143,7 @@ where
             max_steps_per_epoch: (steps_per_epoch as f64 * 1.1) as usize,
             max_unknown_return_discount: 0.1,
             policy,
-            // Slight excess in case of off-by-one errors.
-            history: Vec::with_capacity(max_steps_per_epoch + 1),
+            history: HistoryBuffer::new(discount_factor, Some(max_steps_per_epoch)),
             optimizer,
         }
     }
@@ -190,43 +190,32 @@ where
             return;
         }
 
+        let num_steps = self.history.len();
+        let num_episodes = self.history.num_episodes();
+
         // Epoch
         // Update the policy
-        let history_data = tch::no_grad(|| {
-            history_data(
-                &mut self.history,
-                &self.observation_space,
-                self.discount_factor,
-                self.max_unknown_return_discount,
-            )
-        });
+        let history_features = self.history.drain_features(&self.observation_space);
 
-        let output = self
-            .policy
-            .seq_serial(
-                &history_data.observation_features.unsqueeze(0), // Batch dimension
-                &history_data.episode_lengths,
-            )
-            .squeeze1(0);
+        let output = self.policy.seq_packed(
+            &history_features.observation_features,
+            &history_features.batch_sizes,
+        );
         let (log_probs, entropies) = self
             .action_space
-            .batch_statistics(&output, &history_data.actions);
+            .batch_statistics(&output, &history_features.actions);
 
-        let loss = -(log_probs * history_data.returns).mean(Kind::Float);
+        let loss = -(log_probs * history_features.returns).mean(Kind::Float);
         self.optimizer.backward_step(&loss);
 
         logger
-            .log(
-                Event::Epoch,
-                "batch_num_steps",
-                (history_data.actions.len() as f64).into(),
-            )
+            .log(Event::Epoch, "batch_num_steps", (num_steps as f64).into())
             .unwrap();
         logger
             .log(
                 Event::Epoch,
                 "batch_num_episodes",
-                (history_data.episode_lengths.len() as f64).into(),
+                (num_episodes as f64).into(),
             )
             .unwrap();
         logger
@@ -237,122 +226,6 @@ where
             )
             .unwrap();
         logger.done(Event::Epoch);
-    }
-}
-
-// TODO: Do something like packed sequence so that batch processing is possible.
-struct HistoryData<A> {
-    /// Observation features. A f32 tensor of shape [NUM_STEPS, NUM_OBS_FEATURES]
-    observation_features: Tensor,
-    /// Actions.
-    actions: Vec<A>,
-    // /// Log probabilities of the selected actions. A f32 tensor of shape [NUM_STEPS]
-    // action_log_probs: Tensor,
-    /// Cumulative discounted observed episode returns. A f32 tensor of shape [NUM_STEPS]
-    returns: Tensor,
-    /// The number of steps in each episode as ordered along the NUM_STEPS dimension.
-    episode_lengths: Vec<usize>,
-}
-
-/// Convert a step history vector into data tensors / vectors.
-///
-/// Empties history in the process.
-///
-/// An episode can end with a terminal or a non terminal state.
-/// If an episode ends with a terminal state then all steps are included in the result.
-///
-/// If an episode ends with a non-terminal state then there may be future unobserved rewards in the
-/// episode so an estimate of the return using just the observed steps will be unreliable.
-/// Therefore, when an episode ends in a non-terminal state, the steps close to the end of the
-/// episode are dropped. Specifically a step is dropped if the discounting applied to the unknown
-/// part of the return is > max_unknown_return_discount.
-fn history_data<OS: FeatureSpace<Tensor>, A>(
-    history: &mut Vec<Step<OS::Element, A>>,
-    observation_space: &OS,
-    discount_factor: f64,
-    max_unknown_return_discount: f64,
-) -> HistoryData<A> {
-    // For each step, calculate state = (known_return, unknown_return_discount)
-    // * known_return is the discounted sum of rewards in all future observed steps of the episode.
-    // * unknown_return_scale is the discounting applied to any unknown rewards that might appear
-    //      in the episode after the observed steps.
-    //      This is 0 if all steps of the spisode are observed.
-    //
-    // Then include steps that have unknown_return_discount < max_unknown_return_discount
-    let (known_returns, include_steps): (Vec<f64>, Vec<bool>) = history
-        .iter()
-        .rev()
-        .scan((0.0, 1.0), |state, step| {
-            if step.next_observation.is_none() {
-                // Terminal state
-                *state = (0.0, 0.0)
-            } else if step.episode_done {
-                // Non-terminal end of episode
-                *state = (0.0, 1.0)
-            }
-            state.0 *= discount_factor;
-            state.1 *= discount_factor;
-            state.0 += step.reward;
-            Some((state.0, state.1 <= max_unknown_return_discount))
-        })
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .unzip();
-
-    let mut episode_lengths: Vec<usize> = Vec::new();
-    let mut episode_length = 0;
-    for (step, &include) in history.iter().zip(include_steps.iter()) {
-        if include {
-            episode_length += 1
-        }
-        if step.episode_done && episode_length > 0 {
-            episode_lengths.push(episode_length);
-            episode_length = 0;
-        }
-    }
-
-    assert!(
-        episode_lengths.len() > 0,
-        "No steps were included in the training batch. \
-        This can happen if the discount factor (={}) is close to 1 \
-        and episodes never end or are cut off before reaching a terminal state.",
-        discount_factor
-    );
-
-    // A f32 tensor of shape [NUM_STEPS] containing cumulative known episode returns for each step.
-    let returns = Tensor::of_slice(
-        &known_returns
-            .into_iter()
-            .zip(include_steps.iter())
-            .filter_map(|(return_, &include)| if include { Some(return_ as f32) } else { None })
-            .collect::<Vec<_>>(),
-    );
-
-    let observations = history
-        .iter()
-        .zip(include_steps.iter())
-        .filter_map(|(step, &include)| {
-            if include {
-                Some(&step.observation)
-            } else {
-                None
-            }
-        });
-    // A tensor of shape [NUM_STEPS, NUM_OBSERVATION_FEATURES] containing one-hot feature vectors.
-    let observation_features = observation_space.batch_features(observations);
-
-    let actions = history
-        .drain(..)
-        .zip(include_steps)
-        .filter_map(|(step, include)| if include { Some(step.action) } else { None })
-        .collect();
-
-    HistoryData {
-        observation_features,
-        actions,
-        returns,
-        episode_lengths,
     }
 }
 
