@@ -48,7 +48,7 @@ fn gru_seq_serial(c: &mut Criterion) {
     }
     step_group.finish();
 
-    // n episodes of length 1 batched
+    // n episodes of length 1, batched
     let mut ep_group = c.benchmark_group("gru_seq_serial_n_batches");
     for total_steps in IntoIter::new([1usize, 10, 100, 1000]) {
         let input = Tensor::ones(
@@ -62,6 +62,24 @@ fn gru_seq_serial(c: &mut Criterion) {
             BenchmarkId::from_parameter(total_steps),
             &input,
             |b, input| b.iter_with_large_drop(|| gru.seq_serial(input, &seq_lengths)),
+        );
+    }
+    ep_group.finish();
+
+    // n episodes of length 1, packed
+    let mut ep_group = c.benchmark_group("gru_seq_packed_n_episodes");
+    for total_steps in IntoIter::new([1usize, 10, 100, 1000]) {
+        let input = Tensor::ones(
+            &[total_steps as i64, in_features as i64],
+            (Kind::Float, Device::Cpu),
+        );
+        let batch_sizes = Tensor::of_slice(&[total_steps as i64]);
+
+        ep_group.throughput(Throughput::Elements(total_steps as u64));
+        ep_group.bench_with_input(
+            BenchmarkId::from_parameter(total_steps),
+            &input,
+            |b, input| b.iter_with_large_drop(|| gru.seq_packed(input, &batch_sizes)),
         );
     }
     ep_group.finish();
