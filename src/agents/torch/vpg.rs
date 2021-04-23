@@ -5,6 +5,7 @@ use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
 use crate::torch::{ModuleBuilder, Optimizer, OptimizerBuilder};
+use crate::utils::packed::{PackedBatchSizes, PackingIndices};
 use crate::EnvStructure;
 use tch::{kind::Kind, nn, Device, Tensor};
 
@@ -143,7 +144,7 @@ where
             max_steps_per_epoch: (steps_per_epoch as f64 * 1.1) as usize,
             max_unknown_return_discount: 0.1,
             policy,
-            history: HistoryBuffer::new(discount_factor, Some(max_steps_per_epoch)),
+            history: HistoryBuffer::new(Some(max_steps_per_epoch)),
             optimizer,
         }
     }
@@ -190,22 +191,66 @@ where
             return;
         }
 
+        // Epoch
+        // Update the policy
+
+        // TODO: extract feature calculation to function and set no_grad
+        // let _no_grad = tch::no_grad_guard();
+
         let num_steps = self.history.len();
         let num_episodes = self.history.num_episodes();
 
-        // Epoch
-        // Update the policy
-        let history_features = self.history.drain_features(&self.observation_space);
+        let steps = self.history.steps();
+        let mut episode_ranges: Vec<_> = self.history.episode_ranges().collect();
+        // Sort in decreasing order of length; required for packing
+        episode_ranges.sort_by(|a, b| a.len().cmp(&b.len()).reverse());
 
-        let output = self.policy.seq_packed(
-            &history_features.observation_features,
-            &history_features.batch_sizes,
+        // Packed observation features
+        let observation_features = self.observation_space.batch_features(
+            PackingIndices::from_sorted(&episode_ranges).map(|i| &steps[i].observation),
         );
-        let (log_probs, entropies) = self
-            .action_space
-            .batch_statistics(&output, &history_features.actions);
 
-        let loss = -(log_probs * history_features.returns).mean(Kind::Float);
+        // Step returns in the reverse order as steps
+        let step_returns_rev: Vec<_> = steps
+            .iter()
+            .rev()
+            .scan(0.0, |next_return, step| {
+                if step.next_observation.is_none() {
+                    // Terminal state
+                    *next_return = 0.0
+                } else if step.episode_done {
+                    // Non-terminal end-of-episode
+                    panic!("Non-terminal end-of-episode not currently supported");
+                }
+                *next_return *= self.discount_factor;
+                *next_return += step.reward;
+                Some(*next_return as f32)
+            })
+            .collect();
+        // Packed returns
+        let returns: Vec<_> = PackingIndices::from_sorted(&episode_ranges)
+            .map(|i| step_returns_rev[num_steps - 1 - i])
+            .collect();
+        let returns = Tensor::of_slice(&returns);
+
+        // Actions are not necessarily copyable to drain steps and take the actions.
+        // Put into Option so that we can take the action to when packing.
+        let (drain_steps, _) = self.history.drain();
+        let mut seq_actions: Vec<_> = drain_steps.map(|step| Some(step.action)).collect();
+        // Packed actions
+        let actions: Vec<_> = PackingIndices::from_sorted(&episode_ranges)
+            .map(|i| seq_actions[i].take().unwrap())
+            .collect();
+
+        let batch_sizes: Vec<_> = PackedBatchSizes::from_sorted_ranges(&episode_ranges)
+            .map(|s| s as i64)
+            .collect();
+        let batch_sizes = Tensor::of_slice(&batch_sizes);
+
+        let output = self.policy.seq_packed(&observation_features, &batch_sizes);
+        let (log_probs, entropies) = self.action_space.batch_statistics(&output, &actions);
+
+        let loss = -(log_probs * returns).mean(Kind::Float);
         self.optimizer.backward_step(&loss);
 
         logger
