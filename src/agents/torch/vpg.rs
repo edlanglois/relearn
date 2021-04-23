@@ -191,14 +191,66 @@ where
             return;
         }
 
-        // Epoch
-        // Update the policy
+        self.epoch_update(logger);
+    }
+}
 
-        // TODO: extract feature calculation to function and set no_grad
-        // let _no_grad = tch::no_grad_guard();
-
+impl<OS, AS, P, O> PolicyGradientAgent<OS, AS, P, O>
+where
+    OS: FeatureSpace<Tensor>,
+    AS: ParameterizedSampleSpace<Tensor>,
+    P: SequenceModule + StatefulIterativeModule,
+    O: Optimizer,
+{
+    /// Perform an epoch update: update the policy and value function and clear history.
+    fn epoch_update(&mut self, logger: &mut dyn Logger) {
         let num_steps = self.history.len();
         let num_episodes = self.history.num_episodes();
+
+        let (observation_features, returns, actions, batch_sizes) = self.drain_history_features();
+
+        let output = self.policy.seq_packed(&observation_features, &batch_sizes);
+        let (log_probs, entropies) = self.action_space.batch_statistics(&output, &actions);
+
+        let loss = -(log_probs * returns).mean(Kind::Float);
+        self.optimizer.backward_step(&loss);
+
+        logger
+            .log(Event::Epoch, "batch_num_steps", (num_steps as f64).into())
+            .unwrap();
+        logger
+            .log(
+                Event::Epoch,
+                "batch_num_episodes",
+                (num_episodes as f64).into(),
+            )
+            .unwrap();
+        logger
+            .log(
+                Event::Epoch,
+                "policy_entropy",
+                f64::from(entropies.mean(Kind::Float)).into(),
+            )
+            .unwrap();
+        logger.done(Event::Epoch);
+    }
+
+    /// Drain the stored history into a set of features. Clears the stored history.
+    ///
+    /// # Returns
+    /// * `observation_features` - Packed observation features.
+    ///     An f32 tensor of shape [TOTAL_STEPS, NUM_INPUT_FEATURES].
+    ///
+    /// * `returns` - Packed step returns. For each step, discount sum of current and future
+    ///     rewards. An f32 tensor of shape [TOTAL_STEPS].
+    ///
+    /// * `actions` - Packed step actions. A vector of length TOTAL_STEPS.
+    ///
+    /// * `batch_sizes` - The batch size for each packed time step.
+    ///     An i64 tensor of shape [MAX_EPISODE_LENGHT].
+    ///
+    fn drain_history_features(&mut self) -> (Tensor, Tensor, Vec<AS::Element>, Tensor) {
+        let _no_grad = tch::no_grad_guard();
 
         let steps = self.history.steps();
         let mut episode_ranges: Vec<_> = self.history.episode_ranges().collect();
@@ -228,8 +280,9 @@ where
             })
             .collect();
         // Packed returns
+        let last_step = steps.len() - 1;
         let returns: Vec<_> = PackingIndices::from_sorted(&episode_ranges)
-            .map(|i| step_returns_rev[num_steps - 1 - i])
+            .map(|i| step_returns_rev[last_step - i])
             .collect();
         let returns = Tensor::of_slice(&returns);
 
@@ -247,30 +300,7 @@ where
             .collect();
         let batch_sizes = Tensor::of_slice(&batch_sizes);
 
-        let output = self.policy.seq_packed(&observation_features, &batch_sizes);
-        let (log_probs, entropies) = self.action_space.batch_statistics(&output, &actions);
-
-        let loss = -(log_probs * returns).mean(Kind::Float);
-        self.optimizer.backward_step(&loss);
-
-        logger
-            .log(Event::Epoch, "batch_num_steps", (num_steps as f64).into())
-            .unwrap();
-        logger
-            .log(
-                Event::Epoch,
-                "batch_num_episodes",
-                (num_episodes as f64).into(),
-            )
-            .unwrap();
-        logger
-            .log(
-                Event::Epoch,
-                "policy_entropy",
-                f64::from(entropies.mean(Kind::Float)).into(),
-            )
-            .unwrap();
-        logger.done(Event::Epoch);
+        (observation_features, returns, actions, batch_sizes)
     }
 }
 
