@@ -557,11 +557,11 @@ mod packed_batch_sizes {
 }
 
 #[cfg(test)]
-mod tests {
+mod packed_tensor {
     use super::*;
 
     #[test]
-    fn packed_tensor_from_offset_1() {
+    fn from_offset_1() {
         // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
         let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
         let batch_sizes = [3, 3, 1, 1];
@@ -572,7 +572,7 @@ mod tests {
     }
 
     #[test]
-    fn packed_tensor_from_offset_is_view() {
+    fn from_offset_is_view() {
         // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
         let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
         let batch_sizes = [3, 3, 1, 1];
@@ -586,7 +586,7 @@ mod tests {
     }
 
     #[test]
-    fn packed_tensor_trim_end_n1() {
+    fn trim_end_n1() {
         // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
         let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
         let batch_sizes = [3, 3, 1, 1];
@@ -597,7 +597,7 @@ mod tests {
     }
 
     #[test]
-    fn packed_tensor_trim_end_is_copy() {
+    fn trim_end_is_copy() {
         // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
         let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
         let batch_sizes = [3, 3, 1, 1];
@@ -608,7 +608,7 @@ mod tests {
     }
 
     #[test]
-    fn packed_tensor_push_shift_() {
+    fn push_shift() {
         // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
         let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
         let batch_sizes = [3, 3, 1, 1];
