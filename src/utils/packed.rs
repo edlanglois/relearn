@@ -7,7 +7,9 @@
 //!
 //! For example, the sequences `[0, 1, 2, 3], [10, 11], [100, 101]` are packed as
 //! `[0, 10, 100, 1, 11, 101, 2, 3]`.
+use std::iter;
 use std::ops::{Index, Range};
+use tch::{IndexOp, Scalar, Tensor};
 
 /// Iterator that packs together multiple sequences.
 ///
@@ -288,6 +290,162 @@ impl Length for usize {
     }
 }
 
+/// A view of a packed tensor starting from the given offset within each sequence.
+///
+/// Does not make any copies of the underlying tensors.
+///
+/// # Args
+/// * `packed`: A tensor of sequences packed along the first dimension.
+/// * `batch_sizes`: Batch sizes along the first dimension of `packed`.
+/// * `offset`: Sequence offset from which to start the view.
+///
+/// # Returns
+/// * `packed`: Packed values from `packed` excluding the first `offset` steps of each
+///     sequence. Has the same shape as `packed` except for the first dimension.
+/// * `batch_sizes`: Batch sizes for the output packed tensor.
+
+pub fn packed_tensor_from_offset<'a>(
+    packed: &Tensor,
+    batch_sizes: &'a [usize],
+    offset: usize,
+) -> (Tensor, &'a [usize]) {
+    let packed_offset = batch_sizes[..offset].iter().sum::<usize>() as i64;
+    (packed.i(packed_offset..), &batch_sizes[offset..])
+}
+
+/// Collect batches into groups where only the last batch in a group changes size.
+///
+/// This is designed for resizes that affect only the end of a batch.
+///
+/// If `old_batch_sizes` and `new_batch_sizes` have different lengths then any excess are grouped
+/// together and it is assumed that the corresponding new/old batch size is 0.
+///
+/// # Args
+/// * `old_batch_sizes` - An iterator over the old/original batch sizes.
+/// * `new_batch_sizes` - An iterator over the new batch sizes.
+///
+/// # Returns
+/// * `old_group_sizes` - A vector of old group sizes.
+///                       Each group consists of one or more batches to be resized at the end.
+/// * `new_group_sizes` - A vector with the new size for each group in `old_group_sizes`.
+///                       Has the same length as `old_group_sizes`.
+///
+fn group_batches_for_resize<'a, 'b, T, U>(
+    old_batch_sizes: T,
+    new_batch_sizes: U,
+) -> (Vec<i64>, Vec<i64>)
+where
+    T: IntoIterator<Item = &'a usize>,
+    U: IntoIterator<Item = &'b usize>,
+{
+    let mut old_group_sizes: Vec<i64> = Vec::new(); // i64 required by tch interface
+    let mut new_group_sizes: Vec<i64> = Vec::new();
+    let mut next_old_group_size = 0;
+    let mut next_new_group_size = 0;
+
+    let mut old_batch_size_iter = old_batch_sizes.into_iter().fuse();
+    let mut new_batch_size_iter = new_batch_sizes.into_iter().fuse();
+    loop {
+        let (old, new, tail) = match (old_batch_size_iter.next(), new_batch_size_iter.next()) {
+            (Some(old), Some(new)) => (*old, *new, false),
+            (Some(old), None) => (*old, 0, true),
+            (None, Some(new)) => (0, *new, true),
+            (None, None) => break,
+        };
+        next_old_group_size += old;
+        next_new_group_size += new;
+        // Push the merged groups if the sizes differ.
+        // Can merge consecutive tail batches because the whole tail will be added/removed
+        // so it is still a suffix operation on the group, just one that affects multiple batches.
+        if !tail && old != new {
+            old_group_sizes.push(next_old_group_size as i64);
+            next_old_group_size = 0;
+            new_group_sizes.push(next_new_group_size as i64);
+            next_new_group_size = 0;
+        }
+    }
+    if next_old_group_size != 0 || next_new_group_size != 0 {
+        old_group_sizes.push(next_old_group_size as i64);
+        new_group_sizes.push(next_new_group_size as i64);
+    }
+    (old_group_sizes, new_group_sizes)
+}
+
+/// Copy a packed tensor without the last n elements of each sequence.
+///
+/// # Args
+/// * `packed`: A tensor of sequences packed along the first dimension.
+/// * `batch_sizes`: Batch sizes along the first dimension of `packed`.
+///
+/// # Returns
+/// * `packed`: Packed values from `packed` excluding the last `n` steps of each
+///     sequence. Has the same shape as `packed` except for the first dimension.
+/// * `batch_sizes`: Batch sizes for the output packed tensor.
+///
+pub fn packed_tensor_trim_end<'a>(
+    packed: &Tensor,
+    batch_sizes: &'a [usize],
+    n: usize,
+) -> (Tensor, &'a [usize]) {
+    // Batch sizes are the same as if we had dropped from the start of each sequence
+    let new_batch_sizes = &batch_sizes[n..];
+
+    let (old_group_sizes, new_group_sizes) = group_batches_for_resize(batch_sizes, new_batch_sizes);
+    let groups = packed.split_with_sizes(&old_group_sizes, 0);
+
+    let new_groups: Vec<_> = groups
+        .iter()
+        .zip(new_group_sizes)
+        .map(|(group, new_size)| group.i(..new_size))
+        .collect();
+    let new_packed = Tensor::cat(&new_groups, 0);
+
+    (new_packed, new_batch_sizes)
+}
+
+/// Copy a packed tensor with a value append to every sequence and the first value dropped.
+///
+/// The sequence lengths and batch sizes remain unchanged.
+///
+/// # Args
+/// * `packed`: A tensor of sequences packed along the first dimension.
+/// * `batch_sizes`: Batch sizes along the first dimension of `packed`.
+///
+/// # Returns
+/// Tensor of output packed sequences. Has the same shape and batch sizes as `packed`.
+///
+pub fn packed_tensor_push_shift<S>(packed: &Tensor, batch_sizes: &[usize], value: S) -> Tensor
+where
+    S: Into<Scalar> + Copy,
+{
+    let (old_group_sizes, new_group_sizes) =
+        group_batches_for_resize(batch_sizes, iter::once(&0).chain(batch_sizes.iter()));
+
+    let input_groups = packed.split_with_sizes(&old_group_sizes, 0);
+
+    let packed_output = packed.empty_like();
+    let output_groups = packed_output.split_with_sizes(&new_group_sizes[1..], 0);
+
+    // Drop the first input group
+    // Then each input group is copied to an output group padded with value.
+    // Finally, the remaining out_group is filled with value
+
+    let mut out_group_iter = output_groups.into_iter().fuse();
+    for ((in_group, &in_group_size), out_group) in input_groups[1..]
+        .iter()
+        .zip(&old_group_sizes[1..])
+        .zip(&mut out_group_iter)
+    {
+        out_group.i(..in_group_size).copy_(in_group);
+        let _ = out_group.i(in_group_size..).fill_(value);
+    }
+    for mut out_group in out_group_iter {
+        let _ = out_group.fill_(value);
+    }
+
+    packed_output
+}
+
 #[cfg(test)]
 mod packed_iter {
     use super::*;
@@ -395,5 +553,43 @@ mod packed_batch_sizes {
         assert_eq!(packed_batch_sizes.size_hint(), (3, Some(3)));
         let _ = packed_batch_sizes.next();
         assert_eq!(packed_batch_sizes.size_hint(), (2, Some(2)));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packed_tensor_from_offset_1() {
+        // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
+        let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
+        let batch_sizes = [3, 3, 1, 1];
+        let (packed_out, batch_sizes_out) = packed_tensor_from_offset(&packed, &batch_sizes, 1);
+        assert_eq!(packed_out, Tensor::of_slice(&[1, 11, 101, 2, 3]));
+        assert_eq!(batch_sizes_out, &[3, 1, 1]);
+    }
+
+    #[test]
+    fn packed_tensor_trim_end_1() {
+        // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
+        let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
+        let batch_sizes = [3, 3, 1, 1];
+        let (packed_out, batch_sizes_out) = packed_tensor_trim_end(&packed, &batch_sizes, 1);
+        assert_eq!(packed_out, Tensor::of_slice(&[0, 10, 100, 1, 2]));
+        assert_eq!(batch_sizes_out, &[3, 1, 1]);
+    }
+
+    #[test]
+    fn packed_tensor_push_shift_1() {
+        // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
+        let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
+        let batch_sizes = [3, 3, 1, 1];
+        let packed_out = packed_tensor_push_shift(&packed, &batch_sizes, -1);
+        // Sequences: [1, 2, 3, -1], [11, -1], [101, -1]
+        assert_eq!(
+            packed_out,
+            Tensor::of_slice(&[1, 11, 101, 2, -1, -1, 3, -1])
+        );
     }
 }
