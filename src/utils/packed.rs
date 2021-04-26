@@ -290,6 +290,22 @@ impl Length for usize {
     }
 }
 
+/// View each batched offset of a packed tensor.
+///
+/// # Args
+/// `packed`: A tensor of sequences packed along the first dimension.
+/// `batch_sizes`: Batch sizes along the first dimension of `packed`.
+///                The tch interface requires that this be i64.
+///
+/// # Returns
+/// A vector contained tensor view of each batched time step of the sequences in `packed`.
+/// Has length equal to `batch_sizes`.
+/// Each tensor in the output has the same shape as `packed` except for the first dimension
+/// which has length `batch_sizes[i]`.
+pub fn packed_tensor_batched_steps(packed: &Tensor, batch_sizes: &[i64]) -> Vec<Tensor> {
+    packed.split_with_sizes(&batch_sizes, 0)
+}
+
 /// A view of a packed tensor starting from the given offset within each sequence.
 ///
 /// Does not make any copies of the underlying tensors.
@@ -441,6 +457,51 @@ where
     }
     for mut out_group in out_group_iter {
         let _ = out_group.fill_(value);
+    }
+
+    packed_output
+}
+
+/// Evaluate a discounted cumulative sum from sequence end to start on a packed tensor.
+///
+/// For each element x[i] in the sequence x[0] ... x[N],
+/// returns `y[i] = sum_{j in i..N} discount_factor ** (j - i) * x[j]`
+///
+/// # Args
+/// * `packed`: A tensor of sequences packed along the first dimension.
+/// * `batch_sizes`: Batch sizes along the first dimension of `packed`.
+/// * `discount_factor`: Discount factor to apply in the cumulative sum.
+///
+/// # Returns
+/// A tensor with the same shape as `packed` containing the discounted cumulative sums.
+// TODO: Consider a recursive divide-and-conquer version for better parallelism
+pub fn packed_tensor_discounted_cumsum_from_end(
+    packed: &Tensor,
+    batch_sizes: &[i64],
+    discount_factor: f64,
+) -> Tensor {
+    if batch_sizes.len() == 0 {
+        assert_eq!(packed.numel(), 0);
+        return packed.zeros_like();
+    }
+
+    let packed_output = packed.empty_like();
+
+    let in_steps = packed_tensor_batched_steps(packed, batch_sizes);
+    let mut out_steps = packed_tensor_batched_steps(&packed_output, batch_sizes);
+
+    let max_batch_size = batch_sizes[0];
+    let accumulator = Tensor::zeros(&[max_batch_size], (packed.kind(), packed.device()));
+    for ((in_step, out_step), &batch_size) in in_steps
+        .iter()
+        .rev()
+        .zip(out_steps.iter_mut().rev())
+        .zip(batch_sizes.iter().rev())
+    {
+        let mut batch_accumulator = accumulator.i(..batch_size);
+        batch_accumulator *= discount_factor;
+        batch_accumulator += in_step;
+        out_step.copy_(&batch_accumulator);
     }
 
     packed_output
@@ -628,5 +689,20 @@ mod packed_tensor {
         let mut packed_out = packed_tensor_push_shift(&packed, &batch_sizes, -1);
         let _ = packed_out.neg_();
         assert_eq!(packed, Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]));
+    }
+
+    #[test]
+    fn discounted_cumsum_from_end() {
+        // Sequences: [1, 2, 3, 4], [5, 6], [7, 8]
+        let packed = Tensor::of_slice(&[1.0, 5.0, 7.0, 2.0, 6.0, 8.0, 3.0, 4.0]);
+        let batch_sizes = [3, 3, 1, 1];
+        let cumsum = packed_tensor_discounted_cumsum_from_end(&packed, &batch_sizes, 0.1);
+        // Sequences: [1.234, 2.34, 3.4, 4], [5.6, 6], [7.8, 8]
+        let expected = Tensor::of_slice(&[1.234, 5.6, 7.8, 2.34, 6.0, 8.0, 3.4, 4.0]);
+        println!("result {:?}", cumsum);
+        println!("expected {:?}", expected);
+        assert!(bool::from(
+            cumsum.isclose(&expected, 1e-8, 1e-8, false).all()
+        ));
     }
 }
