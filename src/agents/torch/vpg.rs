@@ -207,7 +207,7 @@ where
         let num_steps = self.history.len();
         let num_episodes = self.history.num_episodes();
 
-        let (observation_features, returns, actions, batch_sizes) = self.drain_history_features();
+        let (observation_features, actions, returns, batch_sizes) = self.drain_history_features();
 
         let output = self.policy.seq_packed(&observation_features, &batch_sizes);
         let (log_probs, entropies) = self.action_space.batch_statistics(&output, &actions);
@@ -241,15 +241,15 @@ where
     /// * `observation_features` - Packed observation features.
     ///     An f32 tensor of shape [TOTAL_STEPS, NUM_INPUT_FEATURES].
     ///
+    /// * `actions` - Packed step actions. A vector of length TOTAL_STEPS.
+    ///
     /// * `returns` - Packed step returns. For each step, discount sum of current and future
     ///     rewards. An f32 tensor of shape [TOTAL_STEPS].
-    ///
-    /// * `actions` - Packed step actions. A vector of length TOTAL_STEPS.
     ///
     /// * `batch_sizes` - The batch size for each packed time step.
     ///     An i64 tensor of shape [MAX_EPISODE_LENGHT].
     ///
-    fn drain_history_features(&mut self) -> (Tensor, Tensor, Vec<AS::Element>, Tensor) {
+    fn drain_history_features(&mut self) -> (Tensor, Vec<AS::Element>, Tensor, Tensor) {
         let _no_grad = tch::no_grad_guard();
 
         let steps = self.history.steps();
@@ -287,7 +287,7 @@ where
         let returns = Tensor::of_slice(&returns);
 
         // Actions are not necessarily copyable to drain steps and take the actions.
-        // Put into Option so that we can take the action to when packing.
+        // Put into Option so that we can take the action when packing.
         let (drain_steps, _) = self.history.drain();
         let mut seq_actions: Vec<_> = drain_steps.map(|step| Some(step.action)).collect();
         // Packed actions
@@ -300,7 +300,7 @@ where
             .collect();
         let batch_sizes = Tensor::of_slice(&batch_sizes);
 
-        (observation_features, returns, actions, batch_sizes)
+        (observation_features, actions, returns, batch_sizes)
     }
 }
 

@@ -1,11 +1,12 @@
 //! Vanilla SequenceModule + StatefulIterativeModule Gradient with Generalized Advantage Estimation
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
+use super::HistoryBuffer;
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
 use crate::torch::{ModuleBuilder, Optimizer, OptimizerBuilder};
+use crate::utils::packed::{self, PackedBatchSizes, PackingIndices};
 use crate::EnvStructure;
-use std::iter;
 use tch::{kind::Kind, nn, Device, Reduction, Tensor};
 
 /// Configuration for GaePolicyGradientAgent
@@ -162,7 +163,7 @@ where
     value_fn_optimizer: VO,
 
     /// The recorded step history.
-    history: Vec<Step<OS::Element, AS::Element>>,
+    history: HistoryBuffer<OS::Element, AS::Element>,
 }
 
 impl<OS, AS, P, PO, V, VO> GaePolicyGradientAgent<OS, AS, P, PO, V, VO>
@@ -220,8 +221,7 @@ where
             policy_optimizer,
             value_fn,
             value_fn_optimizer,
-            // Slight excess in case of off-by-one errors.
-            history: Vec::with_capacity(max_steps_per_epoch + 1),
+            history: HistoryBuffer::new(Some(max_steps_per_epoch)),
         }
     }
 }
@@ -286,95 +286,13 @@ where
 {
     /// Perform an epoch update: update the policy and value function and clear history.
     fn epoch_update(&mut self, logger: &mut dyn Logger) {
-        let mut episode_length = 0;
-        let episode_lengths: Vec<_> = self
-            .history
-            .iter()
-            .filter_map(|step| {
-                episode_length += 1;
-                if step.episode_done {
-                    let len = episode_length;
-                    episode_length = 0;
-                    Some(len)
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let num_steps = self.history.len();
+        let num_episodes = self.history.num_episodes();
 
-        let observation_features = self
-            .observation_space
-            .batch_features(self.history.iter().map(|step| &step.observation));
-        let batched_observation_features = observation_features.unsqueeze(0);
+        let (observation_features, actions, returns, advantages, batch_sizes) =
+            self.drain_history_features();
 
-        let estimated_values = self
-            .value_fn
-            .seq_serial(&batched_observation_features, &episode_lengths)
-            .squeeze1(0);
-
-        // Tensor::iter looks slow, insert into a vector first
-        let estimated_values_vec: Vec<_> = estimated_values.into();
-        let residuals_with_next_value: Vec<_> = self
-            .history
-            .iter()
-            .zip(estimated_values_vec.iter())
-            .zip(
-                estimated_values_vec
-                    .iter()
-                    .skip(1)
-                    .map(Some)
-                    .chain(iter::once(None)),
-            )
-            .map(|((step, &value), next_value)| {
-                let next_value = match (&step.next_observation, next_value) {
-                    (None, _) => 0.0,                         // terminal
-                    (_, Some(&v)) if !step.episode_done => v, // episode continues
-                    (Some(_next_obs), _) => {
-                        // episode done with a non-terminal step
-                        // should use the estimated value of next_obs
-                        // which may require iterating over the whole episode
-                        panic!("non-terminal end-of-episode not yet supported");
-                    }
-                };
-                let residual = step.reward + self.discount_factor * next_value - value;
-                (residual, next_value)
-            })
-            .collect();
-
-        let advantage_discount = self.lambda * self.discount_factor;
-        let mut next_advantage = 0.0;
-        let mut next_return = 0.0;
-        let (advantages, returns): (Vec<_>, Vec<_>) = self
-            .history
-            .iter()
-            .rev()
-            .zip(residuals_with_next_value.into_iter().rev())
-            .map(|(step, (residual, estimated_next_value))| {
-                if step.episode_done {
-                    next_advantage = 0.0;
-                    next_return = estimated_next_value;
-                } else {
-                    next_advantage *= advantage_discount;
-                }
-                next_return *= self.discount_factor;
-
-                next_advantage += residual;
-                next_return += step.reward;
-                (next_advantage as f32, next_return as f32)
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .unzip();
-        let advantages = Tensor::of_slice(&advantages);
-        let returns = Tensor::of_slice(&returns);
-
-        let actions: Vec<_> = self.history.drain(..).map(|step| step.action).collect();
-
-        let policy_output = self
-            .policy
-            .seq_serial(&batched_observation_features, &episode_lengths)
-            .squeeze1(0);
+        let policy_output = self.policy.seq_packed(&observation_features, &batch_sizes);
         let (log_probs, entropies) = self.action_space.batch_statistics(&policy_output, &actions);
 
         let policy_loss = -(log_probs * advantages).mean(Kind::Float);
@@ -383,10 +301,10 @@ where
         for i in 0..self.value_fn_train_iters {
             let value_fn_loss = self
                 .value_fn
-                .seq_serial(&batched_observation_features, &episode_lengths)
+                .seq_packed(&observation_features, &batch_sizes)
                 .squeeze1(-1) // feature dim
-                .squeeze1(0) // batch dim
                 .mse_loss(&returns, Reduction::Mean);
+
             if i == 0 {
                 logger
                     .log(
@@ -409,17 +327,13 @@ where
         }
 
         logger
-            .log(
-                Event::Epoch,
-                "batch_num_steps",
-                (actions.len() as f64).into(),
-            )
+            .log(Event::Epoch, "batch_num_steps", (num_steps as f64).into())
             .unwrap();
         logger
             .log(
                 Event::Epoch,
                 "batch_num_episodes",
-                (episode_lengths.len() as f64).into(),
+                (num_episodes as f64).into(),
             )
             .unwrap();
         logger
@@ -430,6 +344,107 @@ where
             )
             .unwrap();
         logger.done(Event::Epoch);
+    }
+
+    /// Drain the stored history into a set of features. Clears the stored history.
+    ///
+    /// # Returns
+    /// * `observation_features` - Packed observation features.
+    ///     An f32 tensor of shape [TOTAL_STEPS, NUM_INPUT_FEATURES].
+    ///
+    /// * `actions` - Packed step actions. A vector of length TOTAL_STEPS.
+    ///
+    /// * `returns` - Packed step returns. For each step, discount sum of current and future
+    ///     rewards. An f32 tensor of shape [TOTAL_STEPS].
+    ///
+    /// * `advantages` - Packed step action advantages. An f32 tensor of shape [TOTAL_STEPS].
+    ///
+    /// * `batch_sizes` - The batch size for each packed time step.
+    ///     An i64 tensor of shape [MAX_EPISODE_LENGHT].
+    ///
+    fn drain_history_features(&mut self) -> (Tensor, Vec<AS::Element>, Tensor, Tensor, Tensor) {
+        let _no_grad = tch::no_grad_guard();
+
+        let steps = self.history.steps();
+        let mut episode_ranges: Vec<_> = self.history.episode_ranges().collect();
+        // Sort in decreasing order of length; required for packing
+        episode_ranges.sort_by(|a, b| a.len().cmp(&b.len()).reverse());
+
+        // Batch sizes in the packing
+        let batch_sizes: Vec<_> = PackedBatchSizes::from_sorted_ranges(&episode_ranges).collect();
+        let batch_sizes_tensor =
+            Tensor::of_slice(&batch_sizes.iter().map(|&x| x as i64).collect::<Vec<_>>());
+
+        // Packed observation features
+        let observation_features = self.observation_space.batch_features(
+            PackingIndices::from_sorted(&episode_ranges).map(|i| &steps[i].observation),
+        );
+
+        // Packed estimated values of the observed states
+        let estimated_values = self
+            .value_fn
+            .seq_packed(&observation_features, &batch_sizes_tensor)
+            .squeeze1(-1);
+
+        assert!(
+            steps
+                .iter()
+                .all(|s| !s.episode_done || s.next_observation.is_none()),
+            "Non-terminal end-of-episode not supported"
+        );
+
+        // Packed estimated value for the observed successor states.
+        // Assumes that all end-of-episodes are terminal and have value 0.
+        //
+        // More generally, we should apply the value function to last_step.next_observation.
+        // But this is tricky since the value function can be a sequential module and require the
+        // state from the rest of the episode.
+        let estimated_next_values =
+            packed::packed_tensor_push_shift(&estimated_values, &batch_sizes, 0.0);
+
+        // Packed step rewards
+        let rewards = Tensor::of_slice(
+            &PackingIndices::from_sorted(&episode_ranges)
+                .map(|i| steps[i].reward as f32)
+                .collect::<Vec<_>>(),
+        );
+
+        // Packed one-step TD residuals.
+        let residuals = &rewards + self.discount_factor * estimated_next_values - estimated_values;
+
+        let batch_sizes_i64: Vec<_> = batch_sizes.iter().map(|&x| x as i64).collect();
+
+        // Packed step returns
+        let returns = packed::packed_tensor_discounted_cumsum_from_end(
+            &rewards,
+            &batch_sizes_i64,
+            self.discount_factor,
+        );
+
+        // Packed step action advantages
+        let advantages = packed::packed_tensor_discounted_cumsum_from_end(
+            &residuals,
+            &batch_sizes_i64,
+            self.lambda * self.discount_factor,
+        );
+
+        // Packed actions
+        // Actions are not necessarily copyable to drain steps and take the actions.
+        // Put into Option so that we can take the action when packing.
+        let (drain_steps, _) = self.history.drain();
+        let mut seq_actions: Vec<_> = drain_steps.map(|step| Some(step.action)).collect();
+        // Packed actions
+        let actions: Vec<_> = PackingIndices::from_sorted(&episode_ranges)
+            .map(|i| seq_actions[i].take().unwrap())
+            .collect();
+
+        (
+            observation_features,
+            actions,
+            returns,
+            advantages,
+            batch_sizes_tensor,
+        )
     }
 }
 
