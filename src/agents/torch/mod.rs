@@ -1,8 +1,8 @@
 //! Agents that use torch
+mod gae_policy_gradient;
 mod history;
-mod vpg;
-mod vpg_gae;
+mod policy_gradient;
 
+pub use gae_policy_gradient::{GaePolicyGradientAgent, GaePolicyGradientAgentConfig};
 pub use history::HistoryBuffer;
-pub use vpg::{PolicyGradientAgent, PolicyGradientAgentConfig};
-pub use vpg_gae::{GaePolicyGradientAgent, GaePolicyGradientAgentConfig};
+pub use policy_gradient::{PolicyGradientAgent, PolicyGradientAgentConfig};
