@@ -566,22 +566,49 @@ mod tests {
         let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
         let batch_sizes = [3, 3, 1, 1];
         let (packed_out, batch_sizes_out) = packed_tensor_from_offset(&packed, &batch_sizes, 1);
+        // Sequences: [1, 2, 3], [11], [101]
         assert_eq!(packed_out, Tensor::of_slice(&[1, 11, 101, 2, 3]));
         assert_eq!(batch_sizes_out, &[3, 1, 1]);
     }
 
     #[test]
-    fn packed_tensor_trim_end_1() {
+    fn packed_tensor_from_offset_is_view() {
+        // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
+        let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
+        let batch_sizes = [3, 3, 1, 1];
+        let (mut packed_out, _) = packed_tensor_from_offset(&packed, &batch_sizes, 1);
+        // Sequences: [1, 2, 3], [11], [101]
+        let _ = packed_out.neg_();
+        assert_eq!(
+            packed,
+            Tensor::of_slice(&[0, 10, 100, -1, -11, -101, -2, -3])
+        );
+    }
+
+    #[test]
+    fn packed_tensor_trim_end_n1() {
         // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
         let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
         let batch_sizes = [3, 3, 1, 1];
         let (packed_out, batch_sizes_out) = packed_tensor_trim_end(&packed, &batch_sizes, 1);
+        // Sequences: [0, 1, 2], [10], [100]
         assert_eq!(packed_out, Tensor::of_slice(&[0, 10, 100, 1, 2]));
         assert_eq!(batch_sizes_out, &[3, 1, 1]);
     }
 
     #[test]
-    fn packed_tensor_push_shift_1() {
+    fn packed_tensor_trim_end_is_copy() {
+        // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
+        let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
+        let batch_sizes = [3, 3, 1, 1];
+        let (mut packed_out, _) = packed_tensor_trim_end(&packed, &batch_sizes, 1);
+        // Sequences: [0, 1, 2], [10], [100]
+        let _ = packed_out.neg_();
+        assert_eq!(packed, Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]));
+    }
+
+    #[test]
+    fn packed_tensor_push_shift_() {
         // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
         let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
         let batch_sizes = [3, 3, 1, 1];
@@ -591,5 +618,15 @@ mod tests {
             packed_out,
             Tensor::of_slice(&[1, 11, 101, 2, -1, -1, 3, -1])
         );
+    }
+
+    #[test]
+    fn packed_tensor_push_shift_is_copy() {
+        // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
+        let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
+        let batch_sizes = [3, 3, 1, 1];
+        let mut packed_out = packed_tensor_push_shift(&packed, &batch_sizes, -1);
+        let _ = packed_out.neg_();
+        assert_eq!(packed, Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]));
     }
 }
