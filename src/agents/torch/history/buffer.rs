@@ -1,5 +1,5 @@
-//! History buffer utilities
-use super::super::Step;
+//! Step history buffer
+use crate::Step;
 use std::iter::Scan;
 use std::ops::Range;
 use std::slice::Iter;

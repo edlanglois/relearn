@@ -1,11 +1,10 @@
 //! Vanilla SequenceModule + StatefulIterativeModule Gradient
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use super::HistoryBuffer;
+use super::history::{features, HistoryBuffer};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
 use crate::torch::{ModuleBuilder, Optimizer, OptimizerBuilder};
-use crate::utils::packed::{PackedBatchSizes, PackingIndices};
 use crate::EnvStructure;
 use tch::{kind::Kind, nn, Device, Tensor};
 
@@ -253,54 +252,24 @@ where
         let _no_grad = tch::no_grad_guard();
 
         let steps = self.history.steps();
-        let mut episode_ranges: Vec<_> = self.history.episode_ranges().collect();
-        // Sort in decreasing order of length; required for packing
-        episode_ranges.sort_by(|a, b| a.len().cmp(&b.len()).reverse());
+        let episode_ranges = features::sorted_episode_ranges(self.history.episode_ranges());
 
-        // Packed observation features
-        let observation_features = self.observation_space.batch_features(
-            PackingIndices::from_sorted(&episode_ranges).map(|i| &steps[i].observation),
-        );
-
-        // Step returns in the reverse order as steps
-        let step_returns_rev: Vec<_> = steps
-            .iter()
-            .rev()
-            .scan(0.0, |next_return, step| {
-                if step.next_observation.is_none() {
-                    // Terminal state
-                    *next_return = 0.0
-                } else if step.episode_done {
-                    // Non-terminal end-of-episode
-                    panic!("Non-terminal end-of-episode not currently supported");
-                }
-                *next_return *= self.discount_factor;
-                *next_return += step.reward;
-                Some(*next_return as f32)
-            })
+        // Batch sizes in the packing
+        let batch_sizes: Vec<_> = features::packing_batch_sizes(&episode_ranges)
+            .map(|x| x as i64)
             .collect();
-        // Packed returns
-        let last_step = steps.len() - 1;
-        let returns: Vec<_> = PackingIndices::from_sorted(&episode_ranges)
-            .map(|i| step_returns_rev[last_step - i])
-            .collect();
-        let returns = Tensor::of_slice(&returns);
+        let batch_sizes_tensor = Tensor::of_slice(&batch_sizes);
 
-        // Actions are not necessarily copyable to drain steps and take the actions.
-        // Put into Option so that we can take the action when packing.
+        let observation_features =
+            features::packed_observation_features(steps, &episode_ranges, &self.observation_space);
+
+        let rewards = features::packed_rewards(steps, &episode_ranges);
+        let returns = features::packed_returns(&rewards, &batch_sizes, self.discount_factor);
+
         let (drain_steps, _) = self.history.drain();
-        let mut seq_actions: Vec<_> = drain_steps.map(|step| Some(step.action)).collect();
-        // Packed actions
-        let actions: Vec<_> = PackingIndices::from_sorted(&episode_ranges)
-            .map(|i| seq_actions[i].take().unwrap())
-            .collect();
+        let actions = features::into_packed_actions(drain_steps, &episode_ranges);
 
-        let batch_sizes: Vec<_> = PackedBatchSizes::from_sorted_ranges(&episode_ranges)
-            .map(|s| s as i64)
-            .collect();
-        let batch_sizes = Tensor::of_slice(&batch_sizes);
-
-        (observation_features, actions, returns, batch_sizes)
+        (observation_features, actions, returns, batch_sizes_tensor)
     }
 }
 
