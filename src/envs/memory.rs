@@ -4,19 +4,23 @@ use rand::prelude::*;
 
 /// Memory Game Environment
 ///
-/// * The environment consists of (N + M) states.
-/// * An episode starts in a state [0, N) uniformly at random.
-/// * Step i (in [0, M)) transitions to state N + i with 0 reward regardless of the action.
-/// * On step M, the agent chooses 1 of N actions
+/// The agent must remember the inital state and choose the corresponding action as the final
+/// action in an episode.
+///
+/// * The environment consists of (NUM_ACTIONS + HISTORY_LEN) states.
+/// * An episode starts in a state [0, NUM_ACTIONS) uniformly at random.
+/// * Step i in [0, HISTORY_LEN) transitions to state NUM_ACTIONS + i
+///     with 0 reward regardless of the action.
+/// * On step HISTORY_LEN, the agent chooses one of NUM_ACTIONS actions
 ///     and if the action index matches the index of the inital state
 ///     then the agent earns +1 reward, otherwise it earns -1 reward.
 ///     This step is terminal.
-/// * Every episode has length M + 1.
+/// * Every episode has length HISTORY_LEN + 1.
 #[derive(Debug, Clone)]
 pub struct MemoryGame {
-    /// The number of actions; `N`.
+    /// The number of actions.
     pub num_actions: usize,
-    /// Length of remembered history required to solve the environment; `M`.
+    /// Length of remembered history required to solve the environment.
     pub history_len: usize,
 }
 
@@ -33,8 +37,8 @@ impl MemoryGame {
     /// Create a new MemoryGame instance
     ///
     /// # Args
-    /// * `num_actions` - Number of possible actions (N).
-    /// * `history_len` - Length of remembered history required to solve the environment (M).
+    /// * `num_actions` - Number of possible actions.
+    /// * `history_len` - Length of remembered history required to solve the environment.
     pub fn new(num_actions: usize, history_len: usize) -> Self {
         Self {
             num_actions,
