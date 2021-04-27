@@ -369,15 +369,16 @@ where
         let episode_ranges = features::sorted_episode_ranges(self.history.episode_ranges());
 
         // Batch sizes in the packing
-        let batch_sizes: Vec<usize> = features::packing_batch_sizes(&episode_ranges).collect();
-        let batch_sizes_i64: Vec<_> = batch_sizes.iter().map(|&x| x as i64).collect();
-        let batch_sizes_tensor = Tensor::of_slice(&batch_sizes_i64);
+        let batch_sizes: Vec<_> = features::packing_batch_sizes(&episode_ranges)
+            .map(|x| x as i64)
+            .collect();
+        let batch_sizes_tensor = Tensor::of_slice(&batch_sizes);
 
         let observation_features =
             features::packed_observation_features(steps, &episode_ranges, &self.observation_space);
 
         let rewards = features::packed_rewards(steps, &episode_ranges);
-        let returns = features::packed_returns(&rewards, &batch_sizes_i64, self.discount_factor);
+        let returns = features::packed_returns(&rewards, &batch_sizes, self.discount_factor);
 
         // Packed estimated values of the observed states
         let estimated_values = self
@@ -407,7 +408,7 @@ where
         // Packed step action advantages
         let advantages = packed::packed_tensor_discounted_cumsum_from_end(
             &residuals,
-            &batch_sizes_i64,
+            &batch_sizes,
             self.lambda * self.discount_factor,
         );
 

@@ -322,10 +322,10 @@ pub fn packed_tensor_batched_steps(packed: &Tensor, batch_sizes: &[i64]) -> Vec<
 
 pub fn packed_tensor_from_offset<'a>(
     packed: &Tensor,
-    batch_sizes: &'a [usize],
+    batch_sizes: &'a [i64],
     offset: usize,
-) -> (Tensor, &'a [usize]) {
-    let packed_offset = batch_sizes[..offset].iter().sum::<usize>() as i64;
+) -> (Tensor, &'a [i64]) {
+    let packed_offset = batch_sizes[..offset].iter().sum::<i64>() as i64;
     (packed.i(packed_offset..), &batch_sizes[offset..])
 }
 
@@ -351,8 +351,8 @@ fn group_batches_for_resize<'a, 'b, T, U>(
     new_batch_sizes: U,
 ) -> (Vec<i64>, Vec<i64>)
 where
-    T: IntoIterator<Item = &'a usize>,
-    U: IntoIterator<Item = &'b usize>,
+    T: IntoIterator<Item = &'a i64>,
+    U: IntoIterator<Item = &'b i64>,
 {
     let mut old_group_sizes: Vec<i64> = Vec::new(); // i64 required by tch interface
     let mut new_group_sizes: Vec<i64> = Vec::new();
@@ -374,9 +374,9 @@ where
         // Can merge consecutive tail batches because the whole tail will be added/removed
         // so it is still a suffix operation on the group, just one that affects multiple batches.
         if !tail && old != new {
-            old_group_sizes.push(next_old_group_size as i64);
+            old_group_sizes.push(next_old_group_size);
             next_old_group_size = 0;
-            new_group_sizes.push(next_new_group_size as i64);
+            new_group_sizes.push(next_new_group_size);
             next_new_group_size = 0;
         }
     }
@@ -400,9 +400,9 @@ where
 ///
 pub fn packed_tensor_trim_end<'a>(
     packed: &Tensor,
-    batch_sizes: &'a [usize],
+    batch_sizes: &'a [i64],
     n: usize,
-) -> (Tensor, &'a [usize]) {
+) -> (Tensor, &'a [i64]) {
     // Batch sizes are the same as if we had dropped from the start of each sequence
     let new_batch_sizes = &batch_sizes[n..];
 
@@ -430,7 +430,7 @@ pub fn packed_tensor_trim_end<'a>(
 /// # Returns
 /// Tensor of output packed sequences. Has the same shape and batch sizes as `packed`.
 ///
-pub fn packed_tensor_push_shift<S>(packed: &Tensor, batch_sizes: &[usize], value: S) -> Tensor
+pub fn packed_tensor_push_shift<S>(packed: &Tensor, batch_sizes: &[i64], value: S) -> Tensor
 where
     S: Into<Scalar> + Copy,
 {
