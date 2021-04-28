@@ -1,6 +1,6 @@
 //! Vanilla SequenceModule + StatefulIterativeModule Gradient with Generalized Advantage Estimation
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use super::history::{features, HistoryBuffer};
+use super::history::{features, HistoryBuffer, PackedHistoryFeatures};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
@@ -289,21 +289,22 @@ where
         let num_steps = self.history.len();
         let num_episodes = self.history.num_episodes();
 
-        let (observation_features, actions, returns, advantages, batch_sizes) =
-            self.drain_history_features();
+        let (mut features, advantages) = self.history_features();
 
-        let policy_output = self.policy.seq_packed(&observation_features, &batch_sizes);
-        let (log_probs, entropies) = self.action_space.batch_statistics(&policy_output, &actions);
+        let observation_features = features.observations();
+        let batch_sizes_tensor = features.batch_sizes_tensor();
+        let returns = features.returns();
 
-        let policy_loss = -(log_probs * advantages).mean(Kind::Float);
-        self.policy_optimizer.backward_step(&policy_loss);
+        let policy_output = self
+            .policy
+            .seq_packed(observation_features, batch_sizes_tensor);
 
         for i in 0..self.value_fn_train_iters {
             let value_fn_loss = self
                 .value_fn
-                .seq_packed(&observation_features, &batch_sizes)
+                .seq_packed(observation_features, batch_sizes_tensor)
                 .squeeze1(-1) // feature dim
-                .mse_loss(&returns, Reduction::Mean);
+                .mse_loss(returns, Reduction::Mean);
 
             if i == 0 {
                 logger
@@ -325,6 +326,15 @@ where
 
             self.value_fn_optimizer.backward_step(&value_fn_loss);
         }
+
+        let episode_ranges = std::mem::take(&mut features.episode_ranges);
+        let (drain_steps, _) = self.history.drain();
+        let actions = features::into_packed_actions(drain_steps, &episode_ranges);
+
+        let (log_probs, entropies) = self.action_space.batch_statistics(&policy_output, &actions);
+
+        let policy_loss = -(log_probs * advantages).mean(Kind::Float);
+        self.policy_optimizer.backward_step(&policy_loss);
 
         logger
             .log(Event::Epoch, "batch_num_steps", (num_steps as f64).into())
@@ -349,45 +359,30 @@ where
     /// Drain the stored history into a set of features. Clears the stored history.
     ///
     /// # Returns
-    /// * `observation_features` - Packed observation features.
-    ///     An f32 tensor of shape [TOTAL_STEPS, NUM_INPUT_FEATURES].
     ///
-    /// * `actions` - Packed step actions. A vector of length TOTAL_STEPS.
-    ///
-    /// * `returns` - Packed step returns. For each step, discount sum of current and future
-    ///     rewards. An f32 tensor of shape [TOTAL_STEPS].
+    /// * `features` - History features.
     ///
     /// * `advantages` - Packed step action advantages. An f32 tensor of shape [TOTAL_STEPS].
     ///
-    /// * `batch_sizes` - The batch size for each packed time step.
-    ///     An i64 tensor of shape [MAX_EPISODE_LENGHT].
-    ///
-    fn drain_history_features(&mut self) -> (Tensor, Vec<AS::Element>, Tensor, Tensor, Tensor) {
+    fn history_features<'a>(&'a self) -> (PackedHistoryFeatures<'a, OS, AS::Element>, Tensor) {
         let _no_grad = tch::no_grad_guard();
 
-        let steps = self.history.steps();
-        let episode_ranges = features::sorted_episode_ranges(self.history.episode_ranges());
-
-        // Batch sizes in the packing
-        let batch_sizes: Vec<_> = features::packing_batch_sizes(&episode_ranges)
-            .map(|x| x as i64)
-            .collect();
-        let batch_sizes_tensor = Tensor::of_slice(&batch_sizes);
-
-        let observation_features =
-            features::packed_observation_features(steps, &episode_ranges, &self.observation_space);
-
-        let rewards = features::packed_rewards(steps, &episode_ranges);
-        let returns = features::packed_returns(&rewards, &batch_sizes, self.discount_factor);
+        let features = PackedHistoryFeatures::new(
+            self.history.steps(),
+            self.history.episode_ranges(),
+            &self.observation_space,
+            self.discount_factor,
+        );
 
         // Packed estimated values of the observed states
         let estimated_values = self
             .value_fn
-            .seq_packed(&observation_features, &batch_sizes_tensor)
+            .seq_packed(features.observations(), features.batch_sizes_tensor())
             .squeeze1(-1);
 
         assert!(
-            steps
+            features
+                .steps
                 .iter()
                 .all(|s| !s.episode_done || s.next_observation.is_none()),
             "Non-terminal end-of-episode not supported"
@@ -400,28 +395,20 @@ where
         // But this is tricky since the value function can be a sequential module and require the
         // state from the rest of the episode.
         let estimated_next_values =
-            packed::packed_tensor_push_shift(&estimated_values, &batch_sizes, 0.0);
+            packed::packed_tensor_push_shift(&estimated_values, features.batch_sizes(), 0.0);
 
         // Packed one-step TD residuals.
-        let residuals = &rewards + self.discount_factor * estimated_next_values - estimated_values;
+        let residuals =
+            features.rewards() + self.discount_factor * estimated_next_values - estimated_values;
 
         // Packed step action advantages
         let advantages = packed::packed_tensor_discounted_cumsum_from_end(
             &residuals,
-            &batch_sizes,
+            &features.batch_sizes(),
             self.lambda * self.discount_factor,
         );
 
-        let (drain_steps, _) = self.history.drain();
-        let actions = features::into_packed_actions(drain_steps, &episode_ranges);
-
-        (
-            observation_features,
-            actions,
-            returns,
-            advantages,
-            batch_sizes_tensor,
-        )
+        (features, advantages)
     }
 }
 

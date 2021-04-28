@@ -1,6 +1,6 @@
 //! Vanilla SequenceModule + StatefulIterativeModule Gradient
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use super::history::{features, HistoryBuffer};
+use super::history::{features, HistoryBuffer, PackedHistoryFeatures};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
@@ -206,10 +206,23 @@ where
         let num_steps = self.history.len();
         let num_episodes = self.history.num_episodes();
 
-        let (observation_features, actions, returns, batch_sizes) = self.drain_history_features();
+        let mut features = PackedHistoryFeatures::new(
+            self.history.steps(),
+            self.history.episode_ranges(),
+            &self.observation_space,
+            self.discount_factor,
+        );
 
-        let output = self.policy.seq_packed(&observation_features, &batch_sizes);
-        let (log_probs, entropies) = self.action_space.batch_statistics(&output, &actions);
+        let policy_output = self
+            .policy
+            .seq_packed(features.observations(), features.batch_sizes_tensor());
+        let returns = features.returns().shallow_clone();
+
+        let episode_ranges = std::mem::take(&mut features.episode_ranges);
+        let (drain_steps, _) = self.history.drain();
+        let actions = features::into_packed_actions(drain_steps, &episode_ranges);
+
+        let (log_probs, entropies) = self.action_space.batch_statistics(&policy_output, &actions);
 
         let loss = -(log_probs * returns).mean(Kind::Float);
         self.optimizer.backward_step(&loss);
@@ -232,44 +245,6 @@ where
             )
             .unwrap();
         logger.done(Event::Epoch);
-    }
-
-    /// Drain the stored history into a set of features. Clears the stored history.
-    ///
-    /// # Returns
-    /// * `observation_features` - Packed observation features.
-    ///     An f32 tensor of shape [TOTAL_STEPS, NUM_INPUT_FEATURES].
-    ///
-    /// * `actions` - Packed step actions. A vector of length TOTAL_STEPS.
-    ///
-    /// * `returns` - Packed step returns. For each step, discount sum of current and future
-    ///     rewards. An f32 tensor of shape [TOTAL_STEPS].
-    ///
-    /// * `batch_sizes` - The batch size for each packed time step.
-    ///     An i64 tensor of shape [MAX_EPISODE_LENGHT].
-    ///
-    fn drain_history_features(&mut self) -> (Tensor, Vec<AS::Element>, Tensor, Tensor) {
-        let _no_grad = tch::no_grad_guard();
-
-        let steps = self.history.steps();
-        let episode_ranges = features::sorted_episode_ranges(self.history.episode_ranges());
-
-        // Batch sizes in the packing
-        let batch_sizes: Vec<_> = features::packing_batch_sizes(&episode_ranges)
-            .map(|x| x as i64)
-            .collect();
-        let batch_sizes_tensor = Tensor::of_slice(&batch_sizes);
-
-        let observation_features =
-            features::packed_observation_features(steps, &episode_ranges, &self.observation_space);
-
-        let rewards = features::packed_rewards(steps, &episode_ranges);
-        let returns = features::packed_returns(&rewards, &batch_sizes, self.discount_factor);
-
-        let (drain_steps, _) = self.history.drain();
-        let actions = features::into_packed_actions(drain_steps, &episode_ranges);
-
-        (observation_features, actions, returns, batch_sizes_tensor)
     }
 }
 

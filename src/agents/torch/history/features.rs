@@ -1,9 +1,95 @@
 //! Utilities for calculating step history features.
-use crate::spaces::FeatureSpace;
+use crate::spaces::{FeatureSpace, Space};
 use crate::utils::packed::{self, PackedBatchSizes, PackingIndices};
 use crate::Step;
+use lazycell::LazyCell;
 use std::ops::Range;
 use tch::Tensor;
+
+/// Packed history features with lazy evaluation and caching.
+pub struct PackedHistoryFeatures<'a, OS: Space, A> {
+    /// Step history
+    pub steps: &'a [Step<OS::Element, A>],
+    /// Episode index ranges sorted in decreasing order of episode length.
+    pub episode_ranges: Vec<Range<usize>>,
+    /// Observation space
+    pub observation_space: &'a OS,
+    /// Discount factor for calculating returns.
+    pub discount_factor: f64,
+
+    cached_batch_sizes: LazyCell<Vec<i64>>,
+    cached_batch_sizes_tensor: LazyCell<Tensor>,
+    cached_observation_features: LazyCell<Tensor>,
+    cached_returns: LazyCell<Tensor>,
+    cached_rewards: LazyCell<Tensor>,
+}
+
+impl<'a, OS: Space, A> PackedHistoryFeatures<'a, OS, A> {
+    pub fn new<I>(
+        steps: &'a [Step<OS::Element, A>],
+        episode_ranges: I,
+        observation_space: &'a OS,
+        discount_factor: f64,
+    ) -> Self
+    where
+        I: IntoIterator<Item = Range<usize>>,
+    {
+        let episode_ranges = sorted_episode_ranges(episode_ranges);
+        Self {
+            steps,
+            episode_ranges,
+            observation_space,
+            discount_factor,
+            cached_batch_sizes: LazyCell::new(),
+            cached_batch_sizes_tensor: LazyCell::new(),
+            cached_observation_features: LazyCell::new(),
+            cached_returns: LazyCell::new(),
+            cached_rewards: LazyCell::new(),
+        }
+    }
+
+    /// Batch sizes in the packing.
+    ///
+    /// Note: Batch sizes are always >= 0 but the [tch] API uses i64.
+    pub fn batch_sizes(&self) -> &[i64] {
+        self.cached_batch_sizes.borrow_with(|| {
+            packing_batch_sizes(&self.episode_ranges)
+                .map(|x| x as i64)
+                .collect()
+        })
+    }
+
+    /// Batch sizes in the packing. A 1D i64 tensor.
+    pub fn batch_sizes_tensor(&self) -> &Tensor {
+        self.cached_batch_sizes_tensor
+            .borrow_with(|| Tensor::of_slice(self.batch_sizes()))
+    }
+
+    /// Packed rewards. A 1D f32 tensor.
+    pub fn rewards(&self) -> &Tensor {
+        self.cached_rewards
+            .borrow_with(|| packed_rewards(&self.steps, &self.episode_ranges))
+    }
+
+    /// Packed returns (discounted reward-to-go). A 1D f32 tensor.
+    pub fn returns(&self) -> &Tensor {
+        self.cached_returns.borrow_with(|| {
+            packed_returns(self.rewards(), self.batch_sizes(), self.discount_factor)
+        })
+    }
+}
+
+impl<'a, OS, A> PackedHistoryFeatures<'a, OS, A>
+where
+    OS: FeatureSpace<Tensor>,
+{
+    /// Packed observation features. A 2D f64 tensor.
+    pub fn observations(&self) -> &Tensor {
+        self.cached_observation_features.borrow_with(|| {
+            packed_observation_features(&self.steps, &self.episode_ranges, self.observation_space)
+        })
+    }
+}
 
 /// Episode index ranges sorted in decreasing order of episode length.
 ///
@@ -25,23 +111,22 @@ pub fn packing_batch_sizes<'a>(
 }
 
 /// Packed observation features. A 2D f32 tensor.
-pub fn packed_observation_features<'a, OS, A>(
-    steps: &'a [Step<OS::Element, A>],
+pub fn packed_observation_features<OS, A>(
+    steps: &[Step<OS::Element, A>],
     episode_ranges: &[Range<usize>],
     observation_space: &OS,
 ) -> Tensor
 where
     OS: FeatureSpace<Tensor>,
 {
+    let _no_grad = tch::no_grad_guard();
     observation_space
         .batch_features(PackingIndices::from_sorted(&episode_ranges).map(|i| &steps[i].observation))
 }
 
 /// Packed step rewards. A 1D f32 tensor.
-pub fn packed_rewards<'a, S, A>(
-    steps: &'a [Step<S, A>],
-    episode_ranges: &[Range<usize>],
-) -> Tensor {
+pub fn packed_rewards<S, A>(steps: &[Step<S, A>], episode_ranges: &[Range<usize>]) -> Tensor {
+    let _no_grad = tch::no_grad_guard();
     Tensor::of_slice(
         &PackingIndices::from_sorted(&episode_ranges)
             .map(|i| steps[i].reward as f32)
@@ -51,6 +136,7 @@ pub fn packed_rewards<'a, S, A>(
 
 /// Packed step returns (discounted rewards-to-go). A 1D f32 tensor.
 pub fn packed_returns(rewards: &Tensor, batch_sizes: &[i64], discount_factor: f64) -> Tensor {
+    let _no_grad = tch::no_grad_guard();
     packed::packed_tensor_discounted_cumsum_from_end(rewards, batch_sizes, discount_factor)
 }
 
