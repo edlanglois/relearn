@@ -20,17 +20,15 @@ pub struct LazyPackedHistoryFeatures<'a, OS: Space, A> {
     cached_batch_sizes: LazyCell<Vec<i64>>,
     cached_batch_sizes_tensor: LazyCell<Tensor>,
     cached_observation_features: LazyCell<Tensor>,
-    cached_raw_actions: LazyCell<Vec<A>>,
     cached_returns: LazyCell<Tensor>,
     cached_rewards: LazyCell<Tensor>,
 }
 
-pub struct PackedHistoryFeatures<A> {
+pub struct PackedHistoryFeatures {
     pub episode_ranges: Vec<Range<usize>>,
     pub batch_sizes: Option<Vec<i64>>,
     pub batch_sizes_tensor: Option<Tensor>,
     pub observation_features: Option<Tensor>,
-    pub raw_actions: Option<Vec<A>>,
     pub returns: Option<Tensor>,
     pub rewards: Option<Tensor>,
 }
@@ -54,20 +52,18 @@ impl<'a, OS: Space, A> LazyPackedHistoryFeatures<'a, OS, A> {
             cached_batch_sizes: LazyCell::new(),
             cached_batch_sizes_tensor: LazyCell::new(),
             cached_observation_features: LazyCell::new(),
-            cached_raw_actions: LazyCell::new(),
             cached_returns: LazyCell::new(),
             cached_rewards: LazyCell::new(),
         }
     }
 
     /// Finalize this into a structure of the current values in cache.
-    pub fn finalize(self) -> PackedHistoryFeatures<A> {
+    pub fn finalize(self) -> PackedHistoryFeatures {
         PackedHistoryFeatures {
             episode_ranges: self.episode_ranges,
             batch_sizes: self.cached_batch_sizes.into_inner(),
             batch_sizes_tensor: self.cached_batch_sizes_tensor.into_inner(),
             observation_features: self.cached_observation_features.into_inner(),
-            raw_actions: self.cached_raw_actions.into_inner(),
             returns: self.cached_returns.into_inner(),
             rewards: self.cached_rewards.into_inner(),
         }
@@ -113,17 +109,6 @@ where
         self.cached_observation_features.borrow_with(|| {
             packed_observation_features(&self.steps, &self.episode_ranges, self.observation_space)
         })
-    }
-}
-
-impl<'a, OS, A> LazyPackedHistoryFeatures<'a, OS, A>
-where
-    OS: Space,
-    A: Copy,
-{
-    pub fn raw_actions(&self) -> &Vec<A> {
-        self.cached_raw_actions
-            .borrow_with(|| packed_actions(&self.steps, &self.episode_ranges))
     }
 }
 
@@ -174,16 +159,6 @@ pub fn packed_rewards<S, A>(steps: &[Step<S, A>], episode_ranges: &[Range<usize>
 pub fn packed_returns(rewards: &Tensor, batch_sizes: &[i64], discount_factor: f64) -> Tensor {
     let _no_grad = tch::no_grad_guard();
     packed::packed_tensor_discounted_cumsum_from_end(rewards, batch_sizes, discount_factor)
-}
-
-/// A vector of packed step actions.
-pub fn packed_actions<S, A>(steps: &[Step<S, A>], episode_ranges: &[Range<usize>]) -> Vec<A>
-where
-    A: Copy,
-{
-    PackingIndices::from_sorted(&episode_ranges)
-        .map(|i| steps[i].action)
-        .collect()
 }
 
 /// Convert an iterator over steps into packed actions.
