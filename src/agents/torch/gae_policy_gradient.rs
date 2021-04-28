@@ -1,6 +1,6 @@
 //! Vanilla SequenceModule + StatefulIterativeModule Gradient with Generalized Advantage Estimation
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use super::history::{features, HistoryBuffer, PackedHistoryFeatures};
+use super::history::{features, HistoryBuffer, LazyPackedHistoryFeatures};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
@@ -289,7 +289,7 @@ where
         let num_steps = self.history.len();
         let num_episodes = self.history.num_episodes();
 
-        let (mut features, advantages) = self.history_features();
+        let (features, advantages) = self.history_features();
 
         let observation_features = features.observations();
         let batch_sizes_tensor = features.batch_sizes_tensor();
@@ -327,9 +327,11 @@ where
             self.value_fn_optimizer.backward_step(&value_fn_loss);
         }
 
-        let episode_ranges = std::mem::take(&mut features.episode_ranges);
+        let features = features.finalize();
+
+        // Consume steps into a vector of actions.
         let (drain_steps, _) = self.history.drain();
-        let actions = features::into_packed_actions(drain_steps, &episode_ranges);
+        let actions = features::into_packed_actions(drain_steps, &features.episode_ranges);
 
         let (log_probs, entropies) = self.action_space.batch_statistics(&policy_output, &actions);
 
@@ -364,10 +366,10 @@ where
     ///
     /// * `advantages` - Packed step action advantages. An f32 tensor of shape [TOTAL_STEPS].
     ///
-    fn history_features<'a>(&'a self) -> (PackedHistoryFeatures<'a, OS, AS::Element>, Tensor) {
+    fn history_features<'a>(&'a self) -> (LazyPackedHistoryFeatures<'a, OS, AS::Element>, Tensor) {
         let _no_grad = tch::no_grad_guard();
 
-        let features = PackedHistoryFeatures::new(
+        let features = LazyPackedHistoryFeatures::new(
             self.history.steps(),
             self.history.episode_ranges(),
             &self.observation_space,
@@ -381,8 +383,8 @@ where
             .squeeze1(-1);
 
         assert!(
-            features
-                .steps
+            self.history
+                .steps()
                 .iter()
                 .all(|s| !s.episode_done || s.next_observation.is_none()),
             "Non-terminal end-of-episode not supported"

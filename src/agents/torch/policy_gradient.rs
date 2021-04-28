@@ -1,6 +1,6 @@
 //! Vanilla SequenceModule + StatefulIterativeModule Gradient
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use super::history::{features, HistoryBuffer, PackedHistoryFeatures};
+use super::history::{features, HistoryBuffer, LazyPackedHistoryFeatures};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
@@ -206,7 +206,7 @@ where
         let num_steps = self.history.len();
         let num_episodes = self.history.num_episodes();
 
-        let mut features = PackedHistoryFeatures::new(
+        let features = LazyPackedHistoryFeatures::new(
             self.history.steps(),
             self.history.episode_ranges(),
             &self.observation_space,
@@ -216,11 +216,14 @@ where
         let policy_output = self
             .policy
             .seq_packed(features.observations(), features.batch_sizes_tensor());
-        let returns = features.returns().shallow_clone();
 
-        let episode_ranges = std::mem::take(&mut features.episode_ranges);
+        let _ = features.returns(); // fill the cache
+        let mut features = features.finalize();
+        let returns = features.returns.take().unwrap();
+
+        // Consume steps into a vector of actions.
         let (drain_steps, _) = self.history.drain();
-        let actions = features::into_packed_actions(drain_steps, &episode_ranges);
+        let actions = features::into_packed_actions(drain_steps, &features.episode_ranges);
 
         let (log_probs, entropies) = self.action_space.batch_statistics(&policy_output, &actions);
 
