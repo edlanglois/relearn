@@ -69,22 +69,22 @@ impl Update<&Options> for MlpConfig {
     }
 }
 
-impl<R, P> From<&Options> for StackedConfig<R, P>
+impl<'a, R, P> From<&'a Options> for StackedConfig<R, P>
 where
-    R: Default + for<'a> Update<&'a Options>,
-    P: Default + for<'a> Update<&'a Options>,
+    R: Default + Update<&'a Options>,
+    P: Default + Update<&'a Options>,
 {
-    fn from(opts: &Options) -> Self {
+    fn from(opts: &'a Options) -> Self {
         Self::default().with_update(opts)
     }
 }
 
-impl<R, P> Update<&Options> for StackedConfig<R, P>
+impl<'a, R, P> Update<&'a Options> for StackedConfig<R, P>
 where
-    R: for<'a> Update<&'a Options>,
-    P: for<'a> Update<&'a Options>,
+    R: Update<&'a Options>,
+    P: Update<&'a Options>,
 {
-    fn update(&mut self, opts: &Options) {
+    fn update(&mut self, opts: &'a Options) {
         self.seq_config.update(opts);
         self.top_config.update(opts);
         if let Some(seq_output_dim) = opts.rnn_hidden_size {
