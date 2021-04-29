@@ -1,8 +1,8 @@
-use super::{OptimizerDef, SeqModDef};
+use super::{OptimizerDef, SeqModDef, StepValueDef};
 use crate::agents::{
     Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError,
-    GaePolicyGradientAgentConfig, GaePolicyGradientBoxedAgent, PolicyGradientAgentConfig,
-    PolicyGradientBoxedAgent, RandomAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
+    PolicyGradientAgentConfig, PolicyGradientBoxedAgent, RandomAgentConfig,
+    TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::EnvStructure;
 use crate::spaces::{FiniteSpace, RLSpace};
@@ -21,12 +21,8 @@ pub enum AgentDef {
     BetaThompsonSampling(BetaThompsonSamplingAgentConfig),
     /// UCB1 agent from Auer 2002
     UCB1(UCB1AgentConfig),
-    /// Policy gradient.
-    PolicyGradient(PolicyGradientAgentConfig<SeqModDef, OptimizerDef>),
-    /// Policy gradient with Generalized Advantage Estimation.
-    GaePolicyGradient(
-        GaePolicyGradientAgentConfig<SeqModDef, OptimizerDef, SeqModDef, OptimizerDef>,
-    ),
+    /// Policy gradient
+    PolicyGradient(PolicyGradientAgentConfig<SeqModDef, OptimizerDef, StepValueDef, OptimizerDef>),
 }
 
 // TODO: Return Box<dyn ActorAgent> where ActorAgent: Actor + Agent instead of Box<dyn Agent>
@@ -74,9 +70,6 @@ impl AgentDef {
             PolicyGradient(config) => config
                 .build_agent(es, seed)
                 .map(|a: PolicyGradientBoxedAgent<_, _>| Box::new(a) as _),
-            GaePolicyGradient(config) => config
-                .build_agent(es, seed)
-                .map(|a: GaePolicyGradientBoxedAgent<_, _>| Box::new(a) as _),
             _ => Err(BuildAgentError::InvalidSpaceBounds),
         }
     }

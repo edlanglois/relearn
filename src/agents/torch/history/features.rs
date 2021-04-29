@@ -6,15 +6,37 @@ use lazycell::LazyCell;
 use std::ops::Range;
 use tch::Tensor;
 
+/// View packed history features
+pub trait PackedHistoryFeaturesView {
+    /// Discount factor for calculating returns.
+    fn discount_factor(&self) -> f64;
+
+    /// Episode index ranges sorted in decreasing order of episode length.
+    fn episode_ranges(&self) -> &[Range<usize>];
+
+    /// Batch sizes in the packing.
+    ///
+    /// Note: Batch sizes are always >= 0 but the [tch] API uses i64.
+    fn batch_sizes(&self) -> &[i64];
+
+    /// Batch sizes in the packing. A 1D i64 tensor.
+    fn batch_sizes_tensor(&self) -> &Tensor;
+
+    /// Packed observation features. A 2D f64 tensor.
+    fn observations(&self) -> &Tensor;
+
+    /// Packed returns (discounted reward-to-go). A 1D f32 tensor.
+    fn returns(&self) -> &Tensor;
+
+    /// Packed rewards. A 1D f32 tensor.
+    fn rewards(&self) -> &Tensor;
+}
+
 /// Packed history features with lazy evaluation and caching.
 pub struct LazyPackedHistoryFeatures<'a, OS: Space, A> {
-    /// Step history
     steps: &'a [Step<OS::Element, A>],
-    /// Episode index ranges sorted in decreasing order of episode length.
     episode_ranges: Vec<Range<usize>>,
-    /// Observation space
     observation_space: &'a OS,
-    /// Discount factor for calculating returns.
     discount_factor: f64,
 
     cached_batch_sizes: LazyCell<Vec<i64>>,
@@ -22,15 +44,6 @@ pub struct LazyPackedHistoryFeatures<'a, OS: Space, A> {
     cached_observation_features: LazyCell<Tensor>,
     cached_returns: LazyCell<Tensor>,
     cached_rewards: LazyCell<Tensor>,
-}
-
-pub struct PackedHistoryFeatures {
-    pub episode_ranges: Vec<Range<usize>>,
-    pub batch_sizes: Option<Vec<i64>>,
-    pub batch_sizes_tensor: Option<Tensor>,
-    pub observation_features: Option<Tensor>,
-    pub returns: Option<Tensor>,
-    pub rewards: Option<Tensor>,
 }
 
 impl<'a, OS: Space, A> LazyPackedHistoryFeatures<'a, OS, A> {
@@ -60,6 +73,7 @@ impl<'a, OS: Space, A> LazyPackedHistoryFeatures<'a, OS, A> {
     /// Finalize this into a structure of the current values in cache.
     pub fn finalize(self) -> PackedHistoryFeatures {
         PackedHistoryFeatures {
+            discount_factor: self.discount_factor,
             episode_ranges: self.episode_ranges,
             batch_sizes: self.cached_batch_sizes.into_inner(),
             batch_sizes_tensor: self.cached_batch_sizes_tensor.into_inner(),
@@ -68,11 +82,21 @@ impl<'a, OS: Space, A> LazyPackedHistoryFeatures<'a, OS, A> {
             rewards: self.cached_rewards.into_inner(),
         }
     }
+}
 
-    /// Batch sizes in the packing.
-    ///
-    /// Note: Batch sizes are always >= 0 but the [tch] API uses i64.
-    pub fn batch_sizes(&self) -> &[i64] {
+impl<'a, OS, A> PackedHistoryFeaturesView for LazyPackedHistoryFeatures<'a, OS, A>
+where
+    OS: FeatureSpace<Tensor>,
+{
+    fn discount_factor(&self) -> f64 {
+        self.discount_factor
+    }
+
+    fn episode_ranges(&self) -> &[Range<usize>] {
+        &self.episode_ranges
+    }
+
+    fn batch_sizes(&self) -> &[i64] {
         self.cached_batch_sizes.borrow_with(|| {
             packing_batch_sizes(&self.episode_ranges)
                 .map(|x| x as i64)
@@ -80,35 +104,82 @@ impl<'a, OS: Space, A> LazyPackedHistoryFeatures<'a, OS, A> {
         })
     }
 
-    /// Batch sizes in the packing. A 1D i64 tensor.
-    pub fn batch_sizes_tensor(&self) -> &Tensor {
+    fn batch_sizes_tensor(&self) -> &Tensor {
         self.cached_batch_sizes_tensor
             .borrow_with(|| Tensor::of_slice(self.batch_sizes()))
     }
 
-    /// Packed rewards. A 1D f32 tensor.
-    pub fn rewards(&self) -> &Tensor {
-        self.cached_rewards
-            .borrow_with(|| packed_rewards(&self.steps, &self.episode_ranges))
+    fn observations(&self) -> &Tensor {
+        self.cached_observation_features.borrow_with(|| {
+            packed_observation_features(&self.steps, &self.episode_ranges, self.observation_space)
+        })
     }
 
-    /// Packed returns (discounted reward-to-go). A 1D f32 tensor.
-    pub fn returns(&self) -> &Tensor {
+    fn returns(&self) -> &Tensor {
         self.cached_returns.borrow_with(|| {
             packed_returns(self.rewards(), self.batch_sizes(), self.discount_factor)
         })
     }
+
+    fn rewards(&self) -> &Tensor {
+        self.cached_rewards
+            .borrow_with(|| packed_rewards(&self.steps, &self.episode_ranges))
+    }
 }
 
-impl<'a, OS, A> LazyPackedHistoryFeatures<'a, OS, A>
-where
-    OS: FeatureSpace<Tensor>,
-{
-    /// Packed observation features. A 2D f64 tensor.
-    pub fn observations(&self) -> &Tensor {
-        self.cached_observation_features.borrow_with(|| {
-            packed_observation_features(&self.steps, &self.episode_ranges, self.observation_space)
-        })
+/// Packed history features.
+///
+/// # Panics
+/// The [PackedHistoryFeaturesView] this provides will panic
+/// if the requested features is not available.
+pub struct PackedHistoryFeatures {
+    pub discount_factor: f64,
+    pub episode_ranges: Vec<Range<usize>>,
+    pub batch_sizes: Option<Vec<i64>>,
+    pub batch_sizes_tensor: Option<Tensor>,
+    pub observation_features: Option<Tensor>,
+    pub returns: Option<Tensor>,
+    pub rewards: Option<Tensor>,
+}
+
+impl PackedHistoryFeaturesView for PackedHistoryFeatures {
+    fn discount_factor(&self) -> f64 {
+        self.discount_factor
+    }
+
+    fn episode_ranges(&self) -> &[Range<usize>] {
+        &self.episode_ranges
+    }
+
+    fn batch_sizes(&self) -> &[i64] {
+        self.batch_sizes
+            .as_ref()
+            .expect("batch_sizes has not been evaluated")
+    }
+
+    fn batch_sizes_tensor(&self) -> &Tensor {
+        self.batch_sizes_tensor
+            .as_ref()
+            .expect("batch_sizes has not been evaluated")
+    }
+
+    fn observations(&self) -> &Tensor {
+        self.observation_features
+            .as_ref()
+            .expect("observation_features has not been evaluated")
+    }
+
+    fn returns(&self) -> &Tensor {
+        self.returns
+            .as_ref()
+            .expect("returns has not been evaluated")
+    }
+
+    /// Packed rewards. A 1D f32 tensor.
+    fn rewards(&self) -> &Tensor {
+        self.rewards
+            .as_ref()
+            .expect("rewards has not been evaluated")
     }
 }
 

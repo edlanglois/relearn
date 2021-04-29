@@ -4,6 +4,7 @@ mod env;
 mod optimizer;
 mod options;
 mod seq_mod;
+mod step_value;
 
 pub use options::Options;
 

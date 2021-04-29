@@ -3,6 +3,7 @@ use super::agent::AgentType;
 use super::env::{BanditArmPrior, EnvType};
 use super::optimizer::{OptimizerOptions, OptimizerType};
 use super::seq_mod::SeqModType;
+use super::step_value::StepValueType;
 use crate::torch::Activation;
 use clap::{crate_authors, crate_description, crate_version, Clap};
 
@@ -80,6 +81,19 @@ pub struct Options {
     #[clap(long, arg_enum, help_heading = Some("AGENT POLICY OPTIONS"))]
     /// Policy rnn output activation function
     pub rnn_output_activation: Option<Activation>,
+
+    // Value function options
+    #[clap(long, arg_enum, help_heading = Some("AGENT VALUE FN OPTIONS"))]
+    /// Agent step value type
+    pub step_value: Option<StepValueType>,
+
+    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIONS"))]
+    /// Maximum discount factor used by GAE
+    pub gae_discount_factor: Option<f64>,
+
+    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIONS"))]
+    /// Lambda interpolation factor used by GAE
+    pub gae_lambda: Option<f64>,
 
     // Optimizer options
     #[clap(long, arg_enum, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]

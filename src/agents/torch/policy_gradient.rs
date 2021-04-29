@@ -1,6 +1,9 @@
-//! Vanilla SequenceModule + StatefulIterativeModule Gradient
+//! Vanilla SequenceModule + StatefulIterativeModule Gradient with Generalized Advantage Estimation
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use super::history::{features, HistoryBuffer, LazyPackedHistoryFeatures};
+use super::history::{
+    features, HistoryBuffer, LazyPackedHistoryFeatures, PackedHistoryFeaturesView,
+};
+use super::step_value::{StepValue, StepValueBuilder};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
@@ -8,66 +11,96 @@ use crate::torch::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use crate::EnvStructure;
 use tch::{kind::Kind, nn, Device, Tensor};
 
-/// Configuration for PolicyGradientAgent
+/// Configuration for [PolicyGradientAgent]
 #[derive(Debug)]
-pub struct PolicyGradientAgentConfig<PB, OB> {
+pub struct PolicyGradientAgentConfig<PB, POB, VB, VOB> {
     pub steps_per_epoch: usize,
+    pub value_train_iters: u64,
     pub policy_config: PB,
-    pub optimizer_config: OB,
+    pub policy_optimizer_config: POB,
+    pub value_config: VB,
+    pub value_optimizer_config: VOB,
 }
 
-impl<PB, OB> PolicyGradientAgentConfig<PB, OB> {
-    pub fn new(steps_per_epoch: usize, policy_config: PB, optimizer_config: OB) -> Self {
+impl<PB, POB, VB, VOB> PolicyGradientAgentConfig<PB, POB, VB, VOB> {
+    pub fn new(
+        steps_per_epoch: usize,
+        value_train_iters: u64,
+        policy_config: PB,
+        policy_optimizer_config: POB,
+        value_config: VB,
+        value_optimizer_config: VOB,
+    ) -> Self {
         Self {
             steps_per_epoch,
+            value_train_iters,
             policy_config,
-            optimizer_config,
+            policy_optimizer_config,
+            value_config,
+            value_optimizer_config,
         }
     }
 }
 
-impl<PB, OB> Default for PolicyGradientAgentConfig<PB, OB>
+impl<PB, POB, VB, VOB> Default for PolicyGradientAgentConfig<PB, POB, VB, VOB>
 where
     PB: Default,
-    OB: Default,
+    POB: Default,
+    VB: Default,
+    VOB: Default,
 {
     fn default() -> Self {
         Self {
             steps_per_epoch: 1000,
+            value_train_iters: 80,
             policy_config: Default::default(),
-            optimizer_config: Default::default(),
+            policy_optimizer_config: Default::default(),
+            value_config: Default::default(),
+            value_optimizer_config: Default::default(),
         }
     }
 }
 
-impl<OS, AS, PB, P, OB, O> AgentBuilder<PolicyGradientAgent<OS, AS, P, O>, OS, AS>
-    for PolicyGradientAgentConfig<PB, OB>
+impl<OS, AS, PB, P, POB, PO, VB, V, VOB, VO>
+    AgentBuilder<PolicyGradientAgent<OS, AS, P, PO, V, VO>, OS, AS>
+    for PolicyGradientAgentConfig<PB, POB, VB, VOB>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     PB: ModuleBuilder<P>,
-    OB: OptimizerBuilder<O>,
+    P: SequenceModule + StatefulIterativeModule,
+    POB: OptimizerBuilder<PO>,
+    VB: StepValueBuilder<V>,
+    V: StepValue,
+    VOB: OptimizerBuilder<VO>,
 {
     fn build_agent(
         &self,
         env: EnvStructure<OS, AS>,
         _seed: u64,
-    ) -> Result<PolicyGradientAgent<OS, AS, P, O>, BuildAgentError> {
+    ) -> Result<PolicyGradientAgent<OS, AS, P, PO, V, VO>, BuildAgentError> {
         Ok(PolicyGradientAgent::new(
             env.observation_space,
             env.action_space,
             env.discount_factor,
             self.steps_per_epoch,
+            self.value_train_iters,
             &self.policy_config,
-            &self.optimizer_config,
+            &self.policy_optimizer_config,
+            &self.value_config,
+            &self.value_optimizer_config,
         ))
     }
 }
 
-/// A vanilla policy-gradient agent.
+/// SequenceModule + StatefulIterativeModule Gradient with Generalized Advantage Estimation
 ///
 /// Supports both recurrent and non-recurrent policies.
-pub struct PolicyGradientAgent<OS, AS, P, O>
+///
+/// Reference:
+/// High-Dimensional Continuous Control Using Generalized Advantage Estimation
+/// by Schulman et al. (2016)
+pub struct PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: Space,
     AS: Space,
@@ -78,7 +111,7 @@ where
     /// Environment action space
     pub action_space: AS,
 
-    /// Amount by which future rewards are discounted.
+    /// Amount by which future rewards are discounted
     pub discount_factor: f64,
 
     /// Minimum number of steps to collect per epoch.
@@ -86,6 +119,9 @@ where
     /// This value is exceeded by search for the next episode boundary,
     /// up to a maximum of `max_steps_per_epoch`.
     pub steps_per_epoch: usize,
+
+    /// Number of step value update iterations per epoch.
+    pub value_train_iters: u64,
 
     /// Maximum number of steps per epoch.
     ///
@@ -103,53 +139,78 @@ where
     /// The policy module.
     pub policy: P,
 
+    /// SequenceModule + StatefulIterativeModule optimizer
+    policy_optimizer: PO,
+
+    /// The value estimator module.
+    pub value: V,
+
+    /// Step value module optimizer.
+    value_optimizer: VO,
+
     /// The recorded step history.
     history: HistoryBuffer<OS::Element, AS::Element>,
-
-    /// Optimizer
-    optimizer: O,
 }
 
-impl<OS, AS, P, O> PolicyGradientAgent<OS, AS, P, O>
+impl<OS, AS, P, PO, V, VO> PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
+    V: StepValue,
 {
-    pub fn new<PB, OB>(
+    pub fn new<PB, VB, POB, VOB>(
         observation_space: OS,
         action_space: AS,
-        discount_factor: f64,
+        env_discount_factor: f64,
         steps_per_epoch: usize,
+        value_train_iters: u64,
         policy_config: &PB,
-        optimizer_config: &OB,
+        policy_optimizer_config: &POB,
+        value_config: &VB,
+        value_optimizer_config: &VOB,
     ) -> Self
     where
         PB: ModuleBuilder<P>,
-        OB: OptimizerBuilder<O>,
+        VB: StepValueBuilder<V>,
+        POB: OptimizerBuilder<PO>,
+        VOB: OptimizerBuilder<VO>,
     {
         let max_steps_per_epoch = (steps_per_epoch as f64 * 1.1) as usize;
-        let vs = nn::VarStore::new(Device::Cpu);
+
+        let policy_vs = nn::VarStore::new(Device::Cpu);
         let policy = policy_config.build_module(
-            &vs.root(),
+            &policy_vs.root(),
             observation_space.num_features(),
             action_space.num_sample_params(),
         );
-        let optimizer = optimizer_config.build_optimizer(&vs).unwrap();
+        let policy_optimizer = policy_optimizer_config.build_optimizer(&policy_vs).unwrap();
+
+        let value_vs = nn::VarStore::new(Device::Cpu);
+        let value =
+            value_config.build_step_value(&value_vs.root(), observation_space.num_features());
+        let value_optimizer = value_optimizer_config.build_optimizer(&value_vs).unwrap();
+
+        let discount_factor = value.discount_factor(env_discount_factor);
+
         Self {
             observation_space,
             action_space,
             discount_factor,
             steps_per_epoch,
+            value_train_iters,
             max_steps_per_epoch: (steps_per_epoch as f64 * 1.1) as usize,
             max_unknown_return_discount: 0.1,
             policy,
+            policy_optimizer,
+            value,
+            value_optimizer,
             history: HistoryBuffer::new(Some(max_steps_per_epoch)),
-            optimizer,
         }
     }
 }
 
-impl<OS, AS, P, O> Actor<OS::Element, AS::Element> for PolicyGradientAgent<OS, AS, P, O>
+impl<OS, AS, P, PO, V, VO> Actor<OS::Element, AS::Element>
+    for PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
@@ -163,17 +224,20 @@ where
         }
         tch::no_grad(|| {
             let output = self.policy.step(&observation_features);
-            self.action_space.sample(&output)
+            ParameterizedSampleSpace::sample(&self.action_space, &output)
         })
     }
 }
 
-impl<OS, AS, P, O> Agent<OS::Element, AS::Element> for PolicyGradientAgent<OS, AS, P, O>
+impl<OS, AS, P, PO, V, VO> Agent<OS::Element, AS::Element>
+    for PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
     P: SequenceModule + StatefulIterativeModule,
-    O: Optimizer,
+    PO: Optimizer,
+    V: StepValue,
+    VO: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
         Actor::act(self, observation, new_episode)
@@ -194,14 +258,16 @@ where
     }
 }
 
-impl<OS, AS, P, O> PolicyGradientAgent<OS, AS, P, O>
+impl<OS, AS, P, PO, V, VO> PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
     AS: ParameterizedSampleSpace<Tensor>,
-    P: SequenceModule + StatefulIterativeModule,
-    O: Optimizer,
+    P: SequenceModule,
+    PO: Optimizer,
+    V: StepValue,
+    VO: Optimizer,
 {
-    /// Perform an epoch update: update the policy and value function and clear history.
+    /// Perform an epoch update: update the policy and step value module and clear history.
     fn epoch_update(&mut self, logger: &mut dyn Logger) {
         let num_steps = self.history.len();
         let num_episodes = self.history.num_episodes();
@@ -212,14 +278,40 @@ where
             &self.observation_space,
             self.discount_factor,
         );
+        let step_values = tch::no_grad(|| self.value.seq_packed(&features));
 
         let policy_output = self
             .policy
             .seq_packed(features.observations(), features.batch_sizes_tensor());
 
-        let _ = features.returns(); // fill the cache
-        let mut features = features.finalize();
-        let returns = features.returns.take().unwrap();
+        for i in 0..self.value_train_iters {
+            let value_loss = match self.value.loss(&features) {
+                None => break, // no trainable variables
+                Some(value_loss) => value_loss,
+            };
+
+            if i == 0 {
+                logger
+                    .log(
+                        Event::Epoch,
+                        "value_loss_initial",
+                        f64::from(&value_loss).into(),
+                    )
+                    .unwrap();
+            } else if i == self.value_train_iters - 1 {
+                logger
+                    .log(
+                        Event::Epoch,
+                        "value_loss_final",
+                        f64::from(&value_loss).into(),
+                    )
+                    .unwrap();
+            }
+
+            self.value_optimizer.backward_step(&value_loss);
+        }
+
+        let features = features.finalize();
 
         // Consume steps into a vector of actions.
         let (drain_steps, _) = self.history.drain();
@@ -227,8 +319,8 @@ where
 
         let (log_probs, entropies) = self.action_space.batch_statistics(&policy_output, &actions);
 
-        let loss = -(log_probs * returns).mean(Kind::Float);
-        self.optimizer.backward_step(&loss);
+        let policy_loss = -(log_probs * &step_values).mean(Kind::Float);
+        self.policy_optimizer.backward_step(&policy_loss);
 
         logger
             .log(Event::Epoch, "batch_num_steps", (num_steps as f64).into())
@@ -247,27 +339,41 @@ where
                 f64::from(entropies.mean(Kind::Float)).into(),
             )
             .unwrap();
+        logger
+            .log(
+                Event::Epoch,
+                "step_values",
+                f64::from(step_values.mean(Kind::Float)).into(),
+            )
+            .unwrap();
         logger.done(Event::Epoch);
     }
 }
 
 #[cfg(test)]
-mod policy_gradient {
-    use super::super::super::{testing, AgentBuilder};
+mod gae_policy_gradient {
+    use super::super::super::testing;
+    use super::super::step_value::{Gae, GaeConfig, Return};
     use super::*;
     use crate::torch::configs::{MlpConfig, RnnMlpConfig};
     use crate::torch::optimizers::AdamConfig;
     use crate::torch::seq_modules::{GruMlp, WithState};
     use tch::nn::Sequential;
 
-    #[test]
-    fn default_mlp_learns_derministic_bandit() {
-        let mut config = PolicyGradientAgentConfig::<MlpConfig, AdamConfig>::default();
+    fn test_train_default_policy_gradient<P, PB, V, VB>()
+    where
+        P: SequenceModule + StatefulIterativeModule,
+        PB: ModuleBuilder<P> + Default,
+        V: StepValue,
+        VB: StepValueBuilder<V> + Default,
+    {
+        let mut config = PolicyGradientAgentConfig::<PB, AdamConfig, VB, AdamConfig>::default();
         // Speed up learning for this simple environment
         config.steps_per_epoch = 1000;
-        config.optimizer_config.learning_rate = 0.1;
+        config.policy_optimizer_config.learning_rate = 0.1;
+        config.value_optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
-            |env_structure| -> PolicyGradientAgent<_, _, Sequential, _> {
+            |env_structure| -> PolicyGradientAgent<_, _, P, _, V, _> {
                 config.build_agent(env_structure, 0).unwrap()
             },
             1_000,
@@ -276,17 +382,42 @@ mod policy_gradient {
     }
 
     #[test]
-    fn default_gru_mlp_learns_derministic_bandit() {
-        let mut config = PolicyGradientAgentConfig::<RnnMlpConfig, AdamConfig>::default();
-        // Speed up learning for this simple environment
-        config.steps_per_epoch = 1000;
-        config.optimizer_config.learning_rate = 0.1;
-        testing::train_deterministic_bandit(
-            |env_structure| -> PolicyGradientAgent<_, _, WithState<GruMlp>, _> {
-                config.build_agent(env_structure, 0).unwrap()
-            },
-            1_000,
-            0.9,
-        );
+    fn default_mlp_return_learns_derministic_bandit() {
+        test_train_default_policy_gradient::<Sequential, MlpConfig, Return, Return>()
+    }
+
+    #[test]
+    fn default_mlp_gae_mlp_learns_derministic_bandit() {
+        test_train_default_policy_gradient::<
+            Sequential,
+            MlpConfig,
+            Gae<Sequential>,
+            GaeConfig<MlpConfig>,
+        >()
+    }
+
+    #[test]
+    fn default_gru_mlp_return_learns_derministic_bandit() {
+        test_train_default_policy_gradient::<WithState<GruMlp>, RnnMlpConfig, Return, Return>()
+    }
+
+    #[test]
+    fn default_gru_mlp_gae_mlp_derministic_bandit() {
+        test_train_default_policy_gradient::<
+            WithState<GruMlp>,
+            RnnMlpConfig,
+            Gae<Sequential>,
+            GaeConfig<MlpConfig>,
+        >()
+    }
+
+    #[test]
+    fn default_gru_mlp_gae_gru_mlp_derministic_bandit() {
+        test_train_default_policy_gradient::<
+            WithState<GruMlp>,
+            RnnMlpConfig,
+            Gae<WithState<GruMlp>>,
+            GaeConfig<RnnMlpConfig>,
+        >()
     }
 }
