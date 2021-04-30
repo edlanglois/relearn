@@ -1,4 +1,4 @@
-//! Step value functions.
+//! RL step value functions
 mod gae;
 
 pub use gae::{Gae, GaeConfig};

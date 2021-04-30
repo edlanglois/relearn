@@ -1,6 +1,6 @@
 use super::SeqModDef;
-use crate::agents::step_value::{Gae, GaeConfig, Return, StepValue, StepValueBuilder};
 use crate::torch::seq_modules::StatefulIterSeqModule;
+use crate::torch::step_value::{Gae, GaeConfig, Return, StepValue, StepValueBuilder};
 use tch::nn::Path;
 
 /// Step value definition

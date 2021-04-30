@@ -1,13 +1,13 @@
 //! Vanilla SequenceModule + StatefulIterativeModule Gradient with Generalized Advantage Estimation
-use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use super::history::{
+use super::super::history::{
     features, HistoryBuffer, LazyPackedHistoryFeatures, PackedHistoryFeaturesView,
 };
-use super::step_value::{StepValue, StepValueBuilder};
+use super::super::seq_modules::{SequenceModule, StatefulIterativeModule};
+use super::super::step_value::{StepValue, StepValueBuilder};
+use super::super::{ModuleBuilder, Optimizer, OptimizerBuilder};
+use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
-use crate::torch::seq_modules::{SequenceModule, StatefulIterativeModule};
-use crate::torch::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use crate::EnvStructure;
 use tch::{kind::Kind, nn, Device, Tensor};
 
@@ -352,12 +352,12 @@ where
 
 #[cfg(test)]
 mod gae_policy_gradient {
-    use super::super::super::testing;
-    use super::super::step_value::{Gae, GaeConfig, Return};
     use super::*;
+    use crate::agents::testing;
     use crate::torch::modules::MlpConfig;
     use crate::torch::optimizers::AdamConfig;
     use crate::torch::seq_modules::{GruMlp, RnnMlpConfig, WithState};
+    use crate::torch::step_value::{Gae, GaeConfig, Return};
     use tch::nn::Sequential;
 
     fn test_train_default_policy_gradient<P, PB, V, VB>()

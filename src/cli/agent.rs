@@ -1,9 +1,9 @@
 use super::{options::ValueFnView, Options, Update, WithUpdate};
 use crate::agents::{
-    BetaThompsonSamplingAgentConfig, PolicyGradientAgentConfig, TabularQLearningAgentConfig,
-    UCB1AgentConfig,
+    BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::defs::AgentDef;
+use crate::torch::agents::PolicyGradientAgentConfig;
 use clap::Clap;
 
 /// Agent name

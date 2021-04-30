@@ -1,6 +1,6 @@
 use super::{Options, Update, WithUpdate};
-use crate::agents::step_value::GaeConfig;
 use crate::defs::StepValueDef;
+use crate::torch::step_value::GaeConfig;
 use clap::Clap;
 
 /// Agent step value type

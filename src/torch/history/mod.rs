@@ -1,3 +1,4 @@
+//! RL step history buffer and features
 mod buffer;
 pub mod features;
 

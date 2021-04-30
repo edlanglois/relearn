@@ -1,11 +1,11 @@
 use super::{OptimizerDef, SeqModDef, StepValueDef};
 use crate::agents::{
-    Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError,
-    PolicyGradientAgentConfig, PolicyGradientBoxedAgent, RandomAgentConfig,
+    Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError, RandomAgentConfig,
     TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::EnvStructure;
 use crate::spaces::{FiniteSpace, RLSpace};
+use crate::torch::agents::{PolicyGradientAgentConfig, PolicyGradientBoxedAgent};
 use std::fmt::Debug;
 
 /// Agent definition
