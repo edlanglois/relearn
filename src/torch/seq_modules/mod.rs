@@ -30,7 +30,7 @@ pub trait SequenceModule {
     ///
     /// # Args
     /// * `inputs` - Batched input sequences arranged in series.
-    ///     An f32 tensor of shape [BATCH_SIZE, TOTAL_SEQ_LENGTH, NUM_INPUT_FEATURES]
+    ///     An f32 tensor of shape `[BATCH_SIZE, TOTAL_SEQ_LENGTH, NUM_INPUT_FEATURES]`
     /// * `seq_lengths` - Length of each sequence.
     ///     The sequence length is the same across the batch dimension.
     ///
@@ -46,21 +46,21 @@ pub trait SequenceModule {
     ///
     /// # Args
     /// * `inputs` - Packed input sequences.
-    ///     An f32 tensor of shape [TOTAL_STEPS, NUM_INPUT_FEATURES]
-    ///     where the TOTAL_STEPS dimension consists of the packed and batched steps ordered first
+    ///     An f32 tensor of shape `[TOTAL_STEPS, NUM_INPUT_FEATURES]`
+    ///     where the `TOTAL_STEPS` dimension consists of the packed and batched steps ordered first
     ///     by index within a sequence, then by batch index.
     ///     Sequences must be ordered from longest to shortest.
     ///
-    ///     If all sequences have the same length then the TOTAL_STEPS dimension
-    ///     corresponds to a flattend Tensor of shape [SEQ_LENGTH, BATCH_SIZE].
+    ///     If all sequences have the same length then the `TOTAL_STEPS` dimension
+    ///     corresponds to a flattend Tensor of shape `[SEQ_LENGTH, BATCH_SIZE]`.
     ///
     /// * `batch_sizes` - The batch size of each in-sequence step index.
-    ///     A i64 tensor of shape [MAX_SEQ_LENGTH].
+    ///     A i64 tensor of shape `[MAX_SEQ_LENGTH]`.
     ///     Must be monotonically decreasing and positive.
     ///
     /// # Returns
     /// Packed output sequences in the same order as `inputs`.
-    /// A tensor of shape [TOTAL_STEPS, NUM_OUTPUT_FEATURES].
+    /// A tensor of shape `[TOTAL_STEPS, NUM_OUTPUT_FEATURES]`.
     fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor;
 }
 
@@ -76,11 +76,11 @@ pub trait IterativeModule {
     ///
     /// # Args
     /// * `input` - The input for one (batched) step.
-    ///     A tensor with shape [BATCH_SIZE, NUM_INPUT_FEATURES]
+    ///     A tensor with shape `[BATCH_SIZE, NUM_INPUT_FEATURES]`
     /// * `state` - The policy hidden state.
     ///
     /// # Returns
-    /// * `output` - The output tensor. Has shape [BATCH_SIZE, NUM_OUT_FEATURES]
+    /// * `output` - The output tensor. Has shape `[BATCH_SIZE, NUM_OUT_FEATURES]`
     /// * `state` - A new value for the hidden state.
     fn step(&self, input: &Tensor, state: &Self::State) -> (Tensor, Self::State);
 }
@@ -90,10 +90,10 @@ pub trait StatefulIterativeModule {
     /// Apply one step of the module.
     ///
     /// # Args
-    /// * `input` - The input for one step. A tensor with shape [NUM_INPUT_FEATURES]
+    /// * `input` - The input for one step. A tensor with shape `[NUM_INPUT_FEATURES]`
     ///
     /// # Returns
-    /// The output tensor. Has shape [NUM_OUT_FEATURES]
+    /// The output tensor. Has shape `[NUM_OUT_FEATURES]`
     fn step(&mut self, input: &Tensor) -> Tensor;
 
     /// Reset the inner state for the start of a new sequence.
@@ -110,12 +110,12 @@ impl<T: SequenceModule + StatefulIterativeModule> StatefulIterSeqModule for T {}
 ///
 /// # Args:
 /// * `inputs` - Batched input sequences arranged in series.
-///     An f32 tensor of shape [BATCH_SIZE, TOTAL_SEQ_LENGTH, NUM_INPUT_FEATURES]
+///     An f32 tensor of shape `[BATCH_SIZE, TOTAL_SEQ_LENGTH, NUM_INPUT_FEATURES]`
 /// * `seq_lengths` - Length of each sequence.
 ///     The sequence length is the same across the batch dimension.
 /// * `f_seq` - A closure that applies a module to a single sequence.
-///     Takes an input f32 tensor of shape [BATCH_SIZE, SEQ_LENGTH, NUM_INPUT_FEATURES]
-///     to an output f32 tensor of shape [BATCH_SIZE, SEQ_LENGTH, NUM_OUTPUT_FEATURES].
+///     Takes an input f32 tensor of shape `[BATCH_SIZE, SEQ_LENGTH, NUM_INPUT_FEATURES]`
+///     to an output f32 tensor of shape `[BATCH_SIZE, SEQ_LENGTH, NUM_OUTPUT_FEATURES]`.
 ///
 fn seq_serial_map<F>(inputs: &Tensor, seq_lengths: &[usize], f_seq: F) -> Tensor
 where

@@ -5,7 +5,7 @@
 //!
 //! Sequences must always be packed in order from longest to shortest.
 //!
-//! For example, the sequences `[0, 1, 2, 3], [10, 11], [100, 101]` are packed as
+//! For example, the sequences `[0, 1, 2, 3]`, `[10, 11]`, `[100, 101]` are packed as
 //! `[0, 10, 100, 1, 11, 101, 2, 3]`.
 use std::iter;
 use std::ops::{Index, Range};
@@ -464,7 +464,7 @@ where
 
 /// Evaluate a discounted cumulative sum from sequence end to start on a packed tensor.
 ///
-/// For each element x[i] in the sequence x[0] ... x[N],
+/// For each element `x[i]` in the sequence `x[0] ... x[N]`,
 /// returns `y[i] = sum_{j in i..N} discount_factor ** (j - i) * x[j]`
 ///
 /// # Args

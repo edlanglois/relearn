@@ -1,3 +1,4 @@
+//! Base agent definitions
 use crate::logging::Logger;
 
 /// Description of an environment step

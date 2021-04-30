@@ -1,6 +1,6 @@
 //! Reinforcement learning agents
 //!
-//! More agents can be found in [rust_rl::torch::agents].
+//! More agents can be found in [crate::torch::agents].
 mod agents;
 mod bandits;
 mod builder;
