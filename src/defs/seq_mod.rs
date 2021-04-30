@@ -1,5 +1,5 @@
-use crate::torch::configs::{MlpConfig, RnnMlpConfig};
-use crate::torch::seq_modules::{GruMlp, LstmMlp, StatefulIterSeqModule, WithState};
+use crate::torch::modules::MlpConfig;
+use crate::torch::seq_modules::{GruMlp, LstmMlp, RnnMlpConfig, StatefulIterSeqModule, WithState};
 use crate::torch::ModuleBuilder;
 use tch::nn::{Path, Sequential};
 

@@ -1,4 +1,5 @@
-use super::super::{Activation, ModuleBuilder};
+//! Multi-layer perceptron
+use super::{Activation, ModuleBuilder};
 use std::iter;
 use tch::nn;
 

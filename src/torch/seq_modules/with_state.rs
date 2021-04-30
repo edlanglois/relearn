@@ -1,6 +1,7 @@
+use super::super::ModuleBuilder;
 use super::{IterativeModule, SequenceModule, StatefulIterativeModule};
 use std::borrow::Borrow;
-use tch::Tensor;
+use tch::{nn::Path, Tensor};
 
 /// IterativeModule wrapper that also stores the state.
 #[derive(Debug)]
@@ -64,9 +65,19 @@ where
     }
 }
 
+impl<T, MB> ModuleBuilder<WithState<T>> for MB
+where
+    MB: ModuleBuilder<T>,
+    T: IterativeModule,
+{
+    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> WithState<T> {
+        self.build_module(vs, in_dim, out_dim).into()
+    }
+}
+
 #[cfg(test)]
-mod as_stateful_module {
-    use super::super::{testing, Gru};
+mod with_state {
+    use super::super::{testing, Gru, MlpConfig, RnnConfig};
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{nn, Device};
@@ -116,6 +127,13 @@ mod as_stateful_module {
         testing::check_step(&linear, in_dim, out_dim);
     }
 
+    #[test]
+    fn linear_module_builder() {
+        let config = MlpConfig::default();
+        let vs = nn::VarStore::new(Device::Cpu);
+        let _: WithState<nn::Sequential> = config.build_module(&vs.root(), 1, 1);
+    }
+
     #[rstest]
     fn gru_stateful_step(gru: (WithState<Gru>, usize, usize)) {
         let (mut gru, in_dim, out_dim) = gru;
@@ -136,5 +154,12 @@ mod as_stateful_module {
     fn gru_step(gru: (WithState<Gru>, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_step(&gru, in_dim, out_dim);
+    }
+
+    #[test]
+    fn gru_module_builder() {
+        let config = RnnConfig::default();
+        let vs = nn::VarStore::new(Device::Cpu);
+        let _: WithState<Gru> = config.build_module(&vs.root(), 1, 1);
     }
 }

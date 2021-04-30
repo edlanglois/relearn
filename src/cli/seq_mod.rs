@@ -1,6 +1,7 @@
 use super::{Options, Update, WithUpdate};
 use crate::defs::SeqModDef;
-use crate::torch::configs::{MlpConfig, RnnConfig, StackedConfig};
+use crate::torch::modules::MlpConfig;
+use crate::torch::seq_modules::{RnnConfig, StackedConfig};
 use clap::Clap;
 
 /// Sequence module type

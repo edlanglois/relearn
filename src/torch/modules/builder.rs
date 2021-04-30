@@ -1,3 +1,4 @@
+//! Module builder
 use tch::nn::Path;
 
 /// Build an instance of a torch module (or module-like).

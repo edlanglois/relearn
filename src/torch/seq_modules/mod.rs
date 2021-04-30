@@ -1,4 +1,4 @@
-//! Sequence modules. Like [tch::nn::Module] but operate on a sequence of data.
+//! Sequence modules. Like [tch::nn::Module] but operate on sequences of data.
 mod r#box;
 pub mod module;
 mod rnn;
@@ -7,16 +7,19 @@ mod stacked;
 pub mod testing;
 mod with_state;
 
-pub use rnn::{Gru, Lstm};
-pub use stacked::Stacked;
+pub use rnn::{Gru, Lstm, RnnConfig};
+pub use stacked::{Stacked, StackedConfig};
 pub use with_state::WithState;
 
+use super::modules::MlpConfig;
 use tch::{nn, IndexOp, Tensor};
 
 /// An MLP stacked on top of a GRU.
 pub type GruMlp = Stacked<'static, Gru, nn::Sequential>;
 /// An MLP stacked on top of an LSTM.
 pub type LstmMlp = Stacked<'static, Lstm, nn::Sequential>;
+/// Configuration for an MLP stacked on top of an RNN.
+pub type RnnMlpConfig = StackedConfig<RnnConfig, MlpConfig>;
 
 /// A network module that operates on a sequence of data.
 pub trait SequenceModule {

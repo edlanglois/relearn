@@ -1,6 +1,9 @@
+//! Recurrent neural networks
+mod config;
 mod gru;
 mod lstm;
 
+pub use config::RnnConfig;
 pub use gru::Gru;
 pub use lstm::Lstm;
 

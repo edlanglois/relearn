@@ -1,4 +1,6 @@
-use super::super::{Gru, Lstm, ModuleBuilder};
+//! Recurrent neural network configuration
+use super::super::super::ModuleBuilder;
+use super::{Gru, Lstm};
 use tch::nn::Path;
 
 /// Configuration of a recurrent neural network.

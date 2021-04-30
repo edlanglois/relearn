@@ -355,9 +355,9 @@ mod gae_policy_gradient {
     use super::super::super::testing;
     use super::super::step_value::{Gae, GaeConfig, Return};
     use super::*;
-    use crate::torch::configs::{MlpConfig, RnnMlpConfig};
+    use crate::torch::modules::MlpConfig;
     use crate::torch::optimizers::AdamConfig;
-    use crate::torch::seq_modules::{GruMlp, WithState};
+    use crate::torch::seq_modules::{GruMlp, RnnMlpConfig, WithState};
     use tch::nn::Sequential;
 
     fn test_train_default_policy_gradient<P, PB, V, VB>()
