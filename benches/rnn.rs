@@ -1,6 +1,5 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use rust_rl::torch::configs::RnnConfig;
-use rust_rl::torch::seq_modules::{Gru, SequenceModule};
+use rust_rl::torch::seq_modules::{Gru, RnnConfig, SequenceModule};
 use rust_rl::torch::ModuleBuilder;
 use std::array::IntoIter;
 use tch::{nn::VarStore, Device, Kind, Tensor};
