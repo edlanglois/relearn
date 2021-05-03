@@ -28,3 +28,7 @@ criterion = { version = "0.3", features = ["html_reports"] }
 [[bench]]
 name = "rnn"
 harness = false
+
+[[bench]]
+name = "tch"
+harness = false
