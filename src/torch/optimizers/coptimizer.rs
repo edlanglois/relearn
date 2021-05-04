@@ -1,23 +1,13 @@
 //! Torch optimizer wrappers and configuration
-use super::{OnceOptimizer, Optimizer, OptimizerBuilder};
+use super::{BaseOptimizer, OnceOptimizer, OptimizerBuilder};
 use std::convert::{TryFrom, TryInto};
 use tch::{nn::VarStore, COptimizer, TchError, Tensor};
 
-impl Optimizer for COptimizer {
+impl BaseOptimizer for COptimizer {
     type Error = TchError;
 
     fn f_zero_grad(&self) -> Result<(), Self::Error> {
         COptimizer::zero_grad(self)
-    }
-
-    fn f_step(&self, _loss_fn: &dyn Fn() -> Tensor) -> Result<(), Self::Error> {
-        self.f_step_once()
-    }
-
-    fn f_backward_step(&self, loss_fn: &dyn Fn() -> Tensor) -> Result<Tensor, Self::Error> {
-        let loss = loss_fn();
-        self.f_backward_step_once(&loss)?;
-        Ok(loss)
     }
 }
 

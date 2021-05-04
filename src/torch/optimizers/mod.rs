@@ -6,18 +6,25 @@ pub use coptimizer::{AdamConfig, AdamWConfig, RmsPropConfig, SgdConfig};
 use std::error::Error;
 use tch::{nn::VarStore, Tensor};
 
-/// Torch optimizer interface
-pub trait Optimizer {
+/// Base optimizer interface
+pub trait BaseOptimizer {
+    /// Method error type
     type Error: Error;
 
     /// Zero out the gradients of all optimized tensors
     fn f_zero_grad(&self) -> Result<(), Self::Error>;
 
     /// Zero out the gradients of all optimized tensors
+    ///
+    /// # Panics
+    /// This wraps [BaseOptimizer::f_zero_grad] and panics if `f_zero_grad` fails.
     fn zero_grad(&self) {
         self.f_zero_grad().unwrap();
     }
+}
 
+/// Optimizer that minimizes a loss function.
+pub trait Optimizer: BaseOptimizer {
     /// Perform a single optimization step (parameter update).
     ///
     /// See [Optimizer::step].
@@ -29,8 +36,7 @@ pub trait Optimizer {
     ///
     /// # Args
     /// * `loss_fn` - Forward loss function.
-    ///         Used by some optimizers that require multiple evaluations of the loss,
-    ///         like Conjugate Gradient.
+    ///         Used by some optimizers that require multiple evaluations of the loss.
     ///         No backpropagation is applied to the result of this function.
     ///
     /// # Panics
@@ -63,21 +69,21 @@ pub trait Optimizer {
     }
 }
 
-/// Torch optimizer that only requires a single evaluation of the loss on each step.
-pub trait OnceOptimizer: Optimizer {
-    /// Perform a single optimization step (parameter update).
+/// Optimizer that minimizes a loss tensor.
+pub trait OnceOptimizer: BaseOptimizer {
+    /// Perform an optimization step (parameter update).
     ///
     /// See [OnceOptimizer::step_once].
     fn f_step_once(&self) -> Result<(), Self::Error>;
 
-    /// Perform a single optimization step (parameter update).
+    /// Perform an optimization step (parameter update).
     ///
     /// Uses the existing gradients stored with the parameter tensor.
     ///
     /// # Panics
-    /// This wraps [OnceOptimizer::f_step_once] and panics if `f_step_once` fails.
+    /// This wraps [Optimizer::f_step_once] and panics if `f_step_once` fails.
     fn step_once(&self) {
-        self.f_step_once().unwrap();
+        self.f_step_once().unwrap()
     }
 
     /// Apply a backward step pass, update the gradients, and perform an optimization step.
@@ -97,6 +103,18 @@ pub trait OnceOptimizer: Optimizer {
     /// and panics if `f_backward_step_once` fails.
     fn backward_step_once(&self, loss: &Tensor) {
         self.f_backward_step_once(loss).unwrap();
+    }
+}
+
+impl<T: OnceOptimizer> Optimizer for T {
+    fn f_step(&self, _loss_fn: &dyn Fn() -> Tensor) -> Result<(), Self::Error> {
+        self.f_step_once()
+    }
+
+    fn f_backward_step(&self, loss_fn: &dyn Fn() -> Tensor) -> Result<Tensor, Self::Error> {
+        let loss = loss_fn();
+        self.f_backward_step_once(&loss)?;
+        Ok(loss)
     }
 }
 
