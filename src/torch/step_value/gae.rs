@@ -62,6 +62,10 @@ impl<V> StepValue for Gae<V>
 where
     V: SequenceModule,
 {
+    fn trainable(&self) -> bool {
+        true
+    }
+
     fn discount_factor(&self, env_discount_factor: f64) -> f64 {
         env_discount_factor.min(self.gamma)
     }

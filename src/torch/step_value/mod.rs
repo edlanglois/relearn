@@ -8,6 +8,9 @@ use tch::{nn::Path, Tensor};
 
 /// A step value function for use in the policy gradient.
 pub trait StepValue {
+    /// Whether this step values function has trainable internal parameters
+    fn trainable(&self) -> bool;
+
     /// The discount factor to use when calculating step returns.
     ///
     /// # Args
@@ -27,7 +30,7 @@ pub trait StepValue {
 
     /// The loss of any trainable internal variables given the observed history features.
     ///
-    /// Return None if there are no internal trainable variables.
+    /// Returns None if and only if trainable() is false.
     fn loss(&self, features: &dyn PackedHistoryFeaturesView) -> Option<Tensor>;
 }
 
@@ -57,6 +60,10 @@ impl Default for Return {
 }
 
 impl StepValue for Return {
+    fn trainable(&self) -> bool {
+        false
+    }
+
     fn seq_packed(&self, features: &dyn PackedHistoryFeaturesView) -> Tensor {
         features.returns().shallow_clone()
     }
@@ -73,6 +80,10 @@ impl StepValueBuilder<Return> for Return {
 }
 
 impl StepValue for Box<dyn StepValue> {
+    fn trainable(&self) -> bool {
+        self.as_ref().trainable()
+    }
+
     fn discount_factor(&self, env_discount_factor: f64) -> f64 {
         self.as_ref().discount_factor(env_discount_factor)
     }
