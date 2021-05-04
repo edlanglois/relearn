@@ -9,6 +9,7 @@ use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::EnvStructure;
+use std::cell::Cell;
 use tch::{kind::Kind, nn, Device, Tensor};
 
 /// Configuration for [PolicyGradientAgent]
@@ -284,31 +285,29 @@ where
             .policy
             .seq_packed(features.observations(), features.batch_sizes_tensor());
 
-        for i in 0..self.value_train_iters {
-            let value_loss = match self.value.loss(&features) {
-                None => break, // no trainable variables
-                Some(value_loss) => value_loss,
-            };
+        if self.value.trainable() {
+            let value_loss_fn = || self.value.loss(&features).unwrap();
+            for i in 0..self.value_train_iters {
+                let value_loss = self.value_optimizer.backward_step(&value_loss_fn);
 
-            if i == 0 {
-                logger
-                    .log(
-                        Event::Epoch,
-                        "value_loss_initial",
-                        f64::from(&value_loss).into(),
-                    )
-                    .unwrap();
-            } else if i == self.value_train_iters - 1 {
-                logger
-                    .log(
-                        Event::Epoch,
-                        "value_loss_final",
-                        f64::from(&value_loss).into(),
-                    )
-                    .unwrap();
+                if i == 0 {
+                    logger
+                        .log(
+                            Event::Epoch,
+                            "value_loss_initial",
+                            f64::from(&value_loss).into(),
+                        )
+                        .unwrap();
+                } else if i == self.value_train_iters - 1 {
+                    logger
+                        .log(
+                            Event::Epoch,
+                            "value_loss_final",
+                            f64::from(&value_loss).into(),
+                        )
+                        .unwrap();
+                }
             }
-
-            self.value_optimizer.backward_step(&value_loss);
         }
 
         let features = features.finalize();
@@ -317,10 +316,14 @@ where
         let (drain_steps, _) = self.history.drain();
         let actions = features::into_packed_actions(drain_steps, &features.episode_ranges);
 
-        let (log_probs, entropies) = self.action_space.batch_statistics(&policy_output, &actions);
-
-        let policy_loss = -(log_probs * &step_values).mean(Kind::Float);
-        self.policy_optimizer.backward_step(&policy_loss);
+        let entropies = Cell::new(None);
+        let policy_loss_fn = || {
+            let (log_probs, entropies_) =
+                self.action_space.batch_statistics(&policy_output, &actions);
+            entropies.set(Some(entropies_));
+            -(log_probs * &step_values).mean(Kind::Float)
+        };
+        let _ = self.policy_optimizer.backward_step(&policy_loss_fn);
 
         logger
             .log(Event::Epoch, "batch_num_steps", (num_steps as f64).into())
@@ -336,7 +339,7 @@ where
             .log(
                 Event::Epoch,
                 "policy_entropy",
-                f64::from(entropies.mean(Kind::Float)).into(),
+                f64::from(entropies.into_inner().unwrap().mean(Kind::Float)).into(),
             )
             .unwrap();
         logger
