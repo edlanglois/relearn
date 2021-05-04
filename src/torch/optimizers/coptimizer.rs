@@ -205,3 +205,37 @@ impl TryFrom<&AdamWConfig> for COptimizer {
         )
     }
 }
+
+#[cfg(test)]
+mod coptimizer {
+    use super::super::testing;
+    use super::*;
+
+    #[test]
+    fn sgd_optimizes_quadratic() {
+        let mut config = SgdConfig::default();
+        config.learning_rate = 1e-1;
+        testing::check_optimizes_quadratic(&config, 500);
+    }
+
+    #[test]
+    fn rms_prop_optimizes_quadratic() {
+        let mut config = RmsPropConfig::default();
+        config.learning_rate = 1e-1;
+        testing::check_optimizes_quadratic(&config, 500);
+    }
+
+    #[test]
+    fn adam_optimizes_quadratic() {
+        let mut config = AdamConfig::default();
+        config.learning_rate = 1e-1;
+        testing::check_optimizes_quadratic(&config, 500);
+    }
+
+    #[test]
+    fn adam_w_optimizes_quadratic() {
+        let mut config = AdamWConfig::default();
+        config.learning_rate = 1e-1;
+        testing::check_optimizes_quadratic(&config, 500);
+    }
+}

@@ -107,3 +107,41 @@ pub trait OptimizerBuilder<T> {
     /// Build an optimizer for the trainable variables in a variable store.
     fn build_optimizer(&self, vs: &VarStore) -> Result<T, Self::Error>;
 }
+
+#[cfg(test)]
+mod testing {
+    use super::*;
+    use tch::Device;
+
+    pub fn check_optimizes_quadratic<O, OB>(builder: &OB, num_steps: u64)
+    where
+        O: Optimizer,
+        OB: OptimizerBuilder<O>,
+    {
+        // Minimize f(x) = 1/2*x'Mx + b'x
+        // with M = [1  -1]  b = [ 2]
+        //          [-1  2]      [-3]
+        //
+        // which is minimized at x = [-1  1]'
+        let m = Tensor::of_slice(&[1.0f32, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
+        let b = Tensor::of_slice(&[2.0f32, -3.0]);
+
+        let vs = VarStore::new(Device::Cpu);
+        let x = vs.root().f_zeros("x", &[2]).unwrap();
+        let optimizer = builder.build_optimizer(&vs).unwrap();
+
+        let loss_fn = || m.mv(&x).dot(&x) / 2 + b.dot(&x);
+
+        for _ in 0..num_steps {
+            let _ = optimizer.backward_step(&loss_fn);
+        }
+
+        let expected = Tensor::of_slice(&[-1.0, 1.0]);
+        assert!(
+            f64::from((&x - &expected).norm()) < 1e-3,
+            "expected: {:?}, actual: {:?}",
+            expected,
+            x
+        );
+    }
+}
