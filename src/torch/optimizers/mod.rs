@@ -25,26 +25,6 @@ pub trait BaseOptimizer {
 
 /// Optimizer that minimizes a loss function.
 pub trait Optimizer: BaseOptimizer {
-    /// Perform a single optimization step (parameter update).
-    ///
-    /// See [Optimizer::step].
-    fn f_step(&self, loss_fn: &dyn Fn() -> Tensor) -> Result<(), Self::Error>;
-
-    /// Perform a single optimization step (parameter update).
-    ///
-    /// Uses the existing gradients stored with the parameter tensor.
-    ///
-    /// # Args
-    /// * `loss_fn` - Forward loss function.
-    ///         Used by some optimizers that require multiple evaluations of the loss.
-    ///         No backpropagation is applied to the result of this function.
-    ///
-    /// # Panics
-    /// This wraps [Optimizer::f_step] and panics if `f_step` fails.
-    fn step(&self, loss_fn: &dyn Fn() -> Tensor) {
-        self.f_step(loss_fn).unwrap()
-    }
-
     /// Apply an optimization step using the gradient of a loss function.
     ///
     /// See [Optimizer::backward_step].
@@ -57,7 +37,7 @@ pub trait Optimizer: BaseOptimizer {
     /// # Args
     /// * `loss_fn` - Loss function.
     ///     Called to obtain the loss tensor, which is back-propagated to obtain a gradient.
-    ///     Always evaluated at least once, may be evaluated multiple times.
+    ///     Always evaluated at least once; may be evaluated multiple times.
     ///
     /// # Returns
     /// The initial value of `loss_fn`.
@@ -107,10 +87,6 @@ pub trait OnceOptimizer: BaseOptimizer {
 }
 
 impl<T: OnceOptimizer> Optimizer for T {
-    fn f_step(&self, _loss_fn: &dyn Fn() -> Tensor) -> Result<(), Self::Error> {
-        self.f_step_once()
-    }
-
     fn f_backward_step(&self, loss_fn: &dyn Fn() -> Tensor) -> Result<Tensor, Self::Error> {
         let loss = loss_fn();
         self.f_backward_step_once(&loss)?;
