@@ -84,6 +84,22 @@ pub fn unflatten_tensors(vector: &Tensor, shapes: &[Vec<i64>]) -> Vec<Tensor> {
     f_unflatten_tensors(vector, shapes).unwrap()
 }
 
+/// Dot product of two flattened tensors.
+pub fn f_flat_dot(a: &Tensor, b: &Tensor) -> Result<Tensor, TchError> {
+    a.f_flatten(0, 1)?.f_dot(&b.f_flatten(0, -1)?)
+}
+
+/// Dot product of two flattened tensors.
+///
+/// Equivalently, the sum of the elementwise product of two tensors.
+/// The shapes may differ so long as the total number of elements are the same.
+///
+/// # Panics
+/// If [f_flat_dot] fails.
+pub fn flat_dot(a: &Tensor, b: &Tensor) -> Tensor {
+    f_flat_dot(a, b).unwrap()
+}
+
 #[cfg(test)]
 mod one_hot {
     use super::*;
@@ -169,5 +185,19 @@ mod flatten {
         let a = Tensor::of_slice(&[1, 2, 3, 4, 5, 6]).reshape(&[2, 3]);
         let b = Tensor::of_slice(&[10, 11, 12, 13]).reshape(&[4, 1, 1]);
         assert_eq!(ts, vec![a, b]);
+    }
+}
+
+#[cfg(test)]
+mod flat_dot {
+    use super::*;
+    use tch::{Device, Kind};
+
+    #[test]
+    fn test_flat_dot() {
+        let a = Tensor::of_slice(&[1, 2, 3, 4]).reshape(&[2, 2]);
+        let b = Tensor::of_slice(&[10, 9, 8, 7]).reshape(&[2, 2]);
+        let expected = Tensor::scalar_tensor(10 + 9 * 2 + 8 * 3 + 4 * 7, (Kind::Int, Device::Cpu));
+        assert_eq!(flat_dot(&a, &b), expected);
     }
 }
