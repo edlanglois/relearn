@@ -100,6 +100,21 @@ pub fn flat_dot(a: &Tensor, b: &Tensor) -> Tensor {
     f_flat_dot(a, b).unwrap()
 }
 
+/// Zero the gradient of a tensor.
+pub fn f_zero_grad(x: &Tensor) -> Result<(), TchError> {
+    let mut grad = x.f_grad()?;
+    if grad.defined() {
+        let _ = grad.f_detach_()?;
+        let _ = grad.f_zero_()?;
+    }
+    Ok(())
+}
+
+/// Zero the gradient of a tensor.
+pub fn zero_grad(x: &Tensor) {
+    f_zero_grad(x).unwrap()
+}
+
 #[cfg(test)]
 mod one_hot {
     use super::*;
@@ -199,5 +214,34 @@ mod flat_dot {
         let b = Tensor::of_slice(&[10, 9, 8, 7]).reshape(&[2, 2]);
         let expected = Tensor::scalar_tensor(10 + 9 * 2 + 8 * 3 + 4 * 7, (Kind::Int, Device::Cpu));
         assert_eq!(flat_dot(&a, &b), expected);
+    }
+}
+
+#[cfg(test)]
+mod zero_grad {
+    use super::*;
+    use tch::{Cuda, Device, Kind};
+
+    #[test]
+    fn zeros_nonzero_grad() {
+        // Work-around for https://github.com/pytorch/pytorch/issues/35736
+        Cuda::is_available();
+
+        let mut x = Tensor::zeros(&[3], (Kind::Float, Device::Cpu));
+        let _ = x.requires_grad_(true);
+        let y = x.sum(Kind::Float);
+        y.backward();
+        // First verify that the gradient is nonzero
+        assert_eq!(x.grad(), Tensor::ones_like(&x));
+
+        zero_grad(&x);
+        assert_eq!(x.grad(), Tensor::zeros_like(&x));
+    }
+
+    #[test]
+    fn test_no_grad_ok() {
+        let x = Tensor::zeros(&[3], (Kind::Float, Device::Cpu));
+        // Just check that it doesn't crash
+        zero_grad(&x);
     }
 }
