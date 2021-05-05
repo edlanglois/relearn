@@ -1,26 +1,26 @@
 //! Torch optimizer wrappers and configuration
-use super::{BaseOptimizer, OnceOptimizer, OptimizerBuilder};
+use super::{BaseOptimizer, OnceOptimizer, OptimizerBuilder, OptimizerStepError};
 use std::convert::{TryFrom, TryInto};
 use tch::{nn::VarStore, COptimizer, TchError, Tensor};
 
 impl BaseOptimizer for COptimizer {
-    type Error = TchError;
-
-    fn f_zero_grad(&self) -> Result<(), Self::Error> {
-        COptimizer::zero_grad(self)
+    fn zero_grad(&self) {
+        COptimizer::zero_grad(self).unwrap();
     }
 }
 
 impl OnceOptimizer for COptimizer {
-    fn f_step_once(&self) -> Result<(), Self::Error> {
-        COptimizer::step(self)
+    fn step_once(&self) -> Result<(), OptimizerStepError> {
+        // I'm not sure what errors it is possible for torch to raise here
+        // Anything that isn't essentially a type error should be converted to OptimizerStepError.
+        Ok(COptimizer::step(self).unwrap())
     }
 
-    fn f_backward_step_once(&self, loss: &Tensor) -> Result<(), Self::Error> {
-        self.f_zero_grad()?;
-        loss.f_backward()?;
-        self.f_step_once()?;
-        Ok(())
+    fn backward_step_once(&self, loss: &Tensor) -> Result<(), OptimizerStepError> {
+        BaseOptimizer::zero_grad(self);
+        loss.backward();
+        println!("loss {:?}", loss);
+        self.step_once()
     }
 }
 
@@ -198,14 +198,31 @@ impl TryFrom<&AdamWConfig> for COptimizer {
 
 #[cfg(test)]
 mod coptimizer {
-    use super::super::testing;
+    use super::super::{testing, Optimizer};
     use super::*;
+    use tch::{Device, Kind};
 
     #[test]
     fn sgd_optimizes_quadratic() {
         let mut config = SgdConfig::default();
         config.learning_rate = 1e-1;
         testing::check_optimizes_quadratic(&config, 500);
+    }
+
+    #[test]
+    /// Track the behavour when loss is NaN.
+    ///
+    /// SGD continues anyways and sets the parameters to NaN.
+    /// We might want to check for NaN in the wrapper and fail
+    /// but for now it silently runs without error.
+    fn sgd_nan_loss() {
+        let vs = VarStore::new(Device::Cpu);
+        let x = vs.root().f_zeros("x", &[2]).unwrap();
+
+        let optimizer = SgdConfig::default().build_optimizer(&vs).unwrap();
+        let _ = optimizer
+            .backward_step(&(|| (&x / &x).sum(Kind::Float)))
+            .unwrap();
     }
 
     #[test]

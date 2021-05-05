@@ -288,7 +288,7 @@ where
         if self.value.trainable() {
             let value_loss_fn = || self.value.loss(&features).unwrap();
             for i in 0..self.value_train_iters {
-                let value_loss = self.value_optimizer.backward_step(&value_loss_fn);
+                let value_loss = self.value_optimizer.backward_step(&value_loss_fn).unwrap();
 
                 if i == 0 {
                     logger
@@ -323,7 +323,10 @@ where
             entropies.set(Some(entropies_));
             -(log_probs * &step_values).mean(Kind::Float)
         };
-        let _ = self.policy_optimizer.backward_step(&policy_loss_fn);
+        let _ = self
+            .policy_optimizer
+            .backward_step(&policy_loss_fn)
+            .unwrap();
 
         logger
             .log(Event::Epoch, "batch_num_steps", (num_steps as f64).into())

@@ -5,31 +5,16 @@ pub use coptimizer::{AdamConfig, AdamWConfig, RmsPropConfig, SgdConfig};
 
 use std::error::Error;
 use tch::{nn::VarStore, Tensor};
+use thiserror::Error;
 
 /// Base optimizer interface
 pub trait BaseOptimizer {
-    /// Method error type
-    type Error: Error;
-
     /// Zero out the gradients of all optimized tensors
-    fn f_zero_grad(&self) -> Result<(), Self::Error>;
-
-    /// Zero out the gradients of all optimized tensors
-    ///
-    /// # Panics
-    /// This wraps [BaseOptimizer::f_zero_grad] and panics if `f_zero_grad` fails.
-    fn zero_grad(&self) {
-        self.f_zero_grad().unwrap();
-    }
+    fn zero_grad(&self);
 }
 
 /// Optimizer that minimizes a loss function.
 pub trait Optimizer: BaseOptimizer {
-    /// Apply an optimization step using the gradient of a loss function.
-    ///
-    /// See [Optimizer::backward_step].
-    fn f_backward_step(&self, loss_fn: &dyn Fn() -> Tensor) -> Result<Tensor, Self::Error>;
-
     /// Apply an optimization step using the gradient of a loss function.
     ///
     /// Obtains gradients by backpropagating the result of `loss_fn`.
@@ -40,36 +25,28 @@ pub trait Optimizer: BaseOptimizer {
     ///     Always evaluated at least once; may be evaluated multiple times.
     ///
     /// # Returns
-    /// The initial value of `loss_fn`.
+    /// The initial value of `loss_fn` on success.
     ///
-    /// # Panics
-    /// This wraps [Optimizer::f_backward_step] and panics if `f_backward_step` fails.
-    fn backward_step(&self, loss_fn: &dyn Fn() -> Tensor) -> Tensor {
-        self.f_backward_step(loss_fn).unwrap()
-    }
+    /// If an error is detected, the parameters guaranteed to be unchanged from (or reset to)
+    /// their initial values.
+    /// In general, error conditions are not guaranteed to be detected and an optimizer
+    /// may silently put itself or the parameters into a bad state.
+    /// For example, [COptimizer] sets parameters to NaN when the loss is NaN.
+    fn backward_step(&self, loss_fn: &dyn Fn() -> Tensor) -> Result<Tensor, OptimizerStepError>;
 }
 
 /// Optimizer that minimizes a loss tensor.
 pub trait OnceOptimizer: BaseOptimizer {
     /// Perform an optimization step (parameter update).
     ///
-    /// See [OnceOptimizer::step_once].
-    fn f_step_once(&self) -> Result<(), Self::Error>;
-
-    /// Perform an optimization step (parameter update).
-    ///
     /// Uses the existing gradients stored with the parameter tensor.
     ///
-    /// # Panics
-    /// This wraps [Optimizer::f_step_once] and panics if `f_step_once` fails.
-    fn step_once(&self) {
-        self.f_step_once().unwrap()
-    }
-
-    /// Apply a backward step pass, update the gradients, and perform an optimization step.
-    ///
-    /// See [OnceOptimizer::backward_step_once].
-    fn f_backward_step_once(&self, loss: &Tensor) -> Result<(), Self::Error>;
+    /// If an error is detected, the parameters guaranteed to be unchanged from (or reset to)
+    /// their initial values.
+    /// In general, error conditions are not guaranteed to be detected and an optimizer
+    /// may silently put itself or the parameters into a bad state.
+    /// For example, [COptimizer] sets parameters to NaN when the loss is NaN.
+    fn step_once(&self) -> Result<(), OptimizerStepError>;
 
     /// Apply a backward step pass, update the gradients, and perform an optimization step.
     ///
@@ -78,21 +55,28 @@ pub trait OnceOptimizer: BaseOptimizer {
     /// # Args
     /// * `loss` - Loss tensor. Back-propagation is applied to this tensor to obtain a gradient.
     ///
-    /// # Panics
-    /// This wraps [OnceOptimizer::f_backward_step_once]
-    /// and panics if `f_backward_step_once` fails.
-    fn backward_step_once(&self, loss: &Tensor) {
-        self.f_backward_step_once(loss).unwrap();
-    }
+    /// # Returns
+    /// The initial value of `loss_fn` on success.
+    ///
+    /// If an error is detected, the parameters guaranteed to be unchanged from (or reset to)
+    /// their initial values.
+    /// In general, error conditions are not guaranteed to be detected and an optimizer
+    /// may silently put itself or the parameters into a bad state.
+    /// For example, [COptimizer] sets parameters to NaN when the loss is NaN.
+    fn backward_step_once(&self, loss: &Tensor) -> Result<(), OptimizerStepError>;
 }
 
 impl<T: OnceOptimizer> Optimizer for T {
-    fn f_backward_step(&self, loss_fn: &dyn Fn() -> Tensor) -> Result<Tensor, Self::Error> {
+    fn backward_step(&self, loss_fn: &dyn Fn() -> Tensor) -> Result<Tensor, OptimizerStepError> {
         let loss = loss_fn();
-        self.f_backward_step_once(&loss)?;
+        self.backward_step_once(&loss)?;
         Ok(loss)
     }
 }
+
+/// Error performing an optimization step.
+#[derive(Debug, Error)]
+pub enum OptimizerStepError {}
 
 /// Build an optimizer
 pub trait OptimizerBuilder<T> {
