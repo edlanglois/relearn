@@ -86,7 +86,7 @@ pub fn unflatten_tensors(vector: &Tensor, shapes: &[Vec<i64>]) -> Vec<Tensor> {
 
 /// Dot product of two flattened tensors.
 pub fn f_flat_dot(a: &Tensor, b: &Tensor) -> Result<Tensor, TchError> {
-    a.f_flatten(0, 1)?.f_dot(&b.f_flatten(0, -1)?)
+    a.f_flatten(0, -1)?.f_dot(&b.f_flatten(0, -1)?)
 }
 
 /// Dot product of two flattened tensors.
