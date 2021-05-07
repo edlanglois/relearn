@@ -1,4 +1,4 @@
-//! Vanilla SequenceModule + StatefulIterativeModule Gradient with Generalized Advantage Estimation
+//! Vanilla Policy Gradient
 use super::super::history::{
     features, HistoryBuffer, LazyPackedHistoryFeatures, PackedHistoryFeaturesView,
 };
@@ -94,13 +94,9 @@ where
     }
 }
 
-/// SequenceModule + StatefulIterativeModule Gradient with Generalized Advantage Estimation
+/// Vanilla Policy Gradient Agent
 ///
 /// Supports both recurrent and non-recurrent policies.
-///
-/// Reference:
-/// High-Dimensional Continuous Control Using Generalized Advantage Estimation
-/// by Schulman et al. (2016)
 pub struct PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: Space,
