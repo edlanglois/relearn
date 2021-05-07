@@ -1,6 +1,5 @@
 use super::{Event, LogError, Loggable, Logger};
 use enum_map::{enum_map, EnumMap};
-use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
@@ -64,15 +63,27 @@ impl CLILogger {
 }
 
 impl Logger for CLILogger {
-    fn log(&mut self, event: Event, name: &'static str, value: Loggable) -> Result<(), LogError> {
-        match self.events[event].aggregators.entry(name) {
-            Entry::Vacant(v) => {
-                v.insert(Aggregator::new(value));
-            }
-            Entry::Occupied(o) => {
-                if let Err((value, expected)) = o.into_mut().update(value) {
+    fn log<'a>(
+        &mut self,
+        event: Event,
+        name: &'a str,
+        value: Loggable,
+    ) -> Result<(), LogError<'a>> {
+        // The entry API does not currently support lookup with Borrow + IntoOwned
+        // Eventually raw_entry can be used but it is not stable yet.
+        // For now, make separate get() / insert() calls.
+        // The duplicated lookup with insert will only occur once per name since we never remove
+        // aggregators.
+        let ref mut aggregators = self.events[event].aggregators;
+        match aggregators.get_mut(name) {
+            Some(aggregator) => {
+                if let Err((value, expected)) = aggregator.update(value) {
                     return Err(LogError::new(name, value, expected));
                 }
+            }
+            None => {
+                let old_value = aggregators.insert(name.into(), Aggregator::new(value));
+                assert!(old_value.is_none());
             }
         }
         Ok(())
@@ -111,7 +122,7 @@ struct EventLog {
     /// Duration of this summary period to the most recent update
     summary_duration: Duration,
     /// An aggregator for each log entry.
-    aggregators: BTreeMap<&'static str, Aggregator>,
+    aggregators: BTreeMap<String, Aggregator>,
 }
 
 impl EventLog {

@@ -45,14 +45,15 @@ pub trait Logger {
     /// Log a value.
     ///
     /// # Args
-    /// * `event` The event associated with this value.
-    /// * `name` The name that identifies this value.
-    /// * `value` The value to log.
+    /// * `event` - The event associated with this value.
+    /// * `name` - The name that identifies this value.
+    /// * `value` - The value to log.
     ///
     /// # Returns
     /// May return an error if the logged value is structurally incompatible
     /// with previous values logged under the same name.
-    fn log(&mut self, event: Event, name: &'static str, value: Loggable) -> Result<(), LogError>;
+    fn log<'a>(&mut self, event: Event, name: &'a str, value: Loggable)
+        -> Result<(), LogError<'a>>;
 
     /// Mark the end of an event.
     fn done(&mut self, event: Event);
@@ -60,7 +61,7 @@ pub trait Logger {
 
 /// Logger that does nothing
 impl Logger for () {
-    fn log(&mut self, _: Event, _: &'static str, _: Loggable) -> Result<(), LogError> {
+    fn log<'a>(&mut self, _: Event, _: &'a str, _: Loggable) -> Result<(), LogError<'a>> {
         Ok(())
     }
 
@@ -68,14 +69,14 @@ impl Logger for () {
 }
 
 #[derive(Debug)]
-pub struct LogError {
-    name: &'static str,
+pub struct LogError<'a> {
+    name: &'a str,
     value: Loggable,
     expected: String,
 }
 
-impl LogError {
-    pub fn new(name: &'static str, value: Loggable, expected: String) -> Self {
+impl<'a> LogError<'a> {
+    pub fn new(name: &'a str, value: Loggable, expected: String) -> Self {
         Self {
             name,
             value,
@@ -84,7 +85,7 @@ impl LogError {
     }
 }
 
-impl fmt::Display for LogError {
+impl<'a> fmt::Display for LogError<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -94,4 +95,4 @@ impl fmt::Display for LogError {
     }
 }
 
-impl Error for LogError {}
+impl<'a> Error for LogError<'a> {}
