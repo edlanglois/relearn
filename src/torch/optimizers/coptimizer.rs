@@ -19,7 +19,6 @@ impl OnceOptimizer for COptimizer {
     fn backward_step_once(&self, loss: &Tensor) -> Result<(), OptimizerStepError> {
         BaseOptimizer::zero_grad(self);
         loss.backward();
-        println!("loss {:?}", loss);
         self.step_once()
     }
 }
