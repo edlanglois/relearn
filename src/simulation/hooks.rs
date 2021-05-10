@@ -142,19 +142,18 @@ where
     L: Logger + ?Sized,
 {
     fn call(&mut self, step: &Step<OS::Element, AS::Element>, logger: &mut L) -> bool {
-        logger
-            .log(Event::Step, "reward", step.reward.into())
-            .unwrap();
+        use Event::*;
+        logger.log(Step, "reward", step.reward.into()).unwrap();
         logger
             .log(
-                Event::Step,
+                Step,
                 "observation",
                 self.observation_space.elem_ref_into(&step.observation),
             )
             .unwrap();
         logger
             .log(
-                Event::Step,
+                Step,
                 "action",
                 self.action_space.elem_ref_into(&step.action),
             )
@@ -165,20 +164,15 @@ where
         self.episode_reward += step.reward;
         if step.episode_done {
             logger
-                .log(
-                    Event::Episode,
-                    "length",
-                    (self.episode_length as f64).into(),
-                )
+                .log(Episode, "length", (self.episode_length as f64).into())
                 .unwrap();
             self.episode_length = 0;
 
             logger
-                .log(Event::Episode, "reward", self.episode_reward.into())
+                .log(Episode, "reward", self.episode_reward.into())
                 .unwrap();
             self.episode_reward = 0.0;
-
-            logger.done(Event::Episode);
+            logger.done(Episode);
         }
 
         true

@@ -255,6 +255,15 @@ where
     }
 }
 
+/// Log a value with the epoch event.
+fn epoch_log_scalar<'a, 'b, L, V>(logger: &mut L, name: &'a str, value: V)
+where
+    L: Logger + ?Sized,
+    V: Into<f64>,
+{
+    logger.log(Event::Epoch, name, value.into().into()).unwrap();
+}
+
 impl<OS, AS, P, PO, V, VO> PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
@@ -287,21 +296,9 @@ where
                 let value_loss = self.value_optimizer.backward_step(&value_loss_fn).unwrap();
 
                 if i == 0 {
-                    logger
-                        .log(
-                            Event::Epoch,
-                            "value_loss_initial",
-                            f64::from(&value_loss).into(),
-                        )
-                        .unwrap();
+                    epoch_log_scalar(logger, "value_loss_initial", &value_loss);
                 } else if i == self.value_train_iters - 1 {
-                    logger
-                        .log(
-                            Event::Epoch,
-                            "value_loss_final",
-                            f64::from(&value_loss).into(),
-                        )
-                        .unwrap();
+                    epoch_log_scalar(logger, "value_loss_final", &value_loss);
                 }
             }
         }
@@ -324,30 +321,14 @@ where
             .backward_step(&policy_loss_fn)
             .unwrap();
 
-        logger
-            .log(Event::Epoch, "batch_num_steps", (num_steps as f64).into())
-            .unwrap();
-        logger
-            .log(
-                Event::Epoch,
-                "batch_num_episodes",
-                (num_episodes as f64).into(),
-            )
-            .unwrap();
-        logger
-            .log(
-                Event::Epoch,
-                "policy_entropy",
-                f64::from(entropies.into_inner().unwrap().mean(Kind::Float)).into(),
-            )
-            .unwrap();
-        logger
-            .log(
-                Event::Epoch,
-                "step_values",
-                f64::from(step_values.mean(Kind::Float)).into(),
-            )
-            .unwrap();
+        epoch_log_scalar(logger, "batch_num_steps", num_steps as f64);
+        epoch_log_scalar(logger, "batch_num_episodes", num_episodes as f64);
+        epoch_log_scalar(
+            logger,
+            "policy_entropy",
+            entropies.into_inner().unwrap().mean(Kind::Float),
+        );
+        epoch_log_scalar(logger, "step_values", step_values.mean(Kind::Float));
         logger.done(Event::Epoch);
     }
 }
