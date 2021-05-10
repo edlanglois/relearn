@@ -93,6 +93,16 @@ pub trait ParameterizedSampleSpace<T, T2 = T, T0 = T>: Space {
         Self::Element: 'a;
 }
 
+// This could possibly be a single trait like
+//
+// pub trait Convert<T, U> {
+//     fn convert(&self, x: T) -> U;
+// }
+//
+// But doint it for references requires higher order bounds:
+// for<'a> Convert<&'a Self::Element, Foo>
+// which I have had trouble getting to work in all cases.
+
 /// Convert elements of the space into values of type T
 pub trait ElementInto<T>: Space {
     /// Convert an element into a value of type T
