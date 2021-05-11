@@ -17,7 +17,7 @@ pub struct Lstm {
 impl Lstm {
     pub fn new(vs: &Path, in_dim: usize, out_dim: usize, bias: bool, dropout: f64) -> Self {
         let (params, hidden_size, device) =
-            initialize_rnn_params(vs, CudnnRnnMode::LSTM, in_dim, out_dim, bias);
+            initialize_rnn_params(vs, CudnnRnnMode::Lstm, in_dim, out_dim, bias);
         Self {
             params,
             hidden_size,

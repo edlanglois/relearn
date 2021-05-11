@@ -14,8 +14,8 @@ use tch::{nn::Path, Cuda, Device, Tensor};
 ///
 /// See https://github.com/pytorch/pytorch/blob/d6909732954ad182d13fa8ab9959502a386e9d3a/torch/csrc/api/src/nn/modules/rnn.cpp#L29
 enum CudnnRnnMode {
-    LSTM = 2,
-    GRU = 3,
+    Lstm = 2,
+    Gru = 3,
 }
 
 /// Initialize RNN parameters
@@ -29,8 +29,8 @@ fn initialize_rnn_params(
     let in_dim: i64 = in_dim.try_into().unwrap();
     let hidden_size: i64 = out_dim.try_into().unwrap();
     let gates_size = match mode {
-        CudnnRnnMode::LSTM => 4 * hidden_size,
-        CudnnRnnMode::GRU => 3 * hidden_size,
+        CudnnRnnMode::Lstm => 4 * hidden_size,
+        CudnnRnnMode::Gru => 3 * hidden_size,
     };
 
     let mut params = vec![
