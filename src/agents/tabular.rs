@@ -161,7 +161,7 @@ where
 mod tabular_q_learning {
     use super::super::testing;
     use super::*;
-    use crate::envs::{AsStateful, DeterministicBandit, StatefulEnvironment};
+    use crate::envs::{DeterministicBandit, StatefulEnvironment, WithState};
     use crate::simulation;
     use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 
@@ -177,7 +177,7 @@ mod tabular_q_learning {
 
     #[test]
     fn explore_exploit() {
-        let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).as_stateful(0);
+        let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).with_state(0);
         let env_structure = env.structure();
         let action_space = env_structure.action_space.clone();
 

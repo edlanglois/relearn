@@ -74,7 +74,10 @@ where
         // Packed estimated values of the observed states
         let estimated_values = self
             .value_fn
-            .seq_packed(features.observations(), features.batch_sizes_tensor())
+            .seq_packed(
+                features.observation_features(),
+                features.batch_sizes_tensor(),
+            )
             .squeeze1(-1);
 
         // Packed estimated value for the observed successor states.
@@ -105,7 +108,10 @@ where
     fn loss(&self, features: &dyn PackedHistoryFeaturesView) -> Option<Tensor> {
         Some(
             self.value_fn
-                .seq_packed(features.observations(), features.batch_sizes_tensor())
+                .seq_packed(
+                    features.observation_features(),
+                    features.batch_sizes_tensor(),
+                )
                 .squeeze1(-1)
                 .mse_loss(features.returns(), Reduction::Mean),
         )

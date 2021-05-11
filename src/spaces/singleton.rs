@@ -7,11 +7,17 @@ use std::fmt;
 
 /// A space containing a single element.
 #[derive(Debug, Clone)]
-pub struct SingletonSpace {}
+pub struct SingletonSpace;
 
 impl SingletonSpace {
     pub fn new() -> Self {
-        SingletonSpace {}
+        SingletonSpace
+    }
+}
+
+impl Default for SingletonSpace {
+    fn default() -> Self {
+        SingletonSpace
     }
 }
 
@@ -44,9 +50,7 @@ impl FiniteSpace for SingletonSpace {
 }
 
 impl Distribution<<Self as Space>::Element> for SingletonSpace {
-    fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> <Self as Space>::Element {
-        ()
-    }
+    fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> <Self as Space>::Element {}
 }
 
 impl SampleSpace for SingletonSpace {}

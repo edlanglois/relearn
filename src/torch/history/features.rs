@@ -1,5 +1,5 @@
 //! Utilities for calculating step history features.
-use crate::spaces::{FeatureSpace, Space};
+use crate::spaces::{FeatureSpace, ReprSpace, Space};
 use crate::utils::packed::{self, PackedBatchSizes, PackingIndices};
 use crate::Step;
 use lazycell::LazyCell;
@@ -23,7 +23,13 @@ pub trait PackedHistoryFeaturesView {
     fn batch_sizes_tensor(&self) -> &Tensor;
 
     /// Packed observation features. A 2D f64 tensor.
-    fn observations(&self) -> &Tensor;
+    fn observation_features(&self) -> &Tensor;
+
+    /// Packed action values.
+    ///
+    /// A tensor of any type and shape, apart from the first dimension along which actions are
+    /// packed. Appropriate for passing to [ParameterizedSampleSpace] methods.
+    fn actions(&self) -> &Tensor;
 
     /// Packed returns (discounted reward-to-go). A 1D f32 tensor.
     fn returns(&self) -> &Tensor;
@@ -33,24 +39,27 @@ pub trait PackedHistoryFeaturesView {
 }
 
 /// Packed history features with lazy evaluation and caching.
-pub struct LazyPackedHistoryFeatures<'a, OS: Space, A> {
-    steps: &'a [Step<OS::Element, A>],
+pub struct LazyPackedHistoryFeatures<'a, OS: Space, AS: Space> {
+    steps: &'a [Step<OS::Element, AS::Element>],
     episode_ranges: Vec<Range<usize>>,
     observation_space: &'a OS,
+    action_space: &'a AS,
     discount_factor: f64,
 
     cached_batch_sizes: LazyCell<Vec<i64>>,
     cached_batch_sizes_tensor: LazyCell<Tensor>,
     cached_observation_features: LazyCell<Tensor>,
+    cached_actions: LazyCell<Tensor>,
     cached_returns: LazyCell<Tensor>,
     cached_rewards: LazyCell<Tensor>,
 }
 
-impl<'a, OS: Space, A> LazyPackedHistoryFeatures<'a, OS, A> {
+impl<'a, OS: Space, AS: Space> LazyPackedHistoryFeatures<'a, OS, AS> {
     pub fn new<I>(
-        steps: &'a [Step<OS::Element, A>],
+        steps: &'a [Step<OS::Element, AS::Element>],
         episode_ranges: I,
         observation_space: &'a OS,
+        action_space: &'a AS,
         discount_factor: f64,
     ) -> Self
     where
@@ -61,10 +70,12 @@ impl<'a, OS: Space, A> LazyPackedHistoryFeatures<'a, OS, A> {
             steps,
             episode_ranges,
             observation_space,
+            action_space,
             discount_factor,
             cached_batch_sizes: LazyCell::new(),
             cached_batch_sizes_tensor: LazyCell::new(),
             cached_observation_features: LazyCell::new(),
+            cached_actions: LazyCell::new(),
             cached_returns: LazyCell::new(),
             cached_rewards: LazyCell::new(),
         }
@@ -78,15 +89,17 @@ impl<'a, OS: Space, A> LazyPackedHistoryFeatures<'a, OS, A> {
             batch_sizes: self.cached_batch_sizes.into_inner(),
             batch_sizes_tensor: self.cached_batch_sizes_tensor.into_inner(),
             observation_features: self.cached_observation_features.into_inner(),
+            actions: self.cached_actions.into_inner(),
             returns: self.cached_returns.into_inner(),
             rewards: self.cached_rewards.into_inner(),
         }
     }
 }
 
-impl<'a, OS, A> PackedHistoryFeaturesView for LazyPackedHistoryFeatures<'a, OS, A>
+impl<'a, OS, AS> PackedHistoryFeaturesView for LazyPackedHistoryFeatures<'a, OS, AS>
 where
     OS: FeatureSpace<Tensor>,
+    AS: ReprSpace<Tensor>,
 {
     fn discount_factor(&self) -> f64 {
         self.discount_factor
@@ -109,10 +122,15 @@ where
             .borrow_with(|| Tensor::of_slice(self.batch_sizes()))
     }
 
-    fn observations(&self) -> &Tensor {
+    fn observation_features(&self) -> &Tensor {
         self.cached_observation_features.borrow_with(|| {
             packed_observation_features(&self.steps, &self.episode_ranges, self.observation_space)
         })
+    }
+
+    fn actions(&self) -> &Tensor {
+        self.cached_actions
+            .borrow_with(|| packed_actions(&self.steps, &self.episode_ranges, self.action_space))
     }
 
     fn returns(&self) -> &Tensor {
@@ -138,6 +156,7 @@ pub struct PackedHistoryFeatures {
     pub batch_sizes: Option<Vec<i64>>,
     pub batch_sizes_tensor: Option<Tensor>,
     pub observation_features: Option<Tensor>,
+    pub actions: Option<Tensor>,
     pub returns: Option<Tensor>,
     pub rewards: Option<Tensor>,
 }
@@ -163,10 +182,16 @@ impl PackedHistoryFeaturesView for PackedHistoryFeatures {
             .expect("batch_sizes has not been evaluated")
     }
 
-    fn observations(&self) -> &Tensor {
+    fn observation_features(&self) -> &Tensor {
         self.observation_features
             .as_ref()
             .expect("observation_features has not been evaluated")
+    }
+
+    fn actions(&self) -> &Tensor {
+        self.actions
+            .as_ref()
+            .expect("actions has not been evaluated")
     }
 
     fn returns(&self) -> &Tensor {
@@ -196,9 +221,7 @@ where
 }
 
 /// Iterator over batch sizes in the packing
-pub fn packing_batch_sizes<'a>(
-    episode_ranges: &'a [Range<usize>],
-) -> PackedBatchSizes<'a, Range<usize>> {
+pub fn packing_batch_sizes(episode_ranges: &[Range<usize>]) -> PackedBatchSizes<Range<usize>> {
     PackedBatchSizes::from_sorted_ranges(episode_ranges)
 }
 
@@ -214,6 +237,18 @@ where
     let _no_grad = tch::no_grad_guard();
     observation_space
         .batch_features(PackingIndices::from_sorted(&episode_ranges).map(|i| &steps[i].observation))
+}
+
+pub fn packed_actions<O, AS>(
+    steps: &[Step<O, AS::Element>],
+    episode_ranges: &[Range<usize>],
+    action_space: &AS,
+) -> Tensor
+where
+    AS: ReprSpace<Tensor>,
+{
+    let _no_grad = tch::no_grad_guard();
+    action_space.batch_repr(PackingIndices::from_sorted(&episode_ranges).map(|i| &steps[i].action))
 }
 
 /// Packed step rewards. A 1D f32 tensor.

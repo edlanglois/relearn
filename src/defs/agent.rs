@@ -22,7 +22,9 @@ pub enum AgentDef {
     /// UCB1 agent from Auer 2002
     UCB1(UCB1AgentConfig),
     /// Policy gradient
-    PolicyGradient(PolicyGradientAgentConfig<SeqModDef, OptimizerDef, StepValueDef, OptimizerDef>),
+    PolicyGradient(
+        Box<PolicyGradientAgentConfig<SeqModDef, OptimizerDef, StepValueDef, OptimizerDef>>,
+    ),
 }
 
 // TODO: Return Box<dyn ActorAgent> where ActorAgent: Actor + Agent instead of Box<dyn Agent>

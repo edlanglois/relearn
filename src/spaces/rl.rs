@@ -1,4 +1,6 @@
-use super::{ElementRefInto, FeatureSpace, ParameterizedSampleSpace, SampleSpace, Space};
+use super::{
+    ElementRefInto, FeatureSpace, ParameterizedSampleSpace, ReprSpace, SampleSpace, Space,
+};
 use crate::logging::Loggable;
 use std::fmt::Debug;
 use tch::Tensor;
@@ -10,8 +12,9 @@ use tch::Tensor;
 pub trait RLSpace:
     Space
     + SampleSpace
-    + FeatureSpace<Tensor>
-    + ParameterizedSampleSpace<Tensor>
+    + FeatureSpace<Tensor> // Observations only
+    + ReprSpace<Tensor> // Actions only
+    + ParameterizedSampleSpace<Tensor> // Actions only
     + ElementRefInto<Loggable>
     + Debug
 {
@@ -20,6 +23,7 @@ impl<
         T: Space
             + SampleSpace
             + FeatureSpace<Tensor>
+            + ReprSpace<Tensor>
             + ParameterizedSampleSpace<Tensor>
             + ElementRefInto<Loggable>
             + Debug,

@@ -1,6 +1,5 @@
 //! Environment testing utilities
-use super::as_stateful::AsStateful;
-use super::{EnvStructure, Environment, StatefulEnvironment};
+use super::{EnvStructure, Environment, StatefulEnvironment, WithState};
 use crate::agents::{RandomAgent, Step};
 use crate::simulation;
 use crate::simulation::hooks::{ClosureHook, StepLimit};
@@ -16,7 +15,7 @@ where
     <E as Environment>::ActionSpace: Debug + SampleSpace,
     <<E as Environment>::ActionSpace as Space>::Element: Debug,
 {
-    run_stateful(&mut env.as_stateful(seed), num_steps, seed + 1)
+    run_stateful(&mut env.with_state(seed), num_steps, seed + 1)
 }
 
 /// Run a stateful environment and check that invariants are satisfied.

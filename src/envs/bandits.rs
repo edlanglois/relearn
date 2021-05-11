@@ -85,16 +85,13 @@ impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
 
-    fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
-        ()
-    }
+    fn initial_state(&self, _rng: &mut StdRng) -> Self::State {}
 
     fn observe(
         &self,
         _state: &Self::State,
         _rng: &mut StdRng,
     ) -> <Self::ObservationSpace as Space>::Element {
-        ()
     }
 
     fn step(
@@ -123,7 +120,7 @@ impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
         EnvStructure {
             observation_space: SingletonSpace::new(),
             action_space: IndexSpace::new(self.distributions.len()),
-            reward_range: reward_range,
+            reward_range,
             discount_factor: 1.0,
         }
     }
