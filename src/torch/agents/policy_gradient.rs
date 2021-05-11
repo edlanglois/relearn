@@ -71,7 +71,7 @@ where
     /// Base actor
     actor: PolicyValueNetActor<OS, AS, P, V>,
 
-    /// SequenceModule + StatefulIterativeModule optimizer
+    /// Policy optimizer
     policy_optimizer: PO,
 
     /// Step value module optimizer.
