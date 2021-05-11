@@ -3,13 +3,13 @@ use super::super::history::{HistoryBuffer, LazyPackedHistoryFeatures};
 use super::super::seq_modules::StatefulIterativeModule;
 use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::ModuleBuilder;
-use crate::agents::{Actor, Step};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
+use crate::{Actor, EnvStructure, Step};
 use tch::{nn::Path, Tensor};
 
 /// Configuration for [PolicyValueNetActor].
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PolicyValueNetActorConfig<PB, VB> {
     pub steps_per_epoch: usize,
     pub value_train_iters: u64,
@@ -51,9 +51,7 @@ where
 impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
     pub fn build_actor<OS, AS, P, V>(
         &self,
-        observation_space: OS,
-        action_space: AS,
-        env_discount_factor: f64,
+        env: EnvStructure<OS, AS>,
         policy_vs: &Path,
         value_vs: &Path,
     ) -> PolicyValueNetActor<OS, AS, P, V>
@@ -64,17 +62,7 @@ impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
         VB: StepValueBuilder<V>,
         V: StepValue,
     {
-        PolicyValueNetActor::new(
-            observation_space,
-            action_space,
-            env_discount_factor,
-            self.steps_per_epoch,
-            self.value_train_iters,
-            &self.policy_config,
-            policy_vs,
-            &self.value_config,
-            value_vs,
-        )
+        PolicyValueNetActor::new(env, self, policy_vs, value_vs)
     }
 }
 
@@ -142,38 +130,37 @@ where
     /// Others as described by the documentation for [PolicyNetActor].
 
     pub fn new<PB, VB>(
-        observation_space: OS,
-        action_space: AS,
-        env_discount_factor: f64,
-        steps_per_epoch: usize,
-        value_train_iters: u64,
-        policy_config: &PB,
+        env: EnvStructure<OS, AS>,
+        config: &PolicyValueNetActorConfig<PB, VB>,
         policy_vs: &Path,
-        value_config: &VB,
         value_vs: &Path,
     ) -> Self
     where
         PB: ModuleBuilder<P>,
         VB: StepValueBuilder<V>,
     {
-        let max_steps_per_epoch = (steps_per_epoch as f64 * 1.1) as usize;
+        let observation_space = env.observation_space;
+        let action_space = env.action_space;
+        let max_steps_per_epoch = (config.steps_per_epoch as f64 * 1.1) as usize;
 
-        let policy = policy_config.build_module(
+        let policy = config.policy_config.build_module(
             policy_vs,
             observation_space.num_features(),
             action_space.num_sample_params(),
         );
 
-        let value = value_config.build_step_value(&value_vs, observation_space.num_features());
-        let discount_factor = value.discount_factor(env_discount_factor);
+        let value = config
+            .value_config
+            .build_step_value(&value_vs, observation_space.num_features());
+        let discount_factor = value.discount_factor(env.discount_factor);
 
         Self {
             observation_space,
             action_space,
             discount_factor,
-            steps_per_epoch,
+            steps_per_epoch: config.steps_per_epoch,
             max_steps_per_epoch,
-            value_train_iters,
+            value_train_iters: config.value_train_iters,
             policy,
             value,
             history: HistoryBuffer::new(Some(max_steps_per_epoch)),

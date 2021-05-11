@@ -12,7 +12,7 @@ use std::cell::Cell;
 use tch::{kind::Kind, nn, Device, Tensor};
 
 /// Configuration for [PolicyGradientAgent]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct PolicyGradientAgentConfig<PB, POB, VB, VOB> {
     pub actor_config: PolicyValueNetActorConfig<PB, VB>,
     pub policy_optimizer_config: POB,
@@ -52,9 +52,7 @@ where
         _seed: u64,
     ) -> Result<PolicyGradientAgent<OS, AS, P, PO, V, VO>, BuildAgentError> {
         Ok(PolicyGradientAgent::new(
-            env.observation_space,
-            env.action_space,
-            env.discount_factor,
+            env,
             &self.actor_config,
             &self.policy_optimizer_config,
             &self.value_optimizer_config,
@@ -87,9 +85,7 @@ where
     V: StepValue,
 {
     pub fn new<PB, VB, POB, VOB>(
-        observation_space: OS,
-        action_space: AS,
-        env_discount_factor: f64,
+        env: EnvStructure<OS, AS>,
         actor_config: &PolicyValueNetActorConfig<PB, VB>,
         policy_optimizer_config: &POB,
         value_optimizer_config: &VOB,
@@ -102,13 +98,7 @@ where
     {
         let policy_vs = nn::VarStore::new(Device::Cpu);
         let value_vs = nn::VarStore::new(Device::Cpu);
-        let actor = actor_config.build_actor(
-            observation_space,
-            action_space,
-            env_discount_factor,
-            &policy_vs.root(),
-            &value_vs.root(),
-        );
+        let actor = actor_config.build_actor(env, &policy_vs.root(), &value_vs.root());
 
         let policy_optimizer = policy_optimizer_config.build_optimizer(&policy_vs).unwrap();
         let value_optimizer = value_optimizer_config.build_optimizer(&value_vs).unwrap();

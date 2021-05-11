@@ -103,7 +103,7 @@ pub trait StatefulEnvironment {
 }
 
 /// The external structure of an environment.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EnvStructure<OS, AS> {
     /// Space containing all possible observations.
     ///
