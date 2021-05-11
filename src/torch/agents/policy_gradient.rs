@@ -149,10 +149,11 @@ where
     }
 }
 
+/// Perform a single policy gradient update step using the given history features.
 fn policy_gradient_update<OS, AS, P, V, PO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
     features: &LazyPackedHistoryFeatures<OS, AS>,
-    policy_optimizer: &PO,
+    optimizer: &PO,
 ) -> Tensor
 where
     OS: FeatureSpace<Tensor>,
@@ -177,15 +178,16 @@ where
         -(log_probs * &step_values).mean(Kind::Float)
     };
 
-    let _ = policy_optimizer.backward_step(&policy_loss_fn).unwrap();
+    let _ = optimizer.backward_step(&policy_loss_fn).unwrap();
 
     entropies.into_inner().unwrap().mean(Kind::Float)
 }
 
+/// Perform a single squared error loss value function update using the given history features.
 fn value_squared_error_update<OS, AS, P, V, VO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
     features: &LazyPackedHistoryFeatures<OS, AS>,
-    value_optimizer: &VO,
+    optimizer: &VO,
 ) -> Tensor
 where
     OS: FeatureSpace<Tensor>,
@@ -193,7 +195,7 @@ where
     V: StepValue,
     VO: Optimizer,
 {
-    value_optimizer
+    optimizer
         .backward_step(&|| actor.value.loss(features).unwrap())
         .unwrap()
 }
