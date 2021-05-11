@@ -56,10 +56,10 @@ impl<O, A> HistoryBuffer<O, A> {
         &self.steps
     }
 
-    // /// View the stored episode ends.
-    // pub fn episode_ends(&self) -> &[usize] {
-    //     &self.episode_ends
-    // }
+    /// View the stored episode ends.
+    pub fn episode_ends(&self) -> &[usize] {
+        &self.episode_ends
+    }
 
     /// Iterate over episode ranges.
     pub fn episode_ranges(&self) -> EpRangeIter {
@@ -70,14 +70,14 @@ impl<O, A> HistoryBuffer<O, A> {
         })
     }
 
-    // /// Iterate over episode lengths.
-    // pub fn episode_lengths(&self) -> EpLenIter {
-    //     self.episode_ends.iter().scan(0, |start, end| {
-    //         let length = *end - *start;
-    //         *start = *end;
-    //         Some(length)
-    //     })
-    // }
+    /// Iterate over episode lengths.
+    pub fn episode_lengths(&self) -> EpLenIter {
+        self.episode_ends.iter().scan(0, |start, end| {
+            let length = *end - *start;
+            *start = *end;
+            Some(length)
+        })
+    }
 
     /// Creates draining iterators for the stored steps and episode ends.
     ///
@@ -93,7 +93,7 @@ impl<O, A> HistoryBuffer<O, A> {
     }
 }
 
-// pub type EpLenIter<'a> = Scan<Iter<'a, usize>, usize, fn(&mut usize, &usize) -> Option<usize>>;
+pub type EpLenIter<'a> = Scan<Iter<'a, usize>, usize, fn(&mut usize, &usize) -> Option<usize>>;
 
 pub type EpRangeIter<'a> =
     Scan<Iter<'a, usize>, usize, fn(&mut usize, &usize) -> Option<Range<usize>>>;
