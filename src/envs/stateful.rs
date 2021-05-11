@@ -59,17 +59,17 @@ impl<E: Environment> StatefulEnvironment for EnvWithState<E> {
 }
 
 /// Supports conversion to a stateful environment
-pub trait AsStateful {
+pub trait WithState {
     type Output: StatefulEnvironment;
 
     /// Convert into a stateful environment.
-    fn as_stateful(self, seed: u64) -> Self::Output;
+    fn with_state(self, seed: u64) -> Self::Output;
 }
 
-impl<E: Environment> AsStateful for E {
+impl<E: Environment> WithState for E {
     type Output = EnvWithState<E>;
 
-    fn as_stateful(self, seed: u64) -> Self::Output {
+    fn with_state(self, seed: u64) -> Self::Output {
         Self::Output::new(self, seed)
     }
 }
@@ -82,6 +82,6 @@ impl<E: Environment, B: EnvBuilder<E>> EnvBuilder<EnvWithState<E>> for B {
         // Add an arbitrary offset for the dynamics seed.
         // Want to avoid collissions with other seed derivations.
         let dynamics_seed = seed.wrapping_add(135);
-        Ok(self.build_env(structure_seed)?.as_stateful(dynamics_seed))
+        Ok(self.build_env(structure_seed)?.with_state(dynamics_seed))
     }
 }
