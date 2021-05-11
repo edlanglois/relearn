@@ -201,7 +201,7 @@ where
 }
 
 #[cfg(test)]
-mod gae_policy_gradient {
+mod policy_gradient {
     use super::*;
     use crate::agents::testing;
     use crate::torch::modules::MlpConfig;
