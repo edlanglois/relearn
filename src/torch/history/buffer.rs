@@ -85,9 +85,9 @@ impl<O, A> HistoryBuffer<O, A> {
         (self.steps.drain(..), self.episode_ends.drain(..))
     }
 
-    // /// Clears the buffer, removing all stored data.
-    // pub fn clear(&mut self) {
-    //     self.steps.clear();
-    //     self.episode_ends.clear();
-    // }
+    /// Clears the buffer, removing all stored data.
+    pub fn clear(&mut self) {
+        self.steps.clear();
+        self.episode_ends.clear();
+    }
 }

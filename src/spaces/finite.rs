@@ -1,7 +1,7 @@
 //! FiniteSpace trait definition
-use super::{FeatureSpace, ParameterizedSampleSpace, Space};
+use super::{FeatureSpace, ParameterizedSampleSpace, ReprSpace, Space};
 use crate::torch::utils as torch_utils;
-use tch::{kind::Kind, Device, Tensor};
+use tch::{Device, Kind, Tensor};
 
 /// A space containing finitely many elements.
 pub trait FiniteSpace: Space {
@@ -19,6 +19,26 @@ pub trait FiniteSpace: Space {
     fn from_index(&self, index: usize) -> Option<Self::Element>;
 }
 
+/// Represents elements as integer tensors.
+impl<S: FiniteSpace> ReprSpace<Tensor> for S {
+    fn repr(&self, element: &Self::Element) -> Tensor {
+        Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu))
+    }
+
+    fn batch_repr<'a, I>(&self, elements: I) -> Tensor
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+    {
+        let indices: Vec<_> = elements
+            .into_iter()
+            .map(|elem| self.to_index(elem) as i64)
+            .collect();
+        Tensor::of_slice(&indices)
+    }
+}
+
+/// Represents elements with one-hot feature vectors.
 impl<S: FiniteSpace> FeatureSpace<Tensor> for S {
     fn num_features(&self) -> usize {
         self.size()
@@ -62,59 +82,73 @@ impl<S: FiniteSpace> ParameterizedSampleSpace<Tensor> for S {
         .unwrap()
     }
 
-    fn batch_log_probs<'a, I>(&self, parameters: &Tensor, elements: I) -> Tensor
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-    {
+    fn batch_log_probs(&self, parameters: &Tensor, elements: &Tensor) -> Tensor {
         let logits = parameters.log_softmax(-1, Kind::Float);
-        let index_tensor = to_index_tensor(self, elements);
         logits
-            .gather(-1, &index_tensor.unsqueeze(-1), false)
+            .gather(-1, &elements.unsqueeze(-1), false)
             .squeeze1(-1)
     }
 
-    fn batch_statistics<'a, I>(&self, parameters: &Tensor, elements: I) -> (Tensor, Tensor)
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-    {
+    fn batch_statistics(&self, parameters: &Tensor, elements: &Tensor) -> (Tensor, Tensor) {
         let logits = parameters.log_softmax(-1, Kind::Float);
-        let index_tensor = to_index_tensor(self, elements);
         let log_probs = logits
-            .gather(-1, &index_tensor.unsqueeze(-1), false)
+            .gather(-1, &elements.unsqueeze(-1), false)
             .squeeze1(-1);
         let entropy = -(&logits * logits.exp()).sum1(&[-1], false, Kind::Float);
         (log_probs, entropy)
     }
 }
 
-/// Convert an iterator of elements into a index tensor
-fn to_index_tensor<'a, S, I>(space: &S, elements: I) -> Tensor
-where
-    S: FiniteSpace,
-    I: IntoIterator<Item = &'a S::Element>,
-    S::Element: 'a,
-{
-    let indices: Vec<_> = elements
-        .into_iter()
-        .map(|element| space.to_index(element) as i64)
-        .collect();
-    Tensor::of_slice(&indices)
+#[cfg(test)]
+mod trit {
+    use rust_rl_derive::Indexed;
+
+    #[derive(Debug, Indexed, PartialEq, Eq)]
+    pub enum Trit {
+        Zero,
+        One,
+        Two,
+    }
+}
+
+#[cfg(test)]
+mod repr_space_tensor {
+    use super::super::IndexedTypeSpace;
+    use super::trit::Trit;
+    use super::*;
+
+    #[test]
+    fn repr() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        assert_eq!(
+            space.repr(&Trit::Zero),
+            Tensor::scalar_tensor(0, (Kind::Int64, Device::Cpu))
+        );
+        assert_eq!(
+            space.repr(&Trit::One),
+            Tensor::scalar_tensor(1, (Kind::Int64, Device::Cpu))
+        );
+        assert_eq!(
+            space.repr(&Trit::Two),
+            Tensor::scalar_tensor(2, (Kind::Int64, Device::Cpu))
+        );
+    }
+
+    #[test]
+    fn batch_repr() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        let elements = [Trit::Zero, Trit::One, Trit::Two, Trit::One];
+        let actual = space.batch_repr(&elements);
+        let expected = Tensor::of_slice(&[0i64, 1, 2, 1]);
+        assert_eq!(actual, expected);
+    }
 }
 
 #[cfg(test)]
 mod feature_space_tensor {
     use super::super::IndexedTypeSpace;
+    use super::trit::Trit;
     use super::*;
-    use rust_rl_derive::Indexed;
-
-    #[derive(Debug, Indexed)]
-    enum Trit {
-        One,
-        Two,
-        Three,
-    }
 
     #[test]
     fn num_features() {
@@ -127,15 +161,15 @@ mod feature_space_tensor {
         let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
         assert_eq!(
             Tensor::of_slice(&[1.0, 0.0, 0.0]),
-            space.features(&Trit::One)
+            space.features(&Trit::Zero)
         );
         assert_eq!(
             Tensor::of_slice(&[0.0, 1.0, 0.0]),
-            space.features(&Trit::Two)
+            space.features(&Trit::One)
         );
         assert_eq!(
             Tensor::of_slice(&[0.0, 0.0, 1.0]),
-            space.features(&Trit::Three)
+            space.features(&Trit::Two)
         );
     }
 
@@ -144,13 +178,13 @@ mod feature_space_tensor {
         let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
         assert_eq!(
             Tensor::of_slice(&[
-                0.0, 0.0, 1.0, // Three
-                1.0, 0.0, 0.0, // One
-                0.0, 1.0, 0.0, // Two
-                1.0, 0.0, 0.0 // One
+                0.0, 0.0, 1.0, // Two
+                1.0, 0.0, 0.0, // Zero
+                0.0, 1.0, 0.0, // One
+                1.0, 0.0, 0.0 // Zero
             ])
             .reshape(&[4, 3]),
-            space.batch_features(&[Trit::Three, Trit::One, Trit::Two, Trit::One])
+            space.batch_features(&[Trit::Two, Trit::Zero, Trit::One, Trit::Zero])
         );
     }
 }
@@ -158,16 +192,9 @@ mod feature_space_tensor {
 #[cfg(test)]
 mod parameterized_sample_space_tensor {
     use super::super::IndexedTypeSpace;
+    use super::trit::Trit;
     use super::*;
     use f32;
-    use rust_rl_derive::Indexed;
-
-    #[derive(Debug, Indexed, PartialEq)]
-    enum Trit {
-        One,
-        Two,
-        Three,
-    }
 
     #[test]
     fn num_sample_params() {
@@ -180,7 +207,7 @@ mod parameterized_sample_space_tensor {
         let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
         let params = Tensor::of_slice(&[f32::NEG_INFINITY, 0.0, f32::NEG_INFINITY]);
         for _ in 0..10 {
-            assert_eq!(Trit::Two, space.sample(&params));
+            assert_eq!(Trit::One, space.sample(&params));
         }
     }
 
@@ -189,7 +216,7 @@ mod parameterized_sample_space_tensor {
         let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
         let params = Tensor::of_slice(&[f32::NEG_INFINITY, 0.0, 0.0]);
         for _ in 0..10 {
-            assert!(Trit::One != space.sample(&params));
+            assert!(Trit::Zero != space.sample(&params));
         }
     }
 
@@ -203,9 +230,9 @@ mod parameterized_sample_space_tensor {
         let mut three_count = 0;
         for _ in 0..1000 {
             match space.sample(&params) {
-                Trit::One => one_count += 1,
-                Trit::Two => two_count += 1,
-                Trit::Three => three_count += 1,
+                Trit::Zero => one_count += 1,
+                Trit::One => two_count += 1,
+                Trit::Two => three_count += 1,
             }
         }
         // Check that the counts are within 3.5 standard deviations of the mean
@@ -218,45 +245,46 @@ mod parameterized_sample_space_tensor {
     fn batch_log_probs() {
         let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
         let params = Tensor::of_slice(&[
+            // elem: One
+            f32::NEG_INFINITY,
+            0.0,
+            f32::NEG_INFINITY,
+            // elem: Zero
+            f32::NEG_INFINITY,
+            0.0,
+            f32::NEG_INFINITY,
             // elem: Two
             f32::NEG_INFINITY,
             0.0,
-            f32::NEG_INFINITY,
-            // elem: One
-            f32::NEG_INFINITY,
             0.0,
-            f32::NEG_INFINITY,
-            // elem: Three
+            // elem: Zero
             f32::NEG_INFINITY,
             0.0,
             0.0,
-            // elem: One
-            f32::NEG_INFINITY,
+            // elem: Zero
+            -1.0,
             0.0,
-            0.0,
+            1.0,
             // elem: One
             -1.0,
             0.0,
             1.0,
             // elem: Two
-            -1.0,
-            0.0,
-            1.0,
-            // elem: Three
             -1.0,
             0.0,
             1.0,
         ])
         .reshape(&[-1, 3]);
-        let elements = [
+        let elements_list = [
+            Trit::One,
+            Trit::Zero,
             Trit::Two,
-            Trit::One,
-            Trit::Three,
-            Trit::One,
+            Trit::Zero,
+            Trit::Zero,
             Trit::One,
             Trit::Two,
-            Trit::Three,
         ];
+        let elements = space.batch_repr(&elements_list);
 
         // Log normalizing constant for the [-1, 0.0, 1] distribution
         let log_normalizer = f32::ln(f32::exp(-1.0) + 1.0 + f32::exp(1.0));

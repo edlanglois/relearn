@@ -1,13 +1,11 @@
 //! Vanilla Policy Gradient
-use super::super::history::{
-    features, HistoryBuffer, LazyPackedHistoryFeatures, PackedHistoryFeaturesView,
-};
+use super::super::history::{HistoryBuffer, LazyPackedHistoryFeatures, PackedHistoryFeaturesView};
 use super::super::seq_modules::{SequenceModule, StatefulIterativeModule};
 use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::{Event, Logger};
-use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
+use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, ReprSpace, Space};
 use crate::EnvStructure;
 use std::cell::Cell;
 use tch::{kind::Kind, nn, Device, Tensor};
@@ -230,7 +228,7 @@ impl<OS, AS, P, PO, V, VO> Agent<OS::Element, AS::Element>
     for PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
-    AS: ParameterizedSampleSpace<Tensor>,
+    AS: ReprSpace<Tensor> + ParameterizedSampleSpace<Tensor>,
     P: SequenceModule + StatefulIterativeModule,
     PO: Optimizer,
     V: StepValue,
@@ -267,7 +265,7 @@ where
 impl<OS, AS, P, PO, V, VO> PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
-    AS: ParameterizedSampleSpace<Tensor>,
+    AS: ReprSpace<Tensor> + ParameterizedSampleSpace<Tensor>,
     P: SequenceModule,
     PO: Optimizer,
     V: StepValue,
@@ -282,13 +280,29 @@ where
             self.history.steps(),
             self.history.episode_ranges(),
             &self.observation_space,
+            &self.action_space,
             self.discount_factor,
         );
         let step_values = tch::no_grad(|| self.value.seq_packed(&features));
 
-        let policy_output = self
-            .policy
-            .seq_packed(features.observations(), features.batch_sizes_tensor());
+        let policy_output = self.policy.seq_packed(
+            features.observation_features(),
+            features.batch_sizes_tensor(),
+        );
+
+        let entropies = Cell::new(None);
+        let policy_loss_fn = || {
+            let (log_probs, entropies_) = self
+                .action_space
+                .batch_statistics(&policy_output, features.actions());
+            entropies.set(Some(entropies_));
+            -(log_probs * &step_values).mean(Kind::Float)
+        };
+
+        let _ = self
+            .policy_optimizer
+            .backward_step(&policy_loss_fn)
+            .unwrap();
 
         if self.value.trainable() {
             let value_loss_fn = || self.value.loss(&features).unwrap();
@@ -303,24 +317,6 @@ where
             }
         }
 
-        let features = features.finalize();
-
-        // Consume steps into a vector of actions.
-        let (drain_steps, _) = self.history.drain();
-        let actions = features::into_packed_actions(drain_steps, &features.episode_ranges);
-
-        let entropies = Cell::new(None);
-        let policy_loss_fn = || {
-            let (log_probs, entropies_) =
-                self.action_space.batch_statistics(&policy_output, &actions);
-            entropies.set(Some(entropies_));
-            -(log_probs * &step_values).mean(Kind::Float)
-        };
-        let _ = self
-            .policy_optimizer
-            .backward_step(&policy_loss_fn)
-            .unwrap();
-
         epoch_log_scalar(logger, "batch_num_steps", num_steps as f64);
         epoch_log_scalar(logger, "batch_num_episodes", num_episodes as f64);
         epoch_log_scalar(
@@ -330,6 +326,8 @@ where
         );
         epoch_log_scalar(logger, "step_values", step_values.mean(Kind::Float));
         logger.done(Event::Epoch);
+
+        self.history.clear();
     }
 }
 
