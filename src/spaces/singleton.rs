@@ -7,11 +7,11 @@ use std::fmt;
 
 /// A space containing a single element.
 #[derive(Debug, Clone)]
-pub struct SingletonSpace {}
+pub struct SingletonSpace;
 
 impl SingletonSpace {
     pub fn new() -> Self {
-        SingletonSpace {}
+        SingletonSpace
     }
 }
 
