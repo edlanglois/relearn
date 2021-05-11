@@ -3,7 +3,7 @@ use crate::agents::{
     BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::defs::AgentDef;
-use crate::torch::agents::PolicyGradientAgentConfig;
+use crate::torch::agents::{PolicyGradientAgentConfig, PolicyValueNetActorConfig};
 use clap::Clap;
 
 /// Agent name
@@ -88,12 +88,34 @@ where
     VOB: for<'b> Update<&'b ValueFnView<'a>>,
 {
     fn update(&mut self, opts: &'a Options) {
-        self.policy_config.update(opts);
+        self.actor_config.update(opts);
         self.policy_optimizer_config.update(opts);
-        self.value_config.update(opts);
         self.value_optimizer_config.update(&opts.value_fn_view());
+    }
+}
+
+impl<'a, PB, VB> From<&'a Options> for PolicyValueNetActorConfig<PB, VB>
+where
+    PolicyValueNetActorConfig<PB, VB>: Default + Update<&'a Options>,
+{
+    fn from(opts: &'a Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl<'a, PB, VB> Update<&'a Options> for PolicyValueNetActorConfig<PB, VB>
+where
+    PB: Update<&'a Options>,
+    VB: Update<&'a Options>,
+{
+    fn update(&mut self, opts: &'a Options) {
+        self.policy_config.update(opts);
+        self.value_config.update(opts);
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
             self.steps_per_epoch = steps_per_epoch;
+        }
+        if let Some(value_train_iters) = opts.value_fn_train_iters {
+            self.value_train_iters = value_train_iters;
         }
     }
 }

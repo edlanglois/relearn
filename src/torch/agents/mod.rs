@@ -2,6 +2,7 @@
 mod actor;
 mod policy_gradient;
 
+pub use actor::PolicyValueNetActorConfig;
 pub use policy_gradient::{PolicyGradientAgent, PolicyGradientAgentConfig};
 
 use super::seq_modules::StatefulIterSeqModule;

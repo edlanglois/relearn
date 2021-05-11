@@ -8,6 +8,76 @@ use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use tch::{nn::Path, Tensor};
 
+/// Configuration for [PolicyValueNetActor].
+#[derive(Debug)]
+pub struct PolicyValueNetActorConfig<PB, VB> {
+    pub steps_per_epoch: usize,
+    pub value_train_iters: u64,
+    pub policy_config: PB,
+    pub value_config: VB,
+}
+
+impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
+    pub fn new(
+        steps_per_epoch: usize,
+        value_train_iters: u64,
+        policy_config: PB,
+        value_config: VB,
+    ) -> Self {
+        Self {
+            steps_per_epoch,
+            value_train_iters,
+            policy_config,
+            value_config,
+        }
+    }
+}
+
+impl<PB, VB> Default for PolicyValueNetActorConfig<PB, VB>
+where
+    PB: Default,
+    VB: Default,
+{
+    fn default() -> Self {
+        Self {
+            steps_per_epoch: 1000,
+            value_train_iters: 80,
+            policy_config: Default::default(),
+            value_config: Default::default(),
+        }
+    }
+}
+
+impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
+    pub fn build_actor<OS, AS, P, V>(
+        &self,
+        observation_space: OS,
+        action_space: AS,
+        env_discount_factor: f64,
+        policy_vs: &Path,
+        value_vs: &Path,
+    ) -> PolicyValueNetActor<OS, AS, P, V>
+    where
+        OS: FeatureSpace<Tensor>,
+        AS: ParameterizedSampleSpace<Tensor>,
+        PB: ModuleBuilder<P>,
+        VB: StepValueBuilder<V>,
+        V: StepValue,
+    {
+        PolicyValueNetActor::new(
+            observation_space,
+            action_space,
+            env_discount_factor,
+            self.steps_per_epoch,
+            self.value_train_iters,
+            &self.policy_config,
+            policy_vs,
+            &self.value_config,
+            value_vs,
+        )
+    }
+}
+
 /// Policy and Value Network Actor
 ///
 /// Actor that maintains a policy and a value network.

@@ -3,7 +3,7 @@ use super::super::history::{LazyPackedHistoryFeatures, PackedHistoryFeaturesView
 use super::super::seq_modules::{SequenceModule, StatefulIterativeModule};
 use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::{ModuleBuilder, Optimizer, OptimizerBuilder};
-use super::actor::PolicyValueNetActor;
+use super::actor::{PolicyValueNetActor, PolicyValueNetActorConfig};
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::Logger;
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, ReprSpace, Space};
@@ -12,51 +12,23 @@ use std::cell::Cell;
 use tch::{kind::Kind, nn, Device, Tensor};
 
 /// Configuration for [PolicyGradientAgent]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PolicyGradientAgentConfig<PB, POB, VB, VOB> {
-    pub steps_per_epoch: usize,
-    pub value_train_iters: u64,
-    pub policy_config: PB,
+    pub actor_config: PolicyValueNetActorConfig<PB, VB>,
     pub policy_optimizer_config: POB,
-    pub value_config: VB,
     pub value_optimizer_config: VOB,
 }
 
 impl<PB, POB, VB, VOB> PolicyGradientAgentConfig<PB, POB, VB, VOB> {
     pub fn new(
-        steps_per_epoch: usize,
-        value_train_iters: u64,
-        policy_config: PB,
+        actor_config: PolicyValueNetActorConfig<PB, VB>,
         policy_optimizer_config: POB,
-        value_config: VB,
         value_optimizer_config: VOB,
     ) -> Self {
         Self {
-            steps_per_epoch,
-            value_train_iters,
-            policy_config,
+            actor_config,
             policy_optimizer_config,
-            value_config,
             value_optimizer_config,
-        }
-    }
-}
-
-impl<PB, POB, VB, VOB> Default for PolicyGradientAgentConfig<PB, POB, VB, VOB>
-where
-    PB: Default,
-    POB: Default,
-    VB: Default,
-    VOB: Default,
-{
-    fn default() -> Self {
-        Self {
-            steps_per_epoch: 1000,
-            value_train_iters: 80,
-            policy_config: Default::default(),
-            policy_optimizer_config: Default::default(),
-            value_config: Default::default(),
-            value_optimizer_config: Default::default(),
         }
     }
 }
@@ -83,11 +55,8 @@ where
             env.observation_space,
             env.action_space,
             env.discount_factor,
-            self.steps_per_epoch,
-            self.value_train_iters,
-            &self.policy_config,
+            &self.actor_config,
             &self.policy_optimizer_config,
-            &self.value_config,
             &self.value_optimizer_config,
         ))
     }
@@ -121,11 +90,8 @@ where
         observation_space: OS,
         action_space: AS,
         env_discount_factor: f64,
-        steps_per_epoch: usize,
-        value_train_iters: u64,
-        policy_config: &PB,
+        actor_config: &PolicyValueNetActorConfig<PB, VB>,
         policy_optimizer_config: &POB,
-        value_config: &VB,
         value_optimizer_config: &VOB,
     ) -> Self
     where
@@ -136,15 +102,11 @@ where
     {
         let policy_vs = nn::VarStore::new(Device::Cpu);
         let value_vs = nn::VarStore::new(Device::Cpu);
-        let actor = PolicyValueNetActor::new(
+        let actor = actor_config.build_actor(
             observation_space,
             action_space,
             env_discount_factor,
-            steps_per_epoch,
-            value_train_iters,
-            policy_config,
             &policy_vs.root(),
-            value_config,
             &value_vs.root(),
         );
 
@@ -265,7 +227,7 @@ mod gae_policy_gradient {
     {
         let mut config = PolicyGradientAgentConfig::<PB, AdamConfig, VB, AdamConfig>::default();
         // Speed up learning for this simple environment
-        config.steps_per_epoch = 1000;
+        config.actor_config.steps_per_epoch = 1000;
         config.policy_optimizer_config.learning_rate = 0.1;
         config.value_optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(

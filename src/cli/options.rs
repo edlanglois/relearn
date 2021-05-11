@@ -128,6 +128,10 @@ pub struct Options {
     /// Agent value function optimizer weight decay (L2 regularization)
     pub value_fn_weight_decay: Option<f64>,
 
+    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
+    /// Number of value function training iterations per epoch
+    pub value_fn_train_iters: Option<u64>,
+
     // Simulation options
     #[clap(long, default_value = "1", help_heading = Some("SIMULATION OPTIONS"))]
     /// Random seed for the experiment
