@@ -1,4 +1,5 @@
 //! Reinforcement learning agents using torch
+mod actor;
 mod policy_gradient;
 
 pub use policy_gradient::{PolicyGradientAgent, PolicyGradientAgentConfig};

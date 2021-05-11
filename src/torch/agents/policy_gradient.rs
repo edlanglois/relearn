@@ -1,10 +1,11 @@
 //! Vanilla Policy Gradient
-use super::super::history::{HistoryBuffer, LazyPackedHistoryFeatures, PackedHistoryFeaturesView};
+use super::super::history::{LazyPackedHistoryFeatures, PackedHistoryFeaturesView};
 use super::super::seq_modules::{SequenceModule, StatefulIterativeModule};
 use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::{ModuleBuilder, Optimizer, OptimizerBuilder};
+use super::actor::PolicyValueNetActor;
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use crate::logging::{Event, Logger};
+use crate::logging::Logger;
 use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, ReprSpace, Space};
 use crate::EnvStructure;
 use std::cell::Cell;
@@ -100,45 +101,14 @@ where
     OS: Space,
     AS: Space,
 {
-    /// Environment observation space
-    pub observation_space: OS,
-
-    /// Environment action space
-    pub action_space: AS,
-
-    /// Amount by which future rewards are discounted
-    pub discount_factor: f64,
-
-    /// Minimum number of steps to collect per epoch.
-    ///
-    /// This value is exceeded by search for the next episode boundary,
-    /// up to a maximum of `max_steps_per_epoch`.
-    pub steps_per_epoch: usize,
-
-    /// Number of step value update iterations per epoch.
-    pub value_train_iters: u64,
-
-    /// Maximum number of steps per epoch.
-    ///
-    /// The actual number of steps is the first episode end
-    /// between `steps_per_epoch` and `max_steps_per_epoch`,
-    /// or `max_steps_per_epoch` if no episode end is found.
-    pub max_steps_per_epoch: usize,
-
-    /// The policy module.
-    pub policy: P,
+    /// Base actor
+    actor: PolicyValueNetActor<OS, AS, P, V>,
 
     /// SequenceModule + StatefulIterativeModule optimizer
     policy_optimizer: PO,
 
-    /// The value estimator module.
-    pub value: V,
-
     /// Step value module optimizer.
     value_optimizer: VO,
-
-    /// The recorded step history.
-    history: HistoryBuffer<OS::Element, AS::Element>,
 }
 
 impl<OS, AS, P, PO, V, VO> PolicyGradientAgent<OS, AS, P, PO, V, VO>
@@ -164,35 +134,27 @@ where
         POB: OptimizerBuilder<PO>,
         VOB: OptimizerBuilder<VO>,
     {
-        let max_steps_per_epoch = (steps_per_epoch as f64 * 1.1) as usize;
-
         let policy_vs = nn::VarStore::new(Device::Cpu);
-        let policy = policy_config.build_module(
-            &policy_vs.root(),
-            observation_space.num_features(),
-            action_space.num_sample_params(),
-        );
-        let policy_optimizer = policy_optimizer_config.build_optimizer(&policy_vs).unwrap();
-
         let value_vs = nn::VarStore::new(Device::Cpu);
-        let value =
-            value_config.build_step_value(&value_vs.root(), observation_space.num_features());
-        let value_optimizer = value_optimizer_config.build_optimizer(&value_vs).unwrap();
-
-        let discount_factor = value.discount_factor(env_discount_factor);
-
-        Self {
+        let actor = PolicyValueNetActor::new(
             observation_space,
             action_space,
-            discount_factor,
+            env_discount_factor,
             steps_per_epoch,
             value_train_iters,
-            max_steps_per_epoch: (steps_per_epoch as f64 * 1.1) as usize,
-            policy,
+            policy_config,
+            &policy_vs.root(),
+            value_config,
+            &value_vs.root(),
+        );
+
+        let policy_optimizer = policy_optimizer_config.build_optimizer(&policy_vs).unwrap();
+        let value_optimizer = value_optimizer_config.build_optimizer(&value_vs).unwrap();
+
+        Self {
+            actor,
             policy_optimizer,
-            value,
             value_optimizer,
-            history: HistoryBuffer::new(Some(max_steps_per_epoch)),
         }
     }
 }
@@ -205,15 +167,7 @@ where
     P: StatefulIterativeModule,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
-        let observation_features = self.observation_space.features(observation);
-
-        if new_episode {
-            self.policy.reset();
-        }
-        tch::no_grad(|| {
-            let output = self.policy.step(&observation_features);
-            ParameterizedSampleSpace::sample(&self.action_space, &output)
-        })
+        self.actor.act(observation, new_episode)
     }
 }
 
@@ -232,96 +186,64 @@ where
     }
 
     fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn Logger) {
-        let episode_done = step.episode_done;
-        self.history.push(step);
-
-        let history_len = self.history.len();
-        if history_len < self.steps_per_epoch
-            || (history_len < self.max_steps_per_epoch && !episode_done)
-        {
-            return;
-        }
-
-        self.epoch_update(logger);
+        let ref policy_optimizer = self.policy_optimizer;
+        let ref value_optimizer = self.value_optimizer;
+        self.actor.update(
+            step,
+            |actor, features, _logger| policy_gradient_update(actor, features, policy_optimizer),
+            |actor, features, _logger| value_squared_error_update(actor, features, value_optimizer),
+            logger,
+        );
     }
 }
 
-/// Log a value with the epoch event.
-fn epoch_log_scalar<'a, 'b, L, V>(logger: &mut L, name: &'a str, value: V)
-where
-    L: Logger + ?Sized,
-    V: Into<f64>,
-{
-    logger.log(Event::Epoch, name, value.into().into()).unwrap();
-}
-
-impl<OS, AS, P, PO, V, VO> PolicyGradientAgent<OS, AS, P, PO, V, VO>
+fn policy_gradient_update<OS, AS, P, V, PO>(
+    actor: &PolicyValueNetActor<OS, AS, P, V>,
+    features: &LazyPackedHistoryFeatures<OS, AS>,
+    policy_optimizer: &PO,
+) -> Tensor
 where
     OS: FeatureSpace<Tensor>,
     AS: ReprSpace<Tensor> + ParameterizedSampleSpace<Tensor>,
     P: SequenceModule,
+    V: StepValue,
     PO: Optimizer,
+{
+    let step_values = tch::no_grad(|| actor.value.seq_packed(features));
+
+    let policy_output = actor.policy.seq_packed(
+        features.observation_features(),
+        features.batch_sizes_tensor(),
+    );
+
+    let entropies = Cell::new(None);
+    let policy_loss_fn = || {
+        let (log_probs, entropies_) = actor
+            .action_space
+            .batch_statistics(&policy_output, features.actions());
+        entropies.set(Some(entropies_));
+        -(log_probs * &step_values).mean(Kind::Float)
+    };
+
+    let _ = policy_optimizer.backward_step(&policy_loss_fn).unwrap();
+
+    entropies.into_inner().unwrap().mean(Kind::Float)
+}
+
+fn value_squared_error_update<OS, AS, P, V, VO>(
+    actor: &PolicyValueNetActor<OS, AS, P, V>,
+    features: &LazyPackedHistoryFeatures<OS, AS>,
+    value_optimizer: &VO,
+) -> Tensor
+where
+    OS: FeatureSpace<Tensor>,
+    AS: ReprSpace<Tensor>,
     V: StepValue,
     VO: Optimizer,
 {
-    /// Perform an epoch update: update the policy and step value module and clear history.
-    fn epoch_update(&mut self, logger: &mut dyn Logger) {
-        let num_steps = self.history.len();
-        let num_episodes = self.history.num_episodes();
-
-        let features = LazyPackedHistoryFeatures::new(
-            self.history.steps(),
-            self.history.episode_ranges(),
-            &self.observation_space,
-            &self.action_space,
-            self.discount_factor,
-        );
-        let step_values = tch::no_grad(|| self.value.seq_packed(&features));
-
-        let policy_output = self.policy.seq_packed(
-            features.observation_features(),
-            features.batch_sizes_tensor(),
-        );
-
-        let entropies = Cell::new(None);
-        let policy_loss_fn = || {
-            let (log_probs, entropies_) = self
-                .action_space
-                .batch_statistics(&policy_output, features.actions());
-            entropies.set(Some(entropies_));
-            -(log_probs * &step_values).mean(Kind::Float)
-        };
-
-        let _ = self
-            .policy_optimizer
-            .backward_step(&policy_loss_fn)
-            .unwrap();
-
-        if self.value.trainable() {
-            let value_loss_fn = || self.value.loss(&features).unwrap();
-            for i in 0..self.value_train_iters {
-                let value_loss = self.value_optimizer.backward_step(&value_loss_fn).unwrap();
-
-                if i == 0 {
-                    epoch_log_scalar(logger, "value_loss_initial", &value_loss);
-                } else if i == self.value_train_iters - 1 {
-                    epoch_log_scalar(logger, "value_loss_final", &value_loss);
-                }
-            }
-        }
-
-        epoch_log_scalar(logger, "batch_num_steps", num_steps as f64);
-        epoch_log_scalar(logger, "batch_num_episodes", num_episodes as f64);
-        epoch_log_scalar(
-            logger,
-            "policy_entropy",
-            entropies.into_inner().unwrap().mean(Kind::Float),
-        );
-        epoch_log_scalar(logger, "step_values", step_values.mean(Kind::Float));
-        logger.done(Event::Epoch);
-
-        self.history.clear();
-    }
+    value_optimizer
+        .backward_step(&|| actor.value.loss(features).unwrap())
+        .unwrap()
 }
 
 #[cfg(test)]
