@@ -15,6 +15,12 @@ impl SingletonSpace {
     }
 }
 
+impl Default for SingletonSpace {
+    fn default() -> Self {
+        SingletonSpace
+    }
+}
+
 impl fmt::Display for SingletonSpace {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "SingletonSpace")
@@ -44,9 +50,7 @@ impl FiniteSpace for SingletonSpace {
 }
 
 impl Distribution<<Self as Space>::Element> for SingletonSpace {
-    fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> <Self as Space>::Element {
-        ()
-    }
+    fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> <Self as Space>::Element {}
 }
 
 impl SampleSpace for SingletonSpace {}

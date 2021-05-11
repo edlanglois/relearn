@@ -148,8 +148,8 @@ where
     }
 
     fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn Logger) {
-        let ref policy_optimizer = self.policy_optimizer;
-        let ref value_optimizer = self.value_optimizer;
+        let policy_optimizer = &self.policy_optimizer;
+        let value_optimizer = &self.value_optimizer;
         self.actor.update(
             step,
             |actor, features, _logger| policy_gradient_update(actor, features, policy_optimizer),

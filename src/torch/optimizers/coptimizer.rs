@@ -13,7 +13,8 @@ impl OnceOptimizer for COptimizer {
     fn step_once(&self) -> Result<(), OptimizerStepError> {
         // I'm not sure what errors it is possible for torch to raise here
         // Anything that isn't essentially a type error should be converted to OptimizerStepError.
-        Ok(COptimizer::step(self).unwrap())
+        COptimizer::step(self).unwrap();
+        Ok(())
     }
 
     fn backward_step_once(&self, loss: &Tensor) -> Result<(), OptimizerStepError> {

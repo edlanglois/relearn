@@ -101,8 +101,7 @@ where
     fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Stacked<'static, T, U> {
         Stacked::new(
             self.seq_config
-                .build_module(&(vs / "rnn"), in_dim, self.seq_output_dim)
-                .into(),
+                .build_module(&(vs / "rnn"), in_dim, self.seq_output_dim),
             self.seq_output_activation.maybe_module(),
             self.top_config
                 .build_module(&(vs / "post"), self.seq_output_dim, out_dim),

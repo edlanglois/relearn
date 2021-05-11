@@ -221,9 +221,7 @@ where
 }
 
 /// Iterator over batch sizes in the packing
-pub fn packing_batch_sizes<'a>(
-    episode_ranges: &'a [Range<usize>],
-) -> PackedBatchSizes<'a, Range<usize>> {
+pub fn packing_batch_sizes(episode_ranges: &[Range<usize>]) -> PackedBatchSizes<Range<usize>> {
     PackedBatchSizes::from_sorted_ranges(episode_ranges)
 }
 

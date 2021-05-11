@@ -480,7 +480,7 @@ pub fn packed_tensor_discounted_cumsum_from_end(
     batch_sizes: &[i64],
     discount_factor: f64,
 ) -> Tensor {
-    if batch_sizes.len() == 0 {
+    if batch_sizes.is_empty() {
         assert_eq!(packed.numel(), 0);
         return packed.zeros_like();
     }
@@ -510,11 +510,12 @@ pub fn packed_tensor_discounted_cumsum_from_end(
 #[cfg(test)]
 mod packed_iter {
     use super::*;
+    use std::array::IntoIter;
 
     #[test]
     fn iter_from_sorted() {
         let sequences = [vec![0, 1, 2, 3], vec![10, 11], vec![100, 101]];
-        let packed: Vec<_> = PackedIter::from_sorted(&sequences).map(|&x| x).collect();
+        let packed: Vec<_> = PackedIter::from_sorted(IntoIter::new(sequences)).collect();
         let expected = vec![0, 10, 100, 1, 11, 101, 2, 3];
         assert_eq!(packed, expected);
     }
@@ -522,7 +523,7 @@ mod packed_iter {
     #[test]
     fn iter_from_unsorted() {
         let sequences = [vec![10, 11], vec![0, 1, 2, 3], vec![100, 101]];
-        let packed: Vec<_> = PackedIter::new(&sequences).map(|&x| x).collect();
+        let packed: Vec<_> = PackedIter::new(IntoIter::new(sequences)).collect();
         // First sorts the sequences then packs them.
         let expected = vec![0, 10, 100, 1, 11, 101, 2, 3];
         assert_eq!(packed, expected);

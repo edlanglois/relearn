@@ -28,7 +28,7 @@ impl CLILogger {
 
     /// Display the summary and clear all stored data.
     pub fn display(&mut self) {
-        println!("");
+        println!();
         for (event, mut event_log) in self.events.iter_mut() {
             let summary_size = event_log.index - event_log.summary_start_index;
             if summary_size == 0 {
@@ -74,7 +74,7 @@ impl Logger for CLILogger {
         // For now, make separate get() / insert() calls.
         // The duplicated lookup with insert will only occur once per name since we never remove
         // aggregators.
-        let ref mut aggregators = self.events[event].aggregators;
+        let aggregators = &mut self.events[event].aggregators;
         match aggregators.get_mut(name) {
             Some(aggregator) => {
                 if let Err((value, expected)) = aggregator.update(value) {

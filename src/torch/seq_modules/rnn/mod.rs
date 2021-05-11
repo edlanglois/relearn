@@ -33,9 +33,10 @@ fn initialize_rnn_params(
         CudnnRnnMode::GRU => 3 * hidden_size,
     };
 
-    let mut params = Vec::new();
-    params.push(vs.kaiming_uniform("weight_ih", &[gates_size, in_dim]));
-    params.push(vs.kaiming_uniform("weight_hh", &[gates_size, hidden_size]));
+    let mut params = vec![
+        vs.kaiming_uniform("weight_ih", &[gates_size, in_dim]),
+        vs.kaiming_uniform("weight_hh", &[gates_size, hidden_size]),
+    ];
     if bias {
         params.push(vs.zeros("bias_ih", &[gates_size]));
         params.push(vs.zeros("bias_hh", &[gates_size]));

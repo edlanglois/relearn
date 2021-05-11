@@ -290,7 +290,7 @@ where
 }
 
 /// Log a value with the epoch event.
-fn epoch_log_scalar<'a, 'b, L, V>(logger: &mut L, name: &'a str, value: V)
+fn epoch_log_scalar<L, V>(logger: &mut L, name: &str, value: V)
 where
     L: Logger + ?Sized,
     V: Into<f64>,

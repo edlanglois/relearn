@@ -27,6 +27,11 @@ impl<O, A> HistoryBuffer<O, A> {
 }
 
 impl<O, A> HistoryBuffer<O, A> {
+    /// Whether the buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.steps.is_empty()
+    }
+
     /// Number of steps in the buffer.
     pub fn len(&self) -> usize {
         self.steps.len()
@@ -57,9 +62,7 @@ impl<O, A> HistoryBuffer<O, A> {
     // }
 
     /// Iterate over episode ranges.
-    pub fn episode_ranges<'a>(
-        &'a self,
-    ) -> Scan<Iter<'a, usize>, usize, fn(&mut usize, &usize) -> Option<Range<usize>>> {
+    pub fn episode_ranges(&self) -> EpRangeIter {
         self.episode_ends.iter().scan(0, |start, end| {
             let range = *start..*end;
             *start = *end;
@@ -68,9 +71,7 @@ impl<O, A> HistoryBuffer<O, A> {
     }
 
     // /// Iterate over episode lengths.
-    // pub fn episode_lengths<'a>(
-    //     &'a self,
-    // ) -> Scan<Iter<'a, usize>, usize, fn(&mut usize, &usize) -> Option<usize>> {
+    // pub fn episode_lengths(&self) -> EpLenIter {
     //     self.episode_ends.iter().scan(0, |start, end| {
     //         let length = *end - *start;
     //         *start = *end;
@@ -81,7 +82,7 @@ impl<O, A> HistoryBuffer<O, A> {
     /// Creates draining iterators for the stored steps and episode ends.
     ///
     /// This fully resets the history buffer once both are drained or dropped.
-    pub fn drain<'a>(&'a mut self) -> (Drain<'a, Step<O, A>>, Drain<'a, usize>) {
+    pub fn drain(&mut self) -> (Drain<Step<O, A>>, Drain<usize>) {
         (self.steps.drain(..), self.episode_ends.drain(..))
     }
 
@@ -91,3 +92,8 @@ impl<O, A> HistoryBuffer<O, A> {
         self.episode_ends.clear();
     }
 }
+
+// pub type EpLenIter<'a> = Scan<Iter<'a, usize>, usize, fn(&mut usize, &usize) -> Option<usize>>;
+
+pub type EpRangeIter<'a> =
+    Scan<Iter<'a, usize>, usize, fn(&mut usize, &usize) -> Option<Range<usize>>>;

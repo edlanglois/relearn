@@ -15,9 +15,7 @@ impl<M: Module> SequenceModule for M {
 impl<M: Module> IterativeModule for M {
     type State = ();
 
-    fn initial_state(&self, _batch_size: usize) -> Self::State {
-        ()
-    }
+    fn initial_state(&self, _batch_size: usize) -> Self::State {}
 
     fn step(&self, input: &Tensor, _state: &Self::State) -> (Tensor, Self::State) {
         (input.apply(self), ())

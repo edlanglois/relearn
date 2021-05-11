@@ -123,7 +123,7 @@ where
 {
     Tensor::cat(
         &seq_lengths
-            .into_iter()
+            .iter()
             .scan(0, |offset, &length| {
                 let length = length as i64;
                 let seq_input = inputs.i((.., *offset..(*offset + length), ..));
