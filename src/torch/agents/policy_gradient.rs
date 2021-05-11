@@ -125,12 +125,6 @@ where
     /// or `max_steps_per_epoch` if no episode end is found.
     pub max_steps_per_epoch: usize,
 
-    /// When training, only include steps where the discount factor on unknown return is <= this.
-    ///
-    /// If the discount factor is `d` and `n` steps are observed until the episode ends at
-    /// a non-terminal state then the unknown return discount is d^n.
-    pub max_unknown_return_discount: f64,
-
     /// The policy module.
     pub policy: P,
 
@@ -194,7 +188,6 @@ where
             steps_per_epoch,
             value_train_iters,
             max_steps_per_epoch: (steps_per_epoch as f64 * 1.1) as usize,
-            max_unknown_return_discount: 0.1,
             policy,
             policy_optimizer,
             value,
