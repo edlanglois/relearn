@@ -24,7 +24,7 @@ impl From<&Options> for AgentDef {
             TabularQLearning => AgentDef::TabularQLearning(opts.into()),
             BetaThompsonSampling => AgentDef::BetaThompsonSampling(opts.into()),
             UCB1 => AgentDef::UCB1(From::from(opts)),
-            PolicyGradient => AgentDef::PolicyGradient(opts.into()),
+            PolicyGradient => AgentDef::PolicyGradient(Box::new(opts.into())),
         }
     }
 }
