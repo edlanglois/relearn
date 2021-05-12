@@ -119,7 +119,7 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
 
         // Compute step direction
         let mut step_dir =
-            conjugate_gradient(&hvp_fn, &flat_loss_grads, self.config.cg_iters, 1e-10);
+            solve_conjugate_gradient(&hvp_fn, &flat_loss_grads, self.config.cg_iters, 1e-10);
         // Replace nan with 0 (also +- inf with largest/smallest values)
         let _ = step_dir.nan_to_num_(0.0, None, None);
 
@@ -322,7 +322,7 @@ impl MatrixVectorProduct for Tensor {
 ///
 /// # Reference
 /// https://en.wikipedia.org/wiki/Conjugate_gradient_method
-fn conjugate_gradient<T: MatrixVectorProduct<Vector = Tensor>>(
+fn solve_conjugate_gradient<T: MatrixVectorProduct<Vector = Tensor>>(
     #[allow(non_snake_case)] f_Ax: &T,
     b: &Tensor,
     cg_iters: u64,
@@ -449,7 +449,7 @@ mod conjugate_gradient {
         let a = Tensor::of_slice(&[1.0f64, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
         let b = Tensor::of_slice(&[-1.0f64, 4.0]);
         let tol = 1e-4;
-        let x = conjugate_gradient(&a, &b, 10, tol);
+        let x = solve_conjugate_gradient(&a, &b, 10, tol);
 
         let expected = Tensor::of_slice(&[2.0f64, 3.0]);
         assert!(
