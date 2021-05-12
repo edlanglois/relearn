@@ -122,7 +122,7 @@ pub trait OptimizerBuilder<T> {
 #[cfg(test)]
 mod testing {
     use super::*;
-    use tch::{Device, IndexOp, Kind};
+    use tch::{Device, Kind};
 
     pub fn check_optimizes_quadratic<O, OB>(builder: &OB, num_steps: u64)
     where

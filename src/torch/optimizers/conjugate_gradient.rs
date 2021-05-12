@@ -146,7 +146,8 @@ impl ConjugateGradientOptimizer {
         let _ = step_dir.nan_to_num_(0.0, None, None);
 
         // Compute step size
-        let step_size = match ((f64::from(step_dir.dot(&hvp_fn.eval(&step_dir))) + 1e-8).recip()
+        let step_size = match ((f64::from(step_dir.dot(&hvp_fn.mat_vec_mul(&step_dir))) + 1e-8)
+            .recip()
             * max_distance
             * 2.0)
             .sqrt()
@@ -285,9 +286,15 @@ where
             f_grads,
         }
     }
+}
 
-    /// Evaluate the product of this Hessian with an appropriately sized vector.
-    pub fn eval(&self, vector: &Tensor) -> Tensor {
+impl<'a, T> MatrixVectorProduct for HessianVectorProduct<'a, T>
+where
+    T: Borrow<Tensor>,
+{
+    type Vector = Tensor;
+
+    fn mat_vec_mul(&self, vector: &Tensor) -> Tensor {
         let unflattened_vector = utils::unflatten_tensors(vector, &self.param_shapes);
 
         assert_eq!(self.f_grads.len(), unflattened_vector.len());
@@ -316,7 +323,14 @@ where
     }
 }
 
-/// Use Conjugate Gradient iteration to solve Ax = b. Demmel p 312.
+/// A Matrix-Vector product
+pub trait MatrixVectorProduct {
+    type Vector;
+
+    fn mat_vec_mul(&self, vector: &Self::Vector) -> Self::Vector;
+}
+
+/// Use Conjugate Gradient iteration to solve Ax = b.
 ///
 /// # Args
 /// * `f_Ax` - Computes the Hessian-vector product.
@@ -326,32 +340,39 @@ where
 ///
 /// # Returns
 /// Solution x* for equation Ax = b.
-fn conjugate_gradient<T: Borrow<Tensor>>(
-    hvp_fn: &HessianVectorProduct<T>,
+///
+/// # Reference
+/// https://en.wikipedia.org/wiki/Conjugate_gradient_method
+fn conjugate_gradient<T: MatrixVectorProduct<Vector = Tensor>>(
+    #[allow(non_snake_case)] f_Ax: &T,
     b: &Tensor,
     cg_iters: u64,
     residual_tol: f64,
 ) -> Tensor {
-    let mut p = b.copy();
-    let mut r = b.copy();
     let mut x = b.zeros_like();
-    let mut r_dot_r = r.dot(&r);
+    let mut residual = b.copy(); // b - Ax where x = 0
+
+    // step direction (p). residual projected to be orthogonal to previous steps
+    let mut step = b.copy();
+    let mut residual_norm_squared = residual.dot(&residual);
 
     for _ in 0..cg_iters {
-        let z = hvp_fn.eval(&p);
-        let v = &r_dot_r / p.dot(&z);
-        let _ = x.addcmul_(&v, &p);
-        r -= (&v) * (&z);
-        let new_r_dot_r = r.dot(&r);
-        let mu = &new_r_dot_r / &r_dot_r;
-        // Note: Garage version does not re-use the memory of p despite the initial clone()
-        let _ = p.g_mul_(&mu);
-        let _ = p.g_add_(&r);
+        let z = f_Ax.mat_vec_mul(&step); // A *  step
+        let alpha = &residual_norm_squared / step.dot(&z); // ||r||^2 / (step' * A * step)
+        let _ = x.addcmul_(&alpha, &step); // x += alpha * step
+        let _ = residual.addcmul_(&(-alpha), &z); // r -= alpha * A*step
 
-        r_dot_r = new_r_dot_r;
-        if f64::from(&r_dot_r) < residual_tol {
+        let new_residual_norm_squared = residual.dot(&residual);
+        if f64::from(&new_residual_norm_squared) < residual_tol {
             break;
         }
+
+        let mu = &new_residual_norm_squared / &residual_norm_squared;
+        // Note: Garage version does not re-use the memory of p despite the initial clone()
+        let _ = step.g_mul_(&mu);
+        let _ = step.g_add_(&residual);
+
+        residual_norm_squared = new_residual_norm_squared;
     }
     x
 }
@@ -389,11 +410,11 @@ mod hessian_vector_product {
         let hvp = HessianVectorProduct::new(&f, &params, 0.0);
 
         assert_eq!(
-            hvp.eval(&Tensor::of_slice(&[1.0f32, 0.0])),
+            hvp.mat_vec_mul(&Tensor::of_slice(&[1.0f32, 0.0])),
             Tensor::of_slice(&[1.0f32, -1.0])
         );
         assert_eq!(
-            hvp.eval(&Tensor::of_slice(&[0.0f32, 1.0])),
+            hvp.mat_vec_mul(&Tensor::of_slice(&[0.0f32, 1.0])),
             Tensor::of_slice(&[-1.0f32, 2.0])
         );
     }
