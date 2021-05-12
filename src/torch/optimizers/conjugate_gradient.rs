@@ -438,3 +438,25 @@ mod hessian_vector_product {
         );
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::module_inception)]
+mod conjugate_gradient {
+    use super::*;
+
+    #[test]
+    fn solve_2x2() {
+        let a = Tensor::of_slice(&[1.0f64, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
+        let b = Tensor::of_slice(&[-1.0f64, 4.0]);
+        let tol = 1e-4;
+        let x = conjugate_gradient(&a, &b, 10, tol);
+
+        let expected = Tensor::of_slice(&[2.0f64, 3.0]);
+        assert!(
+            f64::from((&x - &expected).norm()) < tol,
+            "expected: {:?}, actual: {:?}",
+            expected,
+            x
+        );
+    }
+}
