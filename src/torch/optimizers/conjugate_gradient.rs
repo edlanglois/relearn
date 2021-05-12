@@ -33,7 +33,6 @@ use super::{BaseOptimizer, OptimizerBuilder, OptimizerStepError, TrustRegionOpti
 use std::borrow::Borrow;
 use std::convert::Infallible;
 use tch::{nn::VarStore, Tensor};
-use thiserror::Error;
 
 /// Configuration for the Conjugate Gradient Optimizer
 #[derive(Debug, Clone)]
@@ -105,39 +104,18 @@ impl BaseOptimizer for ConjugateGradientOptimizer {
 impl TrustRegionOptimizer for ConjugateGradientOptimizer {
     fn trust_region_backward_step(
         &self,
-        loss_fn: &dyn Fn() -> Tensor,
-        distance_fn: &dyn Fn() -> Tensor,
+        loss_distance_fn: &dyn Fn() -> (Tensor, Tensor),
         max_distance: f64,
-    ) -> Result<Tensor, OptimizerStepError> {
-        let loss = loss_fn();
+    ) -> Result<f64, OptimizerStepError> {
+        let (loss, distance) = loss_distance_fn();
+
+        // Loss gradient. Save the graph so that HessianVectorProduct can reuse it.
         self.zero_grad();
-        loss.backward();
-        self.trust_region_step(loss_fn, distance_fn, max_distance);
-        Ok(loss)
-    }
-}
+        let loss_grads = Tensor::run_backward(&[&loss], &self.params, true, false);
+        let flat_loss_grads = utils::flatten_tensors(loss_grads);
 
-impl ConjugateGradientOptimizer {
-    /// Take an optimization step subject to a constraint function.
-    ///
-    /// # Args
-    /// * `loss_fn` - Forward loss function. Used to evaluate loss at the current parameters.
-    ///               Not used to evaluate the gradient: the existing stored gradient is used.
-    ///
-    /// * `distance_fn` - Function that measures the distance of the current parameter values from
-    ///     the initial parameters.
-    ///
-    /// * `max_distance` - Upper bound on `distance_fn` for this step.
-    pub fn trust_region_step<F, G>(&self, loss_fn: &F, distance_fn: &G, max_distance: f64)
-    where
-        F: Fn() -> Tensor + ?Sized,
-        G: Fn() -> Tensor + ?Sized,
-    {
-        let flat_loss_grads = utils::flatten_tensors(self.params.iter().map(Tensor::grad));
-
-        // Build Hessian-vector-product function
-        let hvp_fn =
-            HessianVectorProduct::new(distance_fn, &self.params, self.config.hpv_reg_coeff);
+        // Build Hessian-vector-product function. Backpropagates distance gradients.
+        let hvp_fn = HessianVectorProduct::new(&distance, &self.params, self.config.hpv_reg_coeff);
 
         // Compute step direction
         let mut step_dir =
@@ -157,30 +135,32 @@ impl ConjugateGradientOptimizer {
         };
 
         let descent_step = step_size * step_dir;
-        // These errors all relate to a point on the line search, not necessarily the original
-        // paramter values, which might be fine.
-        let _ = self.backtracking_line_search(&descent_step, loss_fn, distance_fn, max_distance);
-    }
+        let initial_loss: f64 = loss.into();
 
-    fn backtracking_line_search<F, G>(
+        self.backtracking_line_search(&descent_step, loss_distance_fn, max_distance, initial_loss)?;
+
+        Ok(initial_loss)
+    }
+}
+
+impl ConjugateGradientOptimizer {
+    fn backtracking_line_search<F>(
         &self,
         descent_step: &Tensor,
-        loss_fn: &F,
-        constraint_fn: &G,
+        loss_constraint_fn: &F,
         max_constraint_value: f64,
-    ) -> Result<(), LineSearchError>
+        initial_loss: f64,
+    ) -> Result<(), OptimizerStepError>
     where
-        F: Fn() -> Tensor + ?Sized,
-        G: Fn() -> Tensor + ?Sized,
+        F: Fn() -> (Tensor, Tensor) + ?Sized,
     {
         let mut params: Vec<_> = self.params.iter().map(Tensor::detach).collect();
         let prev_params: Vec<_> = params.iter().map(Tensor::copy).collect();
         let param_shapes: Vec<_> = self.params.iter().map(Tensor::size).collect();
 
         let descent_step = utils::unflatten_tensors(descent_step, &param_shapes);
-        let loss_before: f64 = loss_fn().into();
 
-        let mut loss = loss_before;
+        let mut loss = initial_loss;
         let mut constraint_val = f64::INFINITY;
         for i in 0..self.config.max_backtracks {
             let ratio = self.config.backtrack_ratio.powi(i as i32);
@@ -196,21 +176,25 @@ impl ConjugateGradientOptimizer {
                 param.copy_(&(prev_param - ratio * step));
             }
 
-            loss = loss_fn().into();
-            constraint_val = constraint_fn().into();
-            if loss < loss_before && constraint_val <= max_constraint_value {
+            let (loss_tensor, constraint_tensor) = loss_constraint_fn();
+            loss = loss_tensor.into();
+            constraint_val = constraint_tensor.into();
+            if loss < initial_loss && constraint_val <= max_constraint_value {
                 break;
             }
         }
 
         let result = if loss.is_nan() {
-            Err(LineSearchError::NaNLoss)
+            Err(OptimizerStepError::NaNLoss)
         } else if constraint_val.is_nan() {
-            Err(LineSearchError::NaNConstraint)
-        } else if loss >= loss_before {
-            Err(LineSearchError::LossNotImproving { loss, loss_before })
+            Err(OptimizerStepError::NaNConstraint)
+        } else if loss >= initial_loss {
+            Err(OptimizerStepError::LossNotImproving {
+                loss,
+                loss_before: initial_loss,
+            })
         } else if constraint_val >= max_constraint_value && !self.config.accept_violation {
-            Err(LineSearchError::ConstraintViolated {
+            Err(OptimizerStepError::ConstraintViolated {
                 constraint_val,
                 max_constraint_value,
             })
@@ -229,23 +213,6 @@ impl ConjugateGradientOptimizer {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum LineSearchError {
-    #[error("loss is not improving: (new) {loss} >= (prev) {loss_before}")]
-    LossNotImproving { loss: f64, loss_before: f64 },
-    #[error(
-        "constraint is violated: (val) {constraint_val} >= (threshold) {max_constraint_value}"
-    )]
-    ConstraintViolated {
-        constraint_val: f64,
-        max_constraint_value: f64,
-    },
-    #[error("loss is NaN")]
-    NaNLoss,
-    #[error("constraint is NaN")]
-    NaNConstraint,
-}
-
 /// Implements a Hessian-vector product function
 ///
 /// # Reference
@@ -259,7 +226,7 @@ struct HessianVectorProduct<'a, T> {
     /// The shape of each tensor in params.
     param_shapes: Vec<Vec<i64>>,
     /// Gradients with respect to each of `params`.
-    f_grads: Vec<Tensor>,
+    grads: Vec<Tensor>,
 }
 
 impl<'a, T> HessianVectorProduct<'a, T>
@@ -268,22 +235,26 @@ where
 {
     /// Create a new Hessian-vector product function
     ///
+    /// Evaluates the Hessian of the mapping `params -> output`.
+    /// Zeros the existing gradients and backpropagates gradients from `output`.
+    ///
     /// # Args
-    /// * `f` - Use the Hessian of this function.
+    /// * `output` - Function output tensor.
     /// * `params` - A list of function parameter tensors.
     /// * `reg_coeff` - Regularization coefficient. A small value so that A -> A + reg*I.
-    pub fn new<F>(f: &F, params: &'a [T], reg_coeff: f64) -> Self
-    where
-        F: Fn() -> Tensor + ?Sized,
-    {
+    pub fn new(output: &Tensor, params: &'a [T], reg_coeff: f64) -> Self {
         let param_shapes = params.iter().map(|t| t.borrow().size()).collect();
-        let f_out = f();
-        let f_grads = Tensor::run_backward(&[f_out], params, true, true);
+        for param in params.iter() {
+            utils::zero_grad(param.borrow());
+        }
+        // TODO: Possible memory leak. Unset param.grad afterward?
+        // https://pytorch.org/docs/stable/autograd.html#torch.autograd.backward
+        let grads = Tensor::run_backward(&[output], params, true, true);
         Self {
             params,
             reg_coeff,
             param_shapes,
-            f_grads,
+            grads,
         }
     }
 }
@@ -297,10 +268,10 @@ where
     fn mat_vec_mul(&self, vector: &Tensor) -> Tensor {
         let unflattened_vector = utils::unflatten_tensors(vector, &self.param_shapes);
 
-        assert_eq!(self.f_grads.len(), unflattened_vector.len());
+        assert_eq!(self.grads.len(), unflattened_vector.len());
         let grad_vector_product = Tensor::stack(
             &self
-                .f_grads
+                .grads
                 .iter()
                 .zip(&unflattened_vector)
                 .map(|(g, x)| utils::flat_dot(g, x))
@@ -330,7 +301,15 @@ pub trait MatrixVectorProduct {
     fn mat_vec_mul(&self, vector: &Self::Vector) -> Self::Vector;
 }
 
-/// Use Conjugate Gradient iteration to solve Ax = b.
+impl MatrixVectorProduct for Tensor {
+    type Vector = Tensor;
+
+    fn mat_vec_mul(&self, vector: &Self::Vector) -> Self::Vector {
+        self.mv(vector)
+    }
+}
+
+/// Use Conjugate Gradient iteration to solve `Ax = b` where `A` is symmetric positive definite.
 ///
 /// # Args
 /// * `f_Ax` - Computes the Hessian-vector product.
@@ -339,7 +318,7 @@ pub trait MatrixVectorProduct {
 /// * `residual_tol`: Tolerance for convergence.
 ///
 /// # Returns
-/// Solution x* for equation Ax = b.
+/// Solution `x*` for the equation `Ax = b`.
 ///
 /// # Reference
 /// https://en.wikipedia.org/wiki/Conjugate_gradient_method
@@ -378,14 +357,54 @@ fn conjugate_gradient<T: MatrixVectorProduct<Vector = Tensor>>(
 }
 
 #[cfg(test)]
-mod conjugate_gradient {
+mod cg_optimizer {
     use super::super::testing;
     use super::*;
+    use tch::{Device, Kind};
 
     #[test]
     fn optimizes_quadratic() {
         let config = ConjugateGradientOptimizerConfig::default();
         testing::check_trust_region_optimizes_quadratic(&config, 500);
+    }
+
+    #[test]
+    fn shared_loss_distance_computation() {
+        let config = ConjugateGradientOptimizerConfig::default();
+
+        let vs = VarStore::new(Device::Cpu);
+        let x = vs.root().ones("x", &[2]);
+        let optimizer = config.build_optimizer(&vs).unwrap();
+
+        let y_prev = x.square().mean(Kind::Float).detach();
+        let loss_distance_fn = || {
+            let y = x.square().mean(Kind::Float);
+            let loss = &y + 1.0;
+            let distance = (&y - &y_prev).square();
+            (loss, distance)
+        };
+
+        for _ in 0..100 {
+            y_prev
+                .detach()
+                .copy_(&x.square().mean(Kind::Float).detach());
+            let result = optimizer.trust_region_backward_step(&loss_distance_fn, 0.001);
+            match result {
+                Err(OptimizerStepError::LossNotImproving {
+                    loss: _,
+                    loss_before: _,
+                }) => break,
+                r => r.unwrap(),
+            };
+        }
+
+        let expected = Tensor::of_slice(&[0.0, 0.0]);
+        assert!(
+            f64::from((&x - &expected).norm()) < 0.1,
+            "expected: {:?}, actual: {:?}",
+            expected,
+            x
+        );
     }
 }
 
@@ -404,10 +423,10 @@ mod hessian_vector_product {
         let m = Tensor::of_slice(&[1.0f32, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
         let b = Tensor::of_slice(&[2.0f32, -3.0]);
         let x = Tensor::zeros(&[2], (Kind::Float, Device::Cpu)).requires_grad_(true);
-        let f = || m.mv(&x).dot(&x) / 2 + b.dot(&x);
+        let y = m.mv(&x).dot(&x) / 2 + b.dot(&x);
         let params = [&x];
 
-        let hvp = HessianVectorProduct::new(&f, &params, 0.0);
+        let hvp = HessianVectorProduct::new(&y, &params, 0.0);
 
         assert_eq!(
             hvp.mat_vec_mul(&Tensor::of_slice(&[1.0f32, 0.0])),

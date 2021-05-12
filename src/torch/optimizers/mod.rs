@@ -78,38 +78,47 @@ impl<T: OnceOptimizer> Optimizer for T {
 
 /// Optimizer that minimizes a loss function subject to a trust region constraint on each step.
 pub trait TrustRegionOptimizer: BaseOptimizer {
-    /// Obtains gradients by backpropagating the result of `loss_fn`.
-    /// May also backpropagate the result of `mistrust_fn`.
+    /// Take an optimization step subject to a distance constraint
+    ///
+    /// This function obtains gradients by backpropagating the result of `loss_distance_fn`,
+    /// once for each `loss` and `distance`.
+    /// It is not necessary for the caller to compute or zero out the existing gradients.
     ///
     /// # Args
-    /// * `loss_fn` - Loss function to minimize.
-    ///     Called to obtain the loss tensor, which is back-propagated to obtain a gradient.
-    ///     Always evaluated at least once, may be evaluated multiple times.
+    /// * `loss_distance_fn` - Function returning scalar loss and distance values.
+    ///     * Loss is minimized.
+    ///     * The non-negative distance value measures a deviation of the current parameter values
+    ///         from the initial parameters at the start of this step.
+    ///         It should equal zero at the start of the step.
     ///
-    /// * `distance_fn` - Function that measures the distance of the current parameter values from
-    ///     the initial parameters.
-    ///     * Called as `distance_fn(&initial_params)`.
-    ///     * `initial_params` will always be a vectorized copy of the trainable parameter values
-    ///         as they were at the start of the call to `trust_region_backward_step`.
-    ///     * The current parameter values are set directly in the trainable parameter tensors.
-    ///     * Must return a 1-element tensor that is >= 0.
-    ///     * Should return 0 if the current parameters are the same as `initial_params`.
-    ///
-    /// * `max_distance` - Upper bound on `distance_fn` for this step.
+    /// * `max_distance` - Upper bound on the distance value for this step.
     ///
     /// # Returns
-    /// The initial value of `loss_fn` on success.
+    /// The initial loss value on success.
     fn trust_region_backward_step(
         &self,
-        loss_fn: &dyn Fn() -> Tensor,
-        distance_fn: &dyn Fn() -> Tensor,
+        loss_distance_fn: &dyn Fn() -> (Tensor, Tensor),
         max_distance: f64,
-    ) -> Result<Tensor, OptimizerStepError>;
+    ) -> Result<f64, OptimizerStepError>;
 }
 
 /// Error performing an optimization step.
 #[derive(Debug, Error)]
-pub enum OptimizerStepError {}
+pub enum OptimizerStepError {
+    #[error("loss is not improving: (new) {loss} >= (prev) {loss_before}")]
+    LossNotImproving { loss: f64, loss_before: f64 },
+    #[error(
+        "constraint is violated: (val) {constraint_val} >= (threshold) {max_constraint_value}"
+    )]
+    ConstraintViolated {
+        constraint_val: f64,
+        max_constraint_value: f64,
+    },
+    #[error("loss is NaN")]
+    NaNLoss,
+    #[error("constraint is NaN")]
+    NaNConstraint,
+}
 
 /// Build an optimizer
 pub trait OptimizerBuilder<T> {
@@ -173,16 +182,23 @@ mod testing {
         let x = vs.root().zeros("x", &[2]);
         let optimizer = builder.build_optimizer(&vs).unwrap();
 
-        let loss_fn = || m.mv(&x).dot(&x) / 2 + b.dot(&x);
-
-        let mut x_last = x.copy();
+        let x_last = x.detach().copy();
+        let loss_distance_fn = || {
+            let loss = m.mv(&x).dot(&x) / 2 + b.dot(&x);
+            let distance = (&x - &x_last).square().sum(Kind::Float);
+            (loss, distance)
+        };
 
         for _ in 0..num_steps {
-            let _ = x_last.copy_(&x.detach());
-            let distance_fn = || (&x - &x_last).square().sum(Kind::Float);
-            let _ = optimizer
-                .trust_region_backward_step(&loss_fn, &distance_fn, 0.001)
-                .unwrap();
+            let _ = x_last.detach().copy_(&x);
+            let result = optimizer.trust_region_backward_step(&loss_distance_fn, 0.001);
+            match result {
+                Err(OptimizerStepError::LossNotImproving {
+                    loss: _,
+                    loss_before: _,
+                }) => break,
+                r => r.unwrap(),
+            };
         }
 
         let expected = Tensor::of_slice(&[-1.0, 1.0]);
