@@ -25,6 +25,8 @@ pub fn f_one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Result<Tens
 /// A tensor with shape `[*BATCH_SHAPE, num_classes]`
 /// equal to 1 at indices `[*idx, labels[*idx]]` and 0 everywhere else.
 ///
+/// # Warning
+/// Undefined tensors are silently flattened to nothing.
 pub fn one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Tensor {
     f_one_hot(labels, num_classes, kind).unwrap()
 }

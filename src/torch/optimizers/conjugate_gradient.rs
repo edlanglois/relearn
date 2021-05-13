@@ -112,10 +112,25 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
         // Loss gradient. Save the graph so that HessianVectorProduct can reuse it.
         self.zero_grad();
         let loss_grads = Tensor::run_backward(&[&loss], &self.params, true, false);
+
+        // Tensors not involved in computing `loss_grads` will have `undefined` gradient.
+        // We exclude those parameters from the optimization step.
+        // In theory such parameters might contribute to the distance function but
+        // - it would likely be surprising for the optimizer step to update parameters
+        //      uninvolved in computing `loss`, and
+        // - dropping them is more efficient in the most likely event where they are
+        //      not used by `distance` either.
+        let (params, loss_grads): (Vec<&Tensor>, Vec<Tensor>) = self
+            .params
+            .iter()
+            .zip(loss_grads.into_iter())
+            .filter(|(_, grad)| grad.defined())
+            .unzip();
+
         let flat_loss_grads = utils::flatten_tensors(loss_grads);
 
         // Build Hessian-vector-product function. Backpropagates distance gradients.
-        let hvp_fn = HessianVectorProduct::new(&distance, &self.params, self.config.hpv_reg_coeff);
+        let hvp_fn = HessianVectorProduct::new(&distance, &params, self.config.hpv_reg_coeff);
 
         // Compute step direction
         let mut step_dir =
@@ -137,7 +152,13 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
         let descent_step = step_size * step_dir;
         let initial_loss: f64 = loss.into();
 
-        self.backtracking_line_search(&descent_step, loss_distance_fn, max_distance, initial_loss)?;
+        self.backtracking_line_search(
+            &params,
+            &descent_step,
+            loss_distance_fn,
+            max_distance,
+            initial_loss,
+        )?;
 
         Ok(initial_loss)
     }
@@ -146,6 +167,7 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
 impl ConjugateGradientOptimizer {
     fn backtracking_line_search<F>(
         &self,
+        params: &[&Tensor],
         descent_step: &Tensor,
         loss_constraint_fn: &F,
         max_constraint_value: f64,
@@ -154,9 +176,9 @@ impl ConjugateGradientOptimizer {
     where
         F: Fn() -> (Tensor, Tensor) + ?Sized,
     {
-        let mut params: Vec<_> = self.params.iter().map(Tensor::detach).collect();
+        let mut params: Vec<_> = params.iter().map(|t| t.detach()).collect();
         let prev_params: Vec<_> = params.iter().map(Tensor::copy).collect();
-        let param_shapes: Vec<_> = self.params.iter().map(Tensor::size).collect();
+        let param_shapes: Vec<_> = params.iter().map(Tensor::size).collect();
 
         let descent_step = utils::unflatten_tensors(descent_step, &param_shapes);
 
@@ -242,12 +264,20 @@ where
     /// * `output` - Function output tensor.
     /// * `params` - A list of function parameter tensors.
     /// * `reg_coeff` - Regularization coefficient. A small value so that A -> A + reg*I.
+    /// * `param_shapes` - Optional parameter shapes.
     pub fn new(output: &Tensor, params: &'a [T], reg_coeff: f64) -> Self {
         let param_shapes = params.iter().map(|t| t.borrow().size()).collect();
         for param in params.iter() {
             utils::zero_grad(param.borrow());
         }
-        let grads = Tensor::run_backward(&[output], params, true, true);
+        let mut grads = Tensor::run_backward(&[output], params, true, true);
+        // Parameters uninvolved with computing `output` have `undefined` gradient.
+        // Set these to zero tensors.
+        for (grad, param) in grads.iter_mut().zip(params) {
+            if !grad.defined() {
+                *grad = param.borrow().zeros_like();
+            }
+        }
         Self {
             params,
             reg_coeff,
@@ -387,6 +417,43 @@ mod cg_optimizer {
                 .detach()
                 .copy_(&x.square().mean(Kind::Float).detach());
             let result = optimizer.trust_region_backward_step(&loss_distance_fn, 0.001);
+            match result {
+                Err(OptimizerStepError::LossNotImproving {
+                    loss: _,
+                    loss_before: _,
+                }) => break,
+                r => r.unwrap(),
+            };
+        }
+
+        let expected = Tensor::of_slice(&[0.0, 0.0]);
+        assert!(
+            f64::from((&x - &expected).norm()) < 0.1,
+            "expected: {:?}, actual: {:?}",
+            expected,
+            x
+        );
+    }
+
+    #[test]
+    fn unused_params() {
+        let config = ConjugateGradientOptimizerConfig::default();
+
+        let vs = VarStore::new(Device::Cpu);
+        let x = vs.root().ones("x", &[2]);
+        let _ = vs.root().zeros("unused", &[3]);
+        let optimizer = config.build_optimizer(&vs).unwrap();
+
+        let x_prev = x.detach().copy();
+        let loss_distance_fn = || {
+            let loss = x.square().sum(Kind::Float);
+            let distance = (&x - &x_prev).square().sum(Kind::Float);
+            (loss, distance)
+        };
+
+        for _ in 0..100 {
+            let _ = x_prev.detach().copy_(&x);
+            let result = optimizer.trust_region_backward_step(&loss_distance_fn, 0.1);
             match result {
                 Err(OptimizerStepError::LossNotImproving {
                     loss: _,
