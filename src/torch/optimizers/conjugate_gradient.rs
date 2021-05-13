@@ -392,6 +392,29 @@ mod cg_optimizer {
         testing::check_trust_region_optimizes_quadratic(&config, 500);
     }
 
+    fn trpo_run<F, G>(
+        optimizer: &ConjugateGradientOptimizer,
+        loss_distance_fn: F,
+        mut on_step: G,
+        num_steps: u64,
+        max_distance: f64,
+    ) where
+        F: Fn() -> (Tensor, Tensor),
+        G: FnMut(),
+    {
+        for _ in 0..num_steps {
+            on_step();
+            let result = optimizer.trust_region_backward_step(&loss_distance_fn, max_distance);
+            match result {
+                Err(OptimizerStepError::LossNotImproving {
+                    loss: _,
+                    loss_before: _,
+                }) => break,
+                r => r.unwrap(),
+            };
+        }
+    }
+
     #[test]
     fn shared_loss_distance_computation() {
         let config = ConjugateGradientOptimizerConfig::default();
@@ -408,19 +431,15 @@ mod cg_optimizer {
             (loss, distance)
         };
 
-        for _ in 0..100 {
-            y_prev
-                .detach()
-                .copy_(&x.square().mean(Kind::Float).detach());
-            let result = optimizer.trust_region_backward_step(&loss_distance_fn, 0.001);
-            match result {
-                Err(OptimizerStepError::LossNotImproving {
-                    loss: _,
-                    loss_before: _,
-                }) => break,
-                r => r.unwrap(),
-            };
-        }
+        trpo_run(
+            &optimizer,
+            loss_distance_fn,
+            || {
+                y_prev.detach().copy_(&x.square().mean(Kind::Float));
+            },
+            100,
+            0.001,
+        );
 
         let expected = Tensor::of_slice(&[0.0, 0.0]);
         assert!(
@@ -447,17 +466,15 @@ mod cg_optimizer {
             (loss, distance)
         };
 
-        for _ in 0..100 {
-            let _ = x_prev.detach().copy_(&x);
-            let result = optimizer.trust_region_backward_step(&loss_distance_fn, 0.1);
-            match result {
-                Err(OptimizerStepError::LossNotImproving {
-                    loss: _,
-                    loss_before: _,
-                }) => break,
-                r => r.unwrap(),
-            };
-        }
+        trpo_run(
+            &optimizer,
+            loss_distance_fn,
+            || {
+                let _ = x_prev.detach().copy_(&x);
+            },
+            100,
+            0.1,
+        );
 
         let expected = Tensor::of_slice(&[0.0, 0.0]);
         assert!(
