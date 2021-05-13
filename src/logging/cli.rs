@@ -1,3 +1,4 @@
+//! Command-line logger
 use super::{Event, LogError, Loggable, Logger};
 use enum_map::{enum_map, EnumMap};
 use std::collections::BTreeMap;
