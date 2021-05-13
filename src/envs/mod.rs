@@ -23,9 +23,6 @@ use std::f64;
 ///
 /// This defines the environment dynamics and strucutre.
 /// It does not internally manage state.
-///
-/// Every environment implements AsStatefulEnvironment
-/// so that it can be converted to a StatefulEnvironment.
 pub trait Environment {
     type State;
     type ObservationSpace: Space;

@@ -33,7 +33,9 @@ pub trait Optimizer: BaseOptimizer {
     /// their initial values.
     /// In general, error conditions are not guaranteed to be detected and an optimizer
     /// may silently put itself or the parameters into a bad state.
-    /// For example, [COptimizer] sets parameters to NaN when the loss is NaN.
+    /// For example, [`COptimizer`] sets parameters to NaN when the loss is NaN.
+    ///
+    /// [`COptimizer`]: tch::COptimizer
     fn backward_step(&mut self, loss_fn: &dyn Fn() -> Tensor)
         -> Result<Tensor, OptimizerStepError>;
 }
@@ -48,7 +50,9 @@ pub trait OnceOptimizer: BaseOptimizer {
     /// their initial values.
     /// In general, error conditions are not guaranteed to be detected and an optimizer
     /// may silently put itself or the parameters into a bad state.
-    /// For example, [COptimizer] sets parameters to NaN when the loss is NaN.
+    /// For example, [`COptimizer`] sets parameters to NaN when the loss is NaN.
+    ///
+    /// [`COptimizer`]: tch::COptimizer
     fn step_once(&self) -> Result<(), OptimizerStepError>;
 
     /// Apply a backward step pass, update the gradients, and perform an optimization step.
@@ -65,7 +69,9 @@ pub trait OnceOptimizer: BaseOptimizer {
     /// their initial values.
     /// In general, error conditions are not guaranteed to be detected and an optimizer
     /// may silently put itself or the parameters into a bad state.
-    /// For example, [COptimizer] sets parameters to NaN when the loss is NaN.
+    /// For example, [`COptimizer`] sets parameters to NaN when the loss is NaN.
+    ///
+    /// [`COptimizer`]: tch::COptimizer
     fn backward_step_once(&mut self, loss: &Tensor) -> Result<(), OptimizerStepError>;
 }
 

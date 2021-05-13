@@ -1,4 +1,5 @@
 //! A reinforcement learning library.
+#![warn(clippy::doc_markdown)]
 pub mod agents;
 pub mod cli;
 pub mod defs;

@@ -7,15 +7,15 @@ use rand::prelude::*;
 /// The agent must remember the inital state and choose the corresponding action as the final
 /// action in an episode.
 ///
-/// * The environment consists of (NUM_ACTIONS + HISTORY_LEN) states.
-/// * An episode starts in a state [0, NUM_ACTIONS) uniformly at random.
-/// * Step i in [0, HISTORY_LEN) transitions to state NUM_ACTIONS + i
+/// * The environment consists of `(NUM_ACTIONS + HISTORY_LEN)` states.
+/// * An episode starts in a state `[0, NUM_ACTIONS)` uniformly at random.
+/// * Step `i` in `[0, HISTORY_LEN)` transitions to state `NUM_ACTIONS + i`
 ///     with 0 reward regardless of the action.
-/// * On step HISTORY_LEN, the agent chooses one of NUM_ACTIONS actions
+/// * On step `HISTORY_LEN`, the agent chooses one of `NUM_ACTIONS` actions
 ///     and if the action index matches the index of the inital state
-///     then the agent earns +1 reward, otherwise it earns -1 reward.
+///     then the agent earns `+1` reward, otherwise it earns `-1` reward.
 ///     This step is terminal.
-/// * Every episode has length HISTORY_LEN + 1.
+/// * Every episode has length `HISTORY_LEN + 1`.
 #[derive(Debug, Clone)]
 pub struct MemoryGame {
     /// The number of actions.
@@ -34,7 +34,7 @@ impl Default for MemoryGame {
 }
 
 impl MemoryGame {
-    /// Create a new MemoryGame instance
+    /// Create a new `MemoryGame` instance
     ///
     /// # Args
     /// * `num_actions` - Number of possible actions.
@@ -48,7 +48,7 @@ impl MemoryGame {
 }
 
 impl Environment for MemoryGame {
-    /// (current_state, initial_state)
+    /// `(current_state, initial_state)`
     type State = (usize, usize);
     type ObservationSpace = IndexSpace;
     type ActionSpace = IndexSpace;

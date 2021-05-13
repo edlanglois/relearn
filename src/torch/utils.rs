@@ -1,10 +1,10 @@
 //! Torch utilities.
 use std::borrow::Borrow;
-use tch::{kind::Kind, TchError, Tensor};
+use tch::{Kind, TchError, Tensor};
 
 /// Create a one-hot tensor from a tensor of indices,
 ///
-/// The same as one_hot but returns a result instead of panicking
+/// The same as [`one_hot`] but returns a result instead of panicking
 /// when there is an error.
 pub fn f_one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Result<Tensor, TchError> {
     let mut shape = labels.size();
@@ -14,7 +14,9 @@ pub fn f_one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Result<Tens
 
 /// Create a one-hot tensor from a tensor of indices,
 ///
-/// Like Tensor::one_hot but allows the Kind to be set.
+/// Like [`Tensor::one_hot`] but allows the [`Kind`] to be set.
+///
+/// [`Kind`]: tch::Kind
 ///
 /// # Args
 /// * `labels` - An i64 tensor with any shape `[*BATCH_SHAPE]`.
@@ -97,7 +99,7 @@ pub fn f_flat_dot(a: &Tensor, b: &Tensor) -> Result<Tensor, TchError> {
 /// The shapes may differ so long as the total number of elements are the same.
 ///
 /// # Panics
-/// If [f_flat_dot] fails.
+/// If [`f_flat_dot`] fails.
 pub fn flat_dot(a: &Tensor, b: &Tensor) -> Tensor {
     f_flat_dot(a, b).unwrap()
 }

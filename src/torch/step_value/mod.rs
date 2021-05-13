@@ -34,9 +34,9 @@ pub trait StepValue {
     fn loss(&self, features: &dyn PackedHistoryFeaturesView) -> Option<Tensor>;
 }
 
-/// Build a StepValue instance.
+/// Build a [`StepValue`] instance.
 pub trait StepValueBuilder<T> {
-    /// Build a new [StepValue] instance.
+    /// Build a new [`StepValue`] instance.
     ///
     /// # Args
     /// * `vs` - Variable store and namespace.

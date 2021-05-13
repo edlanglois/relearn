@@ -345,7 +345,8 @@ impl MatrixVectorProduct for Tensor {
 /// Solution `x*` for the equation `Ax = b`.
 ///
 /// # Reference
-/// https://en.wikipedia.org/wiki/Conjugate_gradient_method
+/// * <https://en.wikipedia.org/wiki/Conjugate_gradient_method>
+/// * <https://github.com/rlworkgroup/garage/blob/90b60905b29cea8f8373c6732ced0cadf8489b0c/src/garage/torch/optimizers/conjugate_gradient_optimizer.py>
 fn solve_conjugate_gradient<T: MatrixVectorProduct<Vector = Tensor>>(
     #[allow(non_snake_case)] f_Ax: &T,
     b: &Tensor,

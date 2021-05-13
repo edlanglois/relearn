@@ -11,7 +11,7 @@ use crate::EnvStructure;
 use std::cell::Cell;
 use tch::{kind::Kind, nn, Device, Tensor};
 
-/// Configuration for [PolicyGradientAgent]
+/// Configuration for [`PolicyGradientAgent`]
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct PolicyGradientAgentConfig<PB, POB, VB, VOB> {
     pub actor_config: PolicyValueNetActorConfig<PB, VB>,

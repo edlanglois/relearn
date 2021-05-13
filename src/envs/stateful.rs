@@ -1,10 +1,10 @@
-//! Converting an Environment into a StatefulEnvironment
+//! Converting an `Environment` into a `StatefulEnvironment`
 use super::{BuildEnvError, EnvBuilder, Environment, StatefulEnvironment};
 use crate::envs::EnvStructure;
 use crate::spaces::Space;
 use rand::prelude::*;
 
-/// Creates a StatefulEnvironment out of an Environment
+/// Creates a [`StatefulEnvironment`] out of an [`Environment`]
 pub struct EnvWithState<E: Environment> {
     pub env: E,
     state: Option<E::State>,

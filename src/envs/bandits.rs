@@ -143,7 +143,7 @@ impl<D: FromMean<f64>> Bandit<D> {
 pub type BernoulliBandit = Bandit<Bernoulli>;
 
 impl BernoulliBandit {
-    /// Create a new BernoulliBandit with uniform random means.
+    /// Create a new `BernoulliBandit` with uniform random means.
     pub fn uniform<R: Rng>(num_arms: u32, rng: &mut R) -> Self {
         let distributions = (0..num_arms)
             .map(|_| Bernoulli::new(rng.gen()).unwrap())
@@ -156,7 +156,7 @@ impl BernoulliBandit {
 pub type DeterministicBandit = Bandit<Deterministic<f64>>;
 
 impl DeterministicBandit {
-    /// Create a new DeterministicBandit from a list of arm rewards
+    /// Create a new `DeterministicBandit` from a list of arm rewards
     pub fn from_values<I: IntoIterator<Item = T>, T: Borrow<f64>>(values: I) -> Self {
         Self::from_means(values).unwrap()
     }

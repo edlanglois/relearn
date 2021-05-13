@@ -1,4 +1,4 @@
-//! FiniteSpace trait definition
+//! `FiniteSpace` trait definition
 use super::{FeatureSpace, ParameterizedSampleSpace, ReprSpace, Space};
 use crate::torch::utils as torch_utils;
 use tch::{Device, Kind, Tensor};

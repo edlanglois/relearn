@@ -10,7 +10,7 @@ pub trait PartialMax {
     /// A maximum element of an iterator when one exists.
     ///
     /// If several elements are equally maximum then the last one is returned.
-    /// Returns a PartialMaxError if there are no elements or the elements are not comparable.
+    /// Returns a [`PartialMaxError`] if there are no elements or the elements are not comparable.
     fn partial_max(self) -> Result<Self::Item, PartialMaxError>;
 }
 

@@ -28,7 +28,9 @@ pub trait PackedHistoryFeaturesView {
     /// Packed action values.
     ///
     /// A tensor of any type and shape, apart from the first dimension along which actions are
-    /// packed. Appropriate for passing to [ParameterizedSampleSpace] methods.
+    /// packed. Appropriate for passing to [`ParameterizedSampleSpace`] methods.
+    ///
+    /// [`ParameterizedSampleSpace`]: crate::spaces::ParameterizedSampleSpace
     fn actions(&self) -> &Tensor;
 
     /// Packed returns (discounted reward-to-go). A 1D f32 tensor.
@@ -148,7 +150,7 @@ where
 /// Packed history features.
 ///
 /// # Panics
-/// The [PackedHistoryFeaturesView] this provides will panic
+/// The [`PackedHistoryFeaturesView`] this provides will panic
 /// if the requested features is not available.
 pub struct PackedHistoryFeatures {
     pub discount_factor: f64,

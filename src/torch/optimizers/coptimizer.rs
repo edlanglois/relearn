@@ -80,6 +80,7 @@ impl TryFrom<&SgdConfig> for COptimizer {
     }
 }
 
+#[allow(clippy::doc_markdown)] // false positive on RMSProp
 /// Configuration for the RMSProp optimizer.
 #[derive(Debug, Clone)]
 pub struct RmsPropConfig {
@@ -160,6 +161,7 @@ impl TryFrom<&AdamConfig> for COptimizer {
     }
 }
 
+#[allow(clippy::doc_markdown)]
 /// Configuration for the AdamW optimizer.
 #[derive(Debug, Clone)]
 pub struct AdamWConfig {

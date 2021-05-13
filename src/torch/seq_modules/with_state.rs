@@ -3,7 +3,7 @@ use super::{IterativeModule, SequenceModule, StatefulIterativeModule};
 use std::borrow::Borrow;
 use tch::{nn::Path, Tensor};
 
-/// IterativeModule wrapper that also stores the state.
+/// [`IterativeModule`] wrapper that also stores the state.
 #[derive(Debug)]
 pub struct WithState<T: IterativeModule> {
     pub module: T,

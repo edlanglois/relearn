@@ -8,7 +8,7 @@ use ndarray::{Array, Array1, Array2, Axis};
 use std::f64;
 use std::fmt;
 
-/// Configuration for a UCB1Agent
+/// Configuration for a [`UCB1Agent`]
 #[derive(Debug)]
 pub struct UCB1AgentConfig {
     /// Scale factor on the confidence interval; controls the exploration rate.

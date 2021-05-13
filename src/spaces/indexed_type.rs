@@ -1,4 +1,4 @@
-//! IndexedTypeSpace and Indexed trait
+//! `IndexedTypeSpace` and `Indexed` trait
 use super::{ElementRefInto, FiniteSpace, SampleSpace, Space};
 
 use crate::logging::Loggable;

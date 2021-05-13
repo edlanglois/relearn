@@ -1,4 +1,4 @@
-//! IndexSpace definition
+//! `IndexSpace` definition
 use super::{ElementRefInto, FiniteSpace, SampleSpace, Space};
 use crate::logging::Loggable;
 use rand::distributions::Distribution;

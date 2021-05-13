@@ -3,8 +3,8 @@ use std::cmp::{Ordering, PartialOrd};
 
 /// Implements a total order for a partial order by panicking whenever elements cannot be compared.
 ///
-/// Note that [ExpectOrd::partial_cmp] will panic rather than return None.
-/// This is to ensure consistency between the [PartialOrd] methods
+/// Note that [`ExpectOrd::partial_cmp`] will panic rather than return None.
+/// This is to ensure consistency between the [`PartialOrd`] methods
 /// and the [Ord] methods, as required by Ord.
 #[derive(Debug)]
 pub struct ExpectOrd<T> {

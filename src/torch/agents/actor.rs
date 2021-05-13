@@ -8,7 +8,7 @@ use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
 use crate::{Actor, EnvStructure, Step};
 use tch::{nn::Path, Tensor};
 
-/// Configuration for [PolicyValueNetActor].
+/// Configuration for [`PolicyValueNetActor`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PolicyValueNetActorConfig<PB, VB> {
     pub steps_per_epoch: usize,
@@ -118,17 +118,13 @@ where
     AS: ParameterizedSampleSpace<Tensor>,
     V: StepValue,
 {
-    /// Create a new PolicyNetActor
+    /// Create a new `PolicyValueNetActor`
     ///
     /// # Args
-    ///
-    /// * `policy_config` - Policy configuration / builder.
+    /// * `env` - Environment structure.
+    /// * `config` - `PolicyValueNetActor` configuration parameters.
     /// * `policy_vs` - Path in which the policy network variables are stored
-    /// * `value_config` - Value estimator configuration / builder.
     /// * `value_vs` - Path in which the value network variables are stored.
-    ///
-    /// Others as described by the documentation for [PolicyNetActor].
-
     pub fn new<PB, VB>(
         env: EnvStructure<OS, AS>,
         config: &PolicyValueNetActorConfig<PB, VB>,

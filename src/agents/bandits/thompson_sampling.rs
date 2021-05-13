@@ -10,7 +10,7 @@ use rand::prelude::*;
 use statrs::distribution::Beta;
 use std::fmt;
 
-/// Configuration for a BetaThompsonSamplingAgent
+/// Configuration for [`BetaThompsonSamplingAgent`]
 #[derive(Debug)]
 pub struct BetaThompsonSamplingAgentConfig {
     /// Number of posterior samples to draw.

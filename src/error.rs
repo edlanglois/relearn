@@ -1,3 +1,4 @@
+//! Error type
 use crate::agents::BuildAgentError;
 use crate::envs::BuildEnvError;
 use thiserror::Error;

@@ -1,4 +1,4 @@
-//! Space trait definitions
+//! Spaces: runtime-defined types
 mod finite;
 mod index;
 mod indexed_type;
@@ -30,7 +30,7 @@ pub trait SampleSpace: Space + Distribution<<Self as Space>::Element> {}
 
 /// A space whose elements can be represented as value of type `T`
 ///
-/// This representation is generally minimal, in contrast to [FeatureSpace],
+/// This representation is generally minimal, in contrast to [`FeatureSpace`],
 /// which produces a representation suited for use as input to a machine learning model.
 pub trait ReprSpace<T, T0 = T>: Space {
     /// Represent a single element as a scalar value.
@@ -46,7 +46,7 @@ pub trait ReprSpace<T, T0 = T>: Space {
 /// A space whose elements can be converted to feature vectors.
 ///
 /// The representation is generally suited for use as input to a machine learning model,
-/// in contrast to [ReprSpace], which yields a compact representation.
+/// in contrast to [`ReprSpace`], which yields a compact representation.
 pub trait FeatureSpace<T, T2 = T>: Space {
     /// Length of the feature vectors in which which elements are encoded.
     fn num_features(&self) -> usize;
