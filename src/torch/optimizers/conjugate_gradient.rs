@@ -247,8 +247,6 @@ where
         for param in params.iter() {
             utils::zero_grad(param.borrow());
         }
-        // TODO: Possible memory leak. Unset param.grad afterward?
-        // https://pytorch.org/docs/stable/autograd.html#torch.autograd.backward
         let grads = Tensor::run_backward(&[output], params, true, true);
         Self {
             params,
