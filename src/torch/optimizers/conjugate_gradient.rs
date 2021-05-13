@@ -94,9 +94,9 @@ impl ConjugateGradientOptimizer {
 }
 
 impl BaseOptimizer for ConjugateGradientOptimizer {
-    fn zero_grad(&self) {
-        for param in self.params.iter() {
-            utils::zero_grad(param);
+    fn zero_grad(&mut self) {
+        for param in self.params.iter_mut() {
+            param.zero_grad();
         }
     }
 }
@@ -110,7 +110,6 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
         let (loss, distance) = loss_distance_fn();
 
         // Loss gradient. Save the graph so that HessianVectorProduct can reuse it.
-        self.zero_grad();
         let loss_grads = Tensor::run_backward(&[&loss], &self.params, true, false);
 
         // Tensors not involved in computing `loss_grads` will have `undefined` gradient.
@@ -267,9 +266,6 @@ where
     /// * `param_shapes` - Optional parameter shapes.
     pub fn new(output: &Tensor, params: &'a [T], reg_coeff: f64) -> Self {
         let param_shapes = params.iter().map(|t| t.borrow().size()).collect();
-        for param in params.iter() {
-            utils::zero_grad(param.borrow());
-        }
         let mut grads = Tensor::run_backward(&[output], params, true, true);
         // Parameters uninvolved with computing `output` have `undefined` gradient.
         // Set these to zero tensors.

@@ -4,7 +4,7 @@ use std::convert::{TryFrom, TryInto};
 use tch::{nn::VarStore, COptimizer, TchError, Tensor};
 
 impl BaseOptimizer for COptimizer {
-    fn zero_grad(&self) {
+    fn zero_grad(&mut self) {
         COptimizer::zero_grad(self).unwrap();
     }
 }
@@ -17,7 +17,7 @@ impl OnceOptimizer for COptimizer {
         Ok(())
     }
 
-    fn backward_step_once(&self, loss: &Tensor) -> Result<(), OptimizerStepError> {
+    fn backward_step_once(&mut self, loss: &Tensor) -> Result<(), OptimizerStepError> {
         BaseOptimizer::zero_grad(self);
         loss.backward();
         self.step_once()
@@ -197,6 +197,7 @@ impl TryFrom<&AdamWConfig> for COptimizer {
 }
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod coptimizer {
     use super::super::{testing, Optimizer};
     use super::*;
@@ -219,7 +220,7 @@ mod coptimizer {
         let vs = VarStore::new(Device::Cpu);
         let x = vs.root().f_zeros("x", &[2]).unwrap();
 
-        let optimizer = SgdConfig::default().build_optimizer(&vs).unwrap();
+        let mut optimizer = SgdConfig::default().build_optimizer(&vs).unwrap();
         let _ = optimizer
             .backward_step(&(|| (&x / &x).sum(Kind::Float)))
             .unwrap();

@@ -12,7 +12,7 @@ use thiserror::Error;
 /// Base optimizer interface
 pub trait BaseOptimizer {
     /// Zero out the gradients of all optimized tensors
-    fn zero_grad(&self);
+    fn zero_grad(&mut self);
 }
 
 /// Optimizer that minimizes a loss function.
@@ -34,7 +34,8 @@ pub trait Optimizer: BaseOptimizer {
     /// In general, error conditions are not guaranteed to be detected and an optimizer
     /// may silently put itself or the parameters into a bad state.
     /// For example, [COptimizer] sets parameters to NaN when the loss is NaN.
-    fn backward_step(&self, loss_fn: &dyn Fn() -> Tensor) -> Result<Tensor, OptimizerStepError>;
+    fn backward_step(&mut self, loss_fn: &dyn Fn() -> Tensor)
+        -> Result<Tensor, OptimizerStepError>;
 }
 
 /// Optimizer that minimizes a loss tensor.
@@ -65,11 +66,14 @@ pub trait OnceOptimizer: BaseOptimizer {
     /// In general, error conditions are not guaranteed to be detected and an optimizer
     /// may silently put itself or the parameters into a bad state.
     /// For example, [COptimizer] sets parameters to NaN when the loss is NaN.
-    fn backward_step_once(&self, loss: &Tensor) -> Result<(), OptimizerStepError>;
+    fn backward_step_once(&mut self, loss: &Tensor) -> Result<(), OptimizerStepError>;
 }
 
 impl<T: OnceOptimizer> Optimizer for T {
-    fn backward_step(&self, loss_fn: &dyn Fn() -> Tensor) -> Result<Tensor, OptimizerStepError> {
+    fn backward_step(
+        &mut self,
+        loss_fn: &dyn Fn() -> Tensor,
+    ) -> Result<Tensor, OptimizerStepError> {
         let loss = loss_fn();
         self.backward_step_once(&loss)?;
         Ok(loss)
@@ -148,7 +152,7 @@ mod testing {
 
         let vs = VarStore::new(Device::Cpu);
         let x = vs.root().f_zeros("x", &[2]).unwrap();
-        let optimizer = builder.build_optimizer(&vs).unwrap();
+        let mut optimizer = builder.build_optimizer(&vs).unwrap();
 
         let loss_fn = || m.mv(&x).dot(&x) / 2 + b.dot(&x);
 
