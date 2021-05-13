@@ -76,6 +76,7 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod with_state {
     use super::super::{testing, Gru, MlpConfig, RnnConfig};
     use super::*;

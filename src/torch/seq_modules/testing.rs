@@ -13,7 +13,7 @@ pub fn check_forward<M: Module>(
 ) {
     let _no_grad_guard = tch::no_grad_guard();
     let input_shape: Vec<_> = batch_shape
-        .into_iter()
+        .iter()
         .chain(iter::once(&in_dim))
         .map(|&d| d as i64)
         .collect();

@@ -104,6 +104,7 @@ impl Move {
 }
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod chain {
     use super::super::testing;
     use super::*;

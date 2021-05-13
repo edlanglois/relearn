@@ -204,19 +204,13 @@ mod derive_indexed_tests {
     #[test]
     fn empty_enum_from_index_invalid_0() {
         let result = EmptyEnum::from_index(0);
-        if let None = result {
-        } else {
-            panic!("Expected `None`, got {:?}", result);
-        }
+        assert!(result.is_none(), "Expected `None`, got {:?}", result);
     }
 
     #[test]
     fn empty_enum_from_index_invalid_1() {
         let result = EmptyEnum::from_index(1);
-        if let None = result {
-        } else {
-            panic!("Expected `None`, got {:?}", result);
-        }
+        assert!(result.is_none(), "Expected `None`, got {:?}", result);
     }
 
     #[test]
@@ -251,9 +245,6 @@ mod derive_indexed_tests {
     #[test]
     fn non_empty_enum_from_index_invalid_2() {
         let result = NonEmptyEnum::from_index(2);
-        if let None = result {
-        } else {
-            panic!("Expected `None`, got {:?}", result);
-        }
+        assert!(result.is_none(), "Expected `None`, got {:?}", result);
     }
 }

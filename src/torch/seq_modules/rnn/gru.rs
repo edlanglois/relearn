@@ -110,6 +110,7 @@ impl SequenceModule for Gru {
 }
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod gru {
     use super::super::super::testing;
     use super::*;

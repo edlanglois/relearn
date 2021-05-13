@@ -205,8 +205,10 @@ mod coptimizer {
 
     #[test]
     fn sgd_optimizes_quadratic() {
-        let mut config = SgdConfig::default();
-        config.learning_rate = 1e-1;
+        let config = SgdConfig {
+            learning_rate: 1e-1,
+            ..SgdConfig::default()
+        };
         testing::check_optimizes_quadratic(&config, 500);
     }
 
@@ -221,6 +223,7 @@ mod coptimizer {
         let x = vs.root().f_zeros("x", &[2]).unwrap();
 
         let mut optimizer = SgdConfig::default().build_optimizer(&vs).unwrap();
+        #[allow(clippy::eq_op)]
         let _ = optimizer
             .backward_step(&(|| (&x / &x).sum(Kind::Float)))
             .unwrap();
@@ -228,22 +231,28 @@ mod coptimizer {
 
     #[test]
     fn rms_prop_optimizes_quadratic() {
-        let mut config = RmsPropConfig::default();
-        config.learning_rate = 1e-1;
+        let config = RmsPropConfig {
+            learning_rate: 1e-1,
+            ..RmsPropConfig::default()
+        };
         testing::check_optimizes_quadratic(&config, 500);
     }
 
     #[test]
     fn adam_optimizes_quadratic() {
-        let mut config = AdamConfig::default();
-        config.learning_rate = 1e-1;
+        let config = RmsPropConfig {
+            learning_rate: 1e-1,
+            ..RmsPropConfig::default()
+        };
         testing::check_optimizes_quadratic(&config, 500);
     }
 
     #[test]
     fn adam_w_optimizes_quadratic() {
-        let mut config = AdamWConfig::default();
-        config.learning_rate = 1e-1;
+        let config = RmsPropConfig {
+            learning_rate: 1e-1,
+            ..RmsPropConfig::default()
+        };
         testing::check_optimizes_quadratic(&config, 500);
     }
 }

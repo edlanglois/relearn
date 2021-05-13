@@ -182,6 +182,7 @@ mod bernoulli_bandit {
         let mut reward_1_count = 0;
         for _ in 0..num_samples {
             let (_, reward, _) = env.step((), &0, &mut rng);
+            #[allow(clippy::float_cmp)] // Expecting exact values without error
             if reward < 0.5 {
                 assert_eq!(reward, 0.0);
             } else {
@@ -211,6 +212,7 @@ mod deterministic_bandit {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)] // Expecting exact values without error
     fn rewards() {
         let mut rng = StdRng::seed_from_u64(0);
         let env = DeterministicBandit::from_values(vec![0.2, 0.8]);

@@ -58,10 +58,10 @@ mod mlp_config {
     use rstest::{fixture, rstest};
     use tch::{kind::Kind, Device};
 
-    type MLP = nn::Sequential;
+    type Mlp = nn::Sequential;
 
     #[fixture]
-    fn default_module() -> (MLP, usize, usize) {
+    fn default_module() -> (Mlp, usize, usize) {
         let in_dim = 3;
         let out_dim = 2;
         let config = MlpConfig::default();
@@ -71,19 +71,19 @@ mod mlp_config {
     }
 
     #[rstest]
-    fn default_module_forward_batch(default_module: (MLP, usize, usize)) {
+    fn default_module_forward_batch(default_module: (Mlp, usize, usize)) {
         let (default_mlp, in_dim, out_dim) = default_module;
         testing::check_forward(&default_mlp, in_dim, out_dim, &[4], Kind::Float);
     }
 
     #[rstest]
-    fn default_module_seq_serial(default_module: (MLP, usize, usize)) {
+    fn default_module_seq_serial(default_module: (Mlp, usize, usize)) {
         let (default_mlp, in_dim, out_dim) = default_module;
         testing::check_seq_serial(&default_mlp, in_dim, out_dim);
     }
 
     #[rstest]
-    fn default_module_step(default_module: (MLP, usize, usize)) {
+    fn default_module_step(default_module: (Mlp, usize, usize)) {
         let (default_mlp, in_dim, out_dim) = default_module;
         testing::check_step(&default_mlp, in_dim, out_dim);
     }

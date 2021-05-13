@@ -46,9 +46,9 @@ impl<T> From<T> for ExpectOrd<T> {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod expect_ord {
     use super::*;
-    use f64;
     use rstest::rstest;
 
     #[rstest]
