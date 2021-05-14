@@ -34,9 +34,9 @@ pub trait StepValue {
     fn loss(&self, features: &dyn PackedHistoryFeaturesView) -> Option<Tensor>;
 }
 
-/// Build a StepValue instance.
+/// Build a [`StepValue`] instance.
 pub trait StepValueBuilder<T> {
-    /// Build a new [StepValue] instance.
+    /// Build a new [`StepValue`] instance.
     ///
     /// # Args
     /// * `vs` - Variable store and namespace.
@@ -48,7 +48,8 @@ pub trait StepValueBuilder<T> {
 ///
 /// Also known as the Monte Carlo reward-to-go.
 ///
-/// **Note**: Currently does not properly handle non-terminal end-of-episode.
+/// # Note
+/// Currently does not properly handle non-terminal end-of-episode.
 /// This assumes that all episodes end with a reward of 0.
 #[derive(Debug)]
 pub struct Return;
@@ -73,8 +74,8 @@ impl StepValue for Return {
     }
 }
 
-impl StepValueBuilder<Return> for Return {
-    fn build_step_value(&self, _: &Path, _: usize) -> Return {
+impl StepValueBuilder<Self> for Return {
+    fn build_step_value(&self, _: &Path, _: usize) -> Self {
         Return
     }
 }

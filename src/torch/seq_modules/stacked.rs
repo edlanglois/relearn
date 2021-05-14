@@ -13,7 +13,7 @@ pub struct Stacked<'a, T, U> {
 }
 
 impl<'a, T, U> Stacked<'a, T, U> {
-    pub fn new(seq: T, activation: Option<Func<'a>>, top: U) -> Self {
+    pub const fn new(seq: T, activation: Option<Func<'a>>, top: U) -> Self {
         Self {
             seq,
             activation,
@@ -114,7 +114,7 @@ mod stacked_module {
     use super::super::{testing, Gru};
     use super::*;
     use rstest::{fixture, rstest};
-    use tch::{nn, Device};
+    use tch::{nn, nn::LinearConfig, Device};
 
     type GruMlp = Stacked<'static, Gru, nn::Linear>;
 
@@ -131,7 +131,7 @@ mod stacked_module {
             &(path / "linear"),
             hidden_dim as i64,
             out_dim as i64,
-            Default::default(),
+            LinearConfig::default(),
         );
         let sr = Stacked::new(gru, Some(nn::func(Tensor::relu)), linear);
         (sr, in_dim, out_dim)

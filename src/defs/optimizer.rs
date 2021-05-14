@@ -13,7 +13,7 @@ pub enum OptimizerDef {
 
 impl Default for OptimizerDef {
     fn default() -> Self {
-        OptimizerDef::Adam(Default::default())
+        Self::Adam(AdamConfig::default())
     }
 }
 

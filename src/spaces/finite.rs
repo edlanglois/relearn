@@ -1,6 +1,7 @@
-//! FiniteSpace trait definition
+//! `FiniteSpace` trait definition
 use super::{FeatureSpace, ParameterizedSampleSpace, ReprSpace, Space};
 use crate::torch::utils as torch_utils;
+use std::convert::TryInto;
 use tch::{Device, Kind, Tensor};
 
 /// A space containing finitely many elements.
@@ -46,7 +47,7 @@ impl<S: FiniteSpace> FeatureSpace<Tensor> for S {
 
     fn features(&self, element: &Self::Element) -> Tensor {
         torch_utils::one_hot(
-            &Tensor::scalar_tensor(self.to_index(&element) as i64, (Kind::Int64, Device::Cpu)),
+            &Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu)),
             self.num_features(),
             Kind::Float,
         )
@@ -77,7 +78,9 @@ impl<S: FiniteSpace> ParameterizedSampleSpace<Tensor> for S {
 
     fn sample(&self, parameters: &Tensor) -> Self::Element {
         self.from_index(
-            Into::<i64>::into(parameters.softmax(-1, Kind::Float).multinomial(1, true)) as usize,
+            Into::<i64>::into(parameters.softmax(-1, Kind::Float).multinomial(1, true))
+                .try_into()
+                .unwrap(),
         )
         .unwrap()
     }
@@ -139,7 +142,7 @@ mod repr_space_tensor {
         let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
         let elements = [Trit::Zero, Trit::One, Trit::Two, Trit::One];
         let actual = space.batch_repr(&elements);
-        let expected = Tensor::of_slice(&[0i64, 1, 2, 1]);
+        let expected = Tensor::of_slice(&[0_i64, 1, 2, 1]);
         assert_eq!(actual, expected);
     }
 }
@@ -194,7 +197,6 @@ mod parameterized_sample_space_tensor {
     use super::super::IndexedTypeSpace;
     use super::trit::Trit;
     use super::*;
-    use f32;
 
     #[test]
     fn num_sample_params() {
@@ -236,9 +238,9 @@ mod parameterized_sample_space_tensor {
             }
         }
         // Check that the counts are within 3.5 standard deviations of the mean
-        assert!(one_count >= 58 && one_count <= 121);
-        assert!(two_count >= 197 && two_count <= 292);
-        assert!(three_count >= 613 && three_count <= 717);
+        assert!((58..=121).contains(&one_count));
+        assert!((197..=292).contains(&two_count));
+        assert!((613..=717).contains(&three_count));
     }
 
     #[test]

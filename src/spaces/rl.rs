@@ -8,7 +8,9 @@ use tch::Tensor;
 /// A comprehensive space type for use in reinforcement learning.
 ///
 /// This includes all interfaces required by any agent, environment, or simulator
-/// excluding interfaces that can only apply to some spaces, like FiniteSpace.
+/// excluding interfaces that can only apply to some spaces, like [`FiniteSpace`].
+///
+/// [`FiniteSpace`]: super::FiniteSpace
 pub trait RLSpace:
     Space
     + SampleSpace

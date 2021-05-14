@@ -1,4 +1,4 @@
-//! Sequence modules. Like [tch::nn::Module] but operate on sequences of data.
+//! Sequence modules. Like [`tch::nn::Module`] but operate on sequences of data.
 mod r#box;
 pub mod module;
 mod rnn;
@@ -36,7 +36,7 @@ pub trait SequenceModule {
     ///
     /// # Returns
     /// Batched output sequences arranged in series.
-    /// A tensor of shape [BATCH_SHAPE, TOTAL_SEQ_LENGTH, NUM_OUTPUT_FEATURES]
+    /// A tensor of shape `[BATCH_SHAPE, TOTAL_SEQ_LENGTH, NUM_OUTPUT_FEATURES]`.
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor;
 
     /// Apply the network over multiple sequences packed together in heterogeneous batches.
@@ -106,7 +106,7 @@ pub trait StatefulIterativeModule {
 pub trait StatefulIterSeqModule: SequenceModule + StatefulIterativeModule {}
 impl<T: SequenceModule + StatefulIterativeModule> StatefulIterSeqModule for T {}
 
-/// Helper function to implement SequenceModule::seq_serial from a single-sequence closure.
+/// Helper function to implement [`SequenceModule::seq_serial`] from a single-sequence closure.
 ///
 /// # Args:
 /// * `inputs` - Batched input sequences arranged in series.

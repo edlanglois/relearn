@@ -12,7 +12,7 @@ pub enum StepValueDef {
 
 impl Default for StepValueDef {
     fn default() -> Self {
-        StepValueDef::Return
+        Self::Return
     }
 }
 

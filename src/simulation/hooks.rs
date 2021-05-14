@@ -44,7 +44,7 @@ pub struct StepLimit {
 }
 
 impl StepLimit {
-    /// Create a new StepLimit hook.
+    /// Create a new `StepLimit` hook.
     ///
     /// `max_steps` must be >= 1 because hooks cannot stop the simulation before the first step.
     pub fn new(max_steps: u64) -> Self {
@@ -69,10 +69,10 @@ pub struct EpisodeLimit {
 }
 
 impl EpisodeLimit {
-    /// Create a new EpisodeLimit hook.
+    /// Create a new `EpisodeLimit` hook.
     ///
-    /// `max_episodes` must be >= 1 because hooks cannot stop the simulation before the first step
-    /// and this hook only stops at the end of an episode.
+    /// `max_episodes` must be `>= 1` because hooks cannot stop the simulation before the first
+    /// step and this hook only stops at the end of an episode.
     pub fn new(max_episodes: u64) -> Self {
         assert!(max_episodes > 0);
         Self {
@@ -125,7 +125,7 @@ pub struct StepLogger<OS, AS> {
 }
 
 impl<OS, AS> StepLogger<OS, AS> {
-    pub fn new(observation_space: OS, action_space: AS) -> Self {
+    pub const fn new(observation_space: OS, action_space: AS) -> Self {
         Self {
             observation_space,
             action_space,

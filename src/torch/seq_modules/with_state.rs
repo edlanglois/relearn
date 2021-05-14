@@ -3,7 +3,7 @@ use super::{IterativeModule, SequenceModule, StatefulIterativeModule};
 use std::borrow::Borrow;
 use tch::{nn::Path, Tensor};
 
-/// IterativeModule wrapper that also stores the state.
+/// [`IterativeModule`] wrapper that also stores the state.
 #[derive(Debug)]
 pub struct WithState<T: IterativeModule> {
     pub module: T,
@@ -76,11 +76,12 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod with_state {
     use super::super::{testing, Gru, MlpConfig, RnnConfig};
     use super::*;
     use rstest::{fixture, rstest};
-    use tch::{nn, Device};
+    use tch::{nn, nn::LinearConfig, Device};
 
     #[fixture]
     fn linear() -> (WithState<nn::Linear>, usize, usize) {
@@ -91,7 +92,7 @@ mod with_state {
             &vs.root(),
             in_dim as i64,
             out_dim as i64,
-            Default::default(),
+            LinearConfig::default(),
         );
         (linear.into(), in_dim, out_dim)
     }

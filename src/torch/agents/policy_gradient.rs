@@ -11,7 +11,7 @@ use crate::EnvStructure;
 use std::cell::Cell;
 use tch::{kind::Kind, nn, Device, Tensor};
 
-/// Configuration for [PolicyGradientAgent]
+/// Configuration for [`PolicyGradientAgent`]
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct PolicyGradientAgentConfig<PB, POB, VB, VOB> {
     pub actor_config: PolicyValueNetActorConfig<PB, VB>,
@@ -20,7 +20,7 @@ pub struct PolicyGradientAgentConfig<PB, POB, VB, VOB> {
 }
 
 impl<PB, POB, VB, VOB> PolicyGradientAgentConfig<PB, POB, VB, VOB> {
-    pub fn new(
+    pub const fn new(
         actor_config: PolicyValueNetActorConfig<PB, VB>,
         policy_optimizer_config: POB,
         value_optimizer_config: VOB,
@@ -138,8 +138,8 @@ where
     }
 
     fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn Logger) {
-        let policy_optimizer = &self.policy_optimizer;
-        let value_optimizer = &self.value_optimizer;
+        let policy_optimizer = &mut self.policy_optimizer;
+        let value_optimizer = &mut self.value_optimizer;
         self.actor.update(
             step,
             |actor, features, _logger| policy_gradient_update(actor, features, policy_optimizer),
@@ -153,7 +153,7 @@ where
 fn policy_gradient_update<OS, AS, P, V, PO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
     features: &LazyPackedHistoryFeatures<OS, AS>,
-    optimizer: &PO,
+    optimizer: &mut PO,
 ) -> Tensor
 where
     OS: FeatureSpace<Tensor>,
@@ -187,7 +187,7 @@ where
 fn value_squared_error_update<OS, AS, P, V, VO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
     features: &LazyPackedHistoryFeatures<OS, AS>,
-    optimizer: &VO,
+    optimizer: &mut VO,
 ) -> Tensor
 where
     OS: FeatureSpace<Tensor>,
@@ -201,6 +201,7 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod policy_gradient {
     use super::*;
     use crate::agents::testing;

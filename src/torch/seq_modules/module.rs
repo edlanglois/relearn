@@ -82,7 +82,7 @@ mod sequence_module {
         let m = nn::func(|x| x * 2);
         let feature_dim = 1;
         let input = Tensor::of_slice(&[0.0, 1.0, 2.0, 3.0, 4.0, 5.0]).view((-1, feature_dim));
-        let batch_sizes = Tensor::of_slice(&[3i64, 2, 1]);
+        let batch_sizes = Tensor::of_slice(&[3_i64, 2, 1]);
         let output = m.seq_packed(&input, &batch_sizes);
 
         let expected = Tensor::of_slice(&[0.0, 2.0, 4.0, 6.0, 8.0, 10.0]).view((-1, feature_dim));
@@ -91,6 +91,7 @@ mod sequence_module {
 }
 
 #[cfg(test)]
+#[allow(clippy::let_unit_value)] // state is () but this is conceptually unimportant
 mod iterative_module {
     use super::*;
     use tch::kind::Kind;
@@ -99,29 +100,29 @@ mod iterative_module {
     #[test]
     fn batched() {
         let m = nn::func(|x| x * 2);
-        let batch_size = 2;
+        let batch_size: usize = 2;
         let feature_dim = 3;
-        let input =
-            Tensor::of_slice(&[0.0, 1.0, 2.0, 3.0, 4.0, 5.0]).view((batch_size, feature_dim));
+        let input = Tensor::of_slice(&[0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+            .view((batch_size as i64, feature_dim));
 
-        let state = m.initial_state(batch_size as usize);
+        let state = m.initial_state(batch_size);
         let (output, _) = m.step(&input, &state);
 
-        let expected =
-            Tensor::of_slice(&[0.0, 2.0, 4.0, 6.0, 8.0, 10.0]).view((batch_size, feature_dim));
+        let expected = Tensor::of_slice(&[0.0, 2.0, 4.0, 6.0, 8.0, 10.0])
+            .view((batch_size as i64, feature_dim));
         assert_eq!(output, expected);
     }
 
     #[test]
     fn feature_dim_changed() {
         let m = nn::func(|x| x.sum1(&[-1], true, Kind::Float));
-        let batch_size = 1;
-        let input = Tensor::of_slice(&[0.0, 1.0, 2.0]).view((batch_size, 3));
+        let batch_size: usize = 1;
+        let input = Tensor::of_slice(&[0.0, 1.0, 2.0]).view((batch_size as i64, 3));
 
-        let state = m.initial_state(batch_size as usize);
+        let state = m.initial_state(batch_size);
         let (output, _) = m.step(&input, &state);
 
-        let expected = Tensor::of_slice(&[3.0]).view((batch_size, 1));
+        let expected = Tensor::of_slice(&[3.0]).view((batch_size as i64, 1));
         assert_eq!(output, expected);
     }
 }

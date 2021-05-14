@@ -20,11 +20,11 @@ impl From<&Options> for AgentDef {
     fn from(opts: &Options) -> Self {
         use AgentType::*;
         match opts.agent {
-            Random => AgentDef::Random,
-            TabularQLearning => AgentDef::TabularQLearning(opts.into()),
-            BetaThompsonSampling => AgentDef::BetaThompsonSampling(opts.into()),
-            UCB1 => AgentDef::UCB1(From::from(opts)),
-            PolicyGradient => AgentDef::PolicyGradient(Box::new(opts.into())),
+            Random => Self::Random,
+            TabularQLearning => Self::TabularQLearning(opts.into()),
+            BetaThompsonSampling => Self::BetaThompsonSampling(opts.into()),
+            UCB1 => Self::UCB1(From::from(opts)),
+            PolicyGradient => Self::PolicyGradient(Box::new(opts.into())),
         }
     }
 }

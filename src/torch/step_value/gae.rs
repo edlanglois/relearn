@@ -39,13 +39,14 @@ where
 
 /// Generalized Advantage Estimator for step values.
 ///
-/// **Note**: Currently does not properly handle non-terminal end-of-episode.
-/// This assumes that all episodes end with a reward of 0.
+/// # Note
+/// Currently does not properly handle non-terminal end-of-episode.
+/// This assumes that all episodes end with a reward of `0`.
 ///
 /// # Reference
 /// High-Dimensional Continuous Control Using Generalized Advantage Estimation. ICLR  2016
 /// by John Schulman, Philipp Moritz, Sergey Levine, Michael I. Jordan, Pieter Abbeel
-/// https://arxiv.org/pdf/1506.02438.pdf
+/// <https://arxiv.org/pdf/1506.02438.pdf>
 #[derive(Debug)]
 pub struct Gae<V> {
     /// Clips the environment discount factor to be no more than this.
@@ -98,7 +99,7 @@ where
         // Packed step action advantages
         let advantages = packed::packed_tensor_discounted_cumsum_from_end(
             &residuals,
-            &features.batch_sizes(),
+            features.batch_sizes(),
             self.lambda * discount_factor,
         );
 

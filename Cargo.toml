@@ -17,8 +17,7 @@ ndarray-stats = "0.4"
 rand = "0.7.3"
 rust_rl_derive = { path = "rust_rl_derive" }
 statrs = "0.13.0"
-# To get https://github.com/LaurentMazare/tch-rs/issues/336
-tch = { git = "https://github.com/LaurentMazare/tch-rs.git", branch = "master" }
+tch = "0.4.1"
 thiserror = "1.0"
 
 [dev-dependencies]

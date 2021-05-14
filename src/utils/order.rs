@@ -3,8 +3,8 @@ use std::cmp::{Ordering, PartialOrd};
 
 /// Implements a total order for a partial order by panicking whenever elements cannot be compared.
 ///
-/// Note that [ExpectOrd::partial_cmp] will panic rather than return None.
-/// This is to ensure consistency between the [PartialOrd] methods
+/// Note that [`ExpectOrd::partial_cmp`] will panic rather than return None.
+/// This is to ensure consistency between the [`PartialOrd`] methods
 /// and the [Ord] methods, as required by Ord.
 #[derive(Debug)]
 pub struct ExpectOrd<T> {
@@ -12,20 +12,20 @@ pub struct ExpectOrd<T> {
 }
 
 impl<T> ExpectOrd<T> {
-    pub fn new(value: T) -> Self {
+    pub const fn new(value: T) -> Self {
         Self { value }
     }
 }
 
 impl<T: PartialOrd> PartialEq for ExpectOrd<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.cmp(&other) == Ordering::Equal
+        self.cmp(other) == Ordering::Equal
     }
 }
 
 impl<T: PartialOrd> PartialOrd for ExpectOrd<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 
@@ -46,9 +46,9 @@ impl<T> From<T> for ExpectOrd<T> {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod expect_ord {
     use super::*;
-    use f64;
     use rstest::rstest;
 
     #[rstest]

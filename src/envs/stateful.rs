@@ -1,10 +1,10 @@
-//! Converting an Environment into a StatefulEnvironment
+//! Converting an `Environment` into a `StatefulEnvironment`
 use super::{BuildEnvError, EnvBuilder, Environment, StatefulEnvironment};
 use crate::envs::EnvStructure;
 use crate::spaces::Space;
 use rand::prelude::*;
 
-/// Creates a StatefulEnvironment out of an Environment
+/// Creates a [`StatefulEnvironment`] out of an [`Environment`]
 pub struct EnvWithState<E: Environment> {
     pub env: E,
     state: Option<E::State>,
@@ -67,7 +67,7 @@ pub trait WithState {
 }
 
 impl<E: Environment> WithState for E {
-    type Output = EnvWithState<E>;
+    type Output = EnvWithState<Self>;
 
     fn with_state(self, seed: u64) -> Self::Output {
         Self::Output::new(self, seed)

@@ -123,6 +123,7 @@ impl SequenceModule for Lstm {
 }
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod lstm {
     use super::super::super::testing;
     use super::*;

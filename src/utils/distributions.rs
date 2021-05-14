@@ -11,6 +11,8 @@ where
 {
     type Error;
 
+    #[allow(clippy::missing_errors_doc)]
+    /// Construct a distribution having the given mean
     fn from_mean(mean: T) -> Result<Self, Self::Error>;
 }
 
@@ -30,7 +32,7 @@ pub trait Bounded<T: PartialOrd> {
 pub struct Deterministic<T>(T);
 
 impl<T> Deterministic<T> {
-    pub fn new(value: T) -> Self {
+    pub const fn new(value: T) -> Self {
         Self(value)
     }
 }
@@ -57,13 +59,22 @@ impl<T> FromMean<T> for Deterministic<T> {
 #[derive(Debug)]
 pub struct Bernoulli(BoolBernoulli);
 impl Bernoulli {
-    pub fn new(mean: f64) -> Result<Bernoulli, rand::distributions::BernoulliError> {
+    /// Create a new `Bernoulli` instance.
+    ///
+    /// # Errors
+    /// If `mean` is not in `[0, 1]`.
+    pub fn new(mean: f64) -> Result<Self, rand::distributions::BernoulliError> {
         Ok(Self(BoolBernoulli::new(mean)?))
     }
 }
 impl Distribution<f64> for Bernoulli {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> f64 {
-        self.0.sample(rng) as u8 as f64
+        // TODO: Benchmark vs cast
+        if self.0.sample(rng) {
+            1.0
+        } else {
+            0.0
+        }
     }
 }
 impl Bounded<f64> for Bernoulli {

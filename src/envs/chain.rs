@@ -21,7 +21,7 @@ pub struct Chain {
 }
 
 impl Chain {
-    pub fn new(size: u64, discount_factor: f64) -> Self {
+    pub const fn new(size: u64, discount_factor: f64) -> Self {
         Self {
             size,
             discount_factor,
@@ -95,15 +95,16 @@ pub enum Move {
 }
 
 impl Move {
-    fn swap(self) -> Self {
+    const fn swap(self) -> Self {
         match self {
-            Move::Left => Move::Right,
-            Move::Right => Move::Left,
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
         }
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod chain {
     use super::super::testing;
     use super::*;

@@ -1,4 +1,4 @@
-//! IndexedTypeSpace and Indexed trait
+//! `IndexedTypeSpace` and `Indexed` trait
 use super::{ElementRefInto, FiniteSpace, SampleSpace, Space};
 
 use crate::logging::Loggable;
@@ -127,9 +127,9 @@ mod indexed_type_space {
 
         fn from_index(index: usize) -> Option<Self> {
             match index {
-                0 => Some(TestEnum::A),
-                1 => Some(TestEnum::B),
-                2 => Some(TestEnum::C),
+                0 => Some(Self::A),
+                1 => Some(Self::B),
+                2 => Some(Self::C),
                 _ => None,
             }
         }
@@ -137,7 +137,7 @@ mod indexed_type_space {
 
     fn check_contains_samples<T: Indexed>() {
         let space = IndexedTypeSpace::<T>::new();
-        testing::check_contains_samples(space, 100);
+        testing::check_contains_samples(&space, 100);
     }
 
     #[test]
@@ -152,7 +152,7 @@ mod indexed_type_space {
 
     fn check_from_to_index_iter_size<T: Indexed>() {
         let space = IndexedTypeSpace::<T>::new();
-        testing::check_from_to_index_iter_size(space);
+        testing::check_from_to_index_iter_size(&space);
     }
 
     #[test]
@@ -167,7 +167,7 @@ mod indexed_type_space {
 
     fn check_from_index_sampled<T: Indexed>() {
         let space = IndexedTypeSpace::<T>::new();
-        testing::check_from_index_sampled(space, 100);
+        testing::check_from_index_sampled(&space, 100);
     }
 
     #[test]
@@ -204,19 +204,13 @@ mod derive_indexed_tests {
     #[test]
     fn empty_enum_from_index_invalid_0() {
         let result = EmptyEnum::from_index(0);
-        if let None = result {
-        } else {
-            panic!("Expected `None`, got {:?}", result);
-        }
+        assert!(result.is_none(), "Expected `None`, got {:?}", result);
     }
 
     #[test]
     fn empty_enum_from_index_invalid_1() {
         let result = EmptyEnum::from_index(1);
-        if let None = result {
-        } else {
-            panic!("Expected `None`, got {:?}", result);
-        }
+        assert!(result.is_none(), "Expected `None`, got {:?}", result);
     }
 
     #[test]
@@ -251,9 +245,6 @@ mod derive_indexed_tests {
     #[test]
     fn non_empty_enum_from_index_invalid_2() {
         let result = NonEmptyEnum::from_index(2);
-        if let None = result {
-        } else {
-            panic!("Expected `None`, got {:?}", result);
-        }
+        assert!(result.is_none(), "Expected `None`, got {:?}", result);
     }
 }

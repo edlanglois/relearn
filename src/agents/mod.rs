@@ -1,6 +1,7 @@
 //! Reinforcement learning agents
 //!
-//! More agents can be found in [crate::torch::agents].
+//! More agents can be found in [`crate::torch::agents`].
+
 mod bandits;
 mod builder;
 mod random;
@@ -41,8 +42,8 @@ pub struct Step<O, A> {
 /// episode.
 ///
 /// The generated actions should not assume that any updates will follow.
-/// In particular, this means that [Actor::act] may act more greedily compare to
-/// [Agent::act], which assumes that updates will follow.
+/// In particular, this means that [`Actor::act`] may act more greedily compare to
+/// [`Agent::act`], which assumes that updates will follow.
 pub trait Actor<O, A> {
     /// Choose an action in the environment.
     ///
@@ -60,7 +61,7 @@ pub trait Actor<O, A> {
 pub trait Agent<O, A> {
     /// Choose an action in the environment.
     ///
-    /// [Agent::update] must be called immediately after with the result.
+    /// [`Agent::update`] must be called immediately after with the result.
     /// Must be called sequentially on steps within an episode.
     ///
     /// # Args
@@ -71,7 +72,7 @@ pub trait Agent<O, A> {
     /// Update the agent based on the most recent action.
     ///
     /// # Args
-    /// * `step`: The environment step resulting from the  most recent call to [Actor::act].
+    /// * `step`: The environment step resulting from the  most recent call to [`Actor::act`].
     fn update(&mut self, step: Step<O, A>, logger: &mut dyn Logger);
 }
 

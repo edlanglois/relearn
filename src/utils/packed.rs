@@ -35,20 +35,21 @@ impl<T> PackedIter<T>
 where
     T: ExactSizeIterator,
 {
-    /// Create a new [PackedIter] instance.
+    /// Create a new [`PackedIter`] instance.
     ///
     /// # Args
     /// * `sequences` - A iterator of sequence iterators.
     ///     The inner sequence iterators must have fixed lengths.
     ///
-    /// **Note**: Sequences will be reordered (stably) so that
+    /// # Note
+    /// Sequences will be reordered (stably) so that
     /// they are in order of monotonically decreasing length.
     pub fn new<U>(sequences: U) -> Self
     where
         U: IntoIterator,
         <U as IntoIterator>::Item: IntoIterator<IntoIter = T>,
     {
-        let mut sequences: Vec<_> = sequences.into_iter().map(|s| s.into_iter()).collect();
+        let mut sequences: Vec<_> = sequences.into_iter().map(IntoIterator::into_iter).collect();
         // Sort in descending order of length.
         sequences.sort_by(|a, b| a.len().cmp(&b.len()).reverse());
         let batch_size = sequences.len();
@@ -59,7 +60,7 @@ where
         }
     }
 
-    /// Create a new [PackedIter] from sequences sorted in descending order of length.
+    /// Create a new [`PackedIter`] from sequences sorted in descending order of length.
     ///
     /// # Args
     /// * `sequences` - A iterator of sequence iterators.
@@ -70,7 +71,7 @@ where
         U: IntoIterator,
         <U as IntoIterator>::Item: IntoIterator<IntoIter = T>,
     {
-        let sequences: Vec<_> = sequences.into_iter().map(|s| s.into_iter()).collect();
+        let sequences: Vec<_> = sequences.into_iter().map(IntoIterator::into_iter).collect();
         let batch_size = sequences.len();
         Self {
             sequences,
@@ -136,7 +137,7 @@ pub struct PackingIndices<'a> {
 }
 
 impl<'a> PackingIndices<'a> {
-    /// Create a new [PackingIndices] instance from ranges sorted in decreasing order of length.
+    /// Create a new [`PackingIndices`] instance from ranges sorted in decreasing order of length.
     ///
     /// # Args
     /// * `sequence_ranges` - Index range for each sequence,
@@ -206,7 +207,7 @@ pub struct PackedBatchSizes<'a, T> {
 }
 
 impl<'a> PackedBatchSizes<'a, usize> {
-    /// Create a new [PackedBatchSizes] instance from monotonically decreasing sequence lengths.
+    /// Create a [`PackedBatchSizes`] instance from monotonically decreasing sequence lengths.
     pub fn from_sorted_lengths(sequence_lengths: &'a [usize]) -> Self {
         let offset = 0;
         let mut batch_size = sequence_lengths.len();
@@ -220,7 +221,7 @@ impl<'a> PackedBatchSizes<'a, usize> {
 }
 
 impl<'a> PackedBatchSizes<'a, Range<usize>> {
-    /// Create a new [PackedBatchSizes] instance from ranges with monotonically decreasing lengths.
+    /// Create a [`PackedBatchSizes`] instance from ranges with monotonically decreasing lengths.
     pub fn from_sorted_ranges(sequence_ranges: &'a [Range<usize>]) -> Self {
         let offset = 0;
         let mut batch_size = sequence_ranges.len();
@@ -303,7 +304,7 @@ impl Length for usize {
 /// Each tensor in the output has the same shape as `packed` except for the first dimension
 /// which has length `batch_sizes[i]`.
 pub fn packed_tensor_batched_steps(packed: &Tensor, batch_sizes: &[i64]) -> Vec<Tensor> {
-    packed.split_with_sizes(&batch_sizes, 0)
+    packed.split_with_sizes(batch_sizes, 0)
 }
 
 /// A view of a packed tensor starting from the given offset within each sequence.

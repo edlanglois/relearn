@@ -1,11 +1,15 @@
 //! Torch utilities.
 use std::borrow::Borrow;
-use tch::{kind::Kind, TchError, Tensor};
+use tch::{Kind, TchError, Tensor};
 
 /// Create a one-hot tensor from a tensor of indices,
 ///
-/// The same as one_hot but returns a result instead of panicking
+/// The same as [`one_hot`] but returns a result instead of panicking
 /// when there is an error.
+///
+/// # Errors
+/// Returns any error raised `tch` or the Torch C++ api.
+/// These are generally related to incorrect `Tensor` shapes or types.
 pub fn f_one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Result<Tensor, TchError> {
     let mut shape = labels.size();
     shape.push(num_classes as i64);
@@ -14,7 +18,9 @@ pub fn f_one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Result<Tens
 
 /// Create a one-hot tensor from a tensor of indices,
 ///
-/// Like Tensor::one_hot but allows the Kind to be set.
+/// Like [`Tensor::one_hot`] but allows the [`Kind`] to be set.
+///
+/// [`Kind`]: tch::Kind
 ///
 /// # Args
 /// * `labels` - An i64 tensor with any shape `[*BATCH_SHAPE]`.
@@ -25,11 +31,20 @@ pub fn f_one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Result<Tens
 /// A tensor with shape `[*BATCH_SHAPE, num_classes]`
 /// equal to 1 at indices `[*idx, labels[*idx]]` and 0 everywhere else.
 ///
+/// # Warning
+/// Undefined tensors are silently flattened to nothing.
+///
+/// # Panics
+/// If [`f_one_hot`] fails.
 pub fn one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Tensor {
     f_one_hot(labels, num_classes, kind).unwrap()
 }
 
 /// Flatten a set of tensors into a single vector.
+///
+/// # Errors
+/// Returns any error raised `tch` or the Torch C++ api.
+/// These are generally related to incorrect `Tensor` shapes or types.
 pub fn f_flatten_tensors<I>(tensors: I) -> Result<Tensor, TchError>
 where
     I: IntoIterator,
@@ -45,6 +60,9 @@ where
 }
 
 /// Flatten a set of tensors into a single tensor.
+///
+/// # Panics
+/// If [`f_flatten_tensors`] fails.
 pub fn flatten_tensors<I>(tensors: I) -> Tensor
 where
     I: IntoIterator,
@@ -68,6 +86,10 @@ fn shape_size(shape: &[i64]) -> i64 {
 
 /// Unflatten a vector into a set of tensors with the given shapes.
 ///
+/// # Errors
+/// Returns any error raised `tch` or the Torch C++ api.
+/// These are generally related to incorrect `Tensor` shapes or types.
+///
 /// # Panics
 /// Panics if any shape has a dimension with negative size.
 pub fn f_unflatten_tensors(vector: &Tensor, shapes: &[Vec<i64>]) -> Result<Vec<Tensor>, TchError> {
@@ -76,17 +98,25 @@ pub fn f_unflatten_tensors(vector: &Tensor, shapes: &[Vec<i64>]) -> Result<Vec<T
         .f_split_with_sizes(&sizes, 0)?
         .iter()
         .zip(shapes)
-        .map(|(t, shape)| t.f_reshape(&shape))
+        .map(|(t, shape)| t.f_reshape(shape))
         .collect()
 }
 
+/// Unflatten a vector into a set of tensors with the given shapes.
+///
+/// # Panics
+/// If [`f_unflatten_tensors`] fails.
 pub fn unflatten_tensors(vector: &Tensor, shapes: &[Vec<i64>]) -> Vec<Tensor> {
     f_unflatten_tensors(vector, shapes).unwrap()
 }
 
 /// Dot product of two flattened tensors.
+///
+/// # Errors
+/// Returns any error raised `tch` or the Torch C++ api.
+/// These are generally related to incorrect `Tensor` shapes or types.
 pub fn f_flat_dot(a: &Tensor, b: &Tensor) -> Result<Tensor, TchError> {
-    a.f_flatten(0, 1)?.f_dot(&b.f_flatten(0, -1)?)
+    a.f_flatten(0, -1)?.f_dot(&b.f_flatten(0, -1)?)
 }
 
 /// Dot product of two flattened tensors.
@@ -95,24 +125,9 @@ pub fn f_flat_dot(a: &Tensor, b: &Tensor) -> Result<Tensor, TchError> {
 /// The shapes may differ so long as the total number of elements are the same.
 ///
 /// # Panics
-/// If [f_flat_dot] fails.
+/// If [`f_flat_dot`] fails.
 pub fn flat_dot(a: &Tensor, b: &Tensor) -> Tensor {
     f_flat_dot(a, b).unwrap()
-}
-
-/// Zero the gradient of a tensor.
-pub fn f_zero_grad(x: &Tensor) -> Result<(), TchError> {
-    let mut grad = x.f_grad()?;
-    if grad.defined() {
-        let _ = grad.f_detach_()?;
-        let _ = grad.f_zero_()?;
-    }
-    Ok(())
-}
-
-/// Zero the gradient of a tensor.
-pub fn zero_grad(x: &Tensor) {
-    f_zero_grad(x).unwrap()
 }
 
 #[cfg(test)]
@@ -122,7 +137,7 @@ mod one_hot {
     #[test]
     fn scalar_i32() {
         assert_eq!(
-            one_hot(&Tensor::from(1i64), 4, Kind::Int),
+            one_hot(&Tensor::from(1_i64), 4, Kind::Int),
             Tensor::of_slice(&[0, 1, 0, 0])
         );
     }
@@ -130,7 +145,7 @@ mod one_hot {
     #[test]
     fn scalar_i64() {
         assert_eq!(
-            one_hot(&Tensor::from(1i64), 4, Kind::Int64),
+            one_hot(&Tensor::from(1_i64), 4, Kind::Int64),
             Tensor::of_slice(&[0, 1, 0, 0])
         );
     }
@@ -138,33 +153,33 @@ mod one_hot {
     #[test]
     fn scalar_f32() {
         assert_eq!(
-            one_hot(&Tensor::from(3i64), 4, Kind::Float),
-            Tensor::of_slice(&[0.0, 0.0, 0.0, 1.0f32])
+            one_hot(&Tensor::from(3_i64), 4, Kind::Float),
+            Tensor::of_slice(&[0.0, 0.0, 0.0, 1.0_f32])
         );
     }
 
     #[test]
     #[should_panic]
     fn scalar_from_f32_fails() {
-        let _ = one_hot(&Tensor::from(1.0f32), 4, Kind::Float);
+        let _ = one_hot(&Tensor::from(1.0_f32), 4, Kind::Float);
     }
 
     #[test]
     #[should_panic]
     fn scalar_index_too_big_fails() {
-        let _ = one_hot(&Tensor::from(4i64), 4, Kind::Float);
+        let _ = one_hot(&Tensor::from(4_i64), 4, Kind::Float);
     }
 
     #[test]
     #[should_panic]
     fn scalar_index_negative_fails() {
-        let _ = one_hot(&Tensor::from(-1i64), 4, Kind::Float);
+        let _ = one_hot(&Tensor::from(-1_i64), 4, Kind::Float);
     }
 
     #[test]
     fn one_dim() {
         assert_eq!(
-            one_hot(&Tensor::of_slice(&[2i64, 1]), 3, Kind::Int),
+            one_hot(&Tensor::of_slice(&[2_i64, 1]), 3, Kind::Int),
             Tensor::of_slice(&[0, 0, 1, 0, 1, 0]).view((2, 3))
         );
     }
@@ -172,7 +187,7 @@ mod one_hot {
     #[test]
     fn two_dims() {
         assert_eq!(
-            one_hot(&Tensor::of_slice(&[2i64, 1]).view((1, 2)), 3, Kind::Int),
+            one_hot(&Tensor::of_slice(&[2_i64, 1]).view((1, 2)), 3, Kind::Int),
             Tensor::of_slice(&[0, 0, 1, 0, 1, 0]).view((1, 2, 3))
         );
     }
@@ -214,34 +229,5 @@ mod flat_dot {
         let b = Tensor::of_slice(&[10, 9, 8, 7]).reshape(&[2, 2]);
         let expected = Tensor::scalar_tensor(10 + 9 * 2 + 8 * 3 + 4 * 7, (Kind::Int, Device::Cpu));
         assert_eq!(flat_dot(&a, &b), expected);
-    }
-}
-
-#[cfg(test)]
-mod zero_grad {
-    use super::*;
-    use tch::{Cuda, Device, Kind};
-
-    #[test]
-    fn zeros_nonzero_grad() {
-        // Work-around for https://github.com/pytorch/pytorch/issues/35736
-        Cuda::is_available();
-
-        let mut x = Tensor::zeros(&[3], (Kind::Float, Device::Cpu));
-        let _ = x.requires_grad_(true);
-        let y = x.sum(Kind::Float);
-        y.backward();
-        // First verify that the gradient is nonzero
-        assert_eq!(x.grad(), Tensor::ones_like(&x));
-
-        zero_grad(&x);
-        assert_eq!(x.grad(), Tensor::zeros_like(&x));
-    }
-
-    #[test]
-    fn test_no_grad_ok() {
-        let x = Tensor::zeros(&[3], (Kind::Float, Device::Cpu));
-        // Just check that it doesn't crash
-        zero_grad(&x);
     }
 }

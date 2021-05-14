@@ -1,4 +1,5 @@
 //! Logging statistics from simulation runs
+#![allow(clippy::use_self)] // false positive in Enum derive for Event
 pub mod cli;
 
 pub use cli::CLILogger;
@@ -29,14 +30,14 @@ pub enum Loggable {
 }
 
 impl From<f64> for Loggable {
-    fn from(value: f64) -> Loggable {
-        Loggable::Scalar(value)
+    fn from(value: f64) -> Self {
+        Self::Scalar(value)
     }
 }
 
 impl From<f32> for Loggable {
-    fn from(value: f32) -> Loggable {
-        Loggable::Scalar(value as f64)
+    fn from(value: f32) -> Self {
+        Self::Scalar(value.into())
     }
 }
 
@@ -76,7 +77,7 @@ pub struct LogError<'a> {
 }
 
 impl<'a> LogError<'a> {
-    pub fn new(name: &'a str, value: Loggable, expected: String) -> Self {
+    pub const fn new(name: &'a str, value: Loggable, expected: String) -> Self {
         Self {
             name,
             value,

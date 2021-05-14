@@ -13,13 +13,13 @@ pub enum SeqModDef {
 
 impl Default for SeqModDef {
     fn default() -> Self {
-        SeqModDef::Mlp(Default::default())
+        Self::Mlp(MlpConfig::default())
     }
 }
 
 impl From<MlpConfig> for SeqModDef {
     fn from(c: MlpConfig) -> Self {
-        SeqModDef::Mlp(c)
+        Self::Mlp(c)
     }
 }
 

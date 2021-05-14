@@ -11,7 +11,7 @@ use std::fmt;
 pub struct RandomAgentConfig;
 
 impl RandomAgentConfig {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 }
