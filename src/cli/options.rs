@@ -143,7 +143,7 @@ pub struct Options {
 }
 
 impl Options {
-    pub fn value_fn_view(&self) -> ValueFnView {
+    pub const fn value_fn_view(&self) -> ValueFnView {
         ValueFnView(self)
     }
 }

@@ -12,20 +12,20 @@ pub struct ExpectOrd<T> {
 }
 
 impl<T> ExpectOrd<T> {
-    pub fn new(value: T) -> Self {
+    pub const fn new(value: T) -> Self {
         Self { value }
     }
 }
 
 impl<T: PartialOrd> PartialEq for ExpectOrd<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.cmp(&other) == Ordering::Equal
+        self.cmp(other) == Ordering::Equal
     }
 }
 
 impl<T: PartialOrd> PartialOrd for ExpectOrd<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 

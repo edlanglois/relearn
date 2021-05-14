@@ -18,7 +18,7 @@ pub struct PolicyValueNetActorConfig<PB, VB> {
 }
 
 impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
-    pub fn new(
+    pub const fn new(
         steps_per_epoch: usize,
         value_train_iters: u64,
         policy_config: PB,
@@ -137,7 +137,7 @@ where
     {
         let observation_space = env.observation_space;
         let action_space = env.action_space;
-        let max_steps_per_epoch = (config.steps_per_epoch as f64 * 1.1) as usize;
+        let max_steps_per_epoch = config.steps_per_epoch + config.steps_per_epoch / 10;
 
         let policy = config.policy_config.build_module(
             policy_vs,
@@ -147,7 +147,7 @@ where
 
         let value = config
             .value_config
-            .build_step_value(&value_vs, observation_space.num_features());
+            .build_step_value(value_vs, observation_space.num_features());
         let discount_factor = value.discount_factor(env.discount_factor);
 
         Self {

@@ -99,7 +99,7 @@ where
         // Packed step action advantages
         let advantages = packed::packed_tensor_discounted_cumsum_from_end(
             &residuals,
-            &features.batch_sizes(),
+            features.batch_sizes(),
             self.lambda * discount_factor,
         );
 

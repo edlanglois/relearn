@@ -10,6 +10,8 @@ pub trait PartialMax {
     /// A maximum element of an iterator when one exists.
     ///
     /// If several elements are equally maximum then the last one is returned.
+    ///
+    /// # Errors
     /// Returns a [`PartialMaxError`] if there are no elements or the elements are not comparable.
     fn partial_max(self) -> Result<Self::Item, PartialMaxError>;
 }
@@ -21,13 +23,13 @@ where
 {
     type Item = T;
 
-    fn partial_max(mut self: I) -> Result<Self::Item, PartialMaxError> {
+    fn partial_max(mut self) -> Result<Self::Item, PartialMaxError> {
         match self.try_fold(None, |acc: Option<T>, x| match acc {
             None => Ok(Some(x)),
             Some(a) => match a.partial_cmp(&x) {
                 None => Err(()),
                 Some(Ordering::Greater) => Ok(Some(a)),
-                _ => Ok(Some(x)),
+                Some(_) => Ok(Some(x)),
             },
         }) {
             Ok(Some(x)) => Ok(x),
@@ -62,7 +64,7 @@ pub trait ArgMaxBy {
 }
 
 impl<I: Iterator> ArgMaxBy for I {
-    type Item = <I as Iterator>::Item;
+    type Item = <Self as Iterator>::Item;
 
     fn argmax_by<F>(self, mut compare: F) -> Option<usize>
     where

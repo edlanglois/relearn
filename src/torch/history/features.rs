@@ -126,13 +126,13 @@ where
 
     fn observation_features(&self) -> &Tensor {
         self.cached_observation_features.borrow_with(|| {
-            packed_observation_features(&self.steps, &self.episode_ranges, self.observation_space)
+            packed_observation_features(self.steps, &self.episode_ranges, self.observation_space)
         })
     }
 
     fn actions(&self) -> &Tensor {
         self.cached_actions
-            .borrow_with(|| packed_actions(&self.steps, &self.episode_ranges, self.action_space))
+            .borrow_with(|| packed_actions(self.steps, &self.episode_ranges, self.action_space))
     }
 
     fn returns(&self) -> &Tensor {
@@ -143,7 +143,7 @@ where
 
     fn rewards(&self) -> &Tensor {
         self.cached_rewards
-            .borrow_with(|| packed_rewards(&self.steps, &self.episode_ranges))
+            .borrow_with(|| packed_rewards(self.steps, &self.episode_ranges))
     }
 }
 
@@ -238,7 +238,7 @@ where
 {
     let _no_grad = tch::no_grad_guard();
     observation_space
-        .batch_features(PackingIndices::from_sorted(&episode_ranges).map(|i| &steps[i].observation))
+        .batch_features(PackingIndices::from_sorted(episode_ranges).map(|i| &steps[i].observation))
 }
 
 pub fn packed_actions<O, AS>(
@@ -250,14 +250,15 @@ where
     AS: ReprSpace<Tensor>,
 {
     let _no_grad = tch::no_grad_guard();
-    action_space.batch_repr(PackingIndices::from_sorted(&episode_ranges).map(|i| &steps[i].action))
+    action_space.batch_repr(PackingIndices::from_sorted(episode_ranges).map(|i| &steps[i].action))
 }
 
 /// Packed step rewards. A 1D f32 tensor.
 pub fn packed_rewards<S, A>(steps: &[Step<S, A>], episode_ranges: &[Range<usize>]) -> Tensor {
     let _no_grad = tch::no_grad_guard();
+    #[allow(clippy::cast_possible_truncation)]
     Tensor::of_slice(
-        &PackingIndices::from_sorted(&episode_ranges)
+        &PackingIndices::from_sorted(episode_ranges)
             .map(|i| steps[i].reward as f32)
             .collect::<Vec<_>>(),
     )
@@ -278,7 +279,7 @@ where
 {
     // Put into Option so that we can take the action when packing.
     let mut some_actions: Vec<_> = steps.into_iter().map(|step| Some(step.action)).collect();
-    PackingIndices::from_sorted(&episode_ranges)
+    PackingIndices::from_sorted(episode_ranges)
         .map(|i| some_actions[i].take().unwrap())
         .collect()
 }

@@ -16,7 +16,7 @@ pub struct MlpConfig {
 
 impl Default for MlpConfig {
     fn default() -> Self {
-        MlpConfig {
+        Self {
             hidden_sizes: vec![128],
             activation: Activation::Relu,
             output_activation: Activation::Identity,
@@ -40,7 +40,7 @@ impl ModuleBuilder<nn::Sequential> for MlpConfig {
                 vs / format!("layer_{}", i),
                 layer_in_dim as i64,
                 layer_out_dim as i64,
-                Default::default(),
+                nn::LinearConfig::default(),
             ));
         }
 

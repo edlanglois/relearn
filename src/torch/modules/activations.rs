@@ -17,7 +17,7 @@ pub enum Activation {
 
 impl Activation {
     /// Create a module encapsulating this function if not the identity.
-    pub fn maybe_module(&self) -> Option<nn::Func<'static>> {
+    pub fn maybe_module(self) -> Option<nn::Func<'static>> {
         use Activation::*;
         match self {
             Identity => None,
@@ -25,10 +25,10 @@ impl Activation {
         }
     }
     /// Create a module encapsulating this function.
-    pub fn module(&self) -> nn::Func<'static> {
+    pub fn module(self) -> nn::Func<'static> {
         use Activation::*;
         match self {
-            Identity => nn::func(|x| x.shallow_clone()),
+            Identity => nn::func(Tensor::shallow_clone),
             Relu => nn::func(Tensor::relu),
             Sigmoid => nn::func(Tensor::sigmoid),
             Tanh => nn::func(Tensor::tanh),

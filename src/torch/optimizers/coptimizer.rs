@@ -5,7 +5,7 @@ use tch::{nn::VarStore, COptimizer, TchError, Tensor};
 
 impl BaseOptimizer for COptimizer {
     fn zero_grad(&mut self) {
-        COptimizer::zero_grad(self).unwrap();
+        Self::zero_grad(self).unwrap();
     }
 }
 
@@ -13,7 +13,7 @@ impl OnceOptimizer for COptimizer {
     fn step_once(&self) -> Result<(), OptimizerStepError> {
         // I'm not sure what errors it is possible for torch to raise here
         // Anything that isn't essentially a type error should be converted to OptimizerStepError.
-        COptimizer::step(self).unwrap();
+        Self::step(self).unwrap();
         Ok(())
     }
 
@@ -26,7 +26,7 @@ impl OnceOptimizer for COptimizer {
 
 impl<T> OptimizerBuilder<COptimizer> for T
 where
-    for<'a> &'a T: TryInto<COptimizer, Error = TchError>,
+    for<'a> &'a Self: TryInto<COptimizer, Error = TchError>,
 {
     type Error = TchError;
 
@@ -70,7 +70,7 @@ impl Default for SgdConfig {
 impl TryFrom<&SgdConfig> for COptimizer {
     type Error = TchError;
     fn try_from(config: &SgdConfig) -> Result<Self, Self::Error> {
-        COptimizer::sgd(
+        Self::sgd(
             config.learning_rate,
             config.momentum,
             config.dampening,
@@ -114,7 +114,7 @@ impl Default for RmsPropConfig {
 impl TryFrom<&RmsPropConfig> for COptimizer {
     type Error = TchError;
     fn try_from(config: &RmsPropConfig) -> Result<Self, Self::Error> {
-        COptimizer::rms_prop(
+        Self::rms_prop(
             config.learning_rate,
             config.alpha,
             config.eps,
@@ -152,7 +152,7 @@ impl Default for AdamConfig {
 impl TryFrom<&AdamConfig> for COptimizer {
     type Error = TchError;
     fn try_from(config: &AdamConfig) -> Result<Self, Self::Error> {
-        COptimizer::adam(
+        Self::adam(
             config.learning_rate,
             config.beta1,
             config.beta2,
@@ -189,7 +189,7 @@ impl Default for AdamWConfig {
 impl TryFrom<&AdamWConfig> for COptimizer {
     type Error = TchError;
     fn try_from(config: &AdamWConfig) -> Result<Self, Self::Error> {
-        COptimizer::adamw(
+        Self::adamw(
             config.learning_rate,
             config.beta1,
             config.beta2,

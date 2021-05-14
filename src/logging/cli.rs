@@ -2,7 +2,7 @@
 use super::{Event, LogError, Loggable, Logger};
 use enum_map::{enum_map, EnumMap};
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::ops::{AddAssign, Drop};
 use std::time::{Duration, Instant};
@@ -49,11 +49,11 @@ impl CLILogger {
             }
             print!(
                 " ({:?} / event)",
-                event_log.summary_duration / (summary_size as u32)
+                event_log.summary_duration / summary_size.try_into().unwrap()
             );
             println!(" ====");
 
-            for (name, aggregator) in event_log.aggregators.iter_mut() {
+            for (name, aggregator) in &mut event_log.aggregators {
                 println!("{}: {}", name, aggregator);
                 aggregator.clear()
             }
@@ -76,16 +76,13 @@ impl Logger for CLILogger {
         // The duplicated lookup with insert will only occur once per name since we never remove
         // aggregators.
         let aggregators = &mut self.events[event].aggregators;
-        match aggregators.get_mut(name) {
-            Some(aggregator) => {
-                if let Err((value, expected)) = aggregator.update(value) {
-                    return Err(LogError::new(name, value, expected));
-                }
+        if let Some(aggregator) = aggregators.get_mut(name) {
+            if let Err((value, expected)) = aggregator.update(value) {
+                return Err(LogError::new(name, value, expected));
             }
-            None => {
-                let old_value = aggregators.insert(name.into(), Aggregator::new(value));
-                assert!(old_value.is_none());
-            }
+        } else {
+            let old_value = aggregators.insert(name.into(), Aggregator::new(value));
+            assert!(old_value.is_none());
         }
         Ok(())
     }
@@ -94,7 +91,7 @@ impl Logger for CLILogger {
         let event_info = &mut self.events[event];
         event_info.index += 1;
 
-        for (_, aggregator) in event_info.aggregators.iter_mut() {
+        for aggregator in event_info.aggregators.values_mut() {
             aggregator.commit()
         }
 
@@ -127,6 +124,7 @@ struct EventLog {
 }
 
 impl EventLog {
+    #[allow(clippy::missing_const_for_fn)] // Duration & BTreeMap const new not stabilized
     pub fn new() -> Self {
         Self {
             index: 0,
@@ -153,6 +151,8 @@ enum Aggregator {
 use Aggregator::*;
 
 impl Aggregator {
+    // future-proofing in case loggable ends up containing non-copy values
+    #[allow(clippy::needless_pass_by_value)]
     /// Create a new aggregator from a logged value value.
     fn new(value: Loggable) -> Self {
         match value {
@@ -276,7 +276,7 @@ struct MeanAccumulator {
 }
 
 impl MeanAccumulator {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { sum: 0.0, count: 0 }
     }
 }
@@ -357,7 +357,7 @@ impl Accumulator for IndexDistributionAccumulator {
     }
 
     fn reset(&mut self) {
-        for count in self.counts.iter_mut() {
+        for count in &mut self.counts {
             *count = 0;
         }
     }
@@ -391,7 +391,7 @@ impl fmt::Display for IndexDistributionAccumulator {
         if total > 0 {
             write!(f, "[")?;
             let mut first = true;
-            for c in self.counts.iter() {
+            for c in &self.counts {
                 if first {
                     first = false;
                 } else {

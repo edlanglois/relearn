@@ -19,7 +19,7 @@ pub struct UCB1AgentConfig {
 }
 
 impl UCB1AgentConfig {
-    pub fn new(exploration_rate: f64) -> Self {
+    pub const fn new(exploration_rate: f64) -> Self {
         Self { exploration_rate }
     }
 }

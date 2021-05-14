@@ -11,7 +11,7 @@ pub enum StepValueType {
 }
 
 impl StepValueDef {
-    pub fn type_(&self) -> StepValueType {
+    pub const fn type_(&self) -> StepValueType {
         use StepValueDef::*;
         match self {
             Return => StepValueType::Return,
@@ -24,14 +24,15 @@ impl From<&Options> for StepValueDef {
     fn from(opts: &Options) -> Self {
         use StepValueType::*;
         match opts.step_value {
-            Some(Return) | None => StepValueDef::Return,
-            Some(Gae) => StepValueDef::Gae(opts.into()),
+            Some(Return) | None => Self::Return,
+            Some(Gae) => Self::Gae(opts.into()),
         }
     }
 }
 
 impl Update<&Options> for StepValueDef {
     fn update(&mut self, opts: &Options) {
+        use StepValueDef::*;
         if let Some(ref step_value_type) = opts.step_value {
             if *step_value_type != self.type_() {
                 // If the type is different, re-create the config entirely.
@@ -40,7 +41,6 @@ impl Update<&Options> for StepValueDef {
             }
         }
 
-        use StepValueDef::*;
         match self {
             Return => {}
             Gae(config) => config.update(opts),

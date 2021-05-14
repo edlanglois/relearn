@@ -9,6 +9,7 @@ use crate::{Actor, Agent, EnvStructure};
 ///
 /// The environment is a deterministic multi-armed bandit with two arms:
 /// the first arm always gives 0 reward and the second 1.
+#[allow(clippy::cast_possible_truncation)]
 pub fn train_deterministic_bandit<A, F>(make_agent: F, num_train_steps: u64, threshold: f64)
 where
     A: Agent<(), usize> + Actor<(), usize>,

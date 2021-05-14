@@ -125,7 +125,7 @@ pub struct StepLogger<OS, AS> {
 }
 
 impl<OS, AS> StepLogger<OS, AS> {
-    pub fn new(observation_space: OS, action_space: AS) -> Self {
+    pub const fn new(observation_space: OS, action_space: AS) -> Self {
         Self {
             observation_space,
             action_space,

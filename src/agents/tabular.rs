@@ -17,7 +17,7 @@ pub struct TabularQLearningAgentConfig {
 }
 
 impl TabularQLearningAgentConfig {
-    pub fn new(exploration_rate: f64) -> Self {
+    pub const fn new(exploration_rate: f64) -> Self {
         Self { exploration_rate }
     }
 }
@@ -151,7 +151,7 @@ where
         self.state_action_counts[idx] += 1;
 
         let value = step.reward + discounted_next_value;
-        let weight = (self.state_action_counts[idx] as f64).recip();
+        let weight = f64::from(self.state_action_counts[idx]).recip();
         self.state_action_values[idx] *= 1.0 - weight;
         self.state_action_values[idx] += weight * value;
     }

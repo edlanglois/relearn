@@ -12,7 +12,7 @@ pub struct IndexSpace {
 }
 
 impl IndexSpace {
-    pub fn new(size: usize) -> Self {
+    pub const fn new(size: usize) -> Self {
         Self { size }
     }
 }
@@ -73,18 +73,18 @@ mod index_space {
     #[rstest]
     fn contains_samples(#[values(1, 5)] size: usize) {
         let space = IndexSpace::new(size);
-        testing::check_contains_samples(space, 100);
+        testing::check_contains_samples(&space, 100);
     }
 
     #[rstest]
     fn from_to_index_iter_size(#[values(1, 5)] size: usize) {
         let space = IndexSpace::new(size);
-        testing::check_from_to_index_iter_size(space);
+        testing::check_from_to_index_iter_size(&space);
     }
 
     #[rstest]
     fn from_index_sampled(#[values(1, 5)] size: usize) {
         let space = IndexSpace::new(size);
-        testing::check_from_index_sampled(space, 100);
+        testing::check_from_index_sampled(&space, 100);
     }
 }

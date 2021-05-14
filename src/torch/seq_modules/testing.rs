@@ -3,7 +3,7 @@ use super::{IterativeModule, SequenceModule, StatefulIterativeModule};
 use std::iter;
 use tch::{self, kind::Kind, nn::Module, Device, IndexOp, Tensor};
 
-/// Basic structural check of [tch::nn::Module::forward] via Tensor::apply
+/// Basic structural check of [`tch::nn::Module::forward`] via [`Tensor::apply`].
 pub fn check_forward<M: Module>(
     module: &M,
     in_dim: usize,
@@ -24,7 +24,7 @@ pub fn check_forward<M: Module>(
     assert_eq!(output.size(), output_shape);
 }
 
-/// Basic check of SequenceModule::seq_serial
+/// Basic check of [`SequenceModule::seq_serial`]
 ///
 /// * Checks that the output size is correct.
 /// * Checks that identical inner sequences produce identical output.
@@ -54,18 +54,18 @@ pub fn check_seq_serial<M: SequenceModule>(module: &M, in_dim: usize, out_dim: u
     assert_eq!(output.i((.., 1..3, ..)), output.i((.., 4..6, ..)));
 }
 
-/// Basic check of SequenceModule::seq_packed
+/// Basic check of [`SequenceModule::seq_packed`]
 ///
 /// * Checks that the output size is correct.
 /// * Checks that identical inner sequences produce identical output.
 pub fn check_seq_packed<M: SequenceModule>(module: &M, in_dim: usize, out_dim: usize) {
     let _no_grad_guard = tch::no_grad_guard();
     // Input consists of 3 sequences: [0.1, 0.2, 0.3, 0.4], [0.1, 0.2, 0.3], and [0.1].
-    let data = [0.1f32, 0.1, 0.1, 0.2, 0.2, 0.3, 0.3, 0.4];
+    let data = [0.1_f32, 0.1, 0.1, 0.2, 0.2, 0.3, 0.3, 0.4];
     let inputs = Tensor::of_slice(&data)
         .unsqueeze(-1)
         .expand(&[-1, in_dim as i64], false);
-    let batch_sizes = Tensor::of_slice(&[3i64, 2, 2, 1]);
+    let batch_sizes = Tensor::of_slice(&[3_i64, 2, 2, 1]);
 
     let output = module.seq_packed(&inputs, &batch_sizes);
 
@@ -88,7 +88,7 @@ pub fn check_seq_packed<M: SequenceModule>(module: &M, in_dim: usize, out_dim: u
     );
 }
 
-/// Basic structural check of IterativeModule::step
+/// Basic structural check of [`IterativeModule::step`]
 ///
 /// * Checks that the output size is correct.
 /// * Checks that the output state of a step can be used in the next step.
@@ -110,7 +110,7 @@ pub fn check_step<M: IterativeModule>(module: &M, in_dim: usize, out_dim: usize)
     assert_eq!(output2.size(), vec![batch_size as i64, out_dim as i64]);
 }
 
-/// Basic check of StatefulIterativeModule::step
+/// Basic check of [`StatefulIterativeModule::step`]
 ///
 /// * Checks that the output size is correct.
 /// * Checks that multiple steps work.

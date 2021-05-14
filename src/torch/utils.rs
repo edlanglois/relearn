@@ -6,6 +6,10 @@ use tch::{Kind, TchError, Tensor};
 ///
 /// The same as [`one_hot`] but returns a result instead of panicking
 /// when there is an error.
+///
+/// # Errors
+/// Returns any error raised `tch` or the Torch C++ api.
+/// These are generally related to incorrect `Tensor` shapes or types.
 pub fn f_one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Result<Tensor, TchError> {
     let mut shape = labels.size();
     shape.push(num_classes as i64);
@@ -29,11 +33,18 @@ pub fn f_one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Result<Tens
 ///
 /// # Warning
 /// Undefined tensors are silently flattened to nothing.
+///
+/// # Panics
+/// If [`f_one_hot`] fails.
 pub fn one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Tensor {
     f_one_hot(labels, num_classes, kind).unwrap()
 }
 
 /// Flatten a set of tensors into a single vector.
+///
+/// # Errors
+/// Returns any error raised `tch` or the Torch C++ api.
+/// These are generally related to incorrect `Tensor` shapes or types.
 pub fn f_flatten_tensors<I>(tensors: I) -> Result<Tensor, TchError>
 where
     I: IntoIterator,
@@ -49,6 +60,9 @@ where
 }
 
 /// Flatten a set of tensors into a single tensor.
+///
+/// # Panics
+/// If [`f_flatten_tensors`] fails.
 pub fn flatten_tensors<I>(tensors: I) -> Tensor
 where
     I: IntoIterator,
@@ -72,6 +86,10 @@ fn shape_size(shape: &[i64]) -> i64 {
 
 /// Unflatten a vector into a set of tensors with the given shapes.
 ///
+/// # Errors
+/// Returns any error raised `tch` or the Torch C++ api.
+/// These are generally related to incorrect `Tensor` shapes or types.
+///
 /// # Panics
 /// Panics if any shape has a dimension with negative size.
 pub fn f_unflatten_tensors(vector: &Tensor, shapes: &[Vec<i64>]) -> Result<Vec<Tensor>, TchError> {
@@ -80,15 +98,23 @@ pub fn f_unflatten_tensors(vector: &Tensor, shapes: &[Vec<i64>]) -> Result<Vec<T
         .f_split_with_sizes(&sizes, 0)?
         .iter()
         .zip(shapes)
-        .map(|(t, shape)| t.f_reshape(&shape))
+        .map(|(t, shape)| t.f_reshape(shape))
         .collect()
 }
 
+/// Unflatten a vector into a set of tensors with the given shapes.
+///
+/// # Panics
+/// If [`f_unflatten_tensors`] fails.
 pub fn unflatten_tensors(vector: &Tensor, shapes: &[Vec<i64>]) -> Vec<Tensor> {
     f_unflatten_tensors(vector, shapes).unwrap()
 }
 
 /// Dot product of two flattened tensors.
+///
+/// # Errors
+/// Returns any error raised `tch` or the Torch C++ api.
+/// These are generally related to incorrect `Tensor` shapes or types.
 pub fn f_flat_dot(a: &Tensor, b: &Tensor) -> Result<Tensor, TchError> {
     a.f_flatten(0, -1)?.f_dot(&b.f_flatten(0, -1)?)
 }
@@ -111,7 +137,7 @@ mod one_hot {
     #[test]
     fn scalar_i32() {
         assert_eq!(
-            one_hot(&Tensor::from(1i64), 4, Kind::Int),
+            one_hot(&Tensor::from(1_i64), 4, Kind::Int),
             Tensor::of_slice(&[0, 1, 0, 0])
         );
     }
@@ -119,7 +145,7 @@ mod one_hot {
     #[test]
     fn scalar_i64() {
         assert_eq!(
-            one_hot(&Tensor::from(1i64), 4, Kind::Int64),
+            one_hot(&Tensor::from(1_i64), 4, Kind::Int64),
             Tensor::of_slice(&[0, 1, 0, 0])
         );
     }
@@ -127,33 +153,33 @@ mod one_hot {
     #[test]
     fn scalar_f32() {
         assert_eq!(
-            one_hot(&Tensor::from(3i64), 4, Kind::Float),
-            Tensor::of_slice(&[0.0, 0.0, 0.0, 1.0f32])
+            one_hot(&Tensor::from(3_i64), 4, Kind::Float),
+            Tensor::of_slice(&[0.0, 0.0, 0.0, 1.0_f32])
         );
     }
 
     #[test]
     #[should_panic]
     fn scalar_from_f32_fails() {
-        let _ = one_hot(&Tensor::from(1.0f32), 4, Kind::Float);
+        let _ = one_hot(&Tensor::from(1.0_f32), 4, Kind::Float);
     }
 
     #[test]
     #[should_panic]
     fn scalar_index_too_big_fails() {
-        let _ = one_hot(&Tensor::from(4i64), 4, Kind::Float);
+        let _ = one_hot(&Tensor::from(4_i64), 4, Kind::Float);
     }
 
     #[test]
     #[should_panic]
     fn scalar_index_negative_fails() {
-        let _ = one_hot(&Tensor::from(-1i64), 4, Kind::Float);
+        let _ = one_hot(&Tensor::from(-1_i64), 4, Kind::Float);
     }
 
     #[test]
     fn one_dim() {
         assert_eq!(
-            one_hot(&Tensor::of_slice(&[2i64, 1]), 3, Kind::Int),
+            one_hot(&Tensor::of_slice(&[2_i64, 1]), 3, Kind::Int),
             Tensor::of_slice(&[0, 0, 1, 0, 1, 0]).view((2, 3))
         );
     }
@@ -161,7 +187,7 @@ mod one_hot {
     #[test]
     fn two_dims() {
         assert_eq!(
-            one_hot(&Tensor::of_slice(&[2i64, 1]).view((1, 2)), 3, Kind::Int),
+            one_hot(&Tensor::of_slice(&[2_i64, 1]).view((1, 2)), 3, Kind::Int),
             Tensor::of_slice(&[0, 0, 1, 0, 1, 0]).view((1, 2, 3))
         );
     }

@@ -13,7 +13,7 @@ pub enum SeqModType {
 }
 
 impl SeqModDef {
-    pub fn type_(&self) -> SeqModType {
+    pub const fn type_(&self) -> SeqModType {
         use SeqModDef::*;
         match self {
             Mlp(_) => SeqModType::Mlp,
@@ -27,15 +27,16 @@ impl From<&Options> for SeqModDef {
     fn from(opts: &Options) -> Self {
         use SeqModType::*;
         match opts.policy {
-            Some(Mlp) | None => SeqModDef::Mlp(opts.into()),
-            Some(GruMlp) => SeqModDef::GruMlp(opts.into()),
-            Some(LstmMlp) => SeqModDef::LstmMlp(opts.into()),
+            Some(Mlp) | None => Self::Mlp(opts.into()),
+            Some(GruMlp) => Self::GruMlp(opts.into()),
+            Some(LstmMlp) => Self::LstmMlp(opts.into()),
         }
     }
 }
 
 impl Update<&Options> for SeqModDef {
     fn update(&mut self, opts: &Options) {
+        use SeqModDef::*;
         if let Some(ref policy_type) = opts.policy {
             if *policy_type != self.type_() {
                 // If the type is different, re-create the config entirely.
@@ -44,11 +45,9 @@ impl Update<&Options> for SeqModDef {
             }
         }
 
-        use SeqModDef::*;
         match self {
             Mlp(ref mut config) => config.update(opts),
-            GruMlp(ref mut config) => config.update(opts),
-            LstmMlp(ref mut config) => config.update(opts),
+            GruMlp(ref mut config) | LstmMlp(ref mut config) => config.update(opts),
         }
     }
 }

@@ -153,8 +153,8 @@ mod testing {
         //          [-1  2]      [-3]
         //
         // which is minimized at x = [-1  1]'
-        let m = Tensor::of_slice(&[1.0f32, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
-        let b = Tensor::of_slice(&[2.0f32, -3.0]);
+        let m = Tensor::of_slice(&[1.0_f32, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
+        let b = Tensor::of_slice(&[2.0_f32, -3.0]);
 
         let vs = VarStore::new(Device::Cpu);
         let x = vs.root().f_zeros("x", &[2]).unwrap();
@@ -185,8 +185,8 @@ mod testing {
         //          [-1  2]      [-3]
         //
         // which is minimized at x = [-1  1]'
-        let m = Tensor::of_slice(&[1.0f32, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
-        let b = Tensor::of_slice(&[2.0f32, -3.0]);
+        let m = Tensor::of_slice(&[1.0_f32, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
+        let b = Tensor::of_slice(&[2.0_f32, -3.0]);
 
         let vs = VarStore::new(Device::Cpu);
         let x = vs.root().zeros("x", &[2]);
@@ -200,7 +200,7 @@ mod testing {
         };
 
         for _ in 0..num_steps {
-            let _ = x_last.detach().copy_(&x);
+            x_last.detach().copy_(&x);
             let result = optimizer.trust_region_backward_step(&loss_distance_fn, 0.001);
             match result {
                 Err(OptimizerStepError::LossNotImproving {

@@ -21,7 +21,7 @@ pub struct Simulator<E, A, L, H> {
 }
 
 impl<E, A, L, H> Simulator<E, A, L, H> {
-    pub fn new(environment: E, agent: A, logger: L, hook: H) -> Self {
+    pub const fn new(environment: E, agent: A, logger: L, hook: H) -> Self {
         Self {
             environment,
             agent,
@@ -149,9 +149,9 @@ where
             episode_done,
         };
 
-        let stop = !hook.call(&step, logger);
+        let stop_simulation = !hook.call(&step, logger);
         agent.update(step, logger);
-        if stop {
+        if stop_simulation {
             break;
         }
 

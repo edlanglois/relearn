@@ -38,12 +38,12 @@ fn impl_indexed_macro(ast: &syn::DeriveInput) -> TokenStream {
         let as_index_arms = variant_identifiers
             .iter()
             .enumerate()
-            .map(|(i, ident)| quote! {#name::#ident => #i});
+            .map(|(i, ident)| quote! {Self::#ident => #i});
 
         let from_index_arms = variant_identifiers
             .iter()
             .enumerate()
-            .map(|(i, ident)| quote! {#i => Some(#name::#ident),});
+            .map(|(i, ident)| quote! {#i => Some(Self::#ident),});
 
         let gen = quote! {
             impl #impl_generics crate::spaces::Indexed for #name #ty_generics #where_clause {

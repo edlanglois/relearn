@@ -21,7 +21,7 @@ pub trait OptimizerOptions {
 }
 
 impl OptimizerDef {
-    pub fn type_(&self) -> OptimizerType {
+    pub const fn type_(&self) -> OptimizerType {
         use OptimizerDef::*;
         match self {
             Sgd(_) => OptimizerType::Sgd,
@@ -36,16 +36,18 @@ impl<T: OptimizerOptions> From<&T> for OptimizerDef {
     fn from(opts: &T) -> Self {
         use OptimizerType::*;
         match opts.type_() {
-            Some(Sgd) => OptimizerDef::Sgd(opts.into()),
-            Some(RmsProp) => OptimizerDef::RmsProp(opts.into()),
-            Some(Adam) | None => OptimizerDef::Adam(opts.into()),
-            Some(AdamW) => OptimizerDef::AdamW(opts.into()),
+            Some(Sgd) => Self::Sgd(opts.into()),
+            Some(RmsProp) => Self::RmsProp(opts.into()),
+            Some(Adam) | None => Self::Adam(opts.into()),
+            Some(AdamW) => Self::AdamW(opts.into()),
         }
     }
 }
 
 impl<T: OptimizerOptions> Update<&T> for OptimizerDef {
     fn update(&mut self, opts: &T) {
+        use OptimizerDef::*;
+
         if let Some(ref optimizer_type) = opts.type_() {
             if *optimizer_type != self.type_() {
                 // If the type is different, re-create the config entirely.
@@ -53,8 +55,6 @@ impl<T: OptimizerOptions> Update<&T> for OptimizerDef {
                 return;
             }
         }
-
-        use OptimizerDef::*;
         match self {
             Sgd(ref mut config) => config.update(opts),
             RmsProp(ref mut config) => config.update(opts),

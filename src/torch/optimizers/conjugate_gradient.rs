@@ -31,7 +31,7 @@
 use super::super::utils;
 use super::{BaseOptimizer, OptimizerBuilder, OptimizerStepError, TrustRegionOptimizer};
 use std::borrow::Borrow;
-use std::convert::Infallible;
+use std::convert::{Infallible, TryInto};
 use tch::{nn::VarStore, Tensor};
 
 /// Configuration for the Conjugate Gradient Optimizer
@@ -95,7 +95,7 @@ impl ConjugateGradientOptimizer {
 
 impl BaseOptimizer for ConjugateGradientOptimizer {
     fn zero_grad(&mut self) {
-        for param in self.params.iter_mut() {
+        for param in &mut self.params {
             param.zero_grad();
         }
     }
@@ -184,7 +184,7 @@ impl ConjugateGradientOptimizer {
         let mut loss = initial_loss;
         let mut constraint_val = f64::INFINITY;
         for i in 0..self.config.max_backtracks {
-            let ratio = self.config.backtrack_ratio.powi(i as i32);
+            let ratio = self.config.backtrack_ratio.powi(i.try_into().unwrap());
 
             for ((step, prev_param), param) in descent_step
                 .iter()
@@ -326,7 +326,7 @@ pub trait MatrixVectorProduct {
 }
 
 impl MatrixVectorProduct for Tensor {
-    type Vector = Tensor;
+    type Vector = Self;
 
     fn mat_vec_mul(&self, vector: &Self::Vector) -> Self::Vector {
         self.mv(vector)
@@ -470,9 +470,7 @@ mod cg_optimizer {
         trpo_run(
             &optimizer,
             loss_distance_fn,
-            || {
-                let _ = x_prev.detach().copy_(&x);
-            },
+            || x_prev.detach().copy_(&x),
             100,
             0.1,
         );
@@ -499,8 +497,8 @@ mod hessian_vector_product {
 
         // f(x) = 1/2*x'Mx + b'x
         // H_f(x) = M
-        let m = Tensor::of_slice(&[1.0f32, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
-        let b = Tensor::of_slice(&[2.0f32, -3.0]);
+        let m = Tensor::of_slice(&[1.0_f32, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
+        let b = Tensor::of_slice(&[2.0_f32, -3.0]);
         let x = Tensor::zeros(&[2], (Kind::Float, Device::Cpu)).requires_grad_(true);
         let y = m.mv(&x).dot(&x) / 2 + b.dot(&x);
         let params = [&x];
@@ -508,12 +506,12 @@ mod hessian_vector_product {
         let hvp = HessianVectorProduct::new(&y, &params, 0.0);
 
         assert_eq!(
-            hvp.mat_vec_mul(&Tensor::of_slice(&[1.0f32, 0.0])),
-            Tensor::of_slice(&[1.0f32, -1.0])
+            hvp.mat_vec_mul(&Tensor::of_slice(&[1.0_f32, 0.0])),
+            Tensor::of_slice(&[1.0_f32, -1.0])
         );
         assert_eq!(
-            hvp.mat_vec_mul(&Tensor::of_slice(&[0.0f32, 1.0])),
-            Tensor::of_slice(&[-1.0f32, 2.0])
+            hvp.mat_vec_mul(&Tensor::of_slice(&[0.0_f32, 1.0])),
+            Tensor::of_slice(&[-1.0_f32, 2.0])
         );
     }
 }
@@ -525,12 +523,12 @@ mod conjugate_gradient {
 
     #[test]
     fn solve_2x2() {
-        let a = Tensor::of_slice(&[1.0f64, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
-        let b = Tensor::of_slice(&[-1.0f64, 4.0]);
+        let a = Tensor::of_slice(&[1.0_f64, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
+        let b = Tensor::of_slice(&[-1.0_f64, 4.0]);
         let tol = 1e-4;
         let x = solve_conjugate_gradient(&a, &b, 10, tol);
 
-        let expected = Tensor::of_slice(&[2.0f64, 3.0]);
+        let expected = Tensor::of_slice(&[2.0_f64, 3.0]);
         assert!(
             f64::from((&x - &expected).norm()) < tol,
             "expected: {:?}, actual: {:?}",

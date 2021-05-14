@@ -20,7 +20,7 @@ pub struct PolicyGradientAgentConfig<PB, POB, VB, VOB> {
 }
 
 impl<PB, POB, VB, VOB> PolicyGradientAgentConfig<PB, POB, VB, VOB> {
-    pub fn new(
+    pub const fn new(
         actor_config: PolicyValueNetActorConfig<PB, VB>,
         policy_optimizer_config: POB,
         value_optimizer_config: VOB,

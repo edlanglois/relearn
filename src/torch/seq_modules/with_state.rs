@@ -81,7 +81,7 @@ mod with_state {
     use super::super::{testing, Gru, MlpConfig, RnnConfig};
     use super::*;
     use rstest::{fixture, rstest};
-    use tch::{nn, Device};
+    use tch::{nn, nn::LinearConfig, Device};
 
     #[fixture]
     fn linear() -> (WithState<nn::Linear>, usize, usize) {
@@ -92,7 +92,7 @@ mod with_state {
             &vs.root(),
             in_dim as i64,
             out_dim as i64,
-            Default::default(),
+            LinearConfig::default(),
         );
         (linear.into(), in_dim, out_dim)
     }

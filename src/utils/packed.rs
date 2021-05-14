@@ -49,7 +49,7 @@ where
         U: IntoIterator,
         <U as IntoIterator>::Item: IntoIterator<IntoIter = T>,
     {
-        let mut sequences: Vec<_> = sequences.into_iter().map(|s| s.into_iter()).collect();
+        let mut sequences: Vec<_> = sequences.into_iter().map(IntoIterator::into_iter).collect();
         // Sort in descending order of length.
         sequences.sort_by(|a, b| a.len().cmp(&b.len()).reverse());
         let batch_size = sequences.len();
@@ -71,7 +71,7 @@ where
         U: IntoIterator,
         <U as IntoIterator>::Item: IntoIterator<IntoIter = T>,
     {
-        let sequences: Vec<_> = sequences.into_iter().map(|s| s.into_iter()).collect();
+        let sequences: Vec<_> = sequences.into_iter().map(IntoIterator::into_iter).collect();
         let batch_size = sequences.len();
         Self {
             sequences,

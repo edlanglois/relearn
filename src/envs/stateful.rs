@@ -67,7 +67,7 @@ pub trait WithState {
 }
 
 impl<E: Environment> WithState for E {
-    type Output = EnvWithState<E>;
+    type Output = EnvWithState<Self>;
 
     fn with_state(self, seed: u64) -> Self::Output {
         Self::Output::new(self, seed)

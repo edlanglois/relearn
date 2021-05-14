@@ -4,6 +4,7 @@ use crate::defs::{env::DistributionType, EnvDef};
 use crate::envs::{Chain, FixedMeansBanditConfig, MemoryGame, PriorMeansBanditConfig};
 use clap::Clap;
 use rand::distributions::Standard;
+use std::convert::TryInto;
 
 /// Environment name
 #[derive(Clap, Debug, Eq, PartialEq, Clone, Copy)]
@@ -26,8 +27,8 @@ impl From<&Options> for EnvDef {
         match opts.environment {
             DeterministicBandit => bandit_env_def(DistributionType::Deterministic, opts),
             BernoulliBandit => bandit_env_def(DistributionType::Bernoulli, opts),
-            Chain => EnvDef::Chain(opts.into()),
-            MemoryGame => EnvDef::MemoryGame(opts.into()),
+            Chain => Self::Chain(opts.into()),
+            MemoryGame => Self::MemoryGame(opts.into()),
         }
     }
 }
@@ -62,7 +63,7 @@ impl From<&Options> for PriorMeansBanditConfig<Standard> {
 impl Update<&Options> for PriorMeansBanditConfig<Standard> {
     fn update(&mut self, opts: &Options) {
         if let Some(num_actions) = opts.num_actions {
-            self.num_arms = num_actions as usize;
+            self.num_arms = num_actions.try_into().unwrap();
         }
     }
 }
@@ -93,10 +94,10 @@ impl From<&Options> for MemoryGame {
 impl Update<&Options> for MemoryGame {
     fn update(&mut self, opts: &Options) {
         if let Some(num_actions) = opts.num_actions {
-            self.num_actions = num_actions as usize;
+            self.num_actions = num_actions.try_into().unwrap();
         }
         if let Some(episode_len) = opts.episode_len {
-            self.history_len = (episode_len - 1) as usize;
+            self.history_len = (episode_len - 1).try_into().unwrap();
         }
     }
 }

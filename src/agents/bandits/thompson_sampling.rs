@@ -19,7 +19,7 @@ pub struct BetaThompsonSamplingAgentConfig {
 }
 
 impl BetaThompsonSamplingAgentConfig {
-    pub fn new(num_samples: usize) -> Self {
+    pub const fn new(num_samples: usize) -> Self {
         Self { num_samples }
     }
 }

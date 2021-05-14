@@ -15,7 +15,7 @@ pub struct FixedMeansBanditConfig {
 
 impl Default for FixedMeansBanditConfig {
     fn default() -> Self {
-        FixedMeansBanditConfig {
+        Self {
             means: vec![0.2, 0.8],
         }
     }
@@ -27,7 +27,7 @@ where
     <D as FromMean<f64>>::Error: Into<BuildEnvError>,
 {
     fn build_env(&self, _seed: u64) -> Result<Bandit<D>, BuildEnvError> {
-        Bandit::from_means(&self.means).map_err(|e: <D as FromMean<f64>>::Error| e.into())
+        Bandit::from_means(&self.means).map_err(Into::into)
     }
 }
 /// Configuration for a Bandit environment with arm means drawn IID from some distribution.
@@ -62,7 +62,7 @@ where
                 .into_iter()
                 .map(|_| mean_prior.sample(&mut rng)),
         )
-        .map_err(|e: <DR as FromMean<f64>>::Error| e.into())
+        .map_err(Into::into)
     }
 }
 
@@ -192,11 +192,13 @@ mod bernoulli_bandit {
         }
         // Check that the number of 1 rewards is plausible.
         // Approximate the binomial as Gaussian and
-        // check that the number of successes is +- 3 standard deviations of the mean.
-        let bin_mean = (num_samples as f64) * mean;
-        let bin_stddev = ((num_samples as f64) * mean * (1.0 - mean)).sqrt();
-        assert!((reward_1_count as f64) > bin_mean - 3.0 * bin_stddev);
-        assert!((reward_1_count as f64) < bin_mean + 3.0 * bin_stddev);
+        // check that the number of successes is +- 3.5 standard deviations of the mean.
+        let bin_mean = f64::from(num_samples) * mean;
+        let bin_stddev = (f64::from(num_samples) * mean * (1.0 - mean)).sqrt();
+        assert!(
+            ((bin_mean - 3.5 * bin_stddev)..=(bin_mean + 3.5 * bin_stddev))
+                .contains(&reward_1_count.into())
+        );
     }
 }
 
@@ -216,9 +218,9 @@ mod deterministic_bandit {
     fn rewards() {
         let mut rng = StdRng::seed_from_u64(0);
         let env = DeterministicBandit::from_values(vec![0.2, 0.8]);
-        let (_, reward, _) = env.step((), &0, &mut rng);
-        assert_eq!(reward, 0.2);
-        let (_, reward, _) = env.step((), &1, &mut rng);
-        assert_eq!(reward, 0.8);
+        let (_, reward_0, _) = env.step((), &0, &mut rng);
+        assert_eq!(reward_0, 0.2);
+        let (_, reward_1, _) = env.step((), &1, &mut rng);
+        assert_eq!(reward_1, 0.8);
     }
 }
