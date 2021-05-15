@@ -75,7 +75,7 @@ where
     /// Policy optimizer
     policy_optimizer: PO,
 
-    /// Step value module optimizer.
+    /// Step value function optimizer.
     value_optimizer: VO,
 }
 
