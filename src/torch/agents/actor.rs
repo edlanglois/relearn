@@ -4,7 +4,7 @@ use super::super::seq_modules::StatefulIterativeModule;
 use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::ModuleBuilder;
 use crate::logging::{Event, Logger};
-use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, Space};
+use crate::spaces::{FeatureSpace, ParameterizedDistributionSpace, Space};
 use crate::{Actor, EnvStructure, Step};
 use tch::{nn::Path, Tensor};
 
@@ -57,7 +57,7 @@ impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
     ) -> PolicyValueNetActor<OS, AS, P, V>
     where
         OS: FeatureSpace<Tensor>,
-        AS: ParameterizedSampleSpace<Tensor>,
+        AS: ParameterizedDistributionSpace<Tensor>,
         PB: ModuleBuilder<P>,
         VB: StepValueBuilder<V>,
         V: StepValue,
@@ -115,7 +115,7 @@ where
 impl<OS, AS, P, V> PolicyValueNetActor<OS, AS, P, V>
 where
     OS: FeatureSpace<Tensor>,
-    AS: ParameterizedSampleSpace<Tensor>,
+    AS: ParameterizedDistributionSpace<Tensor>,
     V: StepValue,
 {
     /// Create a new `PolicyValueNetActor`
@@ -142,7 +142,7 @@ where
         let policy = config.policy_config.build_module(
             policy_vs,
             observation_space.num_features(),
-            action_space.num_sample_params(),
+            action_space.num_distribution_params(),
         );
 
         let value = config
@@ -167,7 +167,7 @@ where
 impl<OS, AS, P, V> Actor<OS::Element, AS::Element> for PolicyValueNetActor<OS, AS, P, V>
 where
     OS: FeatureSpace<Tensor>,
-    AS: ParameterizedSampleSpace<Tensor>,
+    AS: ParameterizedDistributionSpace<Tensor>,
     P: StatefulIterativeModule,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
@@ -178,7 +178,7 @@ where
         }
         tch::no_grad(|| {
             let output = self.policy.step(&observation_features);
-            ParameterizedSampleSpace::sample(&self.action_space, &output)
+            self.action_space.sample_element(&output)
         })
     }
 }

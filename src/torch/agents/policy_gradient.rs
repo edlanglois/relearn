@@ -6,7 +6,8 @@ use super::super::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use super::actor::{PolicyValueNetActor, PolicyValueNetActorConfig};
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::Logger;
-use crate::spaces::{FeatureSpace, ParameterizedSampleSpace, ReprSpace, Space};
+use crate::spaces::{FeatureSpace, ParameterizedDistributionSpace, ReprSpace, Space};
+use crate::utils::distributions::BatchDistribution;
 use crate::EnvStructure;
 use std::cell::Cell;
 use tch::{kind::Kind, nn, Device, Tensor};
@@ -38,7 +39,7 @@ impl<OS, AS, PB, P, POB, PO, VB, V, VOB, VO>
     for PolicyGradientAgentConfig<PB, POB, VB, VOB>
 where
     OS: FeatureSpace<Tensor>,
-    AS: ParameterizedSampleSpace<Tensor>,
+    AS: ParameterizedDistributionSpace<Tensor>,
     PB: ModuleBuilder<P>,
     P: SequenceModule + StatefulIterativeModule,
     POB: OptimizerBuilder<PO>,
@@ -81,7 +82,7 @@ where
 impl<OS, AS, P, PO, V, VO> PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
-    AS: ParameterizedSampleSpace<Tensor>,
+    AS: ParameterizedDistributionSpace<Tensor>,
     V: StepValue,
 {
     pub fn new<PB, VB, POB, VOB>(
@@ -115,7 +116,7 @@ impl<OS, AS, P, PO, V, VO> Actor<OS::Element, AS::Element>
     for PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
-    AS: ParameterizedSampleSpace<Tensor>,
+    AS: ParameterizedDistributionSpace<Tensor>,
     P: StatefulIterativeModule,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
@@ -127,7 +128,7 @@ impl<OS, AS, P, PO, V, VO> Agent<OS::Element, AS::Element>
     for PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: FeatureSpace<Tensor>,
-    AS: ReprSpace<Tensor> + ParameterizedSampleSpace<Tensor>,
+    AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
     P: SequenceModule + StatefulIterativeModule,
     PO: Optimizer,
     V: StepValue,
@@ -157,7 +158,7 @@ fn policy_gradient_update<OS, AS, P, V, PO>(
 ) -> Tensor
 where
     OS: FeatureSpace<Tensor>,
-    AS: ReprSpace<Tensor> + ParameterizedSampleSpace<Tensor>,
+    AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
     P: SequenceModule,
     V: StepValue,
     PO: Optimizer,
@@ -171,10 +172,9 @@ where
 
     let entropies = Cell::new(None);
     let policy_loss_fn = || {
-        let (log_probs, entropies_) = actor
-            .action_space
-            .batch_statistics(&policy_output, features.actions());
-        entropies.set(Some(entropies_));
+        let action_distributions = actor.action_space.distribution(&policy_output);
+        let log_probs = action_distributions.log_probs(features.actions());
+        entropies.set(Some(action_distributions.entropy()));
         -(log_probs * &step_values).mean(Kind::Float)
     };
 

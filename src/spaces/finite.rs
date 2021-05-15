@@ -1,6 +1,7 @@
 //! `FiniteSpace` trait definition
-use super::{FeatureSpace, ParameterizedSampleSpace, ReprSpace, Space};
-use crate::torch::utils as torch_utils;
+use super::{FeatureSpace, ParameterizedDistributionSpace, ReprSpace, Space};
+use crate::torch;
+use crate::utils::distributions::BatchDistribution;
 use std::convert::TryInto;
 use tch::{Device, Kind, Tensor};
 
@@ -46,7 +47,7 @@ impl<S: FiniteSpace> FeatureSpace<Tensor> for S {
     }
 
     fn features(&self, element: &Self::Element) -> Tensor {
-        torch_utils::one_hot(
+        torch::utils::one_hot(
             &Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu)),
             self.num_features(),
             Kind::Float,
@@ -62,7 +63,7 @@ impl<S: FiniteSpace> FeatureSpace<Tensor> for S {
             .into_iter()
             .map(|element| self.to_index(element) as i64)
             .collect();
-        torch_utils::one_hot(
+        torch::utils::one_hot(
             &Tensor::of_slice(&indices),
             self.num_features(),
             Kind::Float,
@@ -71,34 +72,26 @@ impl<S: FiniteSpace> FeatureSpace<Tensor> for S {
 }
 
 /// Parameterize a categorical distribution.
-impl<S: FiniteSpace> ParameterizedSampleSpace<Tensor> for S {
-    fn num_sample_params(&self) -> usize {
+impl<S: FiniteSpace> ParameterizedDistributionSpace<Tensor> for S {
+    type Distribution = torch::distributions::Categorical;
+
+    fn num_distribution_params(&self) -> usize {
         self.size()
     }
 
-    fn sample(&self, parameters: &Tensor) -> Self::Element {
+    fn sample_element(&self, params: &Tensor) -> Self::Element {
         self.from_index(
-            Into::<i64>::into(parameters.softmax(-1, Kind::Float).multinomial(1, true))
+            self.distribution(params)
+                .sample()
+                .int64_value(&[])
                 .try_into()
                 .unwrap(),
         )
         .unwrap()
     }
 
-    fn batch_log_probs(&self, parameters: &Tensor, elements: &Tensor) -> Tensor {
-        let logits = parameters.log_softmax(-1, Kind::Float);
-        logits
-            .gather(-1, &elements.unsqueeze(-1), false)
-            .squeeze1(-1)
-    }
-
-    fn batch_statistics(&self, parameters: &Tensor, elements: &Tensor) -> (Tensor, Tensor) {
-        let logits = parameters.log_softmax(-1, Kind::Float);
-        let log_probs = logits
-            .gather(-1, &elements.unsqueeze(-1), false)
-            .squeeze1(-1);
-        let entropy = -(&logits * logits.exp()).sum1(&[-1], false, Kind::Float);
-        (log_probs, entropy)
+    fn distribution(&self, params: &Tensor) -> Self::Distribution {
+        Self::Distribution::new(params)
     }
 }
 
@@ -201,29 +194,29 @@ mod parameterized_sample_space_tensor {
     #[test]
     fn num_sample_params() {
         let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
-        assert_eq!(3, space.num_sample_params());
+        assert_eq!(3, space.num_distribution_params());
     }
 
     #[test]
-    fn sample_deterministic() {
+    fn sample_element_deterministic() {
         let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
         let params = Tensor::of_slice(&[f32::NEG_INFINITY, 0.0, f32::NEG_INFINITY]);
         for _ in 0..10 {
-            assert_eq!(Trit::One, space.sample(&params));
+            assert_eq!(Trit::One, space.sample_element(&params));
         }
     }
 
     #[test]
-    fn sample_two_of_three() {
+    fn sample_element_two_of_three() {
         let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
         let params = Tensor::of_slice(&[f32::NEG_INFINITY, 0.0, 0.0]);
         for _ in 0..10 {
-            assert!(Trit::Zero != space.sample(&params));
+            assert!(Trit::Zero != space.sample_element(&params));
         }
     }
 
     #[test]
-    fn sample_check_distribution() {
+    fn sample_element_check_distribution() {
         let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
         // Probabilities: [0.09, 0.24, 0.67]
         let params = Tensor::of_slice(&[-1.0, 0.0, 1.0]);
@@ -231,7 +224,7 @@ mod parameterized_sample_space_tensor {
         let mut two_count = 0;
         let mut three_count = 0;
         for _ in 0..1000 {
-            match space.sample(&params) {
+            match space.sample_element(&params) {
                 Trit::Zero => one_count += 1,
                 Trit::One => two_count += 1,
                 Trit::Two => three_count += 1,
@@ -241,69 +234,5 @@ mod parameterized_sample_space_tensor {
         assert!((58..=121).contains(&one_count));
         assert!((197..=292).contains(&two_count));
         assert!((613..=717).contains(&three_count));
-    }
-
-    #[test]
-    fn batch_log_probs() {
-        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
-        let params = Tensor::of_slice(&[
-            // elem: One
-            f32::NEG_INFINITY,
-            0.0,
-            f32::NEG_INFINITY,
-            // elem: Zero
-            f32::NEG_INFINITY,
-            0.0,
-            f32::NEG_INFINITY,
-            // elem: Two
-            f32::NEG_INFINITY,
-            0.0,
-            0.0,
-            // elem: Zero
-            f32::NEG_INFINITY,
-            0.0,
-            0.0,
-            // elem: Zero
-            -1.0,
-            0.0,
-            1.0,
-            // elem: One
-            -1.0,
-            0.0,
-            1.0,
-            // elem: Two
-            -1.0,
-            0.0,
-            1.0,
-        ])
-        .reshape(&[-1, 3]);
-        let elements_list = [
-            Trit::One,
-            Trit::Zero,
-            Trit::Two,
-            Trit::Zero,
-            Trit::Zero,
-            Trit::One,
-            Trit::Two,
-        ];
-        let elements = space.batch_repr(&elements_list);
-
-        // Log normalizing constant for the [-1, 0.0, 1] distribution
-        let log_normalizer = f32::ln(f32::exp(-1.0) + 1.0 + f32::exp(1.0));
-        let expected = Tensor::of_slice(&[
-            0.0,
-            f32::NEG_INFINITY,
-            -f32::ln(2.0),
-            f32::NEG_INFINITY,
-            -1.0 - log_normalizer,
-            -log_normalizer,
-            1.0 - log_normalizer,
-        ]);
-
-        let actual = space.batch_log_probs(&params, &elements);
-
-        assert!(Into::<bool>::into(
-            expected.isclose(&actual, 1e-6, 1e-6, false).all()
-        ));
     }
 }

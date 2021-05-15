@@ -13,7 +13,8 @@ pub use indexed_type::{Indexed, IndexedTypeSpace};
 pub use rl::RLSpace;
 pub use singleton::SingletonSpace;
 
-use rand::distributions::Distribution;
+use crate::utils::distributions::BatchDistribution;
+use rand::distributions::Distribution as RandDistribution;
 
 /// A space: a set of values with some added structure.
 ///
@@ -26,7 +27,7 @@ pub trait Space {
 }
 
 /// A space from which samples can be drawn.
-pub trait SampleSpace: Space + Distribution<<Self as Space>::Element> {}
+pub trait SampleSpace: Space + RandDistribution<<Self as Space>::Element> {}
 
 /// A space whose elements can be represented as value of type `T`
 ///
@@ -67,42 +68,35 @@ pub trait FeatureSpace<T, T2 = T>: Space {
         Self::Element: 'a;
 }
 
-/// Sample elements from parameter vectors.
-///
-/// Uses an arbitrary non-seeded source of randomness.
-pub trait ParameterizedSampleSpace<T, P = T, E = T>: Space {
+/// A space whose elements parameterize a distribution
+pub trait ParameterizedDistributionSpace<T>: Space {
+    /// Batched distribution type.
+    ///
+    /// The element representation must match the format of [`ReprSpace<_, T>`].
+    /// That is, `batch_repr(&[...])` must be a valid input for [`BatchDistribution::log_probs`].
+    type Distribution: BatchDistribution<T, T>;
+
     /// Size of the parameter vector for which elements are sampled.
-    fn num_sample_params(&self) -> usize;
+    fn num_distribution_params(&self) -> usize;
 
-    /// Sample an element from a parameter vector.
-    ///
-    /// The input array must have length equal to `num_sample_params()`.
-    fn sample(&self, parameters: &P) -> Self::Element;
-
-    /// Log probabilities of elements under corresponding parameterized distributions.
+    /// Sample a single element given a parameter vector.
     ///
     /// # Args
-    /// * `parameters` - A two-dimensional array of shape `[N, num_sample_params()]`
-    /// * `elements`   - N elements represented as an array as produced by [`ReprSpace`].
+    /// * `params` - A one-dimensional parameter vector of length `self.num_distribution_params()`.
     ///
-    /// # Returns
-    /// A one-dimensional array of length N containing the log probability of each element
-    /// under the distribution defined by the corresponding parameter vector.
-    fn batch_log_probs(&self, parameters: &P, elements: &E) -> T;
+    /// # Panics
+    /// Panics if `params` does not have the correct shape.
+    fn sample_element(&self, params: &T) -> Self::Element;
 
-    /// Batch statistics from parameterized distributions.
+    /// The distribution parameterized by the given parameter vector.
     ///
     /// # Args
-    /// * `parameters`  - A two-dimensional array of shape `[N, num_sample_params()]`
-    /// * `elements`   - N elements represented as an array as produced by [`ReprSpace`].
+    /// * `params` - Batched parameter vectors.
+    ///              An array with shape `[BATCH_SIZE.., self.num_distribution_params()]`.
     ///
     /// # Returns
-    /// * `log_probs` - A one-dimensional array of length N containing the log probability
-    ///                 of each element under the distribution defined by the corresponding
-    ///                 parameter vector.
-    /// * `entropy`   - A one-dimensional array of length N containing the entropy
-    ///                 of each parameterized distribution.
-    fn batch_statistics(&self, parameters: &E, elements: &E) -> (T, T);
+    /// The distribution(s) parameterized by `params`.
+    fn distribution(&self, params: &T) -> Self::Distribution;
 }
 
 // This could possibly be a single trait like
@@ -111,7 +105,7 @@ pub trait ParameterizedSampleSpace<T, P = T, E = T>: Space {
 //     fn convert(&self, x: T) -> U;
 // }
 //
-// But doint it for references requires higher order bounds:
+// But doing it for references requires higher order bounds:
 // for<'a> Convert<&'a Self::Element, Foo>
 // which I have had trouble getting to work in all cases.
 

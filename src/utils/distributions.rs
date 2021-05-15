@@ -4,6 +4,41 @@ use rand::prelude::*;
 use std::cmp::PartialOrd;
 use std::convert::Infallible;
 
+/// A batch of distributions with associated statistics.
+///
+/// Any batch shape is allowed, including 0-dimensions for a single distribution.
+pub trait BatchDistribution<E, T> {
+    /// Sample a batch of elements.
+    fn sample(&self) -> E;
+
+    /// Log probabilities of the given elements
+    ///
+    /// # Args
+    /// * `elements` - Elements from the distribution domains. One per distribution.
+    ///                An array with the same (or broadcastable) shape as the batch shape.
+    ///
+    /// # Returns
+    /// An array of log probabilities with shape equal to the batch shape.
+    fn log_probs(&self, elements: &E) -> T;
+
+    /// Distribution entropies.
+    ///
+    /// # Returns
+    /// An array of entropies with shape equal to the batch shape.
+    fn entropy(&self) -> T;
+
+    /// The KL divergence (relative entropy) from another batch of distributions.
+    ///
+    /// `KL(self || other)`
+    ///
+    /// # Args
+    /// * `other` - A batch of distributions with the same (or broadcastable) batch shape.
+    ///
+    /// # Returns
+    /// An array of KL divergences `KL(self[i] || other[i])` having shape equal to the batch shape.
+    fn kl_divergence_from(&self, other: &Self) -> T;
+}
+
 /// Distributions that can be constructed from a mean.
 pub trait FromMean<T>
 where

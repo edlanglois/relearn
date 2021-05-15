@@ -1,5 +1,6 @@
 //! Torch components
 pub mod agents;
+pub mod distributions;
 pub mod history;
 pub mod modules;
 pub mod optimizers;
