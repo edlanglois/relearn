@@ -701,10 +701,11 @@ mod packed_tensor {
         let cumsum = packed_tensor_discounted_cumsum_from_end(&packed, &batch_sizes, 0.1);
         // Sequences: [1.234, 2.34, 3.4, 4], [5.6, 6], [7.8, 8]
         let expected = Tensor::of_slice(&[1.234, 5.6, 7.8, 2.34, 6.0, 8.0, 3.4, 4.0]);
-        println!("result {:?}", cumsum);
-        println!("expected {:?}", expected);
-        assert!(bool::from(
-            cumsum.isclose(&expected, 1e-8, 1e-8, false).all()
-        ));
+        assert!(
+            bool::from(cumsum.isclose(&expected, 1e-8, 1e-8, false).all()),
+            "result: {:?}\nexpected: {:?}",
+            cumsum,
+            expected,
+        );
     }
 }
