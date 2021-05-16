@@ -2,7 +2,7 @@
 mod conjugate_gradient;
 mod coptimizer;
 
-pub use conjugate_gradient::ConjugateGradientOptimizer;
+pub use conjugate_gradient::{ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig};
 pub use coptimizer::{AdamConfig, AdamWConfig, RmsPropConfig, SgdConfig};
 
 use std::error::Error;
