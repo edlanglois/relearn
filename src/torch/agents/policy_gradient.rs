@@ -220,7 +220,7 @@ mod policy_gradient {
     {
         let mut config = PolicyGradientAgentConfig::<PB, AdamConfig, VB, AdamConfig>::default();
         // Speed up learning for this simple environment
-        config.actor_config.steps_per_epoch = 1000;
+        config.actor_config.steps_per_epoch = 25;
         config.policy_optimizer_config.learning_rate = 0.1;
         config.value_optimizer_config.learning_rate = 0.1;
         testing::train_deterministic_bandit(
