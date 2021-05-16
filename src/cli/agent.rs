@@ -85,7 +85,7 @@ where
     PB: Update<&'a Options>,
     POB: Update<&'a Options>,
     VB: Update<&'a Options>,
-    VOB: Update<&'a ValueFnView<'a>>,
+    VOB: for<'b> Update<&'b ValueFnView<'a>>,
 {
     fn update(&mut self, opts: &'a Options) {
         self.actor_config.update(opts);
