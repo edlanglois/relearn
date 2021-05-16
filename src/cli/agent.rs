@@ -73,7 +73,7 @@ impl Update<&Options> for UCB1AgentConfig {
 
 impl<'a, PB, POB, VB, VOB> From<&'a Options> for PolicyGradientAgentConfig<PB, POB, VB, VOB>
 where
-    PolicyGradientAgentConfig<PB, POB, VB, VOB>: Default + Update<&'a Options>,
+    Self: Default + Update<&'a Options>,
 {
     fn from(opts: &'a Options) -> Self {
         Self::default().with_update(opts)
@@ -85,7 +85,7 @@ where
     PB: Update<&'a Options>,
     POB: Update<&'a Options>,
     VB: Update<&'a Options>,
-    VOB: for<'b> Update<&'b ValueFnView<'a>>,
+    VOB: Update<&'a ValueFnView<'a>>,
 {
     fn update(&mut self, opts: &'a Options) {
         self.actor_config.update(opts);
@@ -96,7 +96,7 @@ where
 
 impl<'a, PB, VB> From<&'a Options> for PolicyValueNetActorConfig<PB, VB>
 where
-    PolicyValueNetActorConfig<PB, VB>: Default + Update<&'a Options>,
+    Self: Default + Update<&'a Options>,
 {
     fn from(opts: &'a Options) -> Self {
         Self::default().with_update(opts)
