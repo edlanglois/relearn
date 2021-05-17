@@ -2,9 +2,9 @@
 use super::{Event, LogError, Loggable, Logger};
 use enum_map::{enum_map, EnumMap};
 use std::collections::BTreeMap;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::fmt;
-use std::ops::{AddAssign, Drop};
+use std::ops::Drop;
 use std::time::{Duration, Instant};
 
 /// Logger that writes summaries to stderr.
@@ -140,12 +140,12 @@ enum Aggregator {
     /// Aggregates nothing
     Nothing,
     ScalarMean {
-        accumulated: MeanAccumulator,
-        pending: MeanAccumulator,
+        accumulator: MeanAccumulator,
+        pending: Option<<MeanAccumulator as Accumulator>::Prepared>,
     },
     IndexDistribution {
-        accumulated: IndexDistributionAccumulator,
-        pending: IndexDistributionAccumulator,
+        accumulator: IndexDistributionAccumulator,
+        pending: Option<<IndexDistributionAccumulator as Accumulator>::Prepared>,
     },
 }
 use Aggregator::*;
@@ -158,17 +158,13 @@ impl Aggregator {
         match value {
             Loggable::Nothing => Nothing,
             Loggable::Scalar(x) => ScalarMean {
-                accumulated: MeanAccumulator::new(),
-                pending: x.into(),
+                accumulator: MeanAccumulator::new(),
+                pending: Some(x),
             },
-            Loggable::IndexSample { value, size } => {
-                let mut pending = IndexDistributionAccumulator::new(size);
-                pending.counts[value] += 1;
-                IndexDistribution {
-                    accumulated: IndexDistributionAccumulator::new(size),
-                    pending,
-                }
-            }
+            Loggable::IndexSample { value, size } => IndexDistribution {
+                accumulator: IndexDistributionAccumulator::new(size),
+                pending: Some(value),
+            },
         }
     }
 
@@ -177,22 +173,20 @@ impl Aggregator {
     /// Returns Err((value, expected)) if the value is incompatible with this aggregator.
     fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
         match self {
-            Nothing => {
-                if let Loggable::Nothing = value {
-                    Ok(())
-                } else {
-                    Err((value, "Nothing".into()))
-                }
-            }
+            Nothing => match value {
+                Loggable::Nothing => {}
+                _ => return Err((value, "Nothing".into())),
+            },
             ScalarMean {
-                accumulated: _,
+                accumulator,
                 pending,
-            } => pending.update(value),
+            } => *pending = Some(accumulator.prepare(value)?),
             IndexDistribution {
-                accumulated: _,
+                accumulator,
                 pending,
-            } => pending.update(value),
-        }
+            } => *pending = Some(accumulator.prepare(value)?),
+        };
+        Ok(())
     }
 
     /// Commit the pending values into the aggregate.
@@ -200,18 +194,20 @@ impl Aggregator {
         match self {
             Nothing => {}
             ScalarMean {
-                accumulated,
+                accumulator,
                 pending,
             } => {
-                *accumulated += pending;
-                pending.reset()
+                if let Some(value) = pending.take() {
+                    accumulator.insert(value)
+                }
             }
             IndexDistribution {
-                accumulated,
+                accumulator,
                 pending,
             } => {
-                *accumulated += pending;
-                pending.reset()
+                if let Some(value) = pending.take() {
+                    accumulator.insert(value)
+                }
             }
         }
     }
@@ -221,16 +217,16 @@ impl Aggregator {
         match self {
             Nothing => {}
             ScalarMean {
-                accumulated,
+                accumulator,
                 pending: _,
             } => {
-                accumulated.reset();
+                accumulator.clear();
             }
             IndexDistribution {
-                accumulated,
+                accumulator,
                 pending: _,
             } => {
-                accumulated.reset();
+                accumulator.clear();
             }
         }
     }
@@ -242,31 +238,34 @@ impl fmt::Display for Aggregator {
         match self {
             Nothing => write!(f, "Nothing"),
             ScalarMean {
-                accumulated,
+                accumulator,
                 pending: _,
-            } => accumulated.fmt(f),
+            } => accumulator.fmt(f),
             IndexDistribution {
-                accumulated,
+                accumulator,
                 pending: _,
-            } => accumulated.fmt(f),
+            } => accumulator.fmt(f),
         }
     }
 }
 
 /// Accumulate statistics of a loggable.
-trait Accumulator:
-    'static
-    + TryFrom<Loggable, Error = (Loggable, &'static str)>
-    + AddAssign<&'static Self>
-    + fmt::Display
-{
-    /// Add a new loggable value to the accumulator.
-    ///
-    /// Used when a value is logged multiple times in an event.
-    fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)>;
+trait Accumulator: 'static + fmt::Display {
+    /// Type for prepared values.
+    type Prepared;
 
-    /// Reset the accumulator to empty
-    fn reset(&mut self);
+    /// Prepare a value to be inserted into the accumulator.
+    ///
+    /// Used when a value is logged during an event.
+    fn prepare(&self, value: Loggable) -> Result<Self::Prepared, (Loggable, String)>;
+
+    /// Insert a new prepared value into the accumulation.
+    ///
+    /// Used at the end of an event.
+    fn insert(&mut self, value: Self::Prepared);
+
+    /// Clear the accumulated values.
+    fn clear(&mut self);
 }
 
 #[derive(Debug)]
@@ -281,48 +280,25 @@ impl MeanAccumulator {
     }
 }
 
-impl From<f64> for MeanAccumulator {
-    fn from(value: f64) -> Self {
-        Self {
-            sum: value,
-            count: 1,
-        }
-    }
-}
-
 impl Accumulator for MeanAccumulator {
-    fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
+    type Prepared = f64;
+
+    fn prepare(&self, value: Loggable) -> Result<Self::Prepared, (Loggable, String)> {
         if let Loggable::Scalar(x) = value {
-            self.sum += x;
-            self.count += 1;
-            Ok(())
+            Ok(x)
         } else {
             Err((value, "Scalar".into()))
         }
     }
 
-    fn reset(&mut self) {
+    fn insert(&mut self, value: Self::Prepared) {
+        self.sum += value;
+        self.count += 1;
+    }
+
+    fn clear(&mut self) {
         self.sum = 0.0;
         self.count = 0;
-    }
-}
-
-impl TryFrom<Loggable> for MeanAccumulator {
-    type Error = (Loggable, &'static str);
-
-    fn try_from(value: Loggable) -> Result<Self, Self::Error> {
-        if let Loggable::Scalar(x) = value {
-            Ok(x.into())
-        } else {
-            Err((value, "Scalar"))
-        }
-    }
-}
-
-impl AddAssign<&Self> for MeanAccumulator {
-    fn add_assign(&mut self, other: &Self) {
-        self.sum += other.sum;
-        self.count += other.count;
     }
 }
 
@@ -346,41 +322,22 @@ impl IndexDistributionAccumulator {
 }
 
 impl Accumulator for IndexDistributionAccumulator {
-    fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
+    type Prepared = usize;
+
+    fn prepare(&self, value: Loggable) -> Result<Self::Prepared, (Loggable, String)> {
         match value {
-            Loggable::IndexSample { value, size } if self.counts.len() == size => {
-                self.counts[value] += 1;
-                Ok(())
-            }
+            Loggable::IndexSample { value, size } if self.counts.len() == size => Ok(value),
             v => Err((v, format!("IndexSample{{size: {}}}", self.counts.len()))),
         }
     }
 
-    fn reset(&mut self) {
+    fn insert(&mut self, value: Self::Prepared) {
+        self.counts[value] += 1;
+    }
+
+    fn clear(&mut self) {
         for count in &mut self.counts {
             *count = 0;
-        }
-    }
-}
-
-impl TryFrom<Loggable> for IndexDistributionAccumulator {
-    type Error = (Loggable, &'static str);
-
-    fn try_from(value: Loggable) -> Result<Self, Self::Error> {
-        if let Loggable::IndexSample { value, size } = value {
-            let mut acc = Self::new(size);
-            acc.counts[value] += 1;
-            Ok(acc)
-        } else {
-            Err((value, "IndexSample"))
-        }
-    }
-}
-
-impl AddAssign<&Self> for IndexDistributionAccumulator {
-    fn add_assign(&mut self, other: &Self) {
-        for (count, other_count) in self.counts.iter_mut().zip(other.counts.iter()) {
-            *count += other_count;
         }
     }
 }

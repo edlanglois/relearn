@@ -9,7 +9,7 @@ use enum_map::Enum;
 use std::error::Error;
 use std::fmt;
 
-/// Simulation run events.
+/// Simulation run events types.
 #[derive(Debug, Clone, Copy, PartialEq, Enum)]
 pub enum Event {
     Step,
@@ -46,9 +46,16 @@ pub trait Logger {
     /// Log a value.
     ///
     /// # Args
-    /// * `event` - The event associated with this value.
+    /// * `event` - The event type associated with this value.
     /// * `name` - The name that identifies this value.
     /// * `value` - The value to log.
+    ///
+    /// Each logged value is associated with an event type and a name.
+    /// When multiple values are logged for the same event type and name during an event,
+    /// only the last is used.
+    /// Values may be aggregated across events in a logger-dependent fashion.
+    ///
+    /// An "event" refers to the period between calls to `Logger::done` for that event type.
     ///
     /// # Returns
     /// May return an error if the logged value is structurally incompatible
