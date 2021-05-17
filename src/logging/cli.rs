@@ -56,7 +56,7 @@ impl CLILogger {
 
             for (name, aggregator) in &mut event_log.aggregators {
                 println!("{}: {}", name, aggregator);
-                aggregator.clear()
+                aggregator.clear();
             }
             event_log.summary_start_index = event_log.index;
         }
@@ -78,7 +78,7 @@ impl Logger for CLILogger {
         // aggregators.
         let aggregators = &mut self.events[event].aggregators;
         if let Some(aggregator) = aggregators.get_mut(name) {
-            if let Err((value, expected)) = aggregator.update(value) {
+            if let Err((value, expected)) = aggregator.set_pending(value) {
                 return Err(LogError::new(name, value, expected));
             }
         } else {
@@ -138,145 +138,128 @@ impl EventLog {
 
 #[derive(Debug)]
 enum Aggregator {
-    /// Aggregates nothing
-    Nothing,
-    ScalarMean {
-        accumulator: MeanAccumulator,
-        pending: Option<<MeanAccumulator as Accumulator>::Prepared>,
-    },
-    IndexDistribution {
-        accumulator: IndexDistributionAccumulator,
-        pending: Option<<IndexDistributionAccumulator as Accumulator>::Prepared>,
-    },
-    MessageCounts {
-        accumulator: MessageAccumulator,
-        pending: Option<<MessageAccumulator as Accumulator>::Prepared>,
-    },
+    Nothing(WithPending<NothingAccumulator>),
+    ScalarMean(WithPending<MeanAccumulator>),
+    IndexDistribution(WithPending<IndexDistributionAccumulator>),
+    MessageCounts(WithPending<MessageAccumulator>),
 }
-use Aggregator::*;
 
 impl Aggregator {
     // future-proofing in case loggable ends up containing non-copy values
     #[allow(clippy::needless_pass_by_value)]
     /// Create a new aggregator from a logged value value.
     fn new(value: Loggable) -> Self {
+        use Aggregator::*;
         match value {
-            Loggable::Nothing => Nothing,
-            Loggable::Scalar(x) => ScalarMean {
+            Loggable::Nothing => Nothing(WithPending::new(NothingAccumulator::new())),
+            Loggable::Scalar(x) => ScalarMean(WithPending {
                 accumulator: MeanAccumulator::new(),
                 pending: Some(x),
-            },
-            Loggable::IndexSample { value, size } => IndexDistribution {
+            }),
+            Loggable::IndexSample { value, size } => IndexDistribution(WithPending {
                 accumulator: IndexDistributionAccumulator::new(size),
                 pending: Some(value),
-            },
-            Loggable::Message(message) => MessageCounts {
+            }),
+            Loggable::Message(message) => MessageCounts(WithPending {
                 accumulator: MessageAccumulator::new(),
                 pending: Some(message),
-            },
+            }),
         }
     }
 
-    /// Update an aggregator with a logged value within an event.
+    /// Set the pending value.
     ///
     /// Returns Err((value, expected)) if the value is incompatible with this aggregator.
-    fn update(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
+    fn set_pending(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
+        use Aggregator::*;
         match self {
-            Nothing => match value {
-                Loggable::Nothing => {}
-                _ => return Err((value, "Nothing".into())),
-            },
-            ScalarMean {
-                accumulator,
-                pending,
-            } => *pending = Some(accumulator.prepare(value)?),
-            IndexDistribution {
-                accumulator,
-                pending,
-            } => *pending = Some(accumulator.prepare(value)?),
-            MessageCounts {
-                accumulator,
-                pending,
-            } => *pending = Some(accumulator.prepare(value)?),
-        };
-        Ok(())
-    }
-
-    /// Commit the pending values into the aggregate.
-    fn commit(&mut self) {
-        match self {
-            Nothing => {}
-            ScalarMean {
-                accumulator,
-                pending,
-            } => {
-                if let Some(value) = pending.take() {
-                    accumulator.insert(value)
-                }
-            }
-            IndexDistribution {
-                accumulator,
-                pending,
-            } => {
-                if let Some(value) = pending.take() {
-                    accumulator.insert(value)
-                }
-            }
-            MessageCounts {
-                accumulator,
-                pending,
-            } => {
-                if let Some(value) = pending.take() {
-                    accumulator.insert(value)
-                }
-            }
+            Nothing(a) => a.set_pending(value),
+            ScalarMean(a) => a.set_pending(value),
+            IndexDistribution(a) => a.set_pending(value),
+            MessageCounts(a) => a.set_pending(value),
         }
     }
 
-    /// Clear the aggregated values (but not the pending values)
-    fn clear(&mut self) {
+    /// Commit the pending value to the accumulator.
+    fn commit(&mut self) {
+        use Aggregator::*;
         match self {
-            Nothing => {}
-            ScalarMean {
-                accumulator,
-                pending: _,
-            } => {
-                accumulator.clear();
-            }
-            IndexDistribution {
-                accumulator,
-                pending: _,
-            } => {
-                accumulator.clear();
-            }
-            MessageCounts {
-                accumulator,
-                pending: _,
-            } => {
-                accumulator.clear();
-            }
+            Nothing(a) => a.commit(),
+            ScalarMean(a) => a.commit(),
+            IndexDistribution(a) => a.commit(),
+            MessageCounts(a) => a.commit(),
+        }
+    }
+
+    /// Clear the accumulated value.
+    fn clear(&mut self) {
+        use Aggregator::*;
+        match self {
+            Nothing(a) => a.clear(),
+            ScalarMean(a) => a.clear(),
+            IndexDistribution(a) => a.clear(),
+            MessageCounts(a) => a.clear(),
         }
     }
 }
 
-/// Display the commited aggregated value.
 impl fmt::Display for Aggregator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Aggregator::*;
         match self {
-            Nothing => write!(f, "Nothing"),
-            ScalarMean {
-                accumulator,
-                pending: _,
-            } => accumulator.fmt(f),
-            IndexDistribution {
-                accumulator,
-                pending: _,
-            } => accumulator.fmt(f),
-            MessageCounts {
-                accumulator,
-                pending: _,
-            } => accumulator.fmt(f),
+            Nothing(a) => a.fmt(f),
+            ScalarMean(a) => a.fmt(f),
+            IndexDistribution(a) => a.fmt(f),
+            MessageCounts(a) => a.fmt(f),
         }
+    }
+}
+
+struct WithPending<A: Accumulator> {
+    accumulator: A,
+    pending: Option<<A as Accumulator>::Prepared>,
+}
+
+impl<A> fmt::Debug for WithPending<A>
+where
+    A: Accumulator + fmt::Debug,
+    <A as Accumulator>::Prepared: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WithPending")
+            .field("accumulator", &self.accumulator)
+            .field("pending", &self.pending)
+            .finish()
+    }
+}
+
+impl<A: Accumulator> WithPending<A> {
+    pub fn new(accumulator: A) -> Self {
+        Self {
+            accumulator,
+            pending: None,
+        }
+    }
+
+    fn set_pending(&mut self, value: Loggable) -> Result<(), (Loggable, String)> {
+        self.pending = Some(self.accumulator.prepare(value)?);
+        Ok(())
+    }
+
+    fn commit(&mut self) {
+        if let Some(value) = self.pending.take() {
+            self.accumulator.insert(value);
+        }
+    }
+
+    fn clear(&mut self) {
+        self.accumulator.clear();
+    }
+}
+
+impl<A: Accumulator> fmt::Display for WithPending<A> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.accumulator.fmt(f)
     }
 }
 
@@ -297,6 +280,38 @@ trait Accumulator: 'static + fmt::Display {
 
     /// Clear the accumulated values.
     fn clear(&mut self);
+}
+
+/// Accumulates nothing
+#[derive(Debug)]
+struct NothingAccumulator;
+
+impl NothingAccumulator {
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
+impl Accumulator for NothingAccumulator {
+    type Prepared = ();
+
+    fn prepare(&self, value: Loggable) -> Result<Self::Prepared, (Loggable, String)> {
+        if let Loggable::Nothing = value {
+            Ok(())
+        } else {
+            Err((value, "Nothing".into()))
+        }
+    }
+
+    fn insert(&mut self, _: Self::Prepared) {}
+
+    fn clear(&mut self) {}
+}
+
+impl fmt::Display for NothingAccumulator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Nothing")
+    }
 }
 
 #[derive(Debug)]
