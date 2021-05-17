@@ -112,6 +112,10 @@ pub struct Options {
     /// Agent optimizer(s) weight decay (L2 regularization)
     pub weight_decay: Option<f64>,
 
+    #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
+    /// Max policy KL divergence per update step; for trust-region methods.
+    pub max_policy_step_kl: Option<f64>,
+
     #[clap(long, arg_enum, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
     /// Agent value function optimizer type
     pub value_fn_optimizer: Option<OptimizerType>,
@@ -131,6 +135,27 @@ pub struct Options {
     #[clap(long, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
     /// Number of value function training iterations per epoch
     pub value_fn_train_iters: Option<u64>,
+
+    // Conjugate Gradient Optimizer options
+    #[clap(long, help_heading = Some("CONJUGATE GRADIENT OPTIMIZER OPTIONS"))]
+    /// Number of conjugate gradient iterations used to solve for the step direction
+    pub cg_iterations: Option<u64>,
+
+    #[clap(long, help_heading = Some("CONJUGATE GRADIENT OPTIMIZER OPTIONS"))]
+    /// Maximum number of iterations for backtracking line search
+    pub cg_max_backtracks: Option<u64>,
+
+    #[clap(long, help_heading = Some("CONJUGATE GRADIENT OPTIMIZER OPTIONS"))]
+    /// Multiplicative scale factor applied on each line search backtrack iteration
+    pub cg_backtrack_ratio: Option<f64>,
+
+    #[clap(long, help_heading = Some("CONJUGATE GRADIENT OPTIMIZER OPTIONS"))]
+    /// A small regularization coefficient for stability when inverting the Hessian
+    pub cg_hpv_reg_coeff: Option<f64>,
+
+    #[clap(long, help_heading = Some("CONJUGATE GRADIENT OPTIMIZER OPTIONS"))]
+    /// Whether to accept the conjugate gradient descent step if the distance condition is violated
+    pub cg_accept_violation: Option<bool>,
 
     // Simulation options
     #[clap(long, default_value = "1", help_heading = Some("SIMULATION OPTIONS"))]

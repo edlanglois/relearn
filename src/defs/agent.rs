@@ -5,7 +5,10 @@ use crate::agents::{
 };
 use crate::envs::EnvStructure;
 use crate::spaces::{FiniteSpace, RLSpace};
-use crate::torch::agents::{PolicyGradientAgentConfig, PolicyGradientBoxedAgent};
+use crate::torch::agents::{
+    PolicyGradientAgentConfig, PolicyGradientBoxedAgent, TrpoAgentConfig, TrpoBoxedAgent,
+};
+use crate::torch::optimizers::ConjugateGradientOptimizerConfig;
 use std::fmt::Debug;
 
 /// Agent definition
@@ -24,6 +27,16 @@ pub enum AgentDef {
     /// Policy gradient
     PolicyGradient(
         Box<PolicyGradientAgentConfig<SeqModDef, OptimizerDef, StepValueDef, OptimizerDef>>,
+    ),
+    Trpo(
+        Box<
+            TrpoAgentConfig<
+                SeqModDef,
+                ConjugateGradientOptimizerConfig,
+                StepValueDef,
+                OptimizerDef,
+            >,
+        >,
     ),
 }
 
@@ -72,6 +85,9 @@ impl AgentDef {
             PolicyGradient(config) => config
                 .build_agent(es, seed)
                 .map(|a: PolicyGradientBoxedAgent<_, _>| Box::new(a) as _),
+            Trpo(config) => config
+                .build_agent(es, seed)
+                .map(|a: TrpoBoxedAgent<_, _>| Box::new(a) as _),
             _ => Err(BuildAgentError::InvalidSpaceBounds),
         }
     }

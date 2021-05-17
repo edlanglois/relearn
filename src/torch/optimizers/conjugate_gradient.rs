@@ -38,10 +38,10 @@ use tch::{nn::VarStore, Tensor};
 #[derive(Debug, Clone)]
 pub struct ConjugateGradientOptimizerConfig {
     /// Number of CG iterations used to calculate A^-1 g
-    pub cg_iters: u64,
+    pub iterations: u64,
     /// Maximum number of iterations for backtracking line search
     pub max_backtracks: u64,
-    /// Backtrack ratio for backtracking line search
+    /// Multiplicative scale factor applied on each line search backtrack iteration
     pub backtrack_ratio: f64,
     /// A small value so that A -> A + reg*I. It is used by Hessian Vector Product calculation.
     pub hpv_reg_coeff: f64,
@@ -53,7 +53,7 @@ pub struct ConjugateGradientOptimizerConfig {
 impl Default for ConjugateGradientOptimizerConfig {
     fn default() -> Self {
         Self {
-            cg_iters: 10,
+            iterations: 10,
             max_backtracks: 15,
             backtrack_ratio: 0.8,
             hpv_reg_coeff: 1e-5,
@@ -133,7 +133,7 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
 
         // Compute step direction
         let mut step_dir =
-            solve_conjugate_gradient(&hvp_fn, &flat_loss_grads, self.config.cg_iters, 1e-10);
+            solve_conjugate_gradient(&hvp_fn, &flat_loss_grads, self.config.iterations, 1e-10);
         // Replace nan with 0 (also +- inf with largest/smallest values)
         let _ = step_dir.nan_to_num_(0.0, None, None);
 
@@ -338,7 +338,7 @@ impl MatrixVectorProduct for Tensor {
 /// # Args
 /// * `f_Ax` - Computes the Hessian-vector product.
 /// * `b` - Right hand side of the equation to solve.
-/// * `cg_iters` - Number of iterations to run the conjugate gradient algorithm.
+/// * `iterations` - Number of iterations to run the conjugate gradient algorithm.
 /// * `residual_tol`: Tolerance for convergence.
 ///
 /// # Returns
@@ -350,7 +350,7 @@ impl MatrixVectorProduct for Tensor {
 fn solve_conjugate_gradient<T: MatrixVectorProduct<Vector = Tensor>>(
     #[allow(non_snake_case)] f_Ax: &T,
     b: &Tensor,
-    cg_iters: u64,
+    iterations: u64,
     residual_tol: f64,
 ) -> Tensor {
     let mut x = b.zeros_like();
@@ -360,7 +360,7 @@ fn solve_conjugate_gradient<T: MatrixVectorProduct<Vector = Tensor>>(
     let mut step = b.copy();
     let mut residual_norm_squared = residual.dot(&residual);
 
-    for _ in 0..cg_iters {
+    for _ in 0..iterations {
         let z = f_Ax.mat_vec_mul(&step); // A *  step
         let alpha = &residual_norm_squared / step.dot(&z); // ||r||^2 / (step' * A * step)
         let _ = x.addcmul_(&alpha, &step); // x += alpha * step

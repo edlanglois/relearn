@@ -1,6 +1,8 @@
-use super::{Update, WithUpdate};
+use super::{Options, Update, WithUpdate};
 use crate::defs::OptimizerDef;
-use crate::torch::optimizers::{AdamConfig, AdamWConfig, RmsPropConfig, SgdConfig};
+use crate::torch::optimizers::{
+    AdamConfig, AdamWConfig, ConjugateGradientOptimizerConfig, RmsPropConfig, SgdConfig,
+};
 use clap::Clap;
 
 /// Optimizer name
@@ -134,6 +136,33 @@ impl<T: OptimizerOptions> Update<&T> for AdamWConfig {
         }
         if let Some(weight_decay) = opts.weight_decay() {
             self.weight_decay = weight_decay;
+        }
+    }
+}
+
+// Conjugate Gradient is separate because it does not implement Optimizer
+impl From<&Options> for ConjugateGradientOptimizerConfig {
+    fn from(opts: &Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for ConjugateGradientOptimizerConfig {
+    fn update(&mut self, opts: &Options) {
+        if let Some(iterations) = opts.cg_iterations {
+            self.iterations = iterations;
+        }
+        if let Some(max_backtracks) = opts.cg_max_backtracks {
+            self.max_backtracks = max_backtracks;
+        }
+        if let Some(backtrack_ratio) = opts.cg_backtrack_ratio {
+            self.backtrack_ratio = backtrack_ratio;
+        }
+        if let Some(hpv_reg_coeff) = opts.cg_hpv_reg_coeff {
+            self.hpv_reg_coeff = hpv_reg_coeff;
+        }
+        if let Some(accept_violation) = opts.cg_accept_violation {
+            self.accept_violation = accept_violation;
         }
     }
 }

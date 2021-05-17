@@ -3,7 +3,7 @@ use crate::agents::{
     BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::defs::AgentDef;
-use crate::torch::agents::{PolicyGradientAgentConfig, PolicyValueNetActorConfig};
+use crate::torch::agents::{PolicyGradientAgentConfig, PolicyValueNetActorConfig, TrpoAgentConfig};
 use clap::Clap;
 
 /// Agent name
@@ -14,6 +14,7 @@ pub enum AgentType {
     BetaThompsonSampling,
     UCB1,
     PolicyGradient,
+    Trpo,
 }
 
 impl From<&Options> for AgentDef {
@@ -25,6 +26,7 @@ impl From<&Options> for AgentDef {
             BetaThompsonSampling => Self::BetaThompsonSampling(opts.into()),
             UCB1 => Self::UCB1(From::from(opts)),
             PolicyGradient => Self::PolicyGradient(Box::new(opts.into())),
+            Trpo => Self::Trpo(Box::new(opts.into())),
         }
     }
 }
@@ -91,6 +93,32 @@ where
         self.actor_config.update(opts);
         self.policy_optimizer_config.update(opts);
         self.value_optimizer_config.update(&opts.value_fn_view());
+    }
+}
+
+impl<'a, PB, POB, VB, VOB> From<&'a Options> for TrpoAgentConfig<PB, POB, VB, VOB>
+where
+    Self: Default + Update<&'a Options>,
+{
+    fn from(opts: &'a Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl<'a, PB, POB, VB, VOB> Update<&'a Options> for TrpoAgentConfig<PB, POB, VB, VOB>
+where
+    PB: Update<&'a Options>,
+    POB: Update<&'a Options>,
+    VB: Update<&'a Options>,
+    VOB: for<'b> Update<&'b ValueFnView<'a>>,
+{
+    fn update(&mut self, opts: &'a Options) {
+        self.actor_config.update(opts);
+        self.policy_optimizer_config.update(opts);
+        self.value_optimizer_config.update(&opts.value_fn_view());
+        if let Some(max_policy_step_kl) = opts.max_policy_step_kl {
+            self.max_policy_step_kl = max_policy_step_kl;
+        }
     }
 }
 
