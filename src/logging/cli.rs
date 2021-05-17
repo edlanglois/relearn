@@ -401,6 +401,7 @@ struct MessageAccumulator {
 }
 
 impl MessageAccumulator {
+    #[allow(clippy::missing_const_for_fn)] // BTreeMap const new not stabilized
     pub fn new() -> Self {
         Self {
             message_counts: BTreeMap::new(),
