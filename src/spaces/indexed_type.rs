@@ -179,6 +179,21 @@ mod indexed_type_space {
     fn from_index_sampled_enum() {
         check_from_index_sampled::<TestEnum>();
     }
+
+    fn check_from_index_invalid<T: Indexed>() {
+        let space = IndexedTypeSpace::<T>::new();
+        testing::check_from_index_invalid(&space);
+    }
+
+    #[test]
+    fn from_index_invalid_bool() {
+        check_from_index_invalid::<bool>();
+    }
+
+    #[test]
+    fn from_index_invalid_enum() {
+        check_from_index_invalid::<TestEnum>();
+    }
 }
 
 #[cfg(test)]

@@ -50,6 +50,14 @@ impl FiniteSpace for IndexSpace {
     }
 
     fn from_index(&self, index: usize) -> Option<Self::Element> {
+        if index >= self.size {
+            None
+        } else {
+            Some(index)
+        }
+    }
+
+    fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
         Some(index)
     }
 }
@@ -86,5 +94,11 @@ mod index_space {
     fn from_index_sampled(#[values(1, 5)] size: usize) {
         let space = IndexSpace::new(size);
         testing::check_from_index_sampled(&space, 100);
+    }
+
+    #[rstest]
+    fn from_index_invalid(#[values(1, 5)] size: usize) {
+        let space = IndexSpace::new(size);
+        testing::check_from_index_invalid(&space);
     }
 }

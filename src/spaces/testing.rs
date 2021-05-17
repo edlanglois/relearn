@@ -44,3 +44,10 @@ pub fn check_from_index_sampled<T: FiniteSpace + SampleSpace>(space: &T, num_sam
         assert!(index < size);
     }
 }
+
+/// Check [`FiniteSpace::from_index`] for invalid indices.
+pub fn check_from_index_invalid<T: FiniteSpace>(space: &T) {
+    let size = space.size();
+    assert!(space.from_index(size).is_none());
+    assert!(space.from_index(size + 1).is_none());
+}

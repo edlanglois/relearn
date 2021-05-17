@@ -15,10 +15,18 @@ pub trait FiniteSpace: Space {
 
     /// Try to convert an index to an element.
     ///
+    /// The return value is `Some(elem)` if and only if
+    /// `elem` is the unique element in the space with `to_index(elem) == index`.
+    fn from_index(&self, index: usize) -> Option<Self::Element>;
+
+    /// Try to convert an index to an element.
+    ///
     /// If None is returned then the index was invalid.
     /// It is allowed that Some value may be returned even if the index is invalid.
-    /// If you need to validate the returned value, use contains().
-    fn from_index(&self, index: usize) -> Option<Self::Element>;
+    /// If you need to validate the returned value, use [`FiniteSpace::from_index`].
+    fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
+        self.from_index(index)
+    }
 }
 
 /// Represents elements as integer tensors.

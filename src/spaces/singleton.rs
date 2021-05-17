@@ -44,7 +44,15 @@ impl FiniteSpace for SingletonSpace {
         0
     }
 
-    fn from_index(&self, _index: usize) -> Option<Self::Element> {
+    fn from_index(&self, index: usize) -> Option<Self::Element> {
+        if index == 0 {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn from_index_unchecked(&self, _index: usize) -> Option<Self::Element> {
         Some(())
     }
 }
@@ -82,5 +90,11 @@ mod singleton_space {
     fn from_index_sampled() {
         let space = SingletonSpace::new();
         testing::check_from_index_sampled(&space, 10);
+    }
+
+    #[test]
+    fn from_index_invalid() {
+        let space = SingletonSpace::new();
+        testing::check_from_index_invalid(&space);
     }
 }
