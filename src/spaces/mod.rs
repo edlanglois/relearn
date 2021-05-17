@@ -2,6 +2,7 @@
 mod finite;
 mod index;
 mod indexed_type;
+mod option;
 mod rl;
 mod singleton;
 #[cfg(test)]
@@ -10,6 +11,7 @@ pub mod testing;
 pub use finite::FiniteSpace;
 pub use index::IndexSpace;
 pub use indexed_type::{Indexed, IndexedTypeSpace};
+pub use option::OptionSpace;
 pub use rl::RLSpace;
 pub use singleton::SingletonSpace;
 
