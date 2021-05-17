@@ -15,7 +15,7 @@ use super::super::ModuleBuilder;
 use super::actor::{PolicyValueNetActor, PolicyValueNetActorConfig};
 use super::policy_gradient;
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use crate::logging::Logger;
+use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedDistributionSpace, ReprSpace, Space};
 use crate::utils::distributions::BatchDistribution;
 use crate::EnvStructure;
@@ -174,8 +174,14 @@ where
         let max_policy_step_kl = self.max_policy_step_kl;
         self.actor.update(
             step,
-            |actor, features, _logger| {
-                trpo_update(actor, features, policy_optimizer, max_policy_step_kl)
+            |actor, features, logger| {
+                trpo_update(
+                    actor,
+                    features,
+                    policy_optimizer,
+                    max_policy_step_kl,
+                    logger,
+                )
             },
             |actor, features, _logger| {
                 policy_gradient::value_squared_error_update(actor, features, value_optimizer)
@@ -190,6 +196,7 @@ fn trpo_update<OS, AS, P, PO, V>(
     features: &LazyPackedHistoryFeatures<OS, AS>,
     policy_optimizer: &mut PO,
     max_policy_step_kl: f64,
+    logger: &mut dyn Logger,
 ) -> Tensor
 where
     OS: FeatureSpace<Tensor>,
@@ -244,9 +251,9 @@ where
         match error {
             OptimizerStepError::NaNLoss => panic!("NaN loss in policy optimization"),
             OptimizerStepError::NaNConstraint => panic!("NaN constraint in policy optimization"),
-            e => {
-                println!("Policy Optimization Step Failed: {:?}", e);
-            }
+            e => logger
+                .log(Event::Epoch, "no_policy_step", e.to_string().into())
+                .unwrap(),
         }
     }
 

@@ -1,6 +1,7 @@
 //! Command-line logger
 use super::{Event, LogError, Loggable, Logger};
 use enum_map::{enum_map, EnumMap};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
@@ -147,6 +148,10 @@ enum Aggregator {
         accumulator: IndexDistributionAccumulator,
         pending: Option<<IndexDistributionAccumulator as Accumulator>::Prepared>,
     },
+    MessageCounts {
+        accumulator: MessageAccumulator,
+        pending: Option<<MessageAccumulator as Accumulator>::Prepared>,
+    },
 }
 use Aggregator::*;
 
@@ -165,6 +170,10 @@ impl Aggregator {
                 accumulator: IndexDistributionAccumulator::new(size),
                 pending: Some(value),
             },
+            Loggable::Message(message) => MessageCounts {
+                accumulator: MessageAccumulator::new(),
+                pending: Some(message),
+            },
         }
     }
 
@@ -182,6 +191,10 @@ impl Aggregator {
                 pending,
             } => *pending = Some(accumulator.prepare(value)?),
             IndexDistribution {
+                accumulator,
+                pending,
+            } => *pending = Some(accumulator.prepare(value)?),
+            MessageCounts {
                 accumulator,
                 pending,
             } => *pending = Some(accumulator.prepare(value)?),
@@ -209,6 +222,14 @@ impl Aggregator {
                     accumulator.insert(value)
                 }
             }
+            MessageCounts {
+                accumulator,
+                pending,
+            } => {
+                if let Some(value) = pending.take() {
+                    accumulator.insert(value)
+                }
+            }
         }
     }
 
@@ -228,6 +249,12 @@ impl Aggregator {
             } => {
                 accumulator.clear();
             }
+            MessageCounts {
+                accumulator,
+                pending: _,
+            } => {
+                accumulator.clear();
+            }
         }
     }
 }
@@ -242,6 +269,10 @@ impl fmt::Display for Aggregator {
                 pending: _,
             } => accumulator.fmt(f),
             IndexDistribution {
+                accumulator,
+                pending: _,
+            } => accumulator.fmt(f),
+            MessageCounts {
                 accumulator,
                 pending: _,
             } => accumulator.fmt(f),
@@ -360,5 +391,54 @@ impl fmt::Display for IndexDistributionAccumulator {
         } else {
             write!(f, "None")
         }
+    }
+}
+
+#[derive(Debug)]
+struct MessageAccumulator {
+    /// Number of occurrences of each unique message.
+    message_counts: BTreeMap<Cow<'static, str>, usize>,
+}
+
+impl MessageAccumulator {
+    pub fn new() -> Self {
+        Self {
+            message_counts: BTreeMap::new(),
+        }
+    }
+}
+
+impl Accumulator for MessageAccumulator {
+    type Prepared = Cow<'static, str>;
+
+    fn prepare(&self, value: Loggable) -> Result<Self::Prepared, (Loggable, String)> {
+        if let Loggable::Message(message) = value {
+            Ok(message)
+        } else {
+            Err((value, "Message".into()))
+        }
+    }
+
+    fn insert(&mut self, message: Self::Prepared) {
+        *self.message_counts.entry(message).or_insert(0) += 1;
+    }
+
+    fn clear(&mut self) {
+        self.message_counts.clear();
+    }
+}
+
+impl fmt::Display for MessageAccumulator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.message_counts.len() == 1 {
+            for (message, count) in &self.message_counts {
+                write!(f, "[x{}] {}", count, message)?;
+            }
+        } else {
+            for (message, count) in &self.message_counts {
+                write!(f, "\n\t[x{}] {}", count, message)?;
+            }
+        }
+        Ok(())
     }
 }

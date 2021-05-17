@@ -3,9 +3,9 @@
 pub mod cli;
 
 pub use cli::CLILogger;
-use std::convert::From;
-
 use enum_map::Enum;
+use std::borrow::Cow;
+use std::convert::From;
 use std::error::Error;
 use std::fmt;
 
@@ -27,6 +27,8 @@ pub enum Loggable {
     Scalar(f64),
     /// A sample from a distrbution over 0 .. (size-1)
     IndexSample { value: usize, size: usize },
+    /// A message string.
+    Message(Cow<'static, str>),
 }
 
 impl From<f64> for Loggable {
@@ -38,6 +40,18 @@ impl From<f64> for Loggable {
 impl From<f32> for Loggable {
     fn from(value: f32) -> Self {
         Self::Scalar(value.into())
+    }
+}
+
+impl From<&'static str> for Loggable {
+    fn from(value: &'static str) -> Self {
+        Self::Message(value.into())
+    }
+}
+
+impl From<String> for Loggable {
+    fn from(value: String) -> Self {
+        Self::Message(value.into())
     }
 }
 
