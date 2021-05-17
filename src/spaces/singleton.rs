@@ -75,6 +75,12 @@ mod singleton_space {
     use super::*;
 
     #[test]
+    fn contains_unit() {
+        let space = SingletonSpace::new();
+        assert!(space.contains(&()));
+    }
+
+    #[test]
     fn contains_samples() {
         let space = SingletonSpace::new();
         testing::check_contains_samples(&space, 10);

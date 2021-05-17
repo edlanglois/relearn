@@ -79,6 +79,18 @@ mod index_space {
     use rstest::rstest;
 
     #[rstest]
+    fn contains_zero(#[values(1, 5)] size: usize) {
+        let space = IndexSpace::new(size);
+        assert!(space.contains(&0));
+    }
+
+    #[rstest]
+    fn not_contains_too_large(#[values(1, 5)] size: usize) {
+        let space = IndexSpace::new(size);
+        assert!(!space.contains(&100));
+    }
+
+    #[rstest]
     fn contains_samples(#[values(1, 5)] size: usize) {
         let space = IndexSpace::new(size);
         testing::check_contains_samples(&space, 100);
