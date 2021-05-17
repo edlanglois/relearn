@@ -31,6 +31,8 @@ pub trait Space {
 /// A space from which samples can be drawn.
 pub trait SampleSpace: Space + RandDistribution<<Self as Space>::Element> {}
 
+impl<S> SampleSpace for S where S: Space + RandDistribution<<Self as Space>::Element> {}
+
 /// A space whose elements can be represented as value of type `T`
 ///
 /// This representation is generally minimal, in contrast to [`FeatureSpace`],

@@ -1,5 +1,5 @@
 //! Singleton space definition.
-use super::{ElementRefInto, FiniteSpace, SampleSpace, Space};
+use super::{ElementRefInto, FiniteSpace, Space};
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -60,8 +60,6 @@ impl FiniteSpace for SingletonSpace {
 impl Distribution<<Self as Space>::Element> for SingletonSpace {
     fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> <Self as Space>::Element {}
 }
-
-impl SampleSpace for SingletonSpace {}
 
 impl ElementRefInto<Loggable> for SingletonSpace {
     fn elem_ref_into(&self, _element: &Self::Element) -> Loggable {

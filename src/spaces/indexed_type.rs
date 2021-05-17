@@ -1,5 +1,5 @@
 //! `IndexedTypeSpace` and `Indexed` trait
-use super::{ElementRefInto, FiniteSpace, SampleSpace, Space};
+use super::{ElementRefInto, FiniteSpace, Space};
 
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
@@ -62,8 +62,6 @@ impl<T: Indexed> Distribution<T> for IndexedTypeSpace<T> {
         T::from_index(rng.gen_range(0, T::SIZE)).unwrap()
     }
 }
-
-impl<T: Indexed> SampleSpace for IndexedTypeSpace<T> {}
 
 impl<T: Indexed> FiniteSpace for IndexedTypeSpace<T> {
     fn size(&self) -> usize {

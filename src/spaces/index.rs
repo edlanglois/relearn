@@ -1,5 +1,5 @@
 //! `IndexSpace` definition
-use super::{ElementRefInto, FiniteSpace, SampleSpace, Space};
+use super::{ElementRefInto, FiniteSpace, Space};
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -37,8 +37,6 @@ impl Distribution<<Self as Space>::Element> for IndexSpace {
         rng.gen_range(0, self.size)
     }
 }
-
-impl SampleSpace for IndexSpace {}
 
 impl FiniteSpace for IndexSpace {
     fn size(&self) -> usize {

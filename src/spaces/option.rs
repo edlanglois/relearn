@@ -1,5 +1,5 @@
 //! Optional space definition.
-use super::{ElementRefInto, FiniteSpace, SampleSpace, Space};
+use super::{ElementRefInto, FiniteSpace, Space};
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -68,8 +68,6 @@ where
         }
     }
 }
-
-impl<S> SampleSpace for OptionSpace<S> where S: Space + Distribution<<S as Space>::Element> {}
 
 // NOTE: This should maybe be the equivalent of TryInto instead of Into
 impl<S: Space> ElementRefInto<Loggable> for OptionSpace<S> {
