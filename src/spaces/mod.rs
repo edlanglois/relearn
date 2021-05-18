@@ -3,6 +3,7 @@ mod finite;
 mod index;
 mod indexed_type;
 mod option;
+mod product;
 mod rl;
 mod singleton;
 #[cfg(test)]
@@ -12,6 +13,7 @@ pub use finite::FiniteSpace;
 pub use index::IndexSpace;
 pub use indexed_type::{Indexed, IndexedTypeSpace};
 pub use option::OptionSpace;
+pub use product::ProductSpace;
 pub use rl::RLSpace;
 pub use singleton::SingletonSpace;
 
@@ -29,6 +31,10 @@ pub trait Space {
 }
 
 /// A space from which samples can be drawn.
+///
+/// No particular distribution is specified but the distribution:
+/// * must have support equal to the entire space, and
+/// * should be some form of reasonable "standard" distribution for the space.
 pub trait SampleSpace: Space + RandDistribution<<Self as Space>::Element> {}
 
 impl<S> SampleSpace for S where S: Space + RandDistribution<<Self as Space>::Element> {}
