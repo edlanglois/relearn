@@ -1,88 +1,71 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{
+    criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration,
+    Throughput,
+};
 use rust_rl::torch::seq_modules::{Gru, RnnConfig, SequenceModule};
 use rust_rl::torch::ModuleBuilder;
 use std::array::IntoIter;
 use tch::{nn::VarStore, Device, Kind, Tensor};
 
-fn gru_seq_serial(c: &mut Criterion) {
+fn gru_rnn(c: &mut Criterion) {
+    let mut group = c.benchmark_group("gru_seq");
+    let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
+    group.plot_config(plot_config);
+
     let batch_size = 1;
     let in_features = 3;
     let out_features = 4;
     let vs = VarStore::new(Device::Cpu);
     let gru: Gru = RnnConfig::default().build_module(&vs.root(), in_features, out_features);
 
-    // n episodes of length 1 in serial
-    let mut ep_group = c.benchmark_group("gru_seq_serial_n_episodes");
     for total_steps in IntoIter::new([1usize, 10, 100, 1000]) {
+        group.throughput(Throughput::Elements(total_steps as u64));
         let input = Tensor::ones(
             &[batch_size, total_steps as i64, in_features as i64],
             (Kind::Float, Device::Cpu),
         );
 
-        ep_group.throughput(Throughput::Elements(total_steps as u64));
+        // n episodes of length 1 in serial
         let seq_lengths = vec![1; total_steps];
-        ep_group.bench_with_input(
-            BenchmarkId::from_parameter(total_steps),
+        group.bench_with_input(
+            BenchmarkId::new("seq_serial_n_episodes", total_steps),
             &input,
             |b, input| b.iter_with_large_drop(|| gru.seq_serial(input, &seq_lengths)),
         );
-    }
-    ep_group.finish();
 
-    // 1 episode of length n
-    let mut step_group = c.benchmark_group("gru_seq_serial_n_steps");
-    for total_steps in IntoIter::new([1usize, 10, 100, 1000]) {
-        let input = Tensor::ones(
-            &[batch_size, total_steps as i64, in_features as i64],
-            (Kind::Float, Device::Cpu),
-        );
-
-        step_group.throughput(Throughput::Elements(total_steps as u64));
+        // 1 episode of length n
         let seq_lengths = [total_steps];
-        step_group.bench_with_input(
-            BenchmarkId::from_parameter(total_steps),
+        group.bench_with_input(
+            BenchmarkId::new("seq_serial_n_steps", total_steps),
             &input,
             |b, input| b.iter_with_large_drop(|| gru.seq_serial(input, &seq_lengths)),
         );
-    }
-    step_group.finish();
 
-    // n episodes of length 1, batched
-    let mut ep_group = c.benchmark_group("gru_seq_serial_n_batches");
-    for total_steps in IntoIter::new([1usize, 10, 100, 1000]) {
+        // n episodes of length 1, batched
         let input = Tensor::ones(
             &[total_steps as i64, 1, in_features as i64],
             (Kind::Float, Device::Cpu),
         );
-
-        ep_group.throughput(Throughput::Elements(total_steps as u64));
         let seq_lengths = [1];
-        ep_group.bench_with_input(
-            BenchmarkId::from_parameter(total_steps),
+        group.bench_with_input(
+            BenchmarkId::new("seq_serial_n_batches", total_steps),
             &input,
             |b, input| b.iter_with_large_drop(|| gru.seq_serial(input, &seq_lengths)),
         );
-    }
-    ep_group.finish();
 
-    // n episodes of length 1, packed
-    let mut ep_group = c.benchmark_group("gru_seq_packed_n_episodes");
-    for total_steps in IntoIter::new([1usize, 10, 100, 1000]) {
+        // n episodes of length 1, packed
         let input = Tensor::ones(
             &[total_steps as i64, in_features as i64],
             (Kind::Float, Device::Cpu),
         );
         let batch_sizes = Tensor::of_slice(&[total_steps as i64]);
-
-        ep_group.throughput(Throughput::Elements(total_steps as u64));
-        ep_group.bench_with_input(
-            BenchmarkId::from_parameter(total_steps),
+        group.bench_with_input(
+            BenchmarkId::new("seq_packed_n_episodes", total_steps),
             &input,
             |b, input| b.iter_with_large_drop(|| gru.seq_packed(input, &batch_sizes)),
         );
     }
-    ep_group.finish();
 }
 
-criterion_group!(benches, gru_seq_serial);
+criterion_group!(benches, gru_rnn);
 criterion_main!(benches);
