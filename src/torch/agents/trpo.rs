@@ -5,14 +5,14 @@
 //! International conference on machine learning. PMLR, 2015.
 //! <https://arxiv.org/abs/1502.05477>
 
-use super::super::history::{LazyPackedHistoryFeatures, PackedHistoryFeaturesView};
+use super::super::history::PackedHistoryFeaturesView;
 use super::super::optimizers::{
     Optimizer, OptimizerBuilder, OptimizerStepError, TrustRegionOptimizer,
 };
 use super::super::seq_modules::{SequenceModule, StatefulIterativeModule};
 use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::ModuleBuilder;
-use super::actor::{PolicyValueNetActor, PolicyValueNetActorConfig};
+use super::actor::{HistoryFeatures, PolicyValueNetActor, PolicyValueNetActorConfig};
 use super::policy_gradient;
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::{Event, Logger};
@@ -193,7 +193,7 @@ where
 
 fn trpo_update<OS, AS, P, PO, V>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
-    features: &LazyPackedHistoryFeatures<OS, AS>,
+    features: &HistoryFeatures<OS, AS>,
     policy_optimizer: &mut PO,
     max_policy_step_kl: f64,
     logger: &mut dyn Logger,

@@ -1,9 +1,9 @@
 //! Vanilla Policy Gradient
-use super::super::history::{LazyPackedHistoryFeatures, PackedHistoryFeaturesView};
+use super::super::history::PackedHistoryFeaturesView;
 use super::super::seq_modules::{SequenceModule, StatefulIterativeModule};
 use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::{ModuleBuilder, Optimizer, OptimizerBuilder};
-use super::actor::{PolicyValueNetActor, PolicyValueNetActorConfig};
+use super::actor::{HistoryFeatures, PolicyValueNetActor, PolicyValueNetActorConfig};
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::Logger;
 use crate::spaces::{FeatureSpace, ParameterizedDistributionSpace, ReprSpace, Space};
@@ -153,7 +153,7 @@ where
 /// Perform a single policy gradient update step using the given history features.
 pub fn policy_gradient_update<OS, AS, P, V, PO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
-    features: &LazyPackedHistoryFeatures<OS, AS>,
+    features: &HistoryFeatures<OS, AS>,
     optimizer: &mut PO,
 ) -> Tensor
 where
@@ -186,7 +186,7 @@ where
 /// Perform a single squared error loss value function update using the given history features.
 pub fn value_squared_error_update<OS, AS, P, V, VO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
-    features: &LazyPackedHistoryFeatures<OS, AS>,
+    features: &HistoryFeatures<OS, AS>,
     optimizer: &mut VO,
 ) -> Tensor
 where

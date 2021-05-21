@@ -4,7 +4,9 @@ use super::super::seq_modules::StatefulIterativeModule;
 use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::ModuleBuilder;
 use crate::logging::{Event, Logger};
-use crate::spaces::{FeatureSpace, ParameterizedDistributionSpace, Space};
+use crate::spaces::{
+    FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace, ReprSpace, Space,
+};
 use crate::{Actor, EnvStructure, Step};
 use tch::{nn::Path, Tensor};
 
@@ -78,7 +80,7 @@ where
     AS: Space,
 {
     /// Environment observation space
-    pub observation_space: OS,
+    pub observation_space: NonEmptyFeatures<OS>,
 
     /// Environment action space
     pub action_space: AS,
@@ -135,7 +137,7 @@ where
         PB: ModuleBuilder<P>,
         VB: StepValueBuilder<V>,
     {
-        let observation_space = env.observation_space;
+        let observation_space = NonEmptyFeatures::new(env.observation_space);
         let action_space = env.action_space;
         let max_steps_per_epoch = config.steps_per_epoch + config.steps_per_epoch / 10;
 
@@ -183,10 +185,13 @@ where
     }
 }
 
+/// History features type for [`PolicyValueNetActor`]
+pub type HistoryFeatures<'a, OS, AS> = LazyPackedHistoryFeatures<'a, NonEmptyFeatures<OS>, AS>;
+
 impl<OS, AS, P, V> PolicyValueNetActor<OS, AS, P, V>
 where
-    OS: Space,
-    AS: Space,
+    OS: FeatureSpace<Tensor>,
+    AS: ReprSpace<Tensor>,
     V: StepValue,
 {
     /// Perform a step update and update the model paramters if enough data has been accumulated.
@@ -211,8 +216,8 @@ where
         update_value: G,
         logger: &mut dyn Logger,
     ) where
-        F: FnOnce(&Self, &LazyPackedHistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
-        G: FnMut(&Self, &LazyPackedHistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
+        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
+        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
     {
         let episode_done = step.episode_done;
         self.history.push(step);
@@ -238,8 +243,8 @@ where
 
     fn epoch_update<F, G>(&mut self, update_policy: F, mut update_value: G, logger: &mut dyn Logger)
     where
-        F: FnOnce(&Self, &LazyPackedHistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
-        G: FnMut(&Self, &LazyPackedHistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
+        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
+        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
     {
         let features = LazyPackedHistoryFeatures::new(
             self.history.steps(),
