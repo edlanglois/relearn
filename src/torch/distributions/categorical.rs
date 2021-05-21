@@ -50,7 +50,7 @@ impl ArrayDistribution<Tensor, Tensor> for Categorical {
     }
 
     fn sample(&self) -> Tensor {
-        self.logits.exp().multinomial(1, true)
+        self.logits.exp().multinomial(1, true).squeeze1(-1)
     }
 
     fn log_probs(&self, elements: &Tensor) -> Tensor {
@@ -77,6 +77,55 @@ impl ArrayDistribution<Tensor, Tensor> for Categorical {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tch::IndexOp;
+
+    #[test]
+    fn batch_shape_0d() {
+        let logits = Tensor::of_slice(&[0.0_f32, 1.0, 0.0]).log();
+        let d = Categorical::new(&logits);
+        assert_eq!(d.batch_shape(), vec![]);
+    }
+
+    #[test]
+    fn batch_shape_1d() {
+        let logits = Tensor::of_slice(&[
+            0.0_f32, 1.0, 0.0, //
+            0.2, 0.3, 0.5, //
+        ])
+        .reshape(&[2, 3])
+        .log();
+        let d = Categorical::new(&logits);
+        assert_eq!(d.batch_shape(), vec![2]);
+    }
+
+    #[test]
+    fn element_shape() {
+        let logits = Tensor::of_slice(&[
+            0.0_f32, 1.0, 0.0, //
+            0.2, 0.3, 0.5, //
+        ])
+        .reshape(&[2, 3])
+        .log();
+        let d = Categorical::new(&logits);
+        assert_eq!(d.element_shape(), vec![]);
+    }
+
+    #[test]
+    fn sample() {
+        let logits = Tensor::of_slice(&[
+            1.0_f32, 0.0, 0.0, //
+            0.0, 1.0, 0.0, //
+            0.0, 0.0, 1.0, //
+            0.3, 0.3, 0.4, //
+        ])
+        .reshape(&[4, 3])
+        .log();
+        let d = Categorical::new(&logits);
+        let samples = d.sample();
+        assert_eq!(samples.size(), vec![4]);
+        assert_eq!(samples.i(..3), Tensor::of_slice(&[0_i64, 1, 2]));
+        assert!((0..3).contains(&i64::from(samples.i(3))));
+    }
 
     #[test]
     fn log_probs() {
