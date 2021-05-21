@@ -1,8 +1,13 @@
 //! Singleton space definition.
-use super::{CategoricalSpace, FiniteSpace, Space};
+use super::{
+    ElementRefInto, FeatureSpace, FiniteSpace, ParameterizedDistributionSpace, ReprSpace, Space,
+};
+use crate::logging::Loggable;
+use crate::torch::distributions::DeterministicEmptyVec;
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::fmt;
+use tch::{Device, Kind, Tensor};
 
 /// A space containing a single element.
 #[derive(Debug, Clone)]
@@ -56,18 +61,71 @@ impl FiniteSpace for SingletonSpace {
     }
 }
 
-// TODO: Replace with custom implementations
-impl CategoricalSpace for SingletonSpace {}
+/// Represent elements as an integer vector of length 0.
+impl ReprSpace<Tensor> for SingletonSpace {
+    fn repr(&self, _element: &Self::Element) -> Tensor {
+        Tensor::empty(&[0], (Kind::Int64, Device::Cpu))
+    }
+
+    fn batch_repr<'a, I>(&self, elements: I) -> Tensor
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+    {
+        let num_elements = elements.into_iter().count();
+        Tensor::empty(&[num_elements as i64, 0], (Kind::Int64, Device::Cpu))
+    }
+}
+
+/// Represent elements as a float vector of length 0.
+impl FeatureSpace<Tensor> for SingletonSpace {
+    fn num_features(&self) -> usize {
+        0
+    }
+
+    fn features(&self, _element: &Self::Element) -> Tensor {
+        Tensor::empty(&[0], (Kind::Float, Device::Cpu))
+    }
+
+    fn batch_features<'a, I>(&self, elements: I) -> Tensor
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+    {
+        let num_elements = elements.into_iter().count();
+        Tensor::empty(&[num_elements as i64, 0], (Kind::Int64, Device::Cpu))
+    }
+}
+
+/// "Parameterize" a deterministic distribution with no parameters.
+impl ParameterizedDistributionSpace<Tensor> for SingletonSpace {
+    type Distribution = DeterministicEmptyVec;
+
+    fn num_distribution_params(&self) -> usize {
+        0
+    }
+    fn sample_element(&self, _params: &Tensor) -> Self::Element {}
+
+    fn distribution(&self, params: &Tensor) -> Self::Distribution {
+        let batch_shape: Vec<_> = params
+            .size()
+            .split_last()
+            .expect("params must have shape [BATCH_SHAPE..., 0]")
+            .1
+            .into();
+        Self::Distribution::new(batch_shape)
+    }
+}
 
 impl Distribution<<Self as Space>::Element> for SingletonSpace {
     fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> <Self as Space>::Element {}
 }
 
-// impl ElementRefInto<Loggable> for SingletonSpace {
-//     fn elem_ref_into(&self, _element: &Self::Element) -> Loggable {
-//         Loggable::Nothing
-//     }
-// }
+impl ElementRefInto<Loggable> for SingletonSpace {
+    fn elem_ref_into(&self, _element: &Self::Element) -> Loggable {
+        Loggable::Nothing
+    }
+}
 
 #[cfg(test)]
 mod singleton_space {
