@@ -2,6 +2,7 @@
 mod categorical;
 mod index;
 mod indexed_type;
+mod nonempty_features;
 mod option;
 mod product;
 mod rl;
@@ -12,6 +13,7 @@ pub mod testing;
 pub use categorical::CategoricalSpace;
 pub use index::IndexSpace;
 pub use indexed_type::{Indexed, IndexedTypeSpace};
+pub use nonempty_features::NonEmptyFeatures;
 pub use option::OptionSpace;
 pub use product::ProductSpace;
 pub use rl::RLSpace;
