@@ -105,10 +105,10 @@ pub trait FeatureSpace<T, T2 = T>: Space {
 }
 
 /// A space whose elements parameterize a distribution
-pub trait ParameterizedDistributionSpace<T>: Space {
+pub trait ParameterizedDistributionSpace<T, T2 = T>: ReprSpace<T, T2> {
     /// Batched distribution type.
     ///
-    /// The element representation must match the format of [`ReprSpace<_, T>`].
+    /// The element representation must match the format of [`ReprSpace`].
     /// That is, `batch_repr(&[...])` must be a valid input for [`ArrayDistribution::log_probs`].
     type Distribution: ArrayDistribution<T, T>;
 
@@ -132,7 +132,7 @@ pub trait ParameterizedDistributionSpace<T>: Space {
     ///
     /// # Returns
     /// The distribution(s) parameterized by `params`.
-    fn distribution(&self, params: &T) -> Self::Distribution;
+    fn distribution(&self, params: &T2) -> Self::Distribution;
 }
 
 // This could possibly be a single trait like
