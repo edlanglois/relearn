@@ -17,7 +17,7 @@ pub use product::ProductSpace;
 pub use rl::RLSpace;
 pub use singleton::SingletonSpace;
 
-use crate::utils::distributions::BatchDistribution;
+use crate::utils::distributions::ArrayDistribution;
 use rand::distributions::Distribution as RandDistribution;
 
 /// A space: a set of values with some added structure.
@@ -107,8 +107,8 @@ pub trait ParameterizedDistributionSpace<T>: Space {
     /// Batched distribution type.
     ///
     /// The element representation must match the format of [`ReprSpace<_, T>`].
-    /// That is, `batch_repr(&[...])` must be a valid input for [`BatchDistribution::log_probs`].
-    type Distribution: BatchDistribution<T, T>;
+    /// That is, `batch_repr(&[...])` must be a valid input for [`ArrayDistribution::log_probs`].
+    type Distribution: ArrayDistribution<T, T>;
 
     /// Size of the parameter vector for which elements are sampled.
     fn num_distribution_params(&self) -> usize;

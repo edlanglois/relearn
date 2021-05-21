@@ -17,7 +17,7 @@ use super::policy_gradient;
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::{Event, Logger};
 use crate::spaces::{FeatureSpace, ParameterizedDistributionSpace, ReprSpace, Space};
-use crate::utils::distributions::BatchDistribution;
+use crate::utils::distributions::ArrayDistribution;
 use crate::EnvStructure;
 use tch::{kind::Kind, nn, Device, Tensor};
 

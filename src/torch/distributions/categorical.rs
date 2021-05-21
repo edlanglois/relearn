@@ -1,5 +1,6 @@
 //! Categorical distribution
-use crate::utils::distributions::BatchDistribution;
+use crate::utils::distributions::ArrayDistribution;
+use std::convert::TryInto;
 use tch::{Kind, Tensor};
 
 /// Categorical distribution(s).
@@ -32,7 +33,22 @@ fn clamp_float_min(x: &Tensor) -> Result<Tensor, Kind> {
     }
 }
 
-impl BatchDistribution<Tensor, Tensor> for Categorical {
+impl ArrayDistribution<Tensor, Tensor> for Categorical {
+    fn batch_shape(&self) -> Vec<usize> {
+        self.logits
+            .size() // shape as i64
+            .split_last() // exclude NUM_EVENTS dim
+            .unwrap()
+            .1
+            .iter()
+            .map(|&s| s.try_into().unwrap()) // convert to usize
+            .collect()
+    }
+
+    fn element_shape(&self) -> Vec<usize> {
+        Vec::new()
+    }
+
     fn sample(&self) -> Tensor {
         self.logits.exp().multinomial(1, true)
     }

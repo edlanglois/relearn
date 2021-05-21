@@ -4,27 +4,34 @@ use rand::prelude::*;
 use std::cmp::PartialOrd;
 use std::convert::Infallible;
 
-/// A batch of distributions with associated statistics.
-///
-/// Any batch shape is allowed, including 0-dimensions for a single distribution.
-pub trait BatchDistribution<E, T> {
+/// A (batch of) distribution(s) over multi-dimensional arrays.
+pub trait ArrayDistribution<E, T> {
+    /// The batch shape of distributions.
+    fn batch_shape(&self) -> Vec<usize>;
+
+    /// The shape of an element.
+    fn element_shape(&self) -> Vec<usize>;
+
     /// Sample a batch of elements.
+    ///
+    /// # Returns
+    /// An array of shape `[BATCH_SHAPE..., ELEMENT_SHAPE...]`
     fn sample(&self) -> E;
 
     /// Log probabilities of the given elements
     ///
     /// # Args
     /// * `elements` - Elements from the distribution domains. One per distribution.
-    ///                An array with the same (or broadcastable) shape as the batch shape.
+    ///                An array with shape `[BATCH_SHAPE..., ELEMENT_SHAPE...]`.
     ///
     /// # Returns
-    /// An array of log probabilities with shape equal to the batch shape.
+    /// An array of log probabilities with shape `[BATCH_SHAPE...]`.
     fn log_probs(&self, elements: &E) -> T;
 
     /// Distribution entropies.
     ///
     /// # Returns
-    /// An array of entropies with shape equal to the batch shape.
+    /// An array of entropies with shape `[BATCH_SHAPE...]`.
     fn entropy(&self) -> T;
 
     /// The KL divergence (relative entropy) from another batch of distributions.
@@ -35,7 +42,7 @@ pub trait BatchDistribution<E, T> {
     /// * `other` - A batch of distributions with the same (or broadcastable) batch shape.
     ///
     /// # Returns
-    /// An array of KL divergences `KL(self[i] || other[i])` having shape equal to the batch shape.
+    /// An array of KL divergences `KL(self[i] || other[i])` with shape `[BATCH_SHAPE...]`.
     fn kl_divergence_from(&self, other: &Self) -> T;
 }
 

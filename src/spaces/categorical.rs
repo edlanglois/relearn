@@ -2,7 +2,7 @@
 use super::{ElementRefInto, FeatureSpace, FiniteSpace, ParameterizedDistributionSpace, ReprSpace};
 use crate::logging::Loggable;
 use crate::torch;
-use crate::utils::distributions::BatchDistribution;
+use crate::utils::distributions::ArrayDistribution;
 use std::convert::TryInto;
 use tch::{Device, Kind, Tensor};
 

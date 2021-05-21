@@ -7,7 +7,7 @@ use super::actor::{PolicyValueNetActor, PolicyValueNetActorConfig};
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::Logger;
 use crate::spaces::{FeatureSpace, ParameterizedDistributionSpace, ReprSpace, Space};
-use crate::utils::distributions::BatchDistribution;
+use crate::utils::distributions::ArrayDistribution;
 use crate::EnvStructure;
 use std::cell::Cell;
 use tch::{kind::Kind, nn, Device, Tensor};
