@@ -1,36 +1,24 @@
-//! `FiniteSpace` trait definition
-use super::{FeatureSpace, ParameterizedDistributionSpace, ReprSpace, Space};
+//! Categorical subtype of [`FiniteSpace`]
+use super::{ElementRefInto, FeatureSpace, FiniteSpace, ParameterizedDistributionSpace, ReprSpace};
+use crate::logging::Loggable;
 use crate::torch;
 use crate::utils::distributions::BatchDistribution;
 use std::convert::TryInto;
 use tch::{Device, Kind, Tensor};
 
-/// A space containing finitely many elements.
-pub trait FiniteSpace: Space {
-    /// The number of elements in the space.
-    fn size(&self) -> usize;
-
-    /// Get the index of an element.
-    fn to_index(&self, element: &Self::Element) -> usize;
-
-    /// Try to convert an index to an element.
-    ///
-    /// The return value is `Some(elem)` if and only if
-    /// `elem` is the unique element in the space with `to_index(elem) == index`.
-    fn from_index(&self, index: usize) -> Option<Self::Element>;
-
-    /// Try to convert an index to an element.
-    ///
-    /// If None is returned then the index was invalid.
-    /// It is allowed that Some value may be returned even if the index is invalid.
-    /// If you need to validate the returned value, use [`FiniteSpace::from_index`].
-    fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
-        self.from_index(index)
-    }
-}
+/// A space consisting of `N` distinct elements treated as distinct and unrelated.
+///
+/// This does not assume any particular internal structure for the space.
+///
+/// Implementing this trait provides implementations for:
+/// * [`ReprSpace<Tensor>`] as an integer index
+/// * [`FeatureSpace<Tensor>`] as a one-hot vector
+/// * [`ParameterizedDistributionSpace<Tensor>`] as a categorical distribution
+/// * [`ElementRefInto<Loggable>`] as [`Loggable::IndexSample`]
+pub trait CategoricalSpace: FiniteSpace {}
 
 /// Represents elements as integer tensors.
-impl<S: FiniteSpace> ReprSpace<Tensor> for S {
+impl<S: CategoricalSpace> ReprSpace<Tensor> for S {
     fn repr(&self, element: &Self::Element) -> Tensor {
         Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu))
     }
@@ -49,7 +37,7 @@ impl<S: FiniteSpace> ReprSpace<Tensor> for S {
 }
 
 /// Represents elements with one-hot feature vectors.
-impl<S: FiniteSpace> FeatureSpace<Tensor> for S {
+impl<S: CategoricalSpace> FeatureSpace<Tensor> for S {
     fn num_features(&self) -> usize {
         self.size()
     }
@@ -80,7 +68,7 @@ impl<S: FiniteSpace> FeatureSpace<Tensor> for S {
 }
 
 /// Parameterize a categorical distribution.
-impl<S: FiniteSpace> ParameterizedDistributionSpace<Tensor> for S {
+impl<S: CategoricalSpace> ParameterizedDistributionSpace<Tensor> for S {
     type Distribution = torch::distributions::Categorical;
 
     fn num_distribution_params(&self) -> usize {
@@ -100,6 +88,16 @@ impl<S: FiniteSpace> ParameterizedDistributionSpace<Tensor> for S {
 
     fn distribution(&self, params: &Tensor) -> Self::Distribution {
         Self::Distribution::new(params)
+    }
+}
+
+/// Log the index as a sample from `0..N`
+impl<S: CategoricalSpace> ElementRefInto<Loggable> for S {
+    fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
+        Loggable::IndexSample {
+            value: self.to_index(element),
+            size: self.size(),
+        }
     }
 }
 

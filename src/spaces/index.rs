@@ -1,6 +1,5 @@
 //! `IndexSpace` definition
-use super::{ElementRefInto, FiniteSpace, Space};
-use crate::logging::Loggable;
+use super::{CategoricalSpace, FiniteSpace, Space};
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::fmt;
@@ -60,15 +59,7 @@ impl FiniteSpace for IndexSpace {
     }
 }
 
-// Element conversions
-impl ElementRefInto<Loggable> for IndexSpace {
-    fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
-        Loggable::IndexSample {
-            value: *element,
-            size: self.size,
-        }
-    }
-}
+impl CategoricalSpace for IndexSpace {}
 
 #[cfg(test)]
 mod index_space {

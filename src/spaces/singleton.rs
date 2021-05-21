@@ -1,6 +1,5 @@
 //! Singleton space definition.
-use super::{ElementRefInto, FiniteSpace, Space};
-use crate::logging::Loggable;
+use super::{CategoricalSpace, FiniteSpace, Space};
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::fmt;
@@ -57,15 +56,18 @@ impl FiniteSpace for SingletonSpace {
     }
 }
 
+// TODO: Replace with custom implementations
+impl CategoricalSpace for SingletonSpace {}
+
 impl Distribution<<Self as Space>::Element> for SingletonSpace {
     fn sample<R: Rng + ?Sized>(&self, _rng: &mut R) -> <Self as Space>::Element {}
 }
 
-impl ElementRefInto<Loggable> for SingletonSpace {
-    fn elem_ref_into(&self, _element: &Self::Element) -> Loggable {
-        Loggable::Nothing
-    }
-}
+// impl ElementRefInto<Loggable> for SingletonSpace {
+//     fn elem_ref_into(&self, _element: &Self::Element) -> Loggable {
+//         Loggable::Nothing
+//     }
+// }
 
 #[cfg(test)]
 mod singleton_space {

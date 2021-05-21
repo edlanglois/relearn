@@ -1,7 +1,5 @@
 //! `IndexedTypeSpace` and `Indexed` trait
-use super::{ElementRefInto, FiniteSpace, Space};
-
-use crate::logging::Loggable;
+use super::{CategoricalSpace, FiniteSpace, Space};
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::any;
@@ -77,14 +75,7 @@ impl<T: Indexed> FiniteSpace for IndexedTypeSpace<T> {
     }
 }
 
-impl<T: Indexed> ElementRefInto<Loggable> for IndexedTypeSpace<T> {
-    fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
-        Loggable::IndexSample {
-            value: T::as_index(element),
-            size: T::SIZE,
-        }
-    }
-}
+impl<T: Indexed> CategoricalSpace for IndexedTypeSpace<T> {}
 
 impl Indexed for bool {
     const SIZE: usize = 2;

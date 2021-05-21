@@ -1,5 +1,5 @@
 //! Spaces: runtime-defined types
-mod finite;
+mod categorical;
 mod index;
 mod indexed_type;
 mod option;
@@ -9,7 +9,7 @@ mod singleton;
 #[cfg(test)]
 pub mod testing;
 
-pub use finite::FiniteSpace;
+pub use categorical::CategoricalSpace;
 pub use index::IndexSpace;
 pub use indexed_type::{Indexed, IndexedTypeSpace};
 pub use option::OptionSpace;
@@ -28,6 +28,30 @@ pub trait Space {
 
     /// Check whether a particular value is contained in the space.
     fn contains(&self, value: &Self::Element) -> bool;
+}
+
+/// A space containing finitely many elements.
+pub trait FiniteSpace: Space {
+    /// The number of elements in the space.
+    fn size(&self) -> usize;
+
+    /// Get the index of an element.
+    fn to_index(&self, element: &Self::Element) -> usize;
+
+    /// Try to convert an index to an element.
+    ///
+    /// The return value is `Some(elem)` if and only if
+    /// `elem` is the unique element in the space with `to_index(elem) == index`.
+    fn from_index(&self, index: usize) -> Option<Self::Element>;
+
+    /// Try to convert an index to an element.
+    ///
+    /// If None is returned then the index was invalid.
+    /// It is allowed that Some value may be returned even if the index is invalid.
+    /// If you need to validate the returned value, use [`FiniteSpace::from_index`].
+    fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
+        self.from_index(index)
+    }
 }
 
 /// A space from which samples can be drawn.
