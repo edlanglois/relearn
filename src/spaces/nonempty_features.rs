@@ -61,9 +61,18 @@ impl<S: FeatureSpace<Tensor>> FeatureSpace<Tensor> for NonEmptyFeatures<S> {
         }
     }
 
+    fn features_out(&self, element: &Self::Element, out: &mut Tensor) {
+        if self.inner.num_features() == 0 {
+            let _ = out.zero_();
+        } else {
+            self.inner.features_out(element, out);
+        }
+    }
+
     fn batch_features<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
+        <I as IntoIterator>::IntoIter: ExactSizeIterator,
         Self::Element: 'a,
     {
         if self.inner.num_features() == 0 {
@@ -71,6 +80,18 @@ impl<S: FeatureSpace<Tensor>> FeatureSpace<Tensor> for NonEmptyFeatures<S> {
             Tensor::zeros(&[num_elements as i64, 1], (Kind::Float, Device::Cpu))
         } else {
             self.inner.batch_features(elements)
+        }
+    }
+
+    fn batch_features_out<'a, I>(&self, elements: I, out: &mut Tensor)
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+    {
+        if self.inner.num_features() == 0 {
+            let _ = out.zero_();
+        } else {
+            self.inner.batch_features_out(elements, out);
         }
     }
 }

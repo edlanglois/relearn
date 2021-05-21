@@ -87,6 +87,8 @@ impl FeatureSpace<Tensor> for SingletonSpace {
         Tensor::empty(&[0], (Kind::Float, Device::Cpu))
     }
 
+    fn features_out(&self, _element: &Self::Element, _out: &mut Tensor) {}
+
     fn batch_features<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -94,6 +96,13 @@ impl FeatureSpace<Tensor> for SingletonSpace {
     {
         let num_elements = elements.into_iter().count();
         Tensor::empty(&[num_elements as i64, 0], (Kind::Int64, Device::Cpu))
+    }
+
+    fn batch_features_out<'a, I>(&self, _elements: I, _out: &mut Tensor)
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+    {
     }
 }
 

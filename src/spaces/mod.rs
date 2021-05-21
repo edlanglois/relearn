@@ -21,6 +21,7 @@ pub use singleton::SingletonSpace;
 
 use crate::utils::distributions::ArrayDistribution;
 use rand::distributions::Distribution as RandDistribution;
+use std::iter::ExactSizeIterator;
 
 /// A space: a set of values with some added structure.
 ///
@@ -70,7 +71,7 @@ impl<S> SampleSpace for S where S: Space + RandDistribution<<Self as Space>::Ele
 /// This representation is generally minimal, in contrast to [`FeatureSpace`],
 /// which produces a representation suited for use as input to a machine learning model.
 pub trait ReprSpace<T, T0 = T>: Space {
-    /// Represent a single element as a scalar value.
+    /// Representation of a single element.
     fn repr(&self, element: &Self::Element) -> T0;
 
     /// Represent a batch of elements as an array.
@@ -90,15 +91,40 @@ pub trait FeatureSpace<T, T2 = T>: Space {
 
     /// Convert an element of the space into a feature vector.
     ///
-    /// The output vector has length equal to `num_features()`.
+    /// # Args
+    /// * `element` - An element of the space.
+    ///
+    /// # Returns
+    /// A feature vector with length `NUM_FEATURES`.
     fn features(&self, element: &Self::Element) -> T;
 
-    /// Construct a matrix of feature vectors for an array of elements of the space.
+    /// Convert an element of the space into a feature vector.
     ///
-    /// The output is a two-dimensional array where
-    /// the first dimension has length equal to `elements.len()` and
-    /// the second dimension has length equal to `num_features()`.
+    /// # Args
+    /// * `element` - An element of the space.
+    /// * `out` - A vector with length `NUM_FEATURES` into which the features are written.
+    fn features_out(&self, element: &Self::Element, out: &mut T);
+
+    /// Construct a matrix of feature vectors for a set of elements.
+    ///
+    /// # Args
+    /// * `elements` - A set of elements of the space.
+    ///
+    /// # Returns
+    /// A two-dimensional array of shape `[NUM_ELEMENTS, NUM_FEATURES]`.
     fn batch_features<'a, I>(&self, elements: I) -> T2
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        Self::Element: 'a;
+
+    /// Construct a matrix of feature vectors for a set of elements.
+    ///
+    /// # Args
+    /// * `elements` - A set of elements of the space.
+    /// * `out` - A two-dimensional array of shape `[NUM_ELEMENTS, NUM_FEATURES]`
+    ///           into which the features are written.
+    fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2)
     where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a;

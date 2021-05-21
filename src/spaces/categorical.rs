@@ -50,6 +50,13 @@ impl<S: CategoricalSpace> FeatureSpace<Tensor> for S {
         )
     }
 
+    fn features_out(&self, element: &Self::Element, out: &mut Tensor) {
+        torch::utils::one_hot_out(
+            &Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu)),
+            out,
+        )
+    }
+
     fn batch_features<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -64,6 +71,18 @@ impl<S: CategoricalSpace> FeatureSpace<Tensor> for S {
             self.num_features(),
             Kind::Float,
         )
+    }
+
+    fn batch_features_out<'a, I>(&self, elements: I, out: &mut Tensor)
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+    {
+        let indices: Vec<_> = elements
+            .into_iter()
+            .map(|element| self.to_index(element) as i64)
+            .collect();
+        torch::utils::one_hot_out(&Tensor::of_slice(&indices), out)
     }
 }
 

@@ -3,6 +3,7 @@ use super::{ElementRefInto, FeatureSpace, FiniteSpace, Space};
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
 use rand::Rng;
+use std::convert::TryInto;
 use std::fmt;
 use std::marker::PhantomData;
 use tch::{Device, IndexOp, Kind, Tensor};
@@ -66,24 +67,54 @@ impl<S: FeatureSpace<Tensor>> PhantomFeatureSpace<Tensor> for OptionSpace<S> {
     }
 
     fn phantom_features(&self, element: &Self::Element) -> Tensor {
-        let out = Tensor::zeros(
+        let mut out = Tensor::empty(
             &[self.phantom_num_features() as i64],
             (Kind::Float, Device::Cpu),
         );
-        if let Some(inner_elem) = element {
-            out.i(1..).copy_(&self.inner.features(inner_elem));
-        } else {
-            let _ = out.i(0).fill_(1.0);
-        }
+        self.phantom_features_out(element, &mut out);
         out
+    }
+
+    fn phantom_features_out(&self, element: &Self::Element, out: &mut Tensor) {
+        let rest_size = self.inner.num_features();
+        let [mut first, mut rest]: [Tensor; 2] = out
+            .split_with_sizes(&[1, rest_size as i64], -1)
+            .try_into()
+            .unwrap();
+        if let Some(inner_elem) = element {
+            let _ = first.fill_(0.0);
+            self.inner.features_out(inner_elem, &mut rest);
+        } else {
+            let _ = first.fill_(1.0);
+            let _ = rest.fill_(0.0);
+        }
     }
 
     fn phantom_batch_features<'a, I>(
         &self,
         elements: I,
-        _: PhantomData<&'a Self::Element>,
+        marker: PhantomData<&'a Self::Element>,
     ) -> Tensor
     where
+        I: IntoIterator<Item = &'a Self::Element>,
+        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        Self::Element: 'a,
+    {
+        let elements = elements.into_iter();
+        let mut out = Tensor::empty(
+            &[elements.len() as i64, self.phantom_num_features() as i64],
+            (Kind::Float, Device::Cpu),
+        );
+        self.phantom_batch_features_out(elements, &mut out, marker);
+        out
+    }
+
+    fn phantom_batch_features_out<'a, I>(
+        &self,
+        elements: I,
+        out: &mut Tensor,
+        _: PhantomData<&'a Self::Element>,
+    ) where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a,
     {
@@ -98,15 +129,16 @@ impl<S: FeatureSpace<Tensor>> PhantomFeatureSpace<Tensor> for OptionSpace<S> {
                 none_indices.push(i as i64);
             }
         }
-        let batch_size = none_indices.len() + some_indices.len();
-        let out = Tensor::zeros(
-            &[batch_size as i64, self.phantom_num_features() as i64],
-            (Kind::Float, Device::Cpu),
-        );
-        let _ = out.i((&Tensor::of_slice(&none_indices), 0)).fill_(1.0);
-        out.i((&Tensor::of_slice(&some_indices), 1..))
-            .copy_(&self.inner.batch_features(some_elements));
-        out
+        let rest_size = self.inner.num_features();
+        let [mut first, rest]: [Tensor; 2] = out
+            .split_with_sizes(&[1, rest_size as i64], -1)
+            .try_into()
+            .unwrap();
+
+        let _ = out.zero_();
+        let _ = first.index_fill_(-1, &Tensor::of_slice(&none_indices), 1.0);
+        self.inner
+            .batch_features_out(some_elements, &mut rest.i(&Tensor::of_slice(&some_indices)));
     }
 }
 
@@ -147,12 +179,22 @@ impl<S: Space> ElementRefInto<Loggable> for OptionSpace<S> {
 pub trait PhantomFeatureSpace<T, T2 = T>: Space {
     fn phantom_num_features(&self) -> usize;
     fn phantom_features(&self, element: &Self::Element) -> T;
+    fn phantom_features_out(&self, element: &Self::Element, out: &mut T);
     fn phantom_batch_features<'a, I>(
         &self,
         elements: I,
         _marker: PhantomData<&'a Self::Element>,
     ) -> T2
     where
+        I: IntoIterator<Item = &'a Self::Element>,
+        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        Self::Element: 'a;
+    fn phantom_batch_features_out<'a, I>(
+        &self,
+        elements: I,
+        out: &mut T2,
+        _marker: PhantomData<&'a Self::Element>,
+    ) where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a;
 }
@@ -167,12 +209,23 @@ where
     fn features(&self, element: &Self::Element) -> T {
         self.phantom_features(element)
     }
+    fn features_out(&self, element: &Self::Element, out: &mut T) {
+        self.phantom_features_out(element, out)
+    }
     fn batch_features<'a, I>(&self, elements: I) -> T2
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        Self::Element: 'a,
+    {
+        self.phantom_batch_features(elements, PhantomData)
+    }
+    fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2)
     where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a,
     {
-        self.phantom_batch_features(elements, PhantomData)
+        self.phantom_batch_features_out(elements, out, PhantomData)
     }
 }
 
