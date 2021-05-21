@@ -1,6 +1,4 @@
-use super::{
-    ElementRefInto, FeatureSpace, ParameterizedDistributionSpace, ReprSpace, SampleSpace, Space,
-};
+use super::{ElementRefInto, FeatureSpace, ParameterizedDistributionSpace, SampleSpace, Space};
 use crate::logging::Loggable;
 use std::fmt::Debug;
 use tch::Tensor;
@@ -11,24 +9,13 @@ use tch::Tensor;
 /// excluding interfaces that can only apply to some spaces, like [`FiniteSpace`].
 ///
 /// [`FiniteSpace`]: super::FiniteSpace
-pub trait RLSpace:
-    Space
-    + SampleSpace
-    + FeatureSpace<Tensor> // Observations only
-    + ReprSpace<Tensor> // Actions only
-    + ParameterizedDistributionSpace<Tensor> // Actions only
-    + ElementRefInto<Loggable>
-    + Debug
-{
-}
-impl<
-        T: Space
-            + SampleSpace
-            + FeatureSpace<Tensor>
-            + ReprSpace<Tensor>
-            + ParameterizedDistributionSpace<Tensor>
-            + ElementRefInto<Loggable>
-            + Debug,
-    > RLSpace for T
-{
-}
+pub trait RLSpace: Space + SampleSpace + ElementRefInto<Loggable> + Debug {}
+impl<T: Space + SampleSpace + ElementRefInto<Loggable> + Debug> RLSpace for T {}
+
+/// Comprehensive observation space for use in reinforcement learning
+pub trait RLObservationSpace: RLSpace + FeatureSpace<Tensor> {}
+impl<T: RLSpace + FeatureSpace<Tensor>> RLObservationSpace for T {}
+
+/// Comprehensive action space for use in reinforcement learning
+pub trait RLActionSpace: RLSpace + ParameterizedDistributionSpace<Tensor> {}
+impl<T: RLSpace + ParameterizedDistributionSpace<Tensor>> RLActionSpace for T {}

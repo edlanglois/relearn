@@ -9,7 +9,7 @@ use crate::logging::{Loggable, Logger};
 use crate::simulation::{
     hooks::StepLogger, BoxedSimulator, GenericSimulationHook, Simulation, SimulationHook,
 };
-use crate::spaces::{ElementRefInto, FiniteSpace, RLSpace, Space};
+use crate::spaces::{ElementRefInto, FiniteSpace, RLActionSpace, RLObservationSpace, Space};
 use crate::utils::distributions::{Bernoulli, Deterministic};
 use rand::distributions::Standard;
 
@@ -98,9 +98,9 @@ fn finite_finite_simulator<OS, AS, L, H>(
     agent_seed: u64,
 ) -> Result<Box<dyn Simulation>, BuildAgentError>
 where
-    OS: RLSpace + FiniteSpace + 'static,
+    OS: RLObservationSpace + FiniteSpace + 'static,
     <OS as Space>::Element: Clone,
-    AS: RLSpace + FiniteSpace + 'static,
+    AS: RLActionSpace + FiniteSpace + 'static,
     L: Logger + 'static,
     H: SimulationHook<OS::Element, AS::Element, L> + 'static,
 {

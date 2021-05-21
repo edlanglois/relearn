@@ -4,7 +4,7 @@ use crate::agents::{
     TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::EnvStructure;
-use crate::spaces::{FiniteSpace, RLSpace};
+use crate::spaces::{FiniteSpace, RLActionSpace, RLObservationSpace};
 use crate::torch::agents::{
     PolicyGradientAgentConfig, PolicyGradientBoxedAgent, TrpoAgentConfig, TrpoBoxedAgent,
 };
@@ -52,8 +52,8 @@ impl AgentDef {
         seed: u64,
     ) -> Result<Box<dyn Agent<OS::Element, AS::Element>>, BuildAgentError>
     where
-        OS: RLSpace + FiniteSpace + 'static,
-        AS: RLSpace + FiniteSpace + 'static,
+        OS: RLObservationSpace + FiniteSpace + 'static,
+        AS: RLActionSpace + FiniteSpace + 'static,
     {
         use AgentDef::*;
         match self {
@@ -74,8 +74,8 @@ impl AgentDef {
         seed: u64,
     ) -> Result<Box<dyn Agent<OS::Element, AS::Element>>, BuildAgentError>
     where
-        OS: RLSpace + 'static,
-        AS: RLSpace + 'static,
+        OS: RLObservationSpace + 'static,
+        AS: RLActionSpace + 'static,
     {
         use AgentDef::*;
         match self {

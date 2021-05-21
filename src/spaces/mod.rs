@@ -16,7 +16,7 @@ pub use indexed_type::{Indexed, IndexedTypeSpace};
 pub use nonempty_features::NonEmptyFeatures;
 pub use option::OptionSpace;
 pub use product::ProductSpace;
-pub use rl::RLSpace;
+pub use rl::{RLActionSpace, RLObservationSpace, RLSpace};
 pub use singleton::SingletonSpace;
 
 use crate::utils::distributions::ArrayDistribution;
