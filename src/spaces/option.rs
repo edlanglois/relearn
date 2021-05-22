@@ -136,9 +136,10 @@ impl<S: FeatureSpace<Tensor>> PhantomFeatureSpace<Tensor> for OptionSpace<S> {
             .unwrap();
 
         let _ = out.zero_();
-        let _ = first.index_fill_(-1, &Tensor::of_slice(&none_indices), 1.0);
-        self.inner
-            .batch_features_out(some_elements, &mut rest.i(&Tensor::of_slice(&some_indices)));
+        let _ = first.index_fill_(-2, &Tensor::of_slice(&none_indices), 1.0);
+        // FIXME: This creates a copy not a view
+        let mut some_rest = rest.i(&Tensor::of_slice(&some_indices));
+        self.inner.batch_features_out(some_elements, &mut some_rest);
     }
 }
 
@@ -199,9 +200,12 @@ pub trait PhantomFeatureSpace<T, T2 = T>: Space {
         Self::Element: 'a;
 }
 
+/// Feature vectors are:
+/// * `1, 0, ..., 0` for `None`
+/// * `0, feature_vector(x)` for `Some(x)`.
 impl<S, T, T2> FeatureSpace<T, T2> for OptionSpace<S>
 where
-    OptionSpace<S>: PhantomFeatureSpace<T, T2>,
+    Self: PhantomFeatureSpace<T, T2>,
 {
     fn num_features(&self) -> usize {
         self.phantom_num_features()
@@ -277,6 +281,18 @@ mod finite_space {
     }
 
     #[test]
+    fn from_index_sampled_singleton() {
+        let space = OptionSpace::new(SingletonSpace::new());
+        testing::check_from_index_sampled(&space, 10);
+    }
+
+    #[test]
+    fn from_index_sampled_index() {
+        let space = OptionSpace::new(IndexSpace::new(5));
+        testing::check_from_index_sampled(&space, 30);
+    }
+
+    #[test]
     fn from_index_invalid_singleton() {
         let space = OptionSpace::new(SingletonSpace::new());
         testing::check_from_index_invalid(&space);
@@ -286,5 +302,200 @@ mod finite_space {
     fn from_index_invalid_index() {
         let space = OptionSpace::new(IndexSpace::new(5));
         testing::check_from_index_invalid(&space);
+    }
+}
+
+#[cfg(test)]
+mod feature_space_tensor {
+    use super::super::{IndexSpace, SingletonSpace};
+    use super::*;
+    use std::cmp::PartialEq;
+    use std::fmt::Debug;
+
+    #[test]
+    fn num_features_singleton() {
+        let space = OptionSpace::new(SingletonSpace::new());
+        assert_eq!(space.num_features(), 1);
+    }
+
+    #[test]
+    fn num_features_index() {
+        let space = OptionSpace::new(IndexSpace::new(3));
+        assert_eq!(space.num_features(), 4);
+    }
+
+    fn check_option_features<S, T>(inner: S, element: &Option<S::Element>, expected: &T)
+    where
+        S: FeatureSpace<T>,
+        // These ought to be implied by S: FeatureSpace<T> but the whole PhantomFeatureSpace
+        // hack hides this inference from the compiler.
+        // I think the `where self: PhantomFeatureSpace<T, T2>` is the problem.
+        OptionSpace<S>: FeatureSpace<T> + Space<Element = Option<S::Element>>,
+        T: Debug + PartialEq,
+    {
+        let space = OptionSpace::new(inner);
+        assert_eq!(&space.features(element), expected);
+    }
+
+    fn check_option_features_out<S>(inner: S, element: &Option<S::Element>, expected: &Tensor)
+    where
+        S: FeatureSpace<Tensor>,
+        // These ought to be implied by S: FeatureSpace<T> but the whole PhantomFeatureSpace
+        // hack hides this inference from the compiler.
+        // I think the `where self: PhantomFeatureSpace<T, T2>` is the problem.
+        OptionSpace<S>: FeatureSpace<Tensor> + Space<Element = Option<S::Element>>,
+    {
+        let space = OptionSpace::new(inner);
+        let mut out = expected.empty_like();
+        space.features_out(element, &mut out);
+        assert_eq!(&out, expected);
+    }
+
+    #[test]
+    fn features_singleton_none() {
+        check_option_features(SingletonSpace::new(), &None, &Tensor::of_slice(&[1.0_f32]));
+    }
+
+    #[test]
+    fn features_out_singleton_none() {
+        check_option_features_out(SingletonSpace::new(), &None, &Tensor::of_slice(&[1.0_f32]));
+    }
+
+    #[test]
+    fn features_singleton_some() {
+        check_option_features(
+            SingletonSpace::new(),
+            &Some(()),
+            &Tensor::of_slice(&[0.0_f32]),
+        );
+    }
+
+    #[test]
+    fn features_out_singleton_some() {
+        check_option_features_out(
+            SingletonSpace::new(),
+            &Some(()),
+            &Tensor::of_slice(&[0.0_f32]),
+        );
+    }
+
+    #[test]
+    fn features_index_none() {
+        check_option_features(
+            IndexSpace::new(3),
+            &None,
+            &Tensor::of_slice(&[1.0_f32, 0.0, 0.0, 0.0]),
+        )
+    }
+
+    #[test]
+    fn features_out_index_none() {
+        check_option_features_out(
+            IndexSpace::new(3),
+            &None,
+            &Tensor::of_slice(&[1.0_f32, 0.0, 0.0, 0.0]),
+        )
+    }
+
+    #[test]
+    fn features_index_some() {
+        check_option_features(
+            IndexSpace::new(3),
+            &Some(1),
+            &Tensor::of_slice(&[0.0_f32, 0.0, 1.0, 0.0]),
+        )
+    }
+
+    #[test]
+    fn features_out_index_some() {
+        check_option_features_out(
+            IndexSpace::new(3),
+            &Some(1),
+            &Tensor::of_slice(&[0.0_f32, 0.0, 1.0, 0.0]),
+        )
+    }
+
+    fn check_option_batch_features<S, T>(inner: S, elements: &[Option<S::Element>], expected: &T)
+    where
+        S: FeatureSpace<T>,
+        // These ought to be implied by S: FeatureSpace<T> but the whole PhantomFeatureSpace
+        // hack hides this inference from the compiler.
+        // I think the `where self: PhantomFeatureSpace<T, T2>` is the problem.
+        OptionSpace<S>: FeatureSpace<T> + Space<Element = Option<S::Element>>,
+        T: Debug + PartialEq,
+    {
+        let space = OptionSpace::new(inner);
+        assert_eq!(&space.batch_features(elements), expected);
+    }
+
+    fn check_option_batch_features_out<S>(
+        inner: S,
+        elements: &[Option<S::Element>],
+        expected: &Tensor,
+    ) where
+        S: FeatureSpace<Tensor>,
+        // These ought to be implied by S: FeatureSpace<T> but the whole PhantomFeatureSpace
+        // hack hides this inference from the compiler.
+        // I think the `where self: PhantomFeatureSpace<T, T2>` is the problem.
+        OptionSpace<S>: FeatureSpace<Tensor> + Space<Element = Option<S::Element>>,
+    {
+        let space = OptionSpace::new(inner);
+        let mut out = expected.empty_like();
+        space.batch_features_out(elements, &mut out);
+        assert_eq!(&out, expected);
+    }
+
+    #[test]
+    fn batch_features_singleton() {
+        check_option_batch_features(
+            SingletonSpace::new(),
+            &[Some(()), None, Some(())],
+            &Tensor::of_slice(&[0.0_f32, 1.0, 0.0]).view((3, 1)),
+        );
+    }
+
+    #[test]
+    fn batch_features_out_singleton() {
+        check_option_batch_features_out(
+            SingletonSpace::new(),
+            &[Some(()), None, Some(())],
+            &Tensor::of_slice(&[0.0_f32, 1.0, 0.0]).view((3, 1)),
+        );
+    }
+
+    #[test]
+    fn batch_features_index() {
+        // Note: Currently fails because the complicated indexing used when generating the input
+        // for inner.batch_features_out results in a copy rather than a view.
+        check_option_batch_features(
+            IndexSpace::new(3),
+            &[Some(1), None, Some(0), Some(2), None],
+            &Tensor::of_slice(&[
+                0.0, 0.0, 1.0, 0.0, //
+                1.0, 0.0, 0.0, 0.0, //
+                0.0, 1.0, 0.0, 0.0, //
+                0.0, 0.0, 0.0, 1.0, //
+                1.0, 0.0, 0.0, 0.0_f32,
+            ])
+            .view((5, 4)),
+        );
+    }
+
+    #[test]
+    fn batch_features_out_index() {
+        // Note: Currently fails because the complicated indexing used when generating the input
+        // for inner.batch_features_out results in a copy rather than a view.
+        check_option_batch_features_out(
+            IndexSpace::new(3),
+            &[Some(1), None, Some(0), Some(2), None],
+            &Tensor::of_slice(&[
+                0.0, 0.0, 1.0, 0.0, //
+                1.0, 0.0, 0.0, 0.0, //
+                0.0, 1.0, 0.0, 0.0, //
+                0.0, 0.0, 0.0, 1.0, //
+                1.0, 0.0, 0.0, 0.0_f32,
+            ])
+            .view((5, 4)),
+        );
     }
 }
