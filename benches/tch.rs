@@ -139,6 +139,28 @@ fn tensor_scatter(c: &mut Criterion) {
     }
 }
 
+fn tensor_1d_scatter_fill(c: &mut Criterion) {
+    let mut group = c.benchmark_group("tensor_1d_scatter_fill");
+    let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
+    group.plot_config(plot_config);
+
+    let width = 1_000_000;
+    let mut target = Tensor::zeros(&[width], (Kind::Float, Device::Cpu));
+
+    for size in IntoIter::new([1usize, 100, 10_000, 1_000_000]) {
+        let indices = Tensor::empty(&[size as i64], (Kind::Int64, Device::Cpu)).random_1(width);
+        group.bench_function(BenchmarkId::new("scatter_1", size), |b| {
+            b.iter(|| target.scatter_1(-1, &indices, 1.0))
+        });
+        group.bench_function(BenchmarkId::new("index_fill_", size), |b| {
+            b.iter(|| target.index_fill_(-1, &indices, 1.0))
+        });
+        group.bench_function(BenchmarkId::new("index_then_fill_", size), |b| {
+            b.iter(|| target.i(&indices).fill_(1.0))
+        });
+    }
+}
+
 fn mul_sum(a: &Tensor, b: &Tensor) -> Tensor {
     let c = a * b;
     c.sum(c.kind())
@@ -188,6 +210,7 @@ criterion_group!(
     tensor_indexing,
     tensor_ndarray_convert,
     tensor_scatter,
+    tensor_1d_scatter_fill,
     tensor_mul_sum,
 );
 criterion_main!(benches);
