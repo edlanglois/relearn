@@ -94,7 +94,7 @@ impl Indexed for bool {
 }
 
 #[cfg(test)]
-mod indexed_type_space {
+mod space {
     use super::super::testing;
     use super::*;
 
@@ -186,8 +186,9 @@ mod indexed_type_space {
 }
 
 #[cfg(test)]
+#[allow(clippy::missing_const_for_fn)]
 /// Test the derive(Indexed) macro
-mod derive_indexed_tests {
+mod finite_space {
     use super::*;
     use rust_rl_derive::Indexed;
 

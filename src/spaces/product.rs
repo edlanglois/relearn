@@ -192,7 +192,7 @@ impl SampleSpaceForTuples for Tuple {
 
 #[cfg(test)]
 #[allow(clippy::needless_pass_by_value)]
-mod tuple_space {
+mod space {
     use super::super::{testing, IndexSpace};
     use super::*;
     use rstest::{fixture, rstest};
@@ -220,6 +220,40 @@ mod tuple_space {
     }
 
     #[rstest]
+    fn index_triple_contains_samples(index_314: IndexTriple) {
+        testing::check_contains_samples(&index_314, 100);
+    }
+
+    type UnitSpace = ProductSpace<()>;
+
+    #[test]
+    fn unit_contains_unit() {
+        let space = UnitSpace::new(());
+        assert!(space.contains(&()));
+    }
+
+    #[test]
+    fn unit_contains_samples() {
+        let space = UnitSpace::new(());
+        testing::check_contains_samples(&space, 10);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::needless_pass_by_value)]
+mod finite_space {
+    use super::super::{testing, IndexSpace};
+    use super::*;
+    use rstest::{fixture, rstest};
+
+    type IndexTriple = ProductSpace<(IndexSpace, IndexSpace, IndexSpace)>;
+
+    #[fixture]
+    const fn index_314() -> IndexTriple {
+        ProductSpace::new((IndexSpace::new(3), IndexSpace::new(1), IndexSpace::new(4)))
+    }
+
+    #[rstest]
     fn index_triple_to_index_zeros(index_314: IndexTriple) {
         assert_eq!(index_314.to_index(&(0, 0, 0)), 0);
     }
@@ -240,11 +274,6 @@ mod tuple_space {
     }
 
     #[rstest]
-    fn index_triple_contains_samples(index_314: IndexTriple) {
-        testing::check_contains_samples(&index_314, 100);
-    }
-
-    #[rstest]
     fn index_triple_from_to_index_iter_size(index_314: IndexTriple) {
         testing::check_from_to_index_iter_size(&index_314);
     }
@@ -255,18 +284,6 @@ mod tuple_space {
     }
 
     type UnitSpace = ProductSpace<()>;
-
-    #[test]
-    fn unit_contains_unit() {
-        let space = UnitSpace::new(());
-        assert!(space.contains(&()));
-    }
-
-    #[test]
-    fn unit_contains_samples() {
-        let space = UnitSpace::new(());
-        testing::check_contains_samples(&space, 10);
-    }
 
     #[test]
     fn unit_from_to_index_iter_size() {

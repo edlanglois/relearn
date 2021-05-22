@@ -62,7 +62,7 @@ impl FiniteSpace for IndexSpace {
 impl CategoricalSpace for IndexSpace {}
 
 #[cfg(test)]
-mod index_space {
+mod space {
     use super::super::testing;
     use super::*;
     use rstest::rstest;
@@ -84,6 +84,13 @@ mod index_space {
         let space = IndexSpace::new(size);
         testing::check_contains_samples(&space, 100);
     }
+}
+
+#[cfg(test)]
+mod finite_space {
+    use super::super::testing;
+    use super::*;
+    use rstest::rstest;
 
     #[rstest]
     fn from_to_index_iter_size(#[values(1, 5)] size: usize) {

@@ -230,7 +230,7 @@ where
 }
 
 #[cfg(test)]
-mod option_space {
+mod space {
     use super::super::{testing, IndexSpace, SingletonSpace};
     use super::*;
 
@@ -257,6 +257,12 @@ mod option_space {
         let space = OptionSpace::new(IndexSpace::new(5));
         testing::check_contains_samples(&space, 100);
     }
+}
+
+#[cfg(test)]
+mod finite_space {
+    use super::super::{testing, IndexSpace, SingletonSpace};
+    use super::*;
 
     #[test]
     fn from_to_index_iter_size_singleton() {

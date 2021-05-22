@@ -97,7 +97,7 @@ impl<S: FeatureSpace<Tensor>> FeatureSpace<Tensor> for NonEmptyFeatures<S> {
 }
 
 #[cfg(test)]
-mod tests {
+mod feature_space_tensor {
     use super::super::{IndexSpace, SingletonSpace};
     use super::*;
 

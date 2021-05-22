@@ -137,7 +137,7 @@ impl ElementRefInto<Loggable> for SingletonSpace {
 }
 
 #[cfg(test)]
-mod singleton_space {
+mod space {
     use super::super::testing;
     use super::*;
 
@@ -152,11 +152,23 @@ mod singleton_space {
         let space = SingletonSpace::new();
         testing::check_contains_samples(&space, 10);
     }
+}
+
+#[cfg(test)]
+mod finite_space {
+    use super::super::testing;
+    use super::*;
 
     #[test]
     fn from_to_index_iter_size() {
         let space = SingletonSpace::new();
         testing::check_from_to_index_iter_size(&space);
+    }
+
+    #[test]
+    fn from_to_index_random() {
+        let space = SingletonSpace::new();
+        testing::check_from_to_index_random(&space, 10);
     }
 
     #[test]
