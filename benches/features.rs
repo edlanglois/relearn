@@ -2,6 +2,7 @@ use criterion::{
     criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration,
     Throughput,
 };
+use ndarray::{s, Array, Array2, ArrayViewMut, Ix1};
 use std::array::IntoIter;
 use std::convert::TryInto;
 use tch::{Device, IndexOp, Kind, Tensor};
@@ -185,6 +186,28 @@ fn option_index_features_by_masked_out(elements: &[Option<usize>], num_classes: 
     out
 }
 
+fn array_one_hot(array: &mut ArrayViewMut<f32, Ix1>, index: usize) {
+    array[index] = 1.0;
+}
+
+fn option_index_ndarray_features(elements: &[Option<usize>], num_classes: usize) -> Array2<f32> {
+    let mut out = Array::zeros((elements.len(), num_classes + 1));
+    for (mut row, element) in out.outer_iter_mut().zip(elements) {
+        if let Some(x) = element {
+            array_one_hot(&mut row.slice_mut(s![1..]), *x);
+        } else {
+            row[0] = 1.0;
+        }
+    }
+    out
+}
+
+fn option_index_features_by_ndarray(elements: &[Option<usize>], num_classes: usize) -> Tensor {
+    option_index_ndarray_features(elements, num_classes)
+        .try_into()
+        .unwrap()
+}
+
 /// Test different possible implementations for OptionSpace::batch_features
 fn option_index_features(c: &mut Criterion) {
     let mut group = c.benchmark_group("option_index_features");
@@ -238,6 +261,16 @@ fn option_index_features(c: &mut Criterion) {
         assert_eq!(r1, r6);
         group.bench_function(BenchmarkId::new("by_masked_out", size), |b| {
             b.iter(|| option_index_features_by_masked_out(&elements, num_classes))
+        });
+
+        group.bench_function(BenchmarkId::new("ndarray", size), |b| {
+            b.iter(|| option_index_ndarray_features(&elements, num_classes))
+        });
+
+        let r7 = option_index_features_by_ndarray(&elements, num_classes);
+        assert_eq!(r1, r7);
+        group.bench_function(BenchmarkId::new("by_ndarray", size), |b| {
+            b.iter(|| option_index_features_by_ndarray(&elements, num_classes))
         });
     }
 }
