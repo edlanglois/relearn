@@ -6,6 +6,8 @@ use super::{
 use crate::logging::Loggable;
 use crate::torch;
 use crate::utils::distributions::ArrayDistribution;
+use ndarray::{Array, ArrayBase, DataMut, Ix1, Ix2, RawData};
+use num_traits::{One, Zero};
 use std::convert::TryInto;
 use tch::{Device, Kind, Tensor};
 
@@ -101,6 +103,71 @@ impl<S: CategoricalSpace> BatchFeatureSpaceOut<Tensor> for S {
             .map(|element| self.to_index(element) as i64)
             .collect();
         let _ = out.scatter_1(-1, &Tensor::of_slice(&indices).unsqueeze(-1), 1);
+    }
+}
+
+impl<S, T> FeatureSpace<Array<T, Ix1>> for S
+where
+    S: CategoricalSpace,
+    T: Clone + Zero + One,
+{
+    fn features(&self, element: &Self::Element) -> Array<T, Ix1> {
+        let mut out = Array::zeros(self.num_features());
+        self.features_out(element, &mut out, true);
+        out
+    }
+}
+
+impl<S, T> BatchFeatureSpace<Array<T, Ix2>> for S
+where
+    S: CategoricalSpace,
+    T: Clone + Zero + One,
+{
+    fn batch_features<'a, I>(&self, elements: I) -> Array<T, Ix2>
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        Self::Element: 'a,
+    {
+        let elements = elements.into_iter();
+        let mut out = Array::zeros((elements.len(), self.num_features()));
+        self.batch_features_out(elements, &mut out, true);
+        out
+    }
+}
+
+impl<S, T> FeatureSpaceOut<ArrayBase<T, Ix1>> for S
+where
+    S: CategoricalSpace,
+    T: DataMut,
+    <T as RawData>::Elem: Clone + Zero + One,
+{
+    fn features_out(&self, element: &Self::Element, out: &mut ArrayBase<T, Ix1>, zeroed: bool) {
+        if !zeroed {
+            out.fill(Zero::zero());
+        }
+        out[self.to_index(element)] = One::one();
+    }
+}
+
+impl<S, T> BatchFeatureSpaceOut<ArrayBase<T, Ix2>> for S
+where
+    S: CategoricalSpace,
+    T: DataMut,
+    <T as RawData>::Elem: Clone + Zero + One,
+{
+    fn batch_features_out<'a, I>(&self, elements: I, out: &mut ArrayBase<T, Ix2>, zeroed: bool)
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+    {
+        if !zeroed {
+            out.fill(Zero::zero())
+        }
+        let one = T::Elem::one();
+        for (mut row, element) in out.outer_iter_mut().zip(elements) {
+            row[self.to_index(element)] = one.clone();
+        }
     }
 }
 
@@ -225,6 +292,40 @@ mod feature_space_tensor {
             .reshape(&[4, 3]),
             space.batch_features(&[Trit::Two, Trit::Zero, Trit::One, Trit::Zero])
         );
+    }
+}
+
+#[cfg(test)]
+mod feature_space_array {
+    use super::super::IndexedTypeSpace;
+    use super::trit::Trit;
+    use super::*;
+
+    #[test]
+    fn features() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        let result: Array<f32, _> = space.features(&Trit::Zero);
+        assert_eq!(Array::from_vec(vec![1.0, 0.0, 0.0]), result);
+        let result: Array<f32, _> = space.features(&Trit::One);
+        assert_eq!(Array::from_vec(vec![0.0, 1.0, 0.0]), result);
+        let result: Array<f32, _> = space.features(&Trit::Two);
+        assert_eq!(Array::from_vec(vec![0.0, 0.0, 1.0]), result);
+    }
+
+    #[test]
+    fn batch_features() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        let result: Array<f32, _> =
+            space.batch_features(&[Trit::Two, Trit::Zero, Trit::One, Trit::Zero]);
+        let expected = Array::from_vec(vec![
+            0.0, 0.0, 1.0, // Two
+            1.0, 0.0, 0.0, // Zero
+            0.0, 1.0, 0.0, // One
+            1.0, 0.0, 0.0, // Zero
+        ])
+        .into_shape((4, 3))
+        .unwrap();
+        assert_eq!(expected, result);
     }
 }
 
