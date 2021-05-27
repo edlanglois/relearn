@@ -126,18 +126,22 @@ pub trait FeatureSpaceOut<T, T2 = T>: Space + BaseFeatureSpace {
     ///
     /// # Args
     /// * `element` - An element of the space.
-    /// * `out` - A **zero initialized** vector with length `NUM_FEATURES`
-    ///           into which the features are written.
-    fn features_out(&self, element: &Self::Element, out: &mut T);
+    /// * `out`     - A vector with length `NUM_FEATURES` into which the features are written.
+    /// * `zeroed`  - Whether `out` contains nothing but zeros. For spaces with sparse features,
+    ///             knowing this avoids having to write most of the array.
+    fn features_out(&self, element: &Self::Element, out: &mut T, zeroed: bool);
 
     /// Construct a matrix of feature vectors for a set of elements.
     ///
     /// # Args
     /// * `elements` - A set of elements of the space.
-    /// * `out` - A *zero-initialized** two-dimensional array
-    ///           of shape `[NUM_ELEMENTS, NUM_FEATURES]`
-    ///           into which the features are written.
-    fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2)
+    ///
+    /// * `out`      - A two-dimensional array of shape `[NUM_ELEMENTS, NUM_FEATURES]`
+    ///              into which the features are written.
+    ///
+    /// * `zeroed`   - Whether `out` contains nothing but zeros. For spaces with sparse features,
+    ///              knowing this avoids having to write most of the array.
+    fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2, zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a;

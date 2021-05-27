@@ -79,23 +79,27 @@ impl<S: FeatureSpace<Tensor>> FeatureSpace<Tensor> for NonEmptyFeatures<S> {
 }
 
 impl<S: FeatureSpaceOut<Tensor>> FeatureSpaceOut<Tensor> for NonEmptyFeatures<S> {
-    fn features_out(&self, element: &Self::Element, out: &mut Tensor) {
+    fn features_out(&self, element: &Self::Element, out: &mut Tensor, zeroed: bool) {
         if self.inner.num_features() == 0 {
-            let _ = out.zero_();
+            if !zeroed {
+                let _ = out.zero_();
+            }
         } else {
-            self.inner.features_out(element, out);
+            self.inner.features_out(element, out, zeroed);
         }
     }
 
-    fn batch_features_out<'a, I>(&self, elements: I, out: &mut Tensor)
+    fn batch_features_out<'a, I>(&self, elements: I, out: &mut Tensor, zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a,
     {
         if self.inner.num_features() == 0 {
-            let _ = out.zero_();
+            if !zeroed {
+                let _ = out.zero_();
+            }
         } else {
-            self.inner.batch_features_out(elements, out);
+            self.inner.batch_features_out(elements, out, zeroed);
         }
     }
 }
@@ -148,7 +152,7 @@ mod feature_space_tensor {
     fn features_out_wrap_0() {
         let space = NonEmptyFeatures::new(SingletonSpace::new());
         let mut out = Tensor::empty(&[1], (Kind::Float, Device::Cpu));
-        space.features_out(&(), &mut out);
+        space.features_out(&(), &mut out, false);
         assert_eq!(out, Tensor::zeros(&[1], (Kind::Float, Device::Cpu)));
     }
 
@@ -157,7 +161,16 @@ mod feature_space_tensor {
         let inner = IndexSpace::new(1);
         let space = NonEmptyFeatures::new(inner.clone());
         let mut out = Tensor::empty(&[1], (Kind::Float, Device::Cpu));
-        space.features_out(&0, &mut out);
+        space.features_out(&0, &mut out, false);
+        assert_eq!(out, inner.features(&0),);
+    }
+
+    #[test]
+    fn features_out_wrap_1_zeroed() {
+        let inner = IndexSpace::new(1);
+        let space = NonEmptyFeatures::new(inner.clone());
+        let mut out = Tensor::zeros(&[1], (Kind::Float, Device::Cpu));
+        space.features_out(&0, &mut out, true);
         assert_eq!(out, inner.features(&0),);
     }
 
@@ -166,7 +179,7 @@ mod feature_space_tensor {
         let inner = IndexSpace::new(2);
         let space = NonEmptyFeatures::new(inner.clone());
         let mut out = Tensor::empty(&[2], (Kind::Float, Device::Cpu));
-        space.features_out(&1, &mut out);
+        space.features_out(&1, &mut out, false);
         assert_eq!(out, inner.features(&1));
     }
 
@@ -205,7 +218,7 @@ mod feature_space_tensor {
     fn batch_features_out_wrap_0() {
         let space = NonEmptyFeatures::new(SingletonSpace::new());
         let mut out = Tensor::empty(&[3, 1], (Kind::Float, Device::Cpu));
-        space.batch_features_out(&[(), (), ()], &mut out);
+        space.batch_features_out(&[(), (), ()], &mut out, false);
         assert_eq!(out, Tensor::zeros(&[3, 1], (Kind::Float, Device::Cpu)));
     }
 
@@ -215,7 +228,17 @@ mod feature_space_tensor {
         let space = NonEmptyFeatures::new(inner.clone());
         let mut out = Tensor::empty(&[3, 1], (Kind::Float, Device::Cpu));
         let elements = [0, 0, 0];
-        space.batch_features_out(&elements, &mut out);
+        space.batch_features_out(&elements, &mut out, false);
+        assert_eq!(out, inner.batch_features(&elements),);
+    }
+
+    #[test]
+    fn batch_features_out_wrap_1_zeroed() {
+        let inner = IndexSpace::new(1);
+        let space = NonEmptyFeatures::new(inner.clone());
+        let mut out = Tensor::empty(&[3, 1], (Kind::Float, Device::Cpu));
+        let elements = [0, 0, 0];
+        space.batch_features_out(&elements, &mut out, true);
         assert_eq!(out, inner.batch_features(&elements),);
     }
 
@@ -225,7 +248,7 @@ mod feature_space_tensor {
         let space = NonEmptyFeatures::new(inner.clone());
         let mut out = Tensor::empty(&[3, 2], (Kind::Float, Device::Cpu));
         let elements = [1, 0, 1];
-        space.batch_features_out(&elements, &mut out);
+        space.batch_features_out(&elements, &mut out, false);
         assert_eq!(out, inner.batch_features(&elements),);
     }
 }

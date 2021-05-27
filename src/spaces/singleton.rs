@@ -101,9 +101,9 @@ impl FeatureSpace<Tensor> for SingletonSpace {
 }
 
 impl FeatureSpaceOut<Tensor> for SingletonSpace {
-    fn features_out(&self, _element: &Self::Element, _out: &mut Tensor) {}
+    fn features_out(&self, _element: &Self::Element, _out: &mut Tensor, _zeroed: bool) {}
 
-    fn batch_features_out<'a, I>(&self, _elements: I, _out: &mut Tensor)
+    fn batch_features_out<'a, I>(&self, _elements: I, _out: &mut Tensor, _zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a,

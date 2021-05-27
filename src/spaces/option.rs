@@ -70,7 +70,7 @@ impl<S: BaseFeatureSpace> BaseFeatureSpace for OptionSpace<S> {
 impl<S: FeatureSpaceOut<Tensor>> PhantomFeatureSpace<Tensor> for OptionSpace<S> {
     fn phantom_features(&self, element: &Self::Element) -> Tensor {
         let mut out = Tensor::empty(&[self.num_features() as i64], (Kind::Float, Device::Cpu));
-        self.phantom_features_out(element, &mut out);
+        self.phantom_features_out(element, &mut out, false);
         out
     }
 
@@ -89,24 +89,28 @@ impl<S: FeatureSpaceOut<Tensor>> PhantomFeatureSpace<Tensor> for OptionSpace<S> 
             &[elements.len() as i64, self.num_features() as i64],
             (Kind::Float, Device::Cpu),
         );
-        self.phantom_batch_features_out(elements, &mut out, marker);
+        self.phantom_batch_features_out(elements, &mut out, false, marker);
         out
     }
 }
 
 impl<S: FeatureSpaceOut<Tensor>> PhantomFeatureSpaceOut<Tensor> for OptionSpace<S> {
-    fn phantom_features_out(&self, element: &Self::Element, out: &mut Tensor) {
+    fn phantom_features_out(&self, element: &Self::Element, out: &mut Tensor, zeroed: bool) {
         let rest_size = self.inner.num_features();
         let [mut first, mut rest]: [Tensor; 2] = out
             .split_with_sizes(&[1, rest_size as i64], -1)
             .try_into()
             .unwrap();
         if let Some(inner_elem) = element {
-            let _ = first.fill_(0.0);
-            self.inner.features_out(inner_elem, &mut rest);
+            if !zeroed {
+                let _ = first.zero_();
+            }
+            self.inner.features_out(inner_elem, &mut rest, zeroed);
         } else {
             let _ = first.fill_(1.0);
-            let _ = rest.fill_(0.0);
+            if !zeroed {
+                let _ = rest.zero_();
+            }
         }
     }
 
@@ -114,6 +118,7 @@ impl<S: FeatureSpaceOut<Tensor>> PhantomFeatureSpaceOut<Tensor> for OptionSpace<
         &self,
         elements: I,
         out: &mut Tensor,
+        zeroed: bool,
         _: PhantomData<&'a Self::Element>,
     ) where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -136,11 +141,14 @@ impl<S: FeatureSpaceOut<Tensor>> PhantomFeatureSpaceOut<Tensor> for OptionSpace<
             .try_into()
             .unwrap();
 
-        let _ = out.zero_();
+        if !zeroed {
+            let _ = out.zero_();
+        }
         let _ = first.index_fill_(-2, &Tensor::of_slice(&none_indices), 1.0);
         // FIXME: This creates a copy not a view
         let mut some_rest = rest.i(&Tensor::of_slice(&some_indices));
-        self.inner.batch_features_out(some_elements, &mut some_rest);
+        self.inner
+            .batch_features_out(some_elements, &mut some_rest, true);
     }
 }
 
@@ -195,11 +203,12 @@ pub trait PhantomFeatureSpace<T, T2 = T>: Space {
 ///
 /// See `[PhantomFeatureSpace`] for more details.
 pub trait PhantomFeatureSpaceOut<T, T2 = T>: Space {
-    fn phantom_features_out(&self, element: &Self::Element, out: &mut T);
+    fn phantom_features_out(&self, element: &Self::Element, out: &mut T, zeroed: bool);
     fn phantom_batch_features_out<'a, I>(
         &self,
         elements: I,
         out: &mut T2,
+        zeroed: bool,
         _marker: PhantomData<&'a Self::Element>,
     ) where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -232,15 +241,15 @@ where
     S: BaseFeatureSpace,
     Self: PhantomFeatureSpaceOut<T, T2>,
 {
-    fn features_out(&self, element: &Self::Element, out: &mut T) {
-        self.phantom_features_out(element, out)
+    fn features_out(&self, element: &Self::Element, out: &mut T, zeroed: bool) {
+        self.phantom_features_out(element, out, zeroed)
     }
-    fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2)
+    fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2, zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a,
     {
-        self.phantom_batch_features_out(elements, out, PhantomData)
+        self.phantom_batch_features_out(elements, out, zeroed, PhantomData)
     }
 }
 
@@ -358,7 +367,7 @@ mod feature_space_tensor {
     {
         let space = OptionSpace::new(inner);
         let mut out = expected.empty_like();
-        space.features_out(element, &mut out);
+        space.features_out(element, &mut out, false);
         assert_eq!(&out, expected);
     }
 
@@ -452,7 +461,7 @@ mod feature_space_tensor {
     {
         let space = OptionSpace::new(inner);
         let mut out = expected.empty_like();
-        space.batch_features_out(elements, &mut out);
+        space.batch_features_out(elements, &mut out, false);
         assert_eq!(&out, expected);
     }
 
