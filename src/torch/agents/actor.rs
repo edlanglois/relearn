@@ -59,7 +59,7 @@ impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
         value_vs: &Path,
     ) -> PolicyValueNetActor<OS, AS, P, V>
     where
-        OS: FeatureSpace<Tensor>,
+        OS: Space + BaseFeatureSpace,
         AS: ParameterizedDistributionSpace<Tensor>,
         PB: ModuleBuilder<P>,
         VB: StepValueBuilder<V>,
@@ -117,7 +117,7 @@ where
 
 impl<OS, AS, P, V> PolicyValueNetActor<OS, AS, P, V>
 where
-    OS: FeatureSpace<Tensor>,
+    OS: Space + BaseFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
     V: StepValue,
 {

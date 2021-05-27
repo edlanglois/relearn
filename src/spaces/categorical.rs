@@ -1,7 +1,7 @@
 //! Categorical subtype of [`FiniteSpace`]
 use super::{
-    BaseFeatureSpace, ElementRefInto, FeatureSpace, FeatureSpaceOut, FiniteSpace,
-    ParameterizedDistributionSpace, ReprSpace,
+    BaseFeatureSpace, BatchFeatureSpace, BatchFeatureSpaceOut, ElementRefInto, FeatureSpace,
+    FeatureSpaceOut, FiniteSpace, ParameterizedDistributionSpace, ReprSpace,
 };
 use crate::logging::Loggable;
 use crate::torch;
@@ -54,7 +54,9 @@ impl<S: CategoricalSpace> FeatureSpace<Tensor> for S {
             Kind::Float,
         )
     }
+}
 
+impl<S: CategoricalSpace> BatchFeatureSpace<Tensor> for S {
     fn batch_features<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -83,7 +85,9 @@ impl<S: CategoricalSpace> FeatureSpaceOut<Tensor> for S {
             1,
         );
     }
+}
 
+impl<S: CategoricalSpace> BatchFeatureSpaceOut<Tensor> for S {
     fn batch_features_out<'a, I>(&self, elements: I, out: &mut Tensor, zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,

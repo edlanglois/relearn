@@ -16,7 +16,10 @@ use super::actor::{HistoryFeatures, PolicyValueNetActor, PolicyValueNetActorConf
 use super::policy_gradient;
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::{Event, Logger};
-use crate::spaces::{FeatureSpace, ParameterizedDistributionSpace, ReprSpace, Space};
+use crate::spaces::{
+    BaseFeatureSpace, BatchFeatureSpace, FeatureSpace, ParameterizedDistributionSpace, ReprSpace,
+    Space,
+};
 use crate::utils::distributions::ArrayDistribution;
 use crate::EnvStructure;
 use tch::{kind::Kind, nn, Device, Tensor};
@@ -66,7 +69,7 @@ where
 impl<OS, AS, PB, P, POB, PO, VB, V, VOB, VO> AgentBuilder<TrpoAgent<OS, AS, P, PO, V, VO>, OS, AS>
     for TrpoAgentConfig<PB, POB, VB, VOB>
 where
-    OS: FeatureSpace<Tensor>,
+    OS: Space + BaseFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
     PB: ModuleBuilder<P>,
     P: SequenceModule + StatefulIterativeModule,
@@ -111,7 +114,7 @@ where
 
 impl<OS, AS, P, PO, V, VO> TrpoAgent<OS, AS, P, PO, V, VO>
 where
-    OS: FeatureSpace<Tensor>,
+    OS: Space + BaseFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
     V: StepValue,
 {
@@ -157,7 +160,7 @@ where
 
 impl<OS, AS, P, PO, V, VO> Agent<OS::Element, AS::Element> for TrpoAgent<OS, AS, P, PO, V, VO>
 where
-    OS: FeatureSpace<Tensor>,
+    OS: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
     P: SequenceModule + StatefulIterativeModule,
     PO: TrustRegionOptimizer,
@@ -199,7 +202,7 @@ fn trpo_update<OS, AS, P, PO, V>(
     logger: &mut dyn Logger,
 ) -> Tensor
 where
-    OS: FeatureSpace<Tensor>,
+    OS: BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
     P: SequenceModule,
     PO: TrustRegionOptimizer,

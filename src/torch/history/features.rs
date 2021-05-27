@@ -1,5 +1,5 @@
 //! Utilities for calculating step history features.
-use crate::spaces::{FeatureSpace, ReprSpace, Space};
+use crate::spaces::{BatchFeatureSpace, ReprSpace, Space};
 use crate::utils::packed::{self, PackedBatchSizes, PackingIndices};
 use crate::Step;
 use lazycell::LazyCell;
@@ -100,7 +100,7 @@ impl<'a, OS: Space, AS: Space> LazyPackedHistoryFeatures<'a, OS, AS> {
 
 impl<'a, OS, AS> PackedHistoryFeaturesView for LazyPackedHistoryFeatures<'a, OS, AS>
 where
-    OS: FeatureSpace<Tensor>,
+    OS: BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor>,
 {
     fn discount_factor(&self) -> f64 {
@@ -234,7 +234,7 @@ pub fn packed_observation_features<OS, A>(
     observation_space: &OS,
 ) -> Tensor
 where
-    OS: FeatureSpace<Tensor>,
+    OS: BatchFeatureSpace<Tensor>,
 {
     let _no_grad = tch::no_grad_guard();
     observation_space

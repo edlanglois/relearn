@@ -1,5 +1,8 @@
 //! Wrap spaces to have non-empty feature vectors.
-use super::{BaseFeatureSpace, FeatureSpace, FeatureSpaceOut, FiniteSpace, Space};
+use super::{
+    BaseFeatureSpace, BatchFeatureSpace, BatchFeatureSpaceOut, FeatureSpace, FeatureSpaceOut,
+    FiniteSpace, Space,
+};
 use std::fmt;
 use tch::{Device, Kind, Tensor};
 
@@ -62,7 +65,9 @@ impl<S: FeatureSpace<Tensor>> FeatureSpace<Tensor> for NonEmptyFeatures<S> {
             self.inner.features(element)
         }
     }
+}
 
+impl<S: BatchFeatureSpace<Tensor>> BatchFeatureSpace<Tensor> for NonEmptyFeatures<S> {
     fn batch_features<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -88,7 +93,9 @@ impl<S: FeatureSpaceOut<Tensor>> FeatureSpaceOut<Tensor> for NonEmptyFeatures<S>
             self.inner.features_out(element, out, zeroed);
         }
     }
+}
 
+impl<S: BatchFeatureSpaceOut<Tensor>> BatchFeatureSpaceOut<Tensor> for NonEmptyFeatures<S> {
     fn batch_features_out<'a, I>(&self, elements: I, out: &mut Tensor, zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,

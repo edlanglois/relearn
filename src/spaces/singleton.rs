@@ -1,7 +1,7 @@
 //! Singleton space definition.
 use super::{
-    BaseFeatureSpace, ElementRefInto, FeatureSpace, FeatureSpaceOut, FiniteSpace,
-    ParameterizedDistributionSpace, ReprSpace, Space,
+    BaseFeatureSpace, BatchFeatureSpace, BatchFeatureSpaceOut, ElementRefInto, FeatureSpace,
+    FeatureSpaceOut, FiniteSpace, ParameterizedDistributionSpace, ReprSpace, Space,
 };
 use crate::logging::Loggable;
 use crate::torch::distributions::DeterministicEmptyVec;
@@ -89,7 +89,9 @@ impl FeatureSpace<Tensor> for SingletonSpace {
     fn features(&self, _element: &Self::Element) -> Tensor {
         Tensor::empty(&[0], (Kind::Float, Device::Cpu))
     }
+}
 
+impl BatchFeatureSpace<Tensor> for SingletonSpace {
     fn batch_features<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -102,7 +104,9 @@ impl FeatureSpace<Tensor> for SingletonSpace {
 
 impl FeatureSpaceOut<Tensor> for SingletonSpace {
     fn features_out(&self, _element: &Self::Element, _out: &mut Tensor, _zeroed: bool) {}
+}
 
+impl BatchFeatureSpaceOut<Tensor> for SingletonSpace {
     fn batch_features_out<'a, I>(&self, _elements: I, _out: &mut Tensor, _zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,

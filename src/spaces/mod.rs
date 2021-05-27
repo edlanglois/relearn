@@ -93,7 +93,7 @@ pub trait BaseFeatureSpace {
 ///
 /// The representation is generally suited for use as input to a machine learning model,
 /// in contrast to [`ReprSpace`], which yields a compact representation.
-pub trait FeatureSpace<T, T2 = T>: Space + BaseFeatureSpace {
+pub trait FeatureSpace<T>: Space + BaseFeatureSpace {
     /// Convert an element of the space into a feature vector.
     ///
     /// # Args
@@ -102,7 +102,10 @@ pub trait FeatureSpace<T, T2 = T>: Space + BaseFeatureSpace {
     /// # Returns
     /// A feature vector with length `NUM_FEATURES`.
     fn features(&self, element: &Self::Element) -> T;
+}
 
+/// A space whose elements can be converted to feature vectors in a batch.
+pub trait BatchFeatureSpace<T2>: Space + BaseFeatureSpace {
     /// Construct a matrix of feature vectors for a set of elements.
     ///
     /// # Args
@@ -121,7 +124,7 @@ pub trait FeatureSpace<T, T2 = T>: Space + BaseFeatureSpace {
 ///
 /// The representation is generally suited for use as input to a machine learning model,
 /// in contrast to [`ReprSpace`], which yields a compact representation.
-pub trait FeatureSpaceOut<T, T2 = T>: Space + BaseFeatureSpace {
+pub trait FeatureSpaceOut<T>: Space + BaseFeatureSpace {
     /// Convert an element of the space into a feature vector.
     ///
     /// # Args
@@ -130,7 +133,13 @@ pub trait FeatureSpaceOut<T, T2 = T>: Space + BaseFeatureSpace {
     /// * `zeroed`  - Whether `out` contains nothing but zeros. For spaces with sparse features,
     ///             knowing this avoids having to write most of the array.
     fn features_out(&self, element: &Self::Element, out: &mut T, zeroed: bool);
+}
 
+/// A space whose elements can written into an array as feature vectors in a batch.
+///
+/// The representation is generally suited for use as input to a machine learning model,
+/// in contrast to [`ReprSpace`], which yields a compact representation.
+pub trait BatchFeatureSpaceOut<T2>: Space + BaseFeatureSpace {
     /// Construct a matrix of feature vectors for a set of elements.
     ///
     /// # Args

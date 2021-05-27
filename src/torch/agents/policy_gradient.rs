@@ -6,7 +6,10 @@ use super::super::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use super::actor::{HistoryFeatures, PolicyValueNetActor, PolicyValueNetActorConfig};
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::logging::Logger;
-use crate::spaces::{FeatureSpace, ParameterizedDistributionSpace, ReprSpace, Space};
+use crate::spaces::{
+    BaseFeatureSpace, BatchFeatureSpace, FeatureSpace, ParameterizedDistributionSpace, ReprSpace,
+    Space,
+};
 use crate::utils::distributions::ArrayDistribution;
 use crate::EnvStructure;
 use std::cell::Cell;
@@ -38,7 +41,7 @@ impl<OS, AS, PB, P, POB, PO, VB, V, VOB, VO>
     AgentBuilder<PolicyGradientAgent<OS, AS, P, PO, V, VO>, OS, AS>
     for PolicyGradientAgentConfig<PB, POB, VB, VOB>
 where
-    OS: FeatureSpace<Tensor>,
+    OS: Space + BaseFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
     PB: ModuleBuilder<P>,
     P: SequenceModule + StatefulIterativeModule,
@@ -81,7 +84,7 @@ where
 
 impl<OS, AS, P, PO, V, VO> PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
-    OS: FeatureSpace<Tensor>,
+    OS: Space + BaseFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
     V: StepValue,
 {
@@ -127,7 +130,7 @@ where
 impl<OS, AS, P, PO, V, VO> Agent<OS::Element, AS::Element>
     for PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
-    OS: FeatureSpace<Tensor>,
+    OS: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
     P: SequenceModule + StatefulIterativeModule,
     PO: Optimizer,
@@ -157,7 +160,7 @@ pub fn policy_gradient_update<OS, AS, P, V, PO>(
     optimizer: &mut PO,
 ) -> Tensor
 where
-    OS: FeatureSpace<Tensor>,
+    OS: BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
     P: SequenceModule,
     V: StepValue,
@@ -190,7 +193,7 @@ pub fn value_squared_error_update<OS, AS, P, V, VO>(
     optimizer: &mut VO,
 ) -> Tensor
 where
-    OS: FeatureSpace<Tensor>,
+    OS: BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor>,
     V: StepValue,
     VO: Optimizer,
