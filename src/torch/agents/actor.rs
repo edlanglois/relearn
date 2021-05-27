@@ -5,7 +5,8 @@ use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::ModuleBuilder;
 use crate::logging::{Event, Logger};
 use crate::spaces::{
-    FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace, ReprSpace, Space,
+    BaseFeatureSpace, FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace, ReprSpace,
+    Space,
 };
 use crate::{Actor, EnvStructure, Step};
 use tch::{nn::Path, Tensor};

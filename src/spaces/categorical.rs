@@ -1,5 +1,8 @@
 //! Categorical subtype of [`FiniteSpace`]
-use super::{ElementRefInto, FeatureSpace, FiniteSpace, ParameterizedDistributionSpace, ReprSpace};
+use super::{
+    BaseFeatureSpace, ElementRefInto, FeatureSpace, FeatureSpaceOut, FiniteSpace,
+    ParameterizedDistributionSpace, ReprSpace,
+};
 use crate::logging::Loggable;
 use crate::torch;
 use crate::utils::distributions::ArrayDistribution;
@@ -36,24 +39,19 @@ impl<S: CategoricalSpace> ReprSpace<Tensor> for S {
     }
 }
 
-/// Represents elements with one-hot feature vectors.
-impl<S: CategoricalSpace> FeatureSpace<Tensor> for S {
+impl<S: CategoricalSpace> BaseFeatureSpace for S {
     fn num_features(&self) -> usize {
         self.size()
     }
+}
 
+/// Represents elements with one-hot feature vectors.
+impl<S: CategoricalSpace> FeatureSpace<Tensor> for S {
     fn features(&self, element: &Self::Element) -> Tensor {
         torch::utils::one_hot(
             &Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu)),
             self.num_features(),
             Kind::Float,
-        )
-    }
-
-    fn features_out(&self, element: &Self::Element, out: &mut Tensor) {
-        torch::utils::one_hot_out(
-            &Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu)),
-            out,
         )
     }
 
@@ -70,6 +68,15 @@ impl<S: CategoricalSpace> FeatureSpace<Tensor> for S {
             &Tensor::of_slice(&indices),
             self.num_features(),
             Kind::Float,
+        )
+    }
+}
+
+impl<S: CategoricalSpace> FeatureSpaceOut<Tensor> for S {
+    fn features_out(&self, element: &Self::Element, out: &mut Tensor) {
+        torch::utils::one_hot_out(
+            &Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu)),
+            out,
         )
     }
 

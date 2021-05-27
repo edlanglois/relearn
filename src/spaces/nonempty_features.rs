@@ -1,5 +1,5 @@
 //! Wrap spaces to have non-empty feature vectors.
-use super::{FeatureSpace, FiniteSpace, Space};
+use super::{BaseFeatureSpace, FeatureSpace, FeatureSpaceOut, FiniteSpace, Space};
 use std::fmt;
 use tch::{Device, Kind, Tensor};
 
@@ -48,24 +48,18 @@ impl<S: FiniteSpace> FiniteSpace for NonEmptyFeatures<S> {
     }
 }
 
-impl<S: FeatureSpace<Tensor>> FeatureSpace<Tensor> for NonEmptyFeatures<S> {
+impl<S: BaseFeatureSpace> BaseFeatureSpace for NonEmptyFeatures<S> {
     fn num_features(&self) -> usize {
         self.inner.num_features().max(1)
     }
+}
 
+impl<S: FeatureSpace<Tensor>> FeatureSpace<Tensor> for NonEmptyFeatures<S> {
     fn features(&self, element: &Self::Element) -> Tensor {
         if self.inner.num_features() == 0 {
             Tensor::zeros(&[1], (Kind::Float, Device::Cpu))
         } else {
             self.inner.features(element)
-        }
-    }
-
-    fn features_out(&self, element: &Self::Element, out: &mut Tensor) {
-        if self.inner.num_features() == 0 {
-            let _ = out.zero_();
-        } else {
-            self.inner.features_out(element, out);
         }
     }
 
@@ -80,6 +74,16 @@ impl<S: FeatureSpace<Tensor>> FeatureSpace<Tensor> for NonEmptyFeatures<S> {
             Tensor::zeros(&[num_elements as i64, 1], (Kind::Float, Device::Cpu))
         } else {
             self.inner.batch_features(elements)
+        }
+    }
+}
+
+impl<S: FeatureSpaceOut<Tensor>> FeatureSpaceOut<Tensor> for NonEmptyFeatures<S> {
+    fn features_out(&self, element: &Self::Element, out: &mut Tensor) {
+        if self.inner.num_features() == 0 {
+            let _ = out.zero_();
+        } else {
+            self.inner.features_out(element, out);
         }
     }
 

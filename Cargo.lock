@@ -897,6 +897,7 @@ dependencies = [
  "lazycell",
  "ndarray",
  "ndarray-stats",
+ "num-traits",
  "rand",
  "rstest",
  "rust_rl_derive",

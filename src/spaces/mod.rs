@@ -81,14 +81,19 @@ pub trait ReprSpace<T, T0 = T>: Space {
         Self::Element: 'a;
 }
 
+/// A space whose elements can be encoded as features.
+///
+/// This is the base, output-type-independent feature space trait.
+pub trait BaseFeatureSpace {
+    /// Length of the feature vectors in which which elements are encoded.
+    fn num_features(&self) -> usize;
+}
+
 /// A space whose elements can be converted to feature vectors.
 ///
 /// The representation is generally suited for use as input to a machine learning model,
 /// in contrast to [`ReprSpace`], which yields a compact representation.
-pub trait FeatureSpace<T, T2 = T>: Space {
-    /// Length of the feature vectors in which which elements are encoded.
-    fn num_features(&self) -> usize;
-
+pub trait FeatureSpace<T, T2 = T>: Space + BaseFeatureSpace {
     /// Convert an element of the space into a feature vector.
     ///
     /// # Args
@@ -97,13 +102,6 @@ pub trait FeatureSpace<T, T2 = T>: Space {
     /// # Returns
     /// A feature vector with length `NUM_FEATURES`.
     fn features(&self, element: &Self::Element) -> T;
-
-    /// Convert an element of the space into a feature vector.
-    ///
-    /// # Args
-    /// * `element` - An element of the space.
-    /// * `out` - A vector with length `NUM_FEATURES` into which the features are written.
-    fn features_out(&self, element: &Self::Element, out: &mut T);
 
     /// Construct a matrix of feature vectors for a set of elements.
     ///
@@ -117,12 +115,27 @@ pub trait FeatureSpace<T, T2 = T>: Space {
         I: IntoIterator<Item = &'a Self::Element>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
         Self::Element: 'a;
+}
+
+/// A space whose elements can written into an array as feature vectors.
+///
+/// The representation is generally suited for use as input to a machine learning model,
+/// in contrast to [`ReprSpace`], which yields a compact representation.
+pub trait FeatureSpaceOut<T, T2 = T>: Space + BaseFeatureSpace {
+    /// Convert an element of the space into a feature vector.
+    ///
+    /// # Args
+    /// * `element` - An element of the space.
+    /// * `out` - A **zero initialized** vector with length `NUM_FEATURES`
+    ///           into which the features are written.
+    fn features_out(&self, element: &Self::Element, out: &mut T);
 
     /// Construct a matrix of feature vectors for a set of elements.
     ///
     /// # Args
     /// * `elements` - A set of elements of the space.
-    /// * `out` - A two-dimensional array of shape `[NUM_ELEMENTS, NUM_FEATURES]`
+    /// * `out` - A *zero-initialized** two-dimensional array
+    ///           of shape `[NUM_ELEMENTS, NUM_FEATURES]`
     ///           into which the features are written.
     fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2)
     where

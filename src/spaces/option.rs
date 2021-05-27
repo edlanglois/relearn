@@ -1,5 +1,5 @@
 //! Optional space definition.
-use super::{ElementRefInto, FeatureSpace, FiniteSpace, Space};
+use super::{BaseFeatureSpace, ElementRefInto, FeatureSpace, FeatureSpaceOut, FiniteSpace, Space};
 use crate::logging::Loggable;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -58,36 +58,20 @@ impl<S: FiniteSpace> FiniteSpace for OptionSpace<S> {
     }
 }
 
+impl<S: BaseFeatureSpace> BaseFeatureSpace for OptionSpace<S> {
+    fn num_features(&self) -> usize {
+        1 + self.inner.num_features()
+    }
+}
+
 /// Feature vectors are:
 /// * `1, 0, ..., 0` for `None`
 /// * `0, feature_vector(x)` for `Some(x)`.
-impl<S: FeatureSpace<Tensor>> PhantomFeatureSpace<Tensor> for OptionSpace<S> {
-    fn phantom_num_features(&self) -> usize {
-        1 + self.inner.num_features()
-    }
-
+impl<S: FeatureSpaceOut<Tensor>> PhantomFeatureSpace<Tensor> for OptionSpace<S> {
     fn phantom_features(&self, element: &Self::Element) -> Tensor {
-        let mut out = Tensor::empty(
-            &[self.phantom_num_features() as i64],
-            (Kind::Float, Device::Cpu),
-        );
+        let mut out = Tensor::empty(&[self.num_features() as i64], (Kind::Float, Device::Cpu));
         self.phantom_features_out(element, &mut out);
         out
-    }
-
-    fn phantom_features_out(&self, element: &Self::Element, out: &mut Tensor) {
-        let rest_size = self.inner.num_features();
-        let [mut first, mut rest]: [Tensor; 2] = out
-            .split_with_sizes(&[1, rest_size as i64], -1)
-            .try_into()
-            .unwrap();
-        if let Some(inner_elem) = element {
-            let _ = first.fill_(0.0);
-            self.inner.features_out(inner_elem, &mut rest);
-        } else {
-            let _ = first.fill_(1.0);
-            let _ = rest.fill_(0.0);
-        }
     }
 
     fn phantom_batch_features<'a, I>(
@@ -102,11 +86,28 @@ impl<S: FeatureSpace<Tensor>> PhantomFeatureSpace<Tensor> for OptionSpace<S> {
     {
         let elements = elements.into_iter();
         let mut out = Tensor::empty(
-            &[elements.len() as i64, self.phantom_num_features() as i64],
+            &[elements.len() as i64, self.num_features() as i64],
             (Kind::Float, Device::Cpu),
         );
         self.phantom_batch_features_out(elements, &mut out, marker);
         out
+    }
+}
+
+impl<S: FeatureSpaceOut<Tensor>> PhantomFeatureSpaceOut<Tensor> for OptionSpace<S> {
+    fn phantom_features_out(&self, element: &Self::Element, out: &mut Tensor) {
+        let rest_size = self.inner.num_features();
+        let [mut first, mut rest]: [Tensor; 2] = out
+            .split_with_sizes(&[1, rest_size as i64], -1)
+            .try_into()
+            .unwrap();
+        if let Some(inner_elem) = element {
+            let _ = first.fill_(0.0);
+            self.inner.features_out(inner_elem, &mut rest);
+        } else {
+            let _ = first.fill_(1.0);
+            let _ = rest.fill_(0.0);
+        }
     }
 
     fn phantom_batch_features_out<'a, I>(
@@ -178,9 +179,7 @@ impl<S: Space> ElementRefInto<Loggable> for OptionSpace<S> {
 /// * <https://users.rust-lang.org/t/lifetime/59967>
 /// * <https://github.com/rust-lang/rust/issues/85451>
 pub trait PhantomFeatureSpace<T, T2 = T>: Space {
-    fn phantom_num_features(&self) -> usize;
     fn phantom_features(&self, element: &Self::Element) -> T;
-    fn phantom_features_out(&self, element: &Self::Element, out: &mut T);
     fn phantom_batch_features<'a, I>(
         &self,
         elements: I,
@@ -190,6 +189,13 @@ pub trait PhantomFeatureSpace<T, T2 = T>: Space {
         I: IntoIterator<Item = &'a Self::Element>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
         Self::Element: 'a;
+}
+
+/// Hack to allow implementing [`FeatureSpaceOut`] for [`OptionSpace`].
+///
+/// See `[PhantomFeatureSpace`] for more details.
+pub trait PhantomFeatureSpaceOut<T, T2 = T>: Space {
+    fn phantom_features_out(&self, element: &Self::Element, out: &mut T);
     fn phantom_batch_features_out<'a, I>(
         &self,
         elements: I,
@@ -205,16 +211,11 @@ pub trait PhantomFeatureSpace<T, T2 = T>: Space {
 /// * `0, feature_vector(x)` for `Some(x)`.
 impl<S, T, T2> FeatureSpace<T, T2> for OptionSpace<S>
 where
+    S: BaseFeatureSpace,
     Self: PhantomFeatureSpace<T, T2>,
 {
-    fn num_features(&self) -> usize {
-        self.phantom_num_features()
-    }
     fn features(&self, element: &Self::Element) -> T {
         self.phantom_features(element)
-    }
-    fn features_out(&self, element: &Self::Element, out: &mut T) {
-        self.phantom_features_out(element, out)
     }
     fn batch_features<'a, I>(&self, elements: I) -> T2
     where
@@ -223,6 +224,16 @@ where
         Self::Element: 'a,
     {
         self.phantom_batch_features(elements, PhantomData)
+    }
+}
+
+impl<S, T, T2> FeatureSpaceOut<T, T2> for OptionSpace<S>
+where
+    S: BaseFeatureSpace,
+    Self: PhantomFeatureSpaceOut<T, T2>,
+{
+    fn features_out(&self, element: &Self::Element, out: &mut T) {
+        self.phantom_features_out(element, out)
     }
     fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2)
     where
@@ -339,11 +350,11 @@ mod feature_space_tensor {
 
     fn check_option_features_out<S>(inner: S, element: &Option<S::Element>, expected: &Tensor)
     where
-        S: FeatureSpace<Tensor>,
-        // These ought to be implied by S: FeatureSpace<T> but the whole PhantomFeatureSpace
+        S: FeatureSpaceOut<Tensor>,
+        // These ought to be implied by S: FeatureSpaceOut<T> but the whole PhantomFeatureSpace
         // hack hides this inference from the compiler.
         // I think the `where self: PhantomFeatureSpace<T, T2>` is the problem.
-        OptionSpace<S>: FeatureSpace<Tensor> + Space<Element = Option<S::Element>>,
+        OptionSpace<S>: FeatureSpaceOut<Tensor> + Space<Element = Option<S::Element>>,
     {
         let space = OptionSpace::new(inner);
         let mut out = expected.empty_like();
@@ -433,11 +444,11 @@ mod feature_space_tensor {
         elements: &[Option<S::Element>],
         expected: &Tensor,
     ) where
-        S: FeatureSpace<Tensor>,
-        // These ought to be implied by S: FeatureSpace<T> but the whole PhantomFeatureSpace
+        S: FeatureSpaceOut<Tensor>,
+        // These ought to be implied by S: FeatureSpaceOut<T> but the whole PhantomFeatureSpace
         // hack hides this inference from the compiler.
         // I think the `where self: PhantomFeatureSpace<T, T2>` is the problem.
-        OptionSpace<S>: FeatureSpace<Tensor> + Space<Element = Option<S::Element>>,
+        OptionSpace<S>: FeatureSpaceOut<Tensor> + Space<Element = Option<S::Element>>,
     {
         let space = OptionSpace::new(inner);
         let mut out = expected.empty_like();
