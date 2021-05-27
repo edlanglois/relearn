@@ -54,7 +54,7 @@ impl Environment for MemoryGame {
     type ActionSpace = IndexSpace;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
-        let state = rng.gen_range(0, self.num_actions);
+        let state = rng.gen_range(0..self.num_actions);
         (state, state)
     }
 

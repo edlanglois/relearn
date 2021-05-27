@@ -57,7 +57,7 @@ impl<T: Indexed> Space for IndexedTypeSpace<T> {
 // Subspaces
 impl<T: Indexed> Distribution<T> for IndexedTypeSpace<T> {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
-        T::from_index(rng.gen_range(0, T::SIZE)).unwrap()
+        T::from_index(rng.gen_range(0..T::SIZE)).unwrap()
     }
 }
 

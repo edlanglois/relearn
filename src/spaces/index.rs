@@ -33,7 +33,7 @@ impl Space for IndexSpace {
 // Subspaces
 impl Distribution<<Self as Space>::Element> for IndexSpace {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
-        rng.gen_range(0, self.size)
+        rng.gen_range(0..self.size)
     }
 }
 
