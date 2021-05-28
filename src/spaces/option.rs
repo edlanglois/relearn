@@ -1,9 +1,11 @@
-//! Optional space definition.
+//! Option space definition.
 use super::{
     BaseFeatureSpace, BatchFeatureSpace, BatchFeatureSpaceOut, ElementRefInto, FeatureSpace,
     FeatureSpaceOut, FiniteSpace, Space,
 };
 use crate::logging::Loggable;
+use ndarray::{s, Array, ArrayBase, ArrayViewMut, DataMut, Ix1, Ix2, RawData};
+use num_traits::{One, Zero};
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::convert::TryInto;
@@ -12,6 +14,10 @@ use std::marker::PhantomData;
 use tch::{Device, IndexOp, Kind, Tensor};
 
 /// A space whose elements are either `None` or `Some(inner_elem)`.
+///
+/// The feature vectors are
+/// * `1, 0, ..., 0` for `None`
+/// * `0, inner_feature_vector(x)` for `Some(x)`.
 #[derive(Debug, Clone)]
 pub struct OptionSpace<S> {
     pub inner: S,
@@ -67,9 +73,87 @@ impl<S: BaseFeatureSpace> BaseFeatureSpace for OptionSpace<S> {
     }
 }
 
-/// Feature vectors are:
-/// * `1, 0, ..., 0` for `None`
-/// * `0, feature_vector(x)` for `Some(x)`.
+// Feature vectors are:
+// * `1, 0, ..., 0` for `None`
+// * `0, feature_vector(x)` for `Some(x)`.
+impl<S, T> FeatureSpace<Array<T, Ix1>> for OptionSpace<S>
+where
+    S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, T, Ix1>>,
+    T: Clone + Zero + One,
+{
+    fn features(&self, element: &Self::Element) -> Array<T, Ix1> {
+        let mut out = Array::zeros(self.num_features());
+        self.features_out(element, &mut out, true);
+        out
+    }
+}
+
+impl<S, T> FeatureSpaceOut<ArrayBase<T, Ix1>> for OptionSpace<S>
+where
+    S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, T::Elem, Ix1>>,
+    T: DataMut,
+    <T as RawData>::Elem: Clone + Zero + One,
+{
+    fn features_out(&self, element: &Self::Element, out: &mut ArrayBase<T, Ix1>, zeroed: bool) {
+        if let Some(inner_elem) = element {
+            self.inner
+                .features_out(inner_elem, &mut out.slice_mut(s![1..]), zeroed);
+            if !zeroed {
+                out[0] = Zero::zero()
+            }
+        } else {
+            if !zeroed {
+                out.slice_mut(s![1..]).fill(Zero::zero());
+            }
+            out[0] = One::one();
+        }
+    }
+}
+
+impl<S, T> PhantomBatchFeatureSpace<Array<T, Ix2>> for OptionSpace<S>
+where
+    S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, T, Ix1>>,
+    T: Clone + Zero + One,
+{
+    fn phantom_batch_features<'a, I>(
+        &self,
+        elements: I,
+        marker: PhantomData<&'a Self::Element>,
+    ) -> Array<T, Ix2>
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        Self::Element: 'a,
+    {
+        let elements = elements.into_iter();
+        let mut out = Array::zeros([elements.len(), self.num_features()]);
+        self.phantom_batch_features_out(elements, &mut out, true, marker);
+        out
+    }
+}
+
+impl<S, T> PhantomBatchFeatureSpaceOut<ArrayBase<T, Ix2>> for OptionSpace<S>
+where
+    S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, T::Elem, Ix1>>,
+    T: DataMut,
+    <T as RawData>::Elem: Clone + Zero + One,
+{
+    fn phantom_batch_features_out<'a, I>(
+        &self,
+        elements: I,
+        out: &mut ArrayBase<T, Ix2>,
+        zeroed: bool,
+        _marker: PhantomData<&'a Self::Element>,
+    ) where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+    {
+        for (mut row, element) in out.outer_iter_mut().zip(elements) {
+            self.features_out(element, &mut row, zeroed);
+        }
+    }
+}
+
 impl<S: FeatureSpaceOut<Tensor>> FeatureSpace<Tensor> for OptionSpace<S> {
     fn features(&self, element: &Self::Element) -> Tensor {
         let mut out = Tensor::empty(&[self.num_features() as i64], (Kind::Float, Device::Cpu));
@@ -326,11 +410,9 @@ mod finite_space {
 }
 
 #[cfg(test)]
-mod feature_space_tensor {
+mod base_feature_space {
     use super::super::{IndexSpace, SingletonSpace};
     use super::*;
-    use std::cmp::PartialEq;
-    use std::fmt::Debug;
 
     #[test]
     fn num_features_singleton() {
@@ -343,179 +425,142 @@ mod feature_space_tensor {
         let space = OptionSpace::new(IndexSpace::new(3));
         assert_eq!(space.num_features(), 4);
     }
+}
 
-    fn check_option_features<S, T>(inner: S, element: &Option<S::Element>, expected: &T)
-    where
-        S: FeatureSpace<T>,
-        // These ought to be implied by S: FeatureSpace<T> but the whole PhantomFeatureSpace
-        // hack hides this inference from the compiler.
-        // I think the `where self: PhantomFeatureSpace<T, T2>` is the problem.
-        OptionSpace<S>: FeatureSpace<T> + Space<Element = Option<S::Element>>,
-        T: Debug + PartialEq,
-    {
-        let space = OptionSpace::new(inner);
-        assert_eq!(&space.features(element), expected);
+#[cfg(test)]
+mod feature_space {
+    use super::super::{IndexSpace, SingletonSpace};
+    use super::*;
+    use ndarray::arr1;
+
+    macro_rules! features_tests {
+        ($label:ident, $inner:expr, $elem:expr, $expected:expr) => {
+            mod $label {
+                use super::*;
+
+                #[test]
+                fn tensor_features() {
+                    let space = OptionSpace::new($inner);
+                    let actual: Tensor = space.features(&$elem);
+                    assert_eq!(actual, Tensor::of_slice(&$expected));
+                }
+
+                #[test]
+                fn tensor_features_out() {
+                    let space = OptionSpace::new($inner);
+                    let expected = Tensor::of_slice(&$expected);
+                    let mut out = expected.empty_like();
+                    space.features_out(&$elem, &mut out, false);
+                    assert_eq!(out, expected);
+                }
+
+                #[test]
+                fn array_features() {
+                    let space = OptionSpace::new($inner);
+                    let actual: Array<f32, _> = space.features(&$elem);
+                    let expected: Array<f32, _> = arr1(&$expected);
+                    assert_eq!(actual, expected);
+                }
+
+                #[test]
+                fn array_features_out() {
+                    let space = OptionSpace::new($inner);
+                    let expected: Array<f32, _> = arr1(&$expected);
+                    let mut out = Array::from_elem(expected.raw_dim(), f32::NAN);
+                    space.features_out(&$elem, &mut out, false);
+                    assert_eq!(out, expected);
+                }
+            }
+        };
     }
 
-    fn check_option_features_out<S>(inner: S, element: &Option<S::Element>, expected: &Tensor)
-    where
-        S: FeatureSpaceOut<Tensor>,
-        // These ought to be implied by S: FeatureSpaceOut<T> but the whole PhantomFeatureSpace
-        // hack hides this inference from the compiler.
-        // I think the `where self: PhantomFeatureSpace<T, T2>` is the problem.
-        OptionSpace<S>: FeatureSpaceOut<Tensor> + Space<Element = Option<S::Element>>,
-    {
-        let space = OptionSpace::new(inner);
-        let mut out = expected.empty_like();
-        space.features_out(element, &mut out, false);
-        assert_eq!(&out, expected);
+    features_tests!(singleton_none, SingletonSpace::new(), None, [1.0_f32]);
+    features_tests!(singleton_some, SingletonSpace::new(), Some(()), [0.0_f32]);
+    features_tests!(
+        index_none,
+        IndexSpace::new(3),
+        None,
+        [1.0, 0.0, 0.0, 0.0_f32]
+    );
+    features_tests!(
+        index_some,
+        IndexSpace::new(3),
+        Some(1),
+        [0.0, 0.0, 1.0, 0.0_f32]
+    );
+}
+
+#[cfg(test)]
+mod batch_feature_space {
+    use super::super::{IndexSpace, SingletonSpace};
+    use super::*;
+    use ndarray::arr2;
+    use std::array::IntoIter;
+
+    fn tensor_from_arrays<T: tch::kind::Element, const N: usize, const M: usize>(
+        data: [[T; M]; N],
+    ) -> Tensor {
+        let flat_data: Vec<T> = IntoIter::new(data).map(IntoIter::new).flatten().collect();
+        Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
     }
 
-    #[test]
-    fn features_singleton_none() {
-        check_option_features(SingletonSpace::new(), &None, &Tensor::of_slice(&[1.0_f32]));
+    macro_rules! batch_features_tests {
+        ($label:ident, $inner:expr, $elems:expr, $expected:expr) => {
+            mod $label {
+                use super::*;
+
+                #[test]
+                fn tensor_batch_features() {
+                    let space = OptionSpace::new($inner);
+                    let actual: Tensor = space.batch_features(&$elems);
+                    assert_eq!(actual, tensor_from_arrays($expected));
+                }
+
+                #[test]
+                fn tensor_batch_features_out() {
+                    let space = OptionSpace::new($inner);
+                    let expected = tensor_from_arrays($expected);
+                    let mut out = expected.empty_like();
+                    space.batch_features_out(&$elems, &mut out, false);
+                    assert_eq!(out, expected);
+                }
+
+                #[test]
+                fn array_batch_features() {
+                    let space = OptionSpace::new($inner);
+                    let actual: Array<f32, _> = space.batch_features(&$elems);
+                    let expected: Array<f32, _> = arr2(&$expected);
+                    assert_eq!(actual, expected);
+                }
+
+                #[test]
+                fn array_batch_features_out() {
+                    let space = OptionSpace::new($inner);
+                    let expected: Array<f32, _> = arr2(&$expected);
+                    let mut out = Array::from_elem(expected.raw_dim(), f32::NAN);
+                    space.batch_features_out(&$elems, &mut out, false);
+                    assert_eq!(out, expected);
+                }
+            }
+        };
     }
 
-    #[test]
-    fn features_out_singleton_none() {
-        check_option_features_out(SingletonSpace::new(), &None, &Tensor::of_slice(&[1.0_f32]));
-    }
-
-    #[test]
-    fn features_singleton_some() {
-        check_option_features(
-            SingletonSpace::new(),
-            &Some(()),
-            &Tensor::of_slice(&[0.0_f32]),
-        );
-    }
-
-    #[test]
-    fn features_out_singleton_some() {
-        check_option_features_out(
-            SingletonSpace::new(),
-            &Some(()),
-            &Tensor::of_slice(&[0.0_f32]),
-        );
-    }
-
-    #[test]
-    fn features_index_none() {
-        check_option_features(
-            IndexSpace::new(3),
-            &None,
-            &Tensor::of_slice(&[1.0_f32, 0.0, 0.0, 0.0]),
-        )
-    }
-
-    #[test]
-    fn features_out_index_none() {
-        check_option_features_out(
-            IndexSpace::new(3),
-            &None,
-            &Tensor::of_slice(&[1.0_f32, 0.0, 0.0, 0.0]),
-        )
-    }
-
-    #[test]
-    fn features_index_some() {
-        check_option_features(
-            IndexSpace::new(3),
-            &Some(1),
-            &Tensor::of_slice(&[0.0_f32, 0.0, 1.0, 0.0]),
-        )
-    }
-
-    #[test]
-    fn features_out_index_some() {
-        check_option_features_out(
-            IndexSpace::new(3),
-            &Some(1),
-            &Tensor::of_slice(&[0.0_f32, 0.0, 1.0, 0.0]),
-        )
-    }
-
-    fn check_option_batch_features<S, T>(inner: S, elements: &[Option<S::Element>], expected: &T)
-    where
-        S: FeatureSpace<T>,
-        // These ought to be implied by S: FeatureSpace<T> but the whole PhantomFeatureSpace
-        // hack hides this inference from the compiler.
-        // I think the `where self: PhantomFeatureSpace<T, T2>` is the problem.
-        OptionSpace<S>: BatchFeatureSpace<T> + Space<Element = Option<S::Element>>,
-        T: Debug + PartialEq,
-    {
-        let space = OptionSpace::new(inner);
-        assert_eq!(&space.batch_features(elements), expected);
-    }
-
-    fn check_option_batch_features_out<S>(
-        inner: S,
-        elements: &[Option<S::Element>],
-        expected: &Tensor,
-    ) where
-        S: FeatureSpaceOut<Tensor>,
-        // These ought to be implied by S: FeatureSpaceOut<T> but the whole PhantomFeatureSpace
-        // hack hides this inference from the compiler.
-        // I think the `where self: PhantomFeatureSpace<T, T2>` is the problem.
-        OptionSpace<S>: BatchFeatureSpaceOut<Tensor> + Space<Element = Option<S::Element>>,
-    {
-        let space = OptionSpace::new(inner);
-        let mut out = expected.empty_like();
-        space.batch_features_out(elements, &mut out, false);
-        assert_eq!(&out, expected);
-    }
-
-    #[test]
-    fn batch_features_singleton() {
-        check_option_batch_features(
-            SingletonSpace::new(),
-            &[Some(()), None, Some(())],
-            &Tensor::of_slice(&[0.0_f32, 1.0, 0.0]).view((3, 1)),
-        );
-    }
-
-    #[test]
-    fn batch_features_out_singleton() {
-        check_option_batch_features_out(
-            SingletonSpace::new(),
-            &[Some(()), None, Some(())],
-            &Tensor::of_slice(&[0.0_f32, 1.0, 0.0]).view((3, 1)),
-        );
-    }
-
-    #[test]
-    fn batch_features_index() {
-        // Note: Currently fails because the complicated indexing used when generating the input
-        // for inner.batch_features_out results in a copy rather than a view.
-        check_option_batch_features(
-            IndexSpace::new(3),
-            &[Some(1), None, Some(0), Some(2), None],
-            &Tensor::of_slice(&[
-                0.0, 0.0, 1.0, 0.0, //
-                1.0, 0.0, 0.0, 0.0, //
-                0.0, 1.0, 0.0, 0.0, //
-                0.0, 0.0, 0.0, 1.0, //
-                1.0, 0.0, 0.0, 0.0_f32,
-            ])
-            .view((5, 4)),
-        );
-    }
-
-    #[test]
-    fn batch_features_out_index() {
-        // Note: Currently fails because the complicated indexing used when generating the input
-        // for inner.batch_features_out results in a copy rather than a view.
-        check_option_batch_features_out(
-            IndexSpace::new(3),
-            &[Some(1), None, Some(0), Some(2), None],
-            &Tensor::of_slice(&[
-                0.0, 0.0, 1.0, 0.0, //
-                1.0, 0.0, 0.0, 0.0, //
-                0.0, 1.0, 0.0, 0.0, //
-                0.0, 0.0, 0.0, 1.0, //
-                1.0, 0.0, 0.0, 0.0_f32,
-            ])
-            .view((5, 4)),
-        );
-    }
+    batch_features_tests!(
+        singleton,
+        SingletonSpace::new(),
+        [Some(()), None, Some(())],
+        [[0.0], [1.0], [0.0_f32]]
+    );
+    batch_features_tests!(
+        index,
+        IndexSpace::new(3),
+        [Some(1), None, Some(0), Some(2), None],
+        [
+            [0.0, 0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+            [1.0, 0.0, 0.0, 0.0_f32]
+        ]
+    );
 }
