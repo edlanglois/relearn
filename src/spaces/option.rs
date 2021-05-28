@@ -11,7 +11,7 @@ use rand::Rng;
 use std::convert::TryInto;
 use std::fmt;
 use std::marker::PhantomData;
-use tch::{Device, IndexOp, Kind, Tensor};
+use tch::{Device, Kind, Tensor};
 
 /// A space whose elements are either `None` or `Some(inner_elem)`.
 ///
@@ -183,63 +183,28 @@ impl<S: FeatureSpaceOut<Tensor>> FeatureSpaceOut<Tensor> for OptionSpace<S> {
     }
 }
 
-impl<S: BatchFeatureSpaceOut<Tensor>> PhantomBatchFeatureSpace<Tensor> for OptionSpace<S> {
+impl<S> PhantomBatchFeatureSpace<Tensor> for OptionSpace<S>
+where
+    S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, f32, Ix1>>,
+{
     fn phantom_batch_features<'a, I>(
         &self,
         elements: I,
-        marker: PhantomData<&'a Self::Element>,
+        _marker: PhantomData<&'a Self::Element>,
     ) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
         Self::Element: 'a,
     {
-        let elements = elements.into_iter();
-        let mut out = Tensor::empty(
-            &[elements.len() as i64, self.num_features() as i64],
-            (Kind::Float, Device::Cpu),
-        );
-        self.phantom_batch_features_out(elements, &mut out, false, marker);
-        out
-    }
-}
-
-impl<S: BatchFeatureSpaceOut<Tensor>> PhantomBatchFeatureSpaceOut<Tensor> for OptionSpace<S> {
-    fn phantom_batch_features_out<'a, I>(
-        &self,
-        elements: I,
-        out: &mut Tensor,
-        zeroed: bool,
-        _: PhantomData<&'a Self::Element>,
-    ) where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-    {
-        let mut none_indices = Vec::new();
-        let mut some_elements = Vec::new();
-        let mut some_indices = Vec::new();
-        for (i, element) in elements.into_iter().enumerate() {
-            if let Some(x) = element {
-                some_elements.push(x);
-                some_indices.push(i as i64);
-            } else {
-                none_indices.push(i as i64);
-            }
-        }
-        let rest_size = self.inner.num_features();
-        let [mut first, rest]: [Tensor; 2] = out
-            .split_with_sizes(&[1, rest_size as i64], -1)
-            .try_into()
-            .unwrap();
-
-        if !zeroed {
-            let _ = out.zero_();
-        }
-        let _ = first.index_fill_(-2, &Tensor::of_slice(&none_indices), 1.0);
-        // FIXME: This creates a copy not a view
-        let mut some_rest = rest.i(&Tensor::of_slice(&some_indices));
-        self.inner
-            .batch_features_out(some_elements, &mut some_rest, true);
+        // NOTE:
+        // Constructing an array of features then copying to a tensor is nearly as fast as the
+        // fastest direct-to-torch implementation and considerably simpler.
+        // It is very difficult construct torch tensors with complex inner data layouts
+        // and many methods are orders of magnitude slower than constructing into an Array
+        // and copying.
+        let features: Array<f32, _> = self.batch_features(elements);
+        features.try_into().unwrap()
     }
 }
 
@@ -516,6 +481,8 @@ mod batch_feature_space {
                     assert_eq!(actual, tensor_from_arrays($expected));
                 }
 
+                // No longer implemented
+                /*
                 #[test]
                 fn tensor_batch_features_out() {
                     let space = OptionSpace::new($inner);
@@ -524,6 +491,7 @@ mod batch_feature_space {
                     space.batch_features_out(&$elems, &mut out, false);
                     assert_eq!(out, expected);
                 }
+                */
 
                 #[test]
                 fn array_batch_features() {
