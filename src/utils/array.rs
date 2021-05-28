@@ -6,6 +6,17 @@ use tch::{Device, Tensor};
 
 /// A basic multidimensional array with simple operations.
 pub trait BasicArray<T, const N: usize> {
+    /// Allocate a new array with the given shape.
+    ///
+    /// Also returns a boolean indiciating whether the array is zero-initialized (`true`)
+    /// or contains arbitrary values (`false`).
+    fn allocate(shape: [usize; N]) -> (Self, bool)
+    where
+        Self: Sized,
+    {
+        (Self::zeros(shape), true)
+    }
+
     /// Create a zero-initialized array with the given shape.
     fn zeros(shape: [usize; N]) -> Self;
 }
@@ -17,6 +28,14 @@ pub trait BasicArrayMut {
 }
 
 impl<T: tch::kind::Element, const N: usize> BasicArray<T, N> for Tensor {
+    fn allocate(shape: [usize; N]) -> (Self, bool)
+    where
+        Self: Sized,
+    {
+        let shape: Vec<i64> = shape.iter().map(|&x| x.try_into().unwrap()).collect();
+        (Self::empty(&shape, (T::KIND, Device::Cpu)), false)
+    }
+
     fn zeros(shape: [usize; N]) -> Self {
         let shape: Vec<i64> = shape.iter().map(|&x| x.try_into().unwrap()).collect();
         Self::zeros(&shape, (T::KIND, Device::Cpu))
