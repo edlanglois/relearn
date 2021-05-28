@@ -4,13 +4,6 @@ use num_traits::Zero;
 use std::convert::TryInto;
 use tch::{Device, Tensor};
 
-pub trait NDArrayFamily<T> {
-    /// A one-dimensional array
-    type D1;
-    /// A two-Dimensional array
-    type D2;
-}
-
 /// A basic multidimensional array with simple operations.
 pub trait BasicArray<T, const N: usize> {
     /// Create a zero-initialized array with the given shape.
