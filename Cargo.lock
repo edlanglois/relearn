@@ -13,15 +13,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28b2cd92db5cbd74e8e5028f7e27dd7aa3090e89e4f2a197cc7c8dfb69c7063b"
 
 [[package]]
-name = "approx"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f2a05fd1bd10b2527e20a2cd32d8873d115b8b39fe219ee25f42a8aca6ba278"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -505,30 +496,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "nalgebra"
-version = "0.26.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "476d1d59fe02fe54c86356e91650cd892f392782a1cb9fc524ec84f7aa9e1d06"
-dependencies = [
- "approx",
- "matrixmultiply",
- "num-complex 0.3.1",
- "num-rational",
- "num-traits",
- "rand",
- "rand_distr",
- "simba",
- "typenum",
-]
-
-[[package]]
 name = "ndarray"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02b2e4807aaa21dc6dcc3417e5902dc199c3648043bf27b7af4b202332fe4760"
 dependencies = [
  "matrixmultiply",
- "num-complex 0.4.0",
+ "num-complex",
  "num-integer",
  "num-traits",
  "rawpointer",
@@ -560,15 +534,6 @@ dependencies = [
 
 [[package]]
 name = "num-complex"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "747d632c0c558b87dbabbe6a82f3b4ae03720d0646ac5b7b4dae89394be5f2c5"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
-name = "num-complex"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26873667bbbb7c5182d4a37c1add32cdf09f841af72da53318fdb81543c15085"
@@ -583,17 +548,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2cc698a63b549a70bc047073d2949cce27cd1c7b0a4a862d08a8031bc2801db"
 dependencies = [
  "autocfg",
- "num-traits",
-]
-
-[[package]]
-name = "num-rational"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12ac428b1cb17fce6f731001d307d351ec70a6d202fc2e60f7d4c5e42d8f4f07"
-dependencies = [
- "autocfg",
- "num-integer",
  "num-traits",
 ]
 
@@ -647,12 +601,6 @@ name = "os_str_bytes"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6acbef58a60fe69ab50510a55bc8cdd4d6cf2283d27ad338f54cb52747a9cf2d"
-
-[[package]]
-name = "paste"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
 
 [[package]]
 name = "pest"
@@ -876,9 +824,9 @@ dependencies = [
  "ndarray-stats",
  "num-traits",
  "rand",
+ "rand_distr",
  "rstest",
  "rust_rl_derive",
- "statrs",
  "tch",
  "thiserror",
 ]
@@ -988,18 +936,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "simba"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5132a955559188f3d13c9ba831e77c802ddc8782783f050ed0c52f5988b95f4c"
-dependencies = [
- "approx",
- "num-complex 0.3.1",
- "num-traits",
- "paste",
-]
-
-[[package]]
 name = "socket2"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1007,19 +943,6 @@ checksum = "9e3dfc207c526015c632472a77be09cf1b6e46866581aecae5cc38fb4235dea2"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "statrs"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e0c1f144861fbfd2a8cc82d564ccbf7fb3b7834d4fa128b84e9c2a73371aead"
-dependencies = [
- "approx",
- "lazy_static",
- "nalgebra",
- "num-traits",
- "rand",
 ]
 
 [[package]]
@@ -1132,12 +1055,6 @@ dependencies = [
  "libc",
  "zip",
 ]
-
-[[package]]
-name = "typenum"
-version = "1.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "879f6906492a7cd215bfa4cf595b600146ccfac0c79bcbd1f3000162af5e8b06"
 
 [[package]]
 name = "ucd-trie"

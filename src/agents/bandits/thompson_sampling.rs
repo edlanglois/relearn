@@ -7,7 +7,7 @@ use crate::utils::iter::ArgMaxBy;
 use ndarray::{Array, Array2, Axis};
 use rand::distributions::Distribution;
 use rand::prelude::*;
-use statrs::distribution::Beta;
+use rand_distr::Beta;
 use std::fmt;
 
 /// Configuration for [`BetaThompsonSamplingAgent`]
