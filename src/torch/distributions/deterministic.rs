@@ -5,7 +5,7 @@ use tch::{Device, Kind, Tensor};
 
 /// A deterministic distribution over size-0 vectors.
 pub struct DeterministicEmptyVec {
-    /// batch_shape + [0]
+    /// `batch_shape + [0]`
     sampling_shape: Vec<i64>,
 }
 
