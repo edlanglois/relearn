@@ -62,7 +62,7 @@ impl FiniteSpace for BooleanSpace {
     }
 }
 
-/// Represent an elements as a Boolean valued tensor.
+/// Represent elements as a Boolean valued tensor.
 impl ReprSpace<Tensor> for BooleanSpace {
     fn repr(&self, element: &Self::Element) -> Tensor {
         Tensor::scalar_tensor(*element as i64, (Kind::Bool, Device::Cpu))
