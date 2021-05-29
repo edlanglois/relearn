@@ -1,12 +1,13 @@
 //! Casting
+#![allow(clippy::cast_possible_truncation)]
 
 /// Lossy conversion to another type.
 pub trait CastInto<T> {
     fn cast_into(self) -> T;
 }
 
-impl<T> CastInto<T> for T {
-    fn cast_into(self) -> T {
+impl<T> CastInto<Self> for T {
+    fn cast_into(self) -> Self {
         self
     }
 }
