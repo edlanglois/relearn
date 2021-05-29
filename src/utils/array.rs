@@ -1,6 +1,6 @@
 //! A generic array interface.
 use ndarray::{Array, ArrayBase, DataMut, Dim, Dimension, Ix, RawData};
-use num_traits::Zero;
+use num_traits::{One, Zero};
 use std::convert::TryInto;
 use tch::{Device, Tensor};
 
@@ -19,6 +19,9 @@ pub trait BasicArray<T, const N: usize> {
 
     /// Create a zero-initialized array with the given shape.
     fn zeros(shape: [usize; N]) -> Self;
+
+    /// Create a one-initialized array with the given shape.
+    fn ones(shape: [usize; N]) -> Self;
 }
 
 /// A basic mutable multidimensional array with simple operations.
@@ -27,18 +30,27 @@ pub trait BasicArrayMut {
     fn zero_(&mut self);
 }
 
+fn shape_i64(shape: &[usize]) -> Vec<i64> {
+    shape.iter().map(|&x| x.try_into().unwrap()).collect()
+}
+
 impl<T: tch::kind::Element, const N: usize> BasicArray<T, N> for Tensor {
     fn allocate(shape: [usize; N]) -> (Self, bool)
     where
         Self: Sized,
     {
-        let shape: Vec<i64> = shape.iter().map(|&x| x.try_into().unwrap()).collect();
-        (Self::empty(&shape, (T::KIND, Device::Cpu)), false)
+        (
+            Self::empty(&shape_i64(&shape), (T::KIND, Device::Cpu)),
+            false,
+        )
     }
 
     fn zeros(shape: [usize; N]) -> Self {
-        let shape: Vec<i64> = shape.iter().map(|&x| x.try_into().unwrap()).collect();
-        Self::zeros(&shape, (T::KIND, Device::Cpu))
+        Self::zeros(&shape_i64(&shape), (T::KIND, Device::Cpu))
+    }
+
+    fn ones(shape: [usize; N]) -> Self {
+        Self::ones(&shape_i64(&shape), (T::KIND, Device::Cpu))
     }
 }
 
@@ -52,10 +64,14 @@ macro_rules! basic_ndarray {
     ($n:expr) => {
         impl<T> BasicArray<T, $n> for Array<T, Dim<[Ix; $n]>>
         where
-            T: Clone + Zero,
+            T: Clone + Zero + One,
         {
             fn zeros(shape: [usize; $n]) -> Self {
                 Self::zeros(shape)
+            }
+
+            fn ones(shape: [usize; $n]) -> Self {
+                Self::ones(shape)
             }
         }
     };

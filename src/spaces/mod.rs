@@ -1,4 +1,5 @@
 //! Spaces: runtime-defined types
+mod boolean;
 mod categorical;
 mod index;
 mod indexed_type;
@@ -10,6 +11,7 @@ mod singleton;
 #[cfg(test)]
 pub mod testing;
 
+pub use boolean::BooleanSpace;
 pub use categorical::CategoricalSpace;
 pub use index::IndexSpace;
 pub use indexed_type::{Indexed, IndexedTypeSpace};
