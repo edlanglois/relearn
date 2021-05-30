@@ -52,15 +52,16 @@ where
 }
 
 impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
-    pub fn build_actor<OS, AS, P, V>(
+    pub fn build_actor<E, P, V>(
         &self,
-        env: EnvStructure<OS, AS>,
+        env: &E,
         policy_vs: &Path,
         value_vs: &Path,
-    ) -> PolicyValueNetActor<OS, AS, P, V>
+    ) -> PolicyValueNetActor<E::ObservationSpace, E::ActionSpace, P, V>
     where
-        OS: Space + BaseFeatureSpace,
-        AS: ParameterizedDistributionSpace<Tensor>,
+        E: EnvStructure + ?Sized,
+        <E as EnvStructure>::ObservationSpace: Space + BaseFeatureSpace,
+        <E as EnvStructure>::ActionSpace: ParameterizedDistributionSpace<Tensor>,
         PB: ModuleBuilder<P>,
         VB: StepValueBuilder<V>,
         V: StepValue,
@@ -128,18 +129,19 @@ where
     /// * `config` - `PolicyValueNetActor` configuration parameters.
     /// * `policy_vs` - Path in which the policy network variables are stored
     /// * `value_vs` - Path in which the value network variables are stored.
-    pub fn new<PB, VB>(
-        env: EnvStructure<OS, AS>,
+    pub fn new<E, PB, VB>(
+        env: &E,
         config: &PolicyValueNetActorConfig<PB, VB>,
         policy_vs: &Path,
         value_vs: &Path,
     ) -> Self
     where
+        E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
         PB: ModuleBuilder<P>,
         VB: StepValueBuilder<V>,
     {
-        let observation_space = NonEmptyFeatures::new(env.observation_space);
-        let action_space = env.action_space;
+        let observation_space = NonEmptyFeatures::new(env.observation_space());
+        let action_space = env.action_space();
         let max_steps_per_epoch = config.steps_per_epoch + config.steps_per_epoch / 10;
 
         let policy = config.policy_config.build_module(
@@ -151,7 +153,7 @@ where
         let value = config
             .value_config
             .build_step_value(value_vs, observation_space.num_features());
-        let discount_factor = value.discount_factor(env.discount_factor);
+        let discount_factor = value.discount_factor(env.discount_factor());
 
         Self {
             observation_space,

@@ -47,11 +47,30 @@ impl MemoryGame {
     }
 }
 
+impl EnvStructure for MemoryGame {
+    type ObservationSpace = IndexSpace;
+    type ActionSpace = IndexSpace;
+
+    fn observation_space(&self) -> Self::ObservationSpace {
+        IndexSpace::new(self.num_actions + self.history_len)
+    }
+
+    fn action_space(&self) -> Self::ActionSpace {
+        IndexSpace::new(self.num_actions)
+    }
+
+    fn reward_range(&self) -> (f64, f64) {
+        (-1.0, 1.0)
+    }
+
+    fn discount_factor(&self) -> f64 {
+        1.0
+    }
+}
+
 impl Environment for MemoryGame {
     /// `(current_state, initial_state)`
     type State = (usize, usize);
-    type ObservationSpace = IndexSpace;
-    type ActionSpace = IndexSpace;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
         let state = rng.gen_range(0..self.num_actions);
@@ -83,15 +102,6 @@ impl Environment for MemoryGame {
                 current_state + 1
             };
             (Some((new_state, initial_state)), 0.0, false)
-        }
-    }
-
-    fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
-        EnvStructure {
-            observation_space: IndexSpace::new(self.num_actions + self.history_len),
-            action_space: IndexSpace::new(self.num_actions),
-            reward_range: (-1.0, 1.0),
-            discount_factor: 1.0,
         }
     }
 }

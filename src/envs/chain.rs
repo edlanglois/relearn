@@ -38,10 +38,29 @@ impl Default for Chain {
     }
 }
 
-impl Environment for Chain {
-    type State = u64;
+impl EnvStructure for Chain {
     type ObservationSpace = IndexSpace;
     type ActionSpace = IndexedTypeSpace<Move>;
+
+    fn observation_space(&self) -> Self::ObservationSpace {
+        IndexSpace::new(self.size.try_into().unwrap())
+    }
+
+    fn action_space(&self) -> Self::ActionSpace {
+        Self::ActionSpace::new()
+    }
+
+    fn reward_range(&self) -> (f64, f64) {
+        (0.0, 10.0)
+    }
+
+    fn discount_factor(&self) -> f64 {
+        self.discount_factor
+    }
+}
+
+impl Environment for Chain {
+    type State = u64;
 
     fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
         0
@@ -76,15 +95,6 @@ impl Environment for Chain {
             }
         };
         (Some(state), reward, false)
-    }
-
-    fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
-        EnvStructure {
-            observation_space: IndexSpace::new(self.size.try_into().unwrap()),
-            action_space: Self::ActionSpace::new(),
-            reward_range: (0.0, 10.0),
-            discount_factor: self.discount_factor,
-        }
     }
 }
 

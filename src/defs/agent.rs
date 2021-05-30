@@ -4,7 +4,7 @@ use crate::agents::{
     TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::EnvStructure;
-use crate::spaces::{FiniteSpace, RLActionSpace, RLObservationSpace};
+use crate::spaces::{FiniteSpace, RLActionSpace, RLObservationSpace, Space};
 use crate::torch::agents::{
     PolicyGradientAgentConfig, PolicyGradientBoxedAgent, TrpoAgentConfig, TrpoBoxedAgent,
 };
@@ -46,21 +46,30 @@ impl AgentDef {
     /// Construct an agent for the given environment structure.
     ///
     /// The observation and action spaces must both be finite.
-    pub fn build_finite_finite<OS, AS>(
+    pub fn build_finite_finite<E>(
         &self,
-        es: EnvStructure<OS, AS>,
+        env: &E,
         seed: u64,
-    ) -> Result<Box<dyn Agent<OS::Element, AS::Element>>, BuildAgentError>
+    ) -> Result<
+        Box<
+            dyn Agent<
+                <<E as EnvStructure>::ObservationSpace as Space>::Element,
+                <<E as EnvStructure>::ActionSpace as Space>::Element,
+            >,
+        >,
+        BuildAgentError,
+    >
     where
-        OS: RLObservationSpace + FiniteSpace + 'static,
-        AS: RLActionSpace + FiniteSpace + 'static,
+        E: EnvStructure + ?Sized,
+        <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace + 'static,
+        <E as EnvStructure>::ActionSpace: RLActionSpace + FiniteSpace + 'static,
     {
         use AgentDef::*;
         match self {
-            TabularQLearning(config) => config.build_agent(es, seed).map(|a| Box::new(a) as _),
-            BetaThompsonSampling(config) => config.build_agent(es, seed).map(|a| Box::new(a) as _),
-            UCB1(config) => config.build_agent(es, seed).map(|a| Box::new(a) as _),
-            _ => self.build_any_any(es, seed),
+            TabularQLearning(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            BetaThompsonSampling(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            UCB1(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            _ => self.build_any_any(env, seed),
         }
     }
 
@@ -68,25 +77,34 @@ impl AgentDef {
     ///
     /// There is no trait specialization so this will fail if the agent cannot be built for
     /// arbitrary spaces, even if it can for the specific instance this function is called with.
-    pub fn build_any_any<OS, AS>(
+    pub fn build_any_any<E>(
         &self,
-        es: EnvStructure<OS, AS>,
+        env: &E,
         seed: u64,
-    ) -> Result<Box<dyn Agent<OS::Element, AS::Element>>, BuildAgentError>
+    ) -> Result<
+        Box<
+            dyn Agent<
+                <<E as EnvStructure>::ObservationSpace as Space>::Element,
+                <<E as EnvStructure>::ActionSpace as Space>::Element,
+            >,
+        >,
+        BuildAgentError,
+    >
     where
-        OS: RLObservationSpace + 'static,
-        AS: RLActionSpace + 'static,
+        E: EnvStructure + ?Sized,
+        <E as EnvStructure>::ObservationSpace: RLObservationSpace + 'static,
+        <E as EnvStructure>::ActionSpace: RLActionSpace + 'static,
     {
         use AgentDef::*;
         match self {
             Random => RandomAgentConfig::new()
-                .build_agent(es, seed)
+                .build_agent(env, seed)
                 .map(|a| Box::new(a) as _),
             PolicyGradient(config) => config
-                .build_agent(es, seed)
+                .build_agent(env, seed)
                 .map(|a: PolicyGradientBoxedAgent<_, _>| Box::new(a) as _),
             Trpo(config) => config
-                .build_agent(es, seed)
+                .build_agent(env, seed)
                 .map(|a: TrpoBoxedAgent<_, _>| Box::new(a) as _),
             _ => Err(BuildAgentError::InvalidSpaceBounds),
         }

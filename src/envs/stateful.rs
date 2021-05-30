@@ -21,10 +21,28 @@ impl<E: Environment> EnvWithState<E> {
     }
 }
 
-impl<E: Environment> StatefulEnvironment for EnvWithState<E> {
+impl<E: Environment> EnvStructure for EnvWithState<E> {
     type ObservationSpace = E::ObservationSpace;
     type ActionSpace = E::ActionSpace;
 
+    fn observation_space(&self) -> Self::ObservationSpace {
+        self.env.observation_space()
+    }
+
+    fn action_space(&self) -> Self::ActionSpace {
+        self.env.action_space()
+    }
+
+    fn reward_range(&self) -> (f64, f64) {
+        self.env.reward_range()
+    }
+
+    fn discount_factor(&self) -> f64 {
+        self.env.discount_factor()
+    }
+}
+
+impl<E: Environment> StatefulEnvironment for EnvWithState<E> {
     fn step(
         &mut self,
         action: &<Self::ActionSpace as Space>::Element,
@@ -51,10 +69,6 @@ impl<E: Environment> StatefulEnvironment for EnvWithState<E> {
         let observation = self.env.observe(&state, &mut self.rng);
         self.state = Some(state);
         observation
-    }
-
-    fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
-        self.env.structure()
     }
 }
 

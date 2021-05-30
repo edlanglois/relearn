@@ -10,10 +10,10 @@ use std::fmt::Debug;
 pub fn run_stateless<E>(env: E, num_steps: u64, seed: u64)
 where
     E: Environment,
-    <E as Environment>::ObservationSpace: Debug,
-    <<E as Environment>::ObservationSpace as Space>::Element: Debug + Clone,
-    <E as Environment>::ActionSpace: Debug + SampleSpace,
-    <<E as Environment>::ActionSpace as Space>::Element: Debug,
+    <E as EnvStructure>::ObservationSpace: Debug,
+    <<E as EnvStructure>::ObservationSpace as Space>::Element: Debug + Clone,
+    <E as EnvStructure>::ActionSpace: Debug + SampleSpace,
+    <<E as EnvStructure>::ActionSpace as Space>::Element: Debug,
 {
     run_stateful(&mut env.with_state(seed), num_steps, seed + 1)
 }
@@ -22,17 +22,17 @@ where
 pub fn run_stateful<E>(env: &mut E, num_steps: u64, seed: u64)
 where
     E: StatefulEnvironment,
-    <E as StatefulEnvironment>::ObservationSpace: Debug,
-    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Debug + Clone,
-    <E as StatefulEnvironment>::ActionSpace: Debug + SampleSpace,
-    <<E as StatefulEnvironment>::ActionSpace as Space>::Element: Debug,
+    <E as EnvStructure>::ObservationSpace: Debug,
+    <<E as EnvStructure>::ObservationSpace as Space>::Element: Debug + Clone,
+    <E as EnvStructure>::ActionSpace: Debug + SampleSpace,
+    <<E as EnvStructure>::ActionSpace as Space>::Element: Debug,
 {
-    let EnvStructure {
-        observation_space,
-        action_space,
-        reward_range: (min_reward, max_reward),
-        discount_factor,
-    } = env.structure();
+    let observation_space = env.observation_space();
+    let action_space = env.action_space();
+    let (min_reward, max_reward) = env.reward_range();
+    assert!(min_reward <= max_reward);
+
+    let discount_factor = env.discount_factor();
     assert!(discount_factor >= 0.0);
     assert!(discount_factor <= 1.0);
 

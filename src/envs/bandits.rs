@@ -80,10 +80,33 @@ impl<D> Bandit<D> {
     }
 }
 
-impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
-    type State = ();
+impl<D: Bounded<f64>> EnvStructure for Bandit<D> {
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
+
+    fn observation_space(&self) -> Self::ObservationSpace {
+        SingletonSpace::new()
+    }
+
+    fn action_space(&self) -> Self::ActionSpace {
+        IndexSpace::new(self.distributions.len())
+    }
+
+    fn reward_range(&self) -> (f64, f64) {
+        self.distributions
+            .iter()
+            .map(|d| d.bounds())
+            .reduce(|(a_min, a_max), (b_min, b_max)| (a_min.min(b_min), a_max.max(b_max)))
+            .expect("No arms on the bandit")
+    }
+
+    fn discount_factor(&self) -> f64 {
+        1.0
+    }
+}
+
+impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
+    type State = ();
 
     fn initial_state(&self, _rng: &mut StdRng) -> Self::State {}
 
@@ -102,27 +125,6 @@ impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
     ) -> (Option<Self::State>, f64, bool) {
         let reward = self.distributions[*action].sample(rng);
         (None, reward, true)
-    }
-
-    fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
-        let reward_range = self.distributions.iter().map(|d| d.bounds()).fold(
-            (0.0, -1.0),
-            |(a_min, a_max), (b_min, b_max)| {
-                if a_max < a_min {
-                    (b_min, b_max)
-                } else if b_max < b_min {
-                    (a_min, a_max)
-                } else {
-                    (a_min.min(b_min), a_max.max(b_max))
-                }
-            },
-        );
-        EnvStructure {
-            observation_space: SingletonSpace::new(),
-            action_space: IndexSpace::new(self.distributions.len()),
-            reward_range,
-            discount_factor: 1.0,
-        }
     }
 }
 

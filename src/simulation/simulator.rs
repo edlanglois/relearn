@@ -1,7 +1,7 @@
 use super::hooks::SimulationHook;
 /// Simulation trait and Simulator structs.
 use crate::agents::{Actor, Agent, Step};
-use crate::envs::StatefulEnvironment;
+use crate::envs::{EnvStructure, StatefulEnvironment};
 use crate::logging::Logger;
 use crate::spaces::Space;
 
@@ -34,15 +34,15 @@ impl<E, A, L, H> Simulator<E, A, L, H> {
 impl<E, A, L, H> Simulation for Simulator<E, A, L, H>
 where
     E: StatefulEnvironment,
-    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
+    <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
     A: Agent<
-        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        <<E as EnvStructure>::ObservationSpace as Space>::Element,
+        <<E as EnvStructure>::ActionSpace as Space>::Element,
     >,
     L: Logger,
     H: SimulationHook<
-        <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-        <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+        <<E as EnvStructure>::ObservationSpace as Space>::Element,
+        <<E as EnvStructure>::ActionSpace as Space>::Element,
         L,
     >,
 {
@@ -71,15 +71,15 @@ where
     //
     // Alternatively, it can use the concrete struct types, which allows inlining.
     E: StatefulEnvironment + ?Sized,
-    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
+    <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
     A: Agent<
-            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+            <<E as EnvStructure>::ObservationSpace as Space>::Element,
+            <<E as EnvStructure>::ActionSpace as Space>::Element,
         > + ?Sized,
     L: Logger, // Not ?Sized because can't convert &(Logger + ?Sized) => &mut dyn Logger
     H: SimulationHook<
-            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+            <<E as EnvStructure>::ObservationSpace as Space>::Element,
+            <<E as EnvStructure>::ActionSpace as Space>::Element,
             L,
         > + ?Sized,
 {
@@ -128,15 +128,15 @@ where
 pub fn run_actor<E, A, L, H>(environment: &mut E, actor: &mut A, logger: &mut L, hook: &mut H)
 where
     E: StatefulEnvironment + ?Sized,
-    <<E as StatefulEnvironment>::ObservationSpace as Space>::Element: Clone,
+    <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
     A: Actor<
-            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+            <<E as EnvStructure>::ObservationSpace as Space>::Element,
+            <<E as EnvStructure>::ActionSpace as Space>::Element,
         > + ?Sized,
     L: Logger + ?Sized,
     H: SimulationHook<
-            <<E as StatefulEnvironment>::ObservationSpace as Space>::Element,
-            <<E as StatefulEnvironment>::ActionSpace as Space>::Element,
+            <<E as EnvStructure>::ObservationSpace as Space>::Element,
+            <<E as EnvStructure>::ActionSpace as Space>::Element,
             L,
         > + ?Sized,
 {

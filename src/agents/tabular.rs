@@ -28,20 +28,22 @@ impl Default for TabularQLearningAgentConfig {
     }
 }
 
-impl<OS, AS> AgentBuilder<TabularQLearningAgent<OS, AS>, OS, AS> for TabularQLearningAgentConfig
+impl<E> AgentBuilder<TabularQLearningAgent<E::ObservationSpace, E::ActionSpace>, E>
+    for TabularQLearningAgentConfig
 where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
+    E: EnvStructure + ?Sized,
+    <E as EnvStructure>::ObservationSpace: FiniteSpace,
+    <E as EnvStructure>::ActionSpace: FiniteSpace,
 {
     fn build_agent(
         &self,
-        env: EnvStructure<OS, AS>,
+        env: &E,
         seed: u64,
-    ) -> Result<TabularQLearningAgent<OS, AS>, BuildAgentError> {
+    ) -> Result<TabularQLearningAgent<E::ObservationSpace, E::ActionSpace>, BuildAgentError> {
         Ok(TabularQLearningAgent::new(
-            env.observation_space,
-            env.action_space,
-            env.discount_factor,
+            env.observation_space(),
+            env.action_space(),
+            env.discount_factor(),
             self.exploration_rate,
             seed,
         ))
@@ -161,7 +163,7 @@ where
 mod tabular_q_learning {
     use super::super::testing;
     use super::*;
-    use crate::envs::{DeterministicBandit, StatefulEnvironment, WithState};
+    use crate::envs::{DeterministicBandit, WithState};
     use crate::simulation;
     use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 
@@ -178,14 +180,12 @@ mod tabular_q_learning {
     #[test]
     fn explore_exploit() {
         let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).with_state(0);
-        let env_structure = env.structure();
-        let action_space = env_structure.action_space.clone();
 
         // The agent explores
         let config = TabularQLearningAgentConfig::new(0.95);
-        let mut agent = config.build_agent(env_structure, 0).unwrap();
+        let mut agent = config.build_agent(&env, 0).unwrap();
         let mut explore_hooks = (
-            IndexedActionCounter::new(action_space.clone()),
+            IndexedActionCounter::new(env.action_space()),
             StepLimit::new(1000),
         );
         simulation::run_agent(&mut env, &mut agent, &mut (), &mut explore_hooks);
@@ -195,7 +195,7 @@ mod tabular_q_learning {
 
         // The actor exploits
         let mut exploit_hooks = (
-            IndexedActionCounter::new(action_space),
+            IndexedActionCounter::new(env.action_space()),
             StepLimit::new(1000),
         );
         simulation::run_actor(&mut env, &mut agent, &mut (), &mut exploit_hooks);

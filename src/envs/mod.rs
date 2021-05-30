@@ -19,14 +19,57 @@ use crate::spaces::Space;
 use rand::rngs::StdRng;
 use std::f64;
 
+/// The external structure of a reinforcement learning environment.
+pub trait EnvStructure {
+    type ObservationSpace: Space;
+    type ActionSpace: Space;
+
+    /// Space containing all possible observations.
+    ///
+    /// This is not required to be tight:
+    /// the space may contain elements that can never be produced as a state observation.
+    fn observation_space(&self) -> Self::ObservationSpace;
+
+    /// The space of all possible actions.
+    ///
+    /// Every element in this space must be a valid action.
+    fn action_space(&self) -> Self::ActionSpace;
+
+    /// A lower and upper bound on possible reward values.
+    ///
+    /// These bounds are not required to be tight but ideally will be as tight as possible.
+    fn reward_range(&self) -> (f64, f64);
+
+    /// A discount factor applied to future rewards.
+    ///
+    /// A value between `0` and `1`, inclusive.
+    fn discount_factor(&self) -> f64;
+}
+
+impl<E: EnvStructure + ?Sized> EnvStructure for Box<E> {
+    type ObservationSpace = E::ObservationSpace;
+    type ActionSpace = E::ActionSpace;
+
+    fn observation_space(&self) -> Self::ObservationSpace {
+        E::observation_space(self)
+    }
+    fn action_space(&self) -> Self::ActionSpace {
+        E::action_space(self)
+    }
+    fn reward_range(&self) -> (f64, f64) {
+        E::reward_range(self)
+    }
+    fn discount_factor(&self) -> f64 {
+        E::discount_factor(self)
+    }
+}
+
 /// A reinforcement learning environment.
 ///
 /// This defines the environment dynamics and strucutre.
 /// It does not internally manage state.
-pub trait Environment {
+pub trait Environment: EnvStructure {
     type State;
-    type ObservationSpace: Space;
-    type ActionSpace: Space;
 
     /// Sample a new initial state.
     fn initial_state(&self, rng: &mut StdRng) -> Self::State;
@@ -54,15 +97,10 @@ pub trait Environment {
         action: &<Self::ActionSpace as Space>::Element,
         rng: &mut StdRng,
     ) -> (Option<Self::State>, f64, bool);
-
-    /// The structure of this environment.
-    fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace>;
 }
 
 impl<E: Environment + ?Sized> Environment for Box<E> {
     type State = E::State;
-    type ObservationSpace = E::ObservationSpace;
-    type ActionSpace = E::ActionSpace;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
         E::initial_state(self, rng)
@@ -84,17 +122,13 @@ impl<E: Environment + ?Sized> Environment for Box<E> {
     ) -> (Option<Self::State>, f64, bool) {
         E::step(self, state, action, rng)
     }
-
-    fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
-        E::structure(self)
-    }
 }
 
 /// A reinforcement learning environment with internal state.
-pub trait StatefulEnvironment {
-    type ObservationSpace: Space;
-    type ActionSpace: Space;
-
+///
+/// Prefer implementing [`Environment`] since [`EnvWithState`] can be used
+/// to create a `StatefulEnvironment` out of an `Environment`.
+pub trait StatefulEnvironment: EnvStructure {
     /// Take a step in the environment.
     ///
     /// This may panic if the state has not be initialized with reset()
@@ -125,15 +159,9 @@ pub trait StatefulEnvironment {
     /// # Returns
     /// * `observation`: An observation of the resulting state.
     fn reset(&mut self) -> <Self::ObservationSpace as Space>::Element;
-
-    /// Get the structure of this environment.
-    fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace>;
 }
 
 impl<E: StatefulEnvironment + ?Sized> StatefulEnvironment for Box<E> {
-    type ObservationSpace = E::ObservationSpace;
-    type ActionSpace = E::ActionSpace;
-
     fn step(
         &mut self,
         action: &<Self::ActionSpace as Space>::Element,
@@ -148,28 +176,4 @@ impl<E: StatefulEnvironment + ?Sized> StatefulEnvironment for Box<E> {
     fn reset(&mut self) -> <Self::ObservationSpace as Space>::Element {
         E::reset(self)
     }
-
-    fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
-        E::structure(self)
-    }
-}
-
-/// The external structure of an environment.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct EnvStructure<OS, AS> {
-    /// Space containing all possible observations.
-    ///
-    /// This is not required to be tight:
-    /// this space may contain elements that can never be produced as a state observation.
-    pub observation_space: OS,
-    /// The space of possible actions.
-    ///
-    /// Every element in this space must be a valid action.
-    pub action_space: AS,
-    /// A lower and upper bound on possible reward values.
-    ///
-    /// These bounds are not required to be tight but ideally will be as tight as possible.
-    pub reward_range: (f64, f64),
-    /// A discount factor applied to future rewards.
-    pub discount_factor: f64,
 }

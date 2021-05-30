@@ -104,7 +104,7 @@ where
     L: Logger + 'static,
     H: SimulationHook<OS::Element, AS::Element, L> + 'static,
 {
-    let agent = agent_def.build_finite_finite(environment.structure(), agent_seed)?;
+    let agent = agent_def.build_finite_finite(&environment, agent_seed)?;
     Ok(logging_boxed_simulator(environment, agent, logger, hook))
 }
 
@@ -122,7 +122,6 @@ where
     L: Logger + 'static,
     H: SimulationHook<OS::Element, AS::Element, L> + 'static,
 {
-    let env_structure = environment.structure();
-    let log_hook = StepLogger::new(env_structure.observation_space, env_structure.action_space);
+    let log_hook = StepLogger::new(environment.observation_space(), environment.action_space());
     Box::new(Simulator::new(environment, agent, logger, (log_hook, hook)))
 }

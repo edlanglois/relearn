@@ -30,20 +30,21 @@ impl Default for UCB1AgentConfig {
     }
 }
 
-impl<OS, AS> AgentBuilder<UCB1Agent<OS, AS>, OS, AS> for UCB1AgentConfig
+impl<E> AgentBuilder<UCB1Agent<E::ObservationSpace, E::ActionSpace>, E> for UCB1AgentConfig
 where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
+    E: EnvStructure + ?Sized,
+    <E as EnvStructure>::ObservationSpace: FiniteSpace,
+    <E as EnvStructure>::ActionSpace: FiniteSpace,
 {
     fn build_agent(
         &self,
-        env: EnvStructure<OS, AS>,
+        env: &E,
         _seed: u64,
-    ) -> Result<UCB1Agent<OS, AS>, BuildAgentError> {
+    ) -> Result<UCB1Agent<E::ObservationSpace, E::ActionSpace>, BuildAgentError> {
         UCB1Agent::new(
-            env.observation_space,
-            env.action_space,
-            env.reward_range,
+            env.observation_space(),
+            env.action_space(),
+            env.reward_range(),
             self.exploration_rate,
         )
     }

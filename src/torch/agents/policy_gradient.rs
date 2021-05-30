@@ -37,12 +37,13 @@ impl<PB, POB, VB, VOB> PolicyGradientAgentConfig<PB, POB, VB, VOB> {
     }
 }
 
-impl<OS, AS, PB, P, POB, PO, VB, V, VOB, VO>
-    AgentBuilder<PolicyGradientAgent<OS, AS, P, PO, V, VO>, OS, AS>
+impl<E, PB, P, POB, PO, VB, V, VOB, VO>
+    AgentBuilder<PolicyGradientAgent<E::ObservationSpace, E::ActionSpace, P, PO, V, VO>, E>
     for PolicyGradientAgentConfig<PB, POB, VB, VOB>
 where
-    OS: Space + BaseFeatureSpace,
-    AS: ParameterizedDistributionSpace<Tensor>,
+    E: EnvStructure + ?Sized,
+    <E as EnvStructure>::ObservationSpace: Space + BaseFeatureSpace,
+    <E as EnvStructure>::ActionSpace: ParameterizedDistributionSpace<Tensor>,
     PB: ModuleBuilder<P>,
     P: SequenceModule + StatefulIterativeModule,
     POB: OptimizerBuilder<PO>,
@@ -52,9 +53,12 @@ where
 {
     fn build_agent(
         &self,
-        env: EnvStructure<OS, AS>,
+        env: &E,
         _seed: u64,
-    ) -> Result<PolicyGradientAgent<OS, AS, P, PO, V, VO>, BuildAgentError> {
+    ) -> Result<
+        PolicyGradientAgent<E::ObservationSpace, E::ActionSpace, P, PO, V, VO>,
+        BuildAgentError,
+    > {
         Ok(PolicyGradientAgent::new(
             env,
             &self.actor_config,
@@ -88,13 +92,14 @@ where
     AS: ParameterizedDistributionSpace<Tensor>,
     V: StepValue,
 {
-    pub fn new<PB, VB, POB, VOB>(
-        env: EnvStructure<OS, AS>,
+    pub fn new<E, PB, VB, POB, VOB>(
+        env: &E,
         actor_config: &PolicyValueNetActorConfig<PB, VB>,
         policy_optimizer_config: &POB,
         value_optimizer_config: &VOB,
     ) -> Self
     where
+        E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
         PB: ModuleBuilder<P>,
         VB: StepValueBuilder<V>,
         POB: OptimizerBuilder<PO>,

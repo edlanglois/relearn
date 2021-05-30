@@ -1,8 +1,7 @@
 //! Agent testing utilities
-use crate::envs::{DeterministicBandit, StatefulEnvironment, WithState};
+use crate::envs::{DeterministicBandit, EnvWithState, WithState};
 use crate::simulation;
 use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
-use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::{Actor, Agent, EnvStructure};
 
 /// Check that the agent can be trained to perform well on a trivial bandit environment.
@@ -13,12 +12,10 @@ use crate::{Actor, Agent, EnvStructure};
 pub fn train_deterministic_bandit<A, F>(make_agent: F, num_train_steps: u64, threshold: f64)
 where
     A: Agent<(), usize> + Actor<(), usize>,
-    F: FnOnce(EnvStructure<SingletonSpace, IndexSpace>) -> A,
+    F: FnOnce(&EnvWithState<DeterministicBandit>) -> A,
 {
     let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).with_state(0);
-    let env_structure = env.structure();
-    let action_space = env_structure.action_space.clone();
-    let mut agent = make_agent(env_structure);
+    let mut agent = make_agent(&env);
 
     // Training
     if num_train_steps > 0 {
@@ -33,7 +30,7 @@ where
     // Evaluation
     let num_eval_steps = 1000;
 
-    let action_counter = IndexedActionCounter::new(action_space);
+    let action_counter = IndexedActionCounter::new(env.action_space());
     let mut hooks = (action_counter, StepLimit::new(num_eval_steps));
     simulation::run_actor(&mut env, &mut agent, &mut (), &mut hooks);
 
