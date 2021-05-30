@@ -80,20 +80,20 @@ impl StepValueBuilder<Self> for Return {
     }
 }
 
-impl StepValue for Box<dyn StepValue> {
+impl<T: StepValue + ?Sized> StepValue for Box<T> {
     fn trainable(&self) -> bool {
-        self.as_ref().trainable()
+        T::trainable(self)
     }
 
     fn discount_factor(&self, env_discount_factor: f64) -> f64 {
-        self.as_ref().discount_factor(env_discount_factor)
+        T::discount_factor(self, env_discount_factor)
     }
 
     fn seq_packed(&self, features: &dyn PackedHistoryFeaturesView) -> Tensor {
-        self.as_ref().seq_packed(features)
+        T::seq_packed(self, features)
     }
 
     fn loss(&self, features: &dyn PackedHistoryFeaturesView) -> Option<Tensor> {
-        self.as_ref().loss(features)
+        T::loss(self, features)
     }
 }
