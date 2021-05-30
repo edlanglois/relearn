@@ -3,4 +3,4 @@ pub mod hooks;
 mod simulator;
 
 pub use hooks::{GenericSimulationHook, SimulationHook};
-pub use simulator::{run_actor, run_agent, BoxedSimulator, Simulation, Simulator};
+pub use simulator::{run_actor, run_agent, Simulation, Simulator};

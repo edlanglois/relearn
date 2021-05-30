@@ -56,56 +56,6 @@ where
     }
 }
 
-/// A simulator of a boxed agent and environment.
-pub struct BoxedSimulator<OS, AS, L, H>
-where
-    OS: Space,
-    AS: Space,
-{
-    environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
-    agent: Box<dyn Agent<OS::Element, AS::Element>>,
-    logger: L,
-    hook: H,
-}
-
-impl<OS, AS, L, H> BoxedSimulator<OS, AS, L, H>
-where
-    OS: Space,
-    AS: Space,
-{
-    pub fn new(
-        environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
-        agent: Box<dyn Agent<OS::Element, AS::Element>>,
-        logger: L,
-        hook: H,
-    ) -> Self {
-        Self {
-            environment,
-            agent,
-            logger,
-            hook,
-        }
-    }
-}
-
-impl<OS, AS, L, H> Simulation for BoxedSimulator<OS, AS, L, H>
-where
-    OS: Space,
-    <OS as Space>::Element: Clone,
-    AS: Space,
-    L: Logger,
-    H: SimulationHook<OS::Element, AS::Element, L>,
-{
-    fn run(&mut self) {
-        run_agent(
-            self.environment.as_mut(),
-            self.agent.as_mut(),
-            &mut self.logger,
-            &mut self.hook,
-        );
-    }
-}
-
 /// Run an agent-environment simulation.
 ///
 /// # Args

@@ -55,6 +55,15 @@ pub trait Actor<O, A> {
     fn act(&mut self, observation: &O, new_episode: bool) -> A;
 }
 
+impl<T, O, A> Actor<O, A> for Box<T>
+where
+    T: Actor<O, A> + ?Sized,
+{
+    fn act(&mut self, observation: &O, new_episode: bool) -> A {
+        T::act(self, observation, new_episode)
+    }
+}
+
 /// A learning agent.
 ///
 /// Can interact with an environment and learns from the interaction.
@@ -74,6 +83,19 @@ pub trait Agent<O, A> {
     /// # Args
     /// * `step`: The environment step resulting from the  most recent call to [`Actor::act`].
     fn update(&mut self, step: Step<O, A>, logger: &mut dyn Logger);
+}
+
+impl<T, O, A> Agent<O, A> for Box<T>
+where
+    T: Agent<O, A> + ?Sized,
+{
+    fn act(&mut self, observation: &O, new_episode: bool) -> A {
+        T::act(self, observation, new_episode)
+    }
+
+    fn update(&mut self, step: Step<O, A>, logger: &mut dyn Logger) {
+        T::update(self, step, logger)
+    }
 }
 
 /// Both an Actor and an Agent

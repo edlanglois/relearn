@@ -7,7 +7,7 @@ use crate::envs::{
 use crate::error::RLError;
 use crate::logging::{Loggable, Logger};
 use crate::simulation::{
-    hooks::StepLogger, BoxedSimulator, GenericSimulationHook, Simulation, SimulationHook,
+    hooks::StepLogger, GenericSimulationHook, Simulation, SimulationHook, Simulator,
 };
 use crate::spaces::{ElementRefInto, FiniteSpace, RLActionSpace, RLObservationSpace, Space};
 use crate::utils::distributions::{Bernoulli, Deterministic};
@@ -124,10 +124,5 @@ where
 {
     let env_structure = environment.structure();
     let log_hook = StepLogger::new(env_structure.observation_space, env_structure.action_space);
-    Box::new(BoxedSimulator::new(
-        environment,
-        agent,
-        logger,
-        (log_hook, hook),
-    ))
+    Box::new(Simulator::new(environment, agent, logger, (log_hook, hook)))
 }

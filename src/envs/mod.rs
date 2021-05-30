@@ -59,6 +59,37 @@ pub trait Environment {
     fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace>;
 }
 
+impl<E: Environment + ?Sized> Environment for Box<E> {
+    type State = E::State;
+    type ObservationSpace = E::ObservationSpace;
+    type ActionSpace = E::ActionSpace;
+
+    fn initial_state(&self, rng: &mut StdRng) -> Self::State {
+        E::initial_state(self, rng)
+    }
+
+    fn observe(
+        &self,
+        state: &Self::State,
+        rng: &mut StdRng,
+    ) -> <Self::ObservationSpace as Space>::Element {
+        E::observe(self, state, rng)
+    }
+
+    fn step(
+        &self,
+        state: Self::State,
+        action: &<Self::ActionSpace as Space>::Element,
+        rng: &mut StdRng,
+    ) -> (Option<Self::State>, f64, bool) {
+        E::step(self, state, action, rng)
+    }
+
+    fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
+        E::structure(self)
+    }
+}
+
 /// A reinforcement learning environment with internal state.
 pub trait StatefulEnvironment {
     type ObservationSpace: Space;
@@ -97,6 +128,30 @@ pub trait StatefulEnvironment {
 
     /// Get the structure of this environment.
     fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace>;
+}
+
+impl<E: StatefulEnvironment + ?Sized> StatefulEnvironment for Box<E> {
+    type ObservationSpace = E::ObservationSpace;
+    type ActionSpace = E::ActionSpace;
+
+    fn step(
+        &mut self,
+        action: &<Self::ActionSpace as Space>::Element,
+    ) -> (
+        Option<<Self::ObservationSpace as Space>::Element>,
+        f64,
+        bool,
+    ) {
+        E::step(self, action)
+    }
+
+    fn reset(&mut self) -> <Self::ObservationSpace as Space>::Element {
+        E::reset(self)
+    }
+
+    fn structure(&self) -> EnvStructure<Self::ObservationSpace, Self::ActionSpace> {
+        E::structure(self)
+    }
 }
 
 /// The external structure of an environment.
