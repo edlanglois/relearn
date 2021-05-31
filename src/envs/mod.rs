@@ -10,6 +10,7 @@ pub mod testing;
 
 pub use bandits::{
     Bandit, BernoulliBandit, DeterministicBandit, FixedMeansBanditConfig, PriorMeansBanditConfig,
+    UniformBernoulliBandits,
 };
 pub use builder::{BuildEnvError, EnvBuilder};
 pub use chain::Chain;

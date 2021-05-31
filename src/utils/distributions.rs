@@ -98,7 +98,7 @@ impl<T> FromMean<T> for Deterministic<T> {
 }
 
 /// Bernoulli distribution that can sample floats
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Bernoulli(BoolBernoulli);
 impl Bernoulli {
     /// Create a new `Bernoulli` instance.

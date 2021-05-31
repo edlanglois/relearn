@@ -1,13 +1,13 @@
 //! Multi-armed bandit environments
-use super::{BuildEnvError, EnvBuilder, EnvStructure, Environment};
+use super::{BuildEnvError, EnvBuilder, EnvDistribution, EnvStructure, Environment};
 use crate::spaces::{IndexSpace, SingletonSpace, Space};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
-use rand::distributions::{Distribution, Standard};
+use rand::distributions::{Distribution, Standard, Uniform};
 use rand::prelude::*;
 use std::borrow::Borrow;
 
 /// Configuration for a Bandit environment with fixed means
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FixedMeansBanditConfig {
     /// The arm means
     pub means: Vec<f64>,
@@ -31,7 +31,7 @@ where
     }
 }
 /// Configuration for a Bandit environment with arm means drawn IID from some distribution.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PriorMeansBanditConfig<D> {
     /// The number of arms
     pub num_arms: usize,
@@ -69,7 +69,7 @@ where
 /// A multi-armed bandit
 ///
 /// The distribution of each arm has type `D`.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bandit<D> {
     distributions: Vec<D>,
 }
@@ -145,10 +145,12 @@ impl<D: FromMean<f64>> Bandit<D> {
 pub type BernoulliBandit = Bandit<Bernoulli>;
 
 impl BernoulliBandit {
-    /// Create a new `BernoulliBandit` with uniform random means.
-    pub fn uniform<R: Rng>(num_arms: u32, rng: &mut R) -> Self {
-        let distributions = (0..num_arms)
-            .map(|_| Bernoulli::new(rng.gen()).unwrap())
+    /// Create a new `BernoulliBandit` with uniform random means in `[0, 1]`.
+    pub fn uniform<R: Rng>(num_arms: usize, rng: &mut R) -> Self {
+        let distributions = rng
+            .sample_iter(Uniform::new_inclusive(0.0, 1.0))
+            .take(num_arms)
+            .map(|p| Bernoulli::new(p).unwrap())
             .collect();
         Self { distributions }
     }
@@ -161,6 +163,55 @@ impl DeterministicBandit {
     /// Create a new `DeterministicBandit` from a list of arm rewards
     pub fn from_values<I: IntoIterator<Item = T>, T: Borrow<f64>>(values: I) -> Self {
         Self::from_means(values).unwrap()
+    }
+}
+
+/// A distribution over Beroulli bandit environments with uniformly sampled means.
+///
+/// The mean of each arm is sampled uniformly from `[0, 1]`.
+///
+/// # Reference
+/// This environment distribution is used in the paper
+/// "[RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning][rl2]" by Duan et al.
+///
+/// [rl2]: https://arxiv.org/pdf/1611.02779
+pub struct UniformBernoulliBandits {
+    /// Number of bandit arms.
+    pub num_arms: usize,
+}
+
+impl UniformBernoulliBandits {
+    pub const fn new(num_arms: usize) -> Self {
+        Self { num_arms }
+    }
+}
+
+impl EnvStructure for UniformBernoulliBandits {
+    type ObservationSpace = SingletonSpace;
+    type ActionSpace = IndexSpace;
+
+    fn observation_space(&self) -> Self::ObservationSpace {
+        SingletonSpace::new()
+    }
+
+    fn action_space(&self) -> Self::ActionSpace {
+        IndexSpace::new(self.num_arms)
+    }
+
+    fn reward_range(&self) -> (f64, f64) {
+        (0.0, 1.0)
+    }
+
+    fn discount_factor(&self) -> f64 {
+        1.0
+    }
+}
+
+impl EnvDistribution for UniformBernoulliBandits {
+    type Environment = BernoulliBandit;
+
+    fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment {
+        BernoulliBandit::uniform(self.num_arms, rng)
     }
 }
 
@@ -224,5 +275,20 @@ mod deterministic_bandit {
         assert_eq!(reward_0, 0.2);
         let (_, reward_1, _) = env.step((), &1, &mut rng);
         assert_eq!(reward_1, 0.8);
+    }
+}
+
+#[cfg(test)]
+mod uniform_determistic_bandit {
+    use super::super::testing;
+    use super::*;
+    use rand::SeedableRng;
+
+    #[test]
+    fn run_sample() {
+        let env_dist = UniformBernoulliBandits::new(3);
+        let mut rng = StdRng::seed_from_u64(284);
+        let env = env_dist.sample_environment(&mut rng);
+        testing::run_stateless(env, 1000, 286);
     }
 }
