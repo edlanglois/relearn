@@ -1,10 +1,11 @@
 //! Converting an `Environment` into a `StatefulEnvironment`
-use super::{BuildEnvError, EnvBuilder, Environment, StatefulEnvironment};
+use super::{BuildEnvError, EnvBuilder, EnvDistribution, Environment, StatefulEnvironment};
 use crate::envs::EnvStructure;
 use crate::spaces::Space;
 use rand::prelude::*;
 
 /// Creates a [`StatefulEnvironment`] out of an [`Environment`]
+#[derive(Debug)]
 pub struct EnvWithState<E: Environment> {
     pub env: E,
     state: Option<E::State>,
@@ -72,9 +73,53 @@ impl<E: Environment> StatefulEnvironment for EnvWithState<E> {
     }
 }
 
+/// Adds state to the environments of an [`EnvDistribution`].
+#[derive(Debug)]
+pub struct DistWithState<D>(D);
+
+impl<D> DistWithState<D> {
+    pub const fn new(env_dist: D) -> Self {
+        Self(env_dist)
+    }
+}
+
+impl<D: EnvStructure> EnvStructure for DistWithState<D> {
+    type ObservationSpace = D::ObservationSpace;
+    type ActionSpace = D::ActionSpace;
+
+    fn observation_space(&self) -> Self::ObservationSpace {
+        self.0.observation_space()
+    }
+
+    fn action_space(&self) -> Self::ActionSpace {
+        self.0.action_space()
+    }
+
+    fn reward_range(&self) -> (f64, f64) {
+        self.0.reward_range()
+    }
+
+    fn discount_factor(&self) -> f64 {
+        self.0.discount_factor()
+    }
+}
+
+impl<D> EnvDistribution for DistWithState<D>
+where
+    D: EnvDistribution,
+    <D as EnvDistribution>::Environment: Environment,
+{
+    type Environment = EnvWithState<D::Environment>;
+
+    fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment {
+        let seed = rng.gen();
+        self.0.sample_environment(rng).with_state(seed)
+    }
+}
+
 /// Supports conversion to a stateful environment
 pub trait WithState {
-    type Output: StatefulEnvironment;
+    type Output;
 
     /// Convert into a stateful environment.
     fn with_state(self, seed: u64) -> Self::Output;

@@ -3,6 +3,7 @@ mod bandits;
 mod builder;
 mod chain;
 mod memory;
+mod meta;
 mod stateful;
 #[cfg(test)]
 pub mod testing;
@@ -13,7 +14,8 @@ pub use bandits::{
 pub use builder::{BuildEnvError, EnvBuilder};
 pub use chain::Chain;
 pub use memory::MemoryGame;
-pub use stateful::{EnvWithState, WithState};
+pub use meta::{MetaEnv, MetaEnvState, StatefulMetaEnv};
+pub use stateful::{DistWithState, EnvWithState, WithState};
 
 use crate::spaces::Space;
 use rand::rngs::StdRng;
@@ -175,5 +177,32 @@ impl<E: StatefulEnvironment + ?Sized> StatefulEnvironment for Box<E> {
 
     fn reset(&mut self) -> <Self::ObservationSpace as Space>::Element {
         E::reset(self)
+    }
+}
+
+/// A distribution of envrionments sharing the same structure.
+///
+/// The spaces / intervals of each sampled environment must be equal to
+/// or a subset of the spaces for `EnvDistribution`.
+/// The discount factor of the sampled environments must be the same.
+pub trait EnvDistribution: EnvStructure {
+    type Environment: EnvStructure<
+        ObservationSpace = Self::ObservationSpace,
+        ActionSpace = Self::ActionSpace,
+    >;
+
+    /// Sample an environment from the distribution.
+    ///
+    /// # Args
+    /// * `rng` - Random number generator used for sampling the environment structure and for
+    ///           seeding any internal randomness of the environment dynamics.
+    fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment;
+
+    fn with_state(self) -> DistWithState<Self>
+    where
+        Self: Sized,
+        Self::Environment: Environment,
+    {
+        DistWithState::new(self)
     }
 }

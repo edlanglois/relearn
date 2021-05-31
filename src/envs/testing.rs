@@ -1,9 +1,13 @@
 //! Environment testing utilities
-use super::{EnvStructure, Environment, StatefulEnvironment, WithState};
+use super::{
+    DeterministicBandit, EnvDistribution, EnvStructure, Environment, StatefulEnvironment, WithState,
+};
 use crate::agents::{RandomAgent, Step};
 use crate::simulation;
 use crate::simulation::hooks::{ClosureHook, StepLimit};
-use crate::spaces::{SampleSpace, Space};
+use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space};
+use rand::rngs::StdRng;
+use std::cell::Cell;
 use std::fmt::Debug;
 
 /// Run a stateless environment and check that invariants are satisfied.
@@ -59,4 +63,57 @@ where
             StepLimit::new(num_steps),
         ),
     );
+}
+
+/// Deterministic multi-armed bandit "distribution" with a different goal arm on each sample.
+///
+/// The first environment sampled has reward 1 only on the first arm and 0s on the rest,
+/// the second environment sampled has reward 1 only on the second arm, etc.
+/// Wraps around to the first arm upon reaching the end.
+#[derive(Debug)]
+pub struct RoundRobinDeterministicBandits {
+    pub num_arms: usize,
+    good_arm: Cell<usize>,
+}
+
+impl RoundRobinDeterministicBandits {
+    pub const fn new(num_arms: usize) -> Self {
+        Self {
+            num_arms,
+            good_arm: Cell::new(0),
+        }
+    }
+}
+
+impl EnvStructure for RoundRobinDeterministicBandits {
+    type ObservationSpace = SingletonSpace;
+    type ActionSpace = IndexSpace;
+
+    fn observation_space(&self) -> Self::ObservationSpace {
+        SingletonSpace::new()
+    }
+
+    fn action_space(&self) -> Self::ActionSpace {
+        IndexSpace::new(self.num_arms)
+    }
+
+    fn reward_range(&self) -> (f64, f64) {
+        (0.0, 1.0)
+    }
+
+    fn discount_factor(&self) -> f64 {
+        1.0
+    }
+}
+
+impl EnvDistribution for RoundRobinDeterministicBandits {
+    type Environment = DeterministicBandit;
+
+    fn sample_environment(&self, _rng: &mut StdRng) -> Self::Environment {
+        let mut values = vec![0.0; self.num_arms];
+        let good_arm = self.good_arm.get();
+        values[good_arm] = 1.0;
+        self.good_arm.set((good_arm + 1) % self.num_arms);
+        DeterministicBandit::from_values(&values)
+    }
 }
