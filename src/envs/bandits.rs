@@ -187,6 +187,12 @@ impl UniformBernoulliBandits {
     }
 }
 
+impl Default for UniformBernoulliBandits {
+    fn default() -> Self {
+        Self { num_arms: 2 }
+    }
+}
+
 impl EnvStructure for UniformBernoulliBandits {
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;

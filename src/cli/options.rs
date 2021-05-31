@@ -44,6 +44,10 @@ pub struct Options {
     /// How bandit arm reward means are generated (once). Fixed uses --arm-rewards.
     pub arm_prior: BanditArmPrior,
 
+    #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
+    /// Number of inner episodes per trial in meta environments.
+    pub episodes_per_trial: Option<usize>,
+
     // Agent args
     #[clap(arg_enum)]
     /// Agent type

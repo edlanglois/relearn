@@ -1,7 +1,10 @@
 //! Parse environment definition from Options
 use super::{Options, Update, WithUpdate};
 use crate::defs::{env::DistributionType, EnvDef};
-use crate::envs::{Chain, FixedMeansBanditConfig, MemoryGame, PriorMeansBanditConfig};
+use crate::envs::{
+    Chain, FixedMeansBanditConfig, MemoryGame, MetaEnvConfig, PriorMeansBanditConfig,
+    UniformBernoulliBandits,
+};
 use clap::Clap;
 use rand::distributions::Standard;
 use std::convert::TryInto;
@@ -13,6 +16,7 @@ pub enum EnvType {
     BernoulliBandit,
     Chain,
     MemoryGame,
+    MetaUniformBernoulliBandits,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
@@ -29,6 +33,7 @@ impl From<&Options> for EnvDef {
             BernoulliBandit => bandit_env_def(DistributionType::Bernoulli, opts),
             Chain => Self::Chain(opts.into()),
             MemoryGame => Self::MemoryGame(opts.into()),
+            MetaUniformBernoulliBandits => Self::MetaUniformBernoulliBandits(opts.into()),
         }
     }
 }
@@ -98,6 +103,41 @@ impl Update<&Options> for MemoryGame {
         }
         if let Some(episode_len) = opts.episode_len {
             self.history_len = (episode_len - 1).try_into().unwrap();
+        }
+    }
+}
+
+impl<'a, EB> From<&'a Options> for MetaEnvConfig<EB>
+where
+    Self: Default + Update<&'a Options>,
+{
+    fn from(opts: &'a Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl<'a, EB> Update<&'a Options> for MetaEnvConfig<EB>
+where
+    EB: Update<&'a Options>,
+{
+    fn update(&mut self, opts: &'a Options) {
+        self.env_dist_config.update(opts);
+        if let Some(num_episodes_per_trial) = opts.episodes_per_trial {
+            self.num_episodes_per_trial = num_episodes_per_trial;
+        }
+    }
+}
+
+impl From<&Options> for UniformBernoulliBandits {
+    fn from(opts: &Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for UniformBernoulliBandits {
+    fn update(&mut self, opts: &Options) {
+        if let Some(num_actions) = opts.num_actions {
+            self.num_arms = num_actions.try_into().unwrap();
         }
     }
 }

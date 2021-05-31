@@ -1,9 +1,65 @@
 //! Meta reinforcement learning environment.
-use super::{EnvDistribution, EnvStructure, Environment, StatefulEnvironment};
+use super::{
+    BuildEnvError, EnvBuilder, EnvDistBuilder, EnvDistribution, EnvStructure, Environment,
+    StatefulEnvironment,
+};
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::fmt;
+
+/// Configuration for a meta environment
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MetaEnvConfig<EB> {
+    /// Environment distribution configuration
+    pub env_dist_config: EB,
+    /// Number of episodes per trial
+    pub num_episodes_per_trial: usize,
+}
+
+impl<EB> MetaEnvConfig<EB> {
+    pub const fn new(env_dist_config: EB, num_episodes_per_trial: usize) -> Self {
+        Self {
+            env_dist_config,
+            num_episodes_per_trial,
+        }
+    }
+}
+
+impl<EB: Default> Default for MetaEnvConfig<EB> {
+    fn default() -> Self {
+        Self {
+            env_dist_config: EB::default(),
+            num_episodes_per_trial: 10,
+        }
+    }
+}
+
+impl<E, EB> EnvBuilder<MetaEnv<E>> for MetaEnvConfig<EB>
+where
+    EB: EnvDistBuilder<E>,
+{
+    fn build_env(&self, _seed: u64) -> Result<MetaEnv<E>, BuildEnvError> {
+        Ok(MetaEnv::new(
+            self.env_dist_config.build_env_dist(),
+            self.num_episodes_per_trial,
+        ))
+    }
+}
+
+impl<E, EB> EnvBuilder<StatefulMetaEnv<E>> for MetaEnvConfig<EB>
+where
+    EB: EnvDistBuilder<E>,
+    E: EnvDistribution,
+{
+    fn build_env(&self, seed: u64) -> Result<StatefulMetaEnv<E>, BuildEnvError> {
+        Ok(StatefulMetaEnv::new(
+            self.env_dist_config.build_env_dist(),
+            self.num_episodes_per_trial,
+            seed,
+        ))
+    }
+}
 
 /// A meta reinforcement learning environment that treats RL itself as an environment.
 ///

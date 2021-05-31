@@ -1,8 +1,9 @@
 use super::AgentDef;
 use crate::agents::{Agent, BuildAgentError};
 use crate::envs::{
-    Bandit, Chain as ChainEnv, EnvBuilder, EnvWithState, FixedMeansBanditConfig,
-    MemoryGame as MemoryGameEnv, PriorMeansBanditConfig, StatefulEnvironment,
+    Bandit, Chain as ChainEnv, DistWithState, EnvBuilder, EnvWithState, FixedMeansBanditConfig,
+    MemoryGame as MemoryGameEnv, MetaEnvConfig, PriorMeansBanditConfig, StatefulEnvironment,
+    StatefulMetaEnv, UniformBernoulliBandits,
 };
 use crate::error::RLError;
 use crate::logging::{Loggable, Logger};
@@ -24,6 +25,8 @@ pub enum EnvDef {
     Chain(ChainEnv),
     /// The Memory Game environment
     MemoryGame(MemoryGameEnv),
+    /// Meta uniform bernoulli bandits environment
+    MetaUniformBernoulliBandits(MetaEnvConfig<UniformBernoulliBandits>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -85,11 +88,16 @@ impl EnvDef {
                 let env: EnvWithState<MemoryGameEnv> = config.build_env(env_seed)?;
                 finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
             }
+            MetaUniformBernoulliBandits(config) => {
+                let env: StatefulMetaEnv<DistWithState<UniformBernoulliBandits>> =
+                    config.build_env(env_seed)?;
+                any_any_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
+            }
         })
     }
 }
 
-/// Make a boxed simulator for an environment with a finite state and action space.
+/// Make a boxed simulator for an environment with a finite observation and action space.
 fn finite_finite_simulator<OS, AS, L, H>(
     environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
     agent_def: &AgentDef,
@@ -105,6 +113,27 @@ where
     H: SimulationHook<OS::Element, AS::Element, L> + 'static,
 {
     let agent = agent_def.build_finite_finite(&environment, agent_seed)?;
+    Ok(logging_boxed_simulator(environment, agent, logger, hook))
+}
+
+/// Make a boxed simulator for an environment with any observation and action space.
+///
+/// Fails if the agent requires a more specialized bound on the observation or action spaces.
+fn any_any_simulator<OS, AS, L, H>(
+    environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
+    agent_def: &AgentDef,
+    logger: L,
+    hook: H,
+    agent_seed: u64,
+) -> Result<Box<dyn Simulation>, BuildAgentError>
+where
+    OS: RLObservationSpace + 'static,
+    <OS as Space>::Element: Clone,
+    AS: RLActionSpace + 'static,
+    L: Logger + 'static,
+    H: SimulationHook<OS::Element, AS::Element, L> + 'static,
+{
+    let agent = agent_def.build_any_any(&environment, agent_seed)?;
     Ok(logging_boxed_simulator(environment, agent, logger, hook))
 }
 
