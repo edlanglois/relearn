@@ -21,7 +21,7 @@ use tch::{IndexOp, Scalar, Tensor};
 /// let packed: Vec<_> = PackedIter::from_sorted(&sequences).map(|&x| x).collect();
 /// assert_eq!(packed, vec![0, 10, 100, 1, 11, 101, 2, 3]);
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PackedIter<T> {
     /// Sequences from which elements are obtained.
     sequences: Vec<T>,
@@ -123,7 +123,7 @@ impl<T> ExactSizeIterator for PackedIter<T> where T: ExactSizeIterator {}
 /// let packed: Vec<_> = PackingIndices::from_sorted(&ranges).map(|i| data[i]).collect();
 /// assert_eq!(packed, vec![0, 10, 100, 1, 11, 101, 2, 3]);
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PackingIndices<'a> {
     /// Sequence index ranges, sorted in monotonically decreasing order of sequence length.
     sequence_ranges: &'a [Range<usize>],
@@ -196,7 +196,7 @@ impl<'a> ExactSizeIterator for PackingIndices<'a> {}
 /// let batch_sizes: Vec<_> = PackedBatchSizes::from_sorted_lengths(&sequence_lengths).collect();
 /// assert_eq!(batch_sizes, vec![3, 3, 1, 1]);
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PackedBatchSizes<'a, T> {
     /// Sequences lengths sorted in monotonically decreasing order.
     sequence_lengths: &'a [T],

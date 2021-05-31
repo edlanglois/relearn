@@ -13,10 +13,11 @@ use crate::spaces::{
 use crate::utils::distributions::ArrayDistribution;
 use crate::EnvStructure;
 use std::cell::Cell;
+use std::fmt;
 use tch::{kind::Kind, nn, Device, Tensor};
 
 /// Configuration for [`PolicyGradientAgent`]
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PolicyGradientAgentConfig<PB, POB, VB, VOB> {
     pub actor_config: PolicyValueNetActorConfig<PB, VB>,
     pub policy_optimizer_config: POB,
@@ -85,6 +86,46 @@ where
 
     /// Step value function optimizer.
     value_optimizer: VO,
+}
+
+impl<OS, AS, P, PO, V, VO> fmt::Debug for PolicyGradientAgent<OS, AS, P, PO, V, VO>
+where
+    OS: Space + fmt::Debug,
+    <OS as Space>::Element: fmt::Debug,
+    AS: Space + fmt::Debug,
+    <AS as Space>::Element: fmt::Debug,
+    P: fmt::Debug,
+    PO: fmt::Debug,
+    V: fmt::Debug,
+    VO: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PolicyGradientAgent")
+            .field("actor", &self.actor)
+            .field("policy_optimizer", &self.policy_optimizer)
+            .field("value_optimizer", &self.value_optimizer)
+            .finish()
+    }
+}
+
+impl<OS, AS, P, PO, V, VO> Clone for PolicyGradientAgent<OS, AS, P, PO, V, VO>
+where
+    OS: Space + Clone,
+    <OS as Space>::Element: Clone,
+    AS: Space + Clone,
+    <AS as Space>::Element: Clone,
+    P: Clone,
+    PO: Clone,
+    V: Clone,
+    VO: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            actor: self.actor.clone(),
+            policy_optimizer: self.policy_optimizer.clone(),
+            value_optimizer: self.value_optimizer.clone(),
+        }
+    }
 }
 
 impl<OS, AS, P, PO, V, VO> PolicyGradientAgent<OS, AS, P, PO, V, VO>

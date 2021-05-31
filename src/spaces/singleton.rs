@@ -12,17 +12,11 @@ use std::fmt;
 use tch::{Device, Kind, Tensor};
 
 /// A space containing a single element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SingletonSpace;
 
 impl SingletonSpace {
     pub const fn new() -> Self {
-        SingletonSpace
-    }
-}
-
-impl Default for SingletonSpace {
-    fn default() -> Self {
         SingletonSpace
     }
 }

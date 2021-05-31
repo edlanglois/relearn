@@ -51,14 +51,8 @@ pub trait StepValueBuilder<T> {
 /// # Note
 /// Currently does not properly handle non-terminal end-of-episode.
 /// This assumes that all episodes end with a reward of 0.
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Return;
-
-impl Default for Return {
-    fn default() -> Self {
-        Self
-    }
-}
 
 impl StepValue for Return {
     fn trainable(&self) -> bool {

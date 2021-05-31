@@ -9,6 +9,7 @@ use std::ops::Drop;
 use std::time::{Duration, Instant};
 
 /// Logger that writes summaries to stderr.
+#[derive(Debug, Clone)]
 pub struct CLILogger {
     events: EnumMap<Event, EventLog>,
 
@@ -113,6 +114,7 @@ impl Drop for CLILogger {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 struct EventLog {
     /// Global index for this event
     index: u64,
@@ -136,7 +138,7 @@ impl EventLog {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 enum Aggregator {
     Nothing(WithPending<NothingAccumulator>),
     ScalarMean(WithPending<MeanAccumulator>),
@@ -220,6 +222,8 @@ struct WithPending<A: Accumulator> {
     pending: Option<<A as Accumulator>::Prepared>,
 }
 
+// derive(...) does not work because of the associated type
+
 impl<A> fmt::Debug for WithPending<A>
 where
     A: Accumulator + fmt::Debug,
@@ -231,6 +235,43 @@ where
             .field("pending", &self.pending)
             .finish()
     }
+}
+
+impl<A> Clone for WithPending<A>
+where
+    A: Accumulator + Clone,
+    <A as Accumulator>::Prepared: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            accumulator: self.accumulator.clone(),
+            pending: self.pending.clone(),
+        }
+    }
+}
+
+impl<A> Copy for WithPending<A>
+where
+    A: Accumulator + Copy,
+    <A as Accumulator>::Prepared: Copy,
+{
+}
+
+impl<A> PartialEq for WithPending<A>
+where
+    A: Accumulator + PartialEq,
+    <A as Accumulator>::Prepared: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.accumulator == other.accumulator && self.pending == other.pending
+    }
+}
+
+impl<A> Eq for WithPending<A>
+where
+    A: Accumulator + Eq,
+    <A as Accumulator>::Prepared: Eq,
+{
 }
 
 impl<A: Accumulator> WithPending<A> {
@@ -283,7 +324,7 @@ trait Accumulator: 'static + fmt::Display {
 }
 
 /// Accumulates nothing
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 struct NothingAccumulator;
 
 impl NothingAccumulator {
@@ -314,7 +355,7 @@ impl fmt::Display for NothingAccumulator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct MeanAccumulator {
     sum: f64,
     count: u64,
@@ -354,7 +395,7 @@ impl fmt::Display for MeanAccumulator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct IndexDistributionAccumulator {
     counts: Vec<u64>,
 }
@@ -409,7 +450,7 @@ impl fmt::Display for IndexDistributionAccumulator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 struct MessageAccumulator {
     /// Number of occurrences of each unique message.
     message_counts: BTreeMap<Cow<'static, str>, usize>,

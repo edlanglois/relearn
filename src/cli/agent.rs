@@ -7,7 +7,7 @@ use crate::torch::agents::{PolicyGradientAgentConfig, PolicyValueNetActorConfig,
 use clap::Clap;
 
 /// Agent name
-#[derive(Clap, Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
 pub enum AgentType {
     Random,
     TabularQLearning,

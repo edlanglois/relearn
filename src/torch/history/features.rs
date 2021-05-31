@@ -41,6 +41,7 @@ pub trait PackedHistoryFeaturesView {
 }
 
 /// Packed history features with lazy evaluation and caching.
+#[derive(Debug)]
 pub struct LazyPackedHistoryFeatures<'a, OS: Space, AS: Space> {
     steps: &'a [Step<OS::Element, AS::Element>],
     episode_ranges: Vec<Range<usize>>,
@@ -152,6 +153,7 @@ where
 /// # Panics
 /// The [`PackedHistoryFeaturesView`] this provides will panic
 /// if the requested features is not available.
+#[derive(Debug, PartialEq)]
 pub struct PackedHistoryFeatures {
     pub discount_factor: f64,
     pub episode_ranges: Vec<Range<usize>>,

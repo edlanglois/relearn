@@ -3,7 +3,7 @@ use std::convert::{TryFrom, TryInto};
 use tch::{COptimizer, TchError};
 
 /// Torch optimizer definition
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum OptimizerDef {
     Sgd(SgdConfig),
     RmsProp(RmsPropConfig),

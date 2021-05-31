@@ -12,7 +12,7 @@ use crate::torch::optimizers::ConjugateGradientOptimizerConfig;
 use std::fmt::Debug;
 
 /// Agent definition
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum AgentDef {
     /// An agent that selects actions randomly.
     Random,

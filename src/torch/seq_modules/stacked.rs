@@ -3,6 +3,7 @@ use super::{IterativeModule, SequenceModule};
 use tch::{nn::Func, nn::Module, nn::Path, Tensor};
 
 /// A module stacked on top of a sequence.
+#[derive(Debug)]
 pub struct Stacked<'a, T, U> {
     /// The sequence module.
     pub seq: T,
@@ -66,7 +67,7 @@ where
 }
 
 /// Stacked module configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StackedConfig<TC, UC> {
     /// Configuration for the initial sequence module layer.
     pub seq_config: TC,

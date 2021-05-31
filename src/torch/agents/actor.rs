@@ -12,7 +12,7 @@ use crate::{Actor, EnvStructure, Step};
 use tch::{nn::Path, Tensor};
 
 /// Configuration for [`PolicyValueNetActor`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PolicyValueNetActorConfig<PB, VB> {
     pub steps_per_epoch: usize,
     pub value_train_iters: u64,
@@ -76,6 +76,7 @@ impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
 /// Takes actions and records history.
 ///
 /// Accepts a callback function to update the model parameters.
+#[derive(Debug, Clone, PartialEq)]
 pub struct PolicyValueNetActor<OS, AS, P, V>
 where
     OS: Space,

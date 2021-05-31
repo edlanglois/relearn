@@ -7,7 +7,7 @@ use rand::distributions::Standard;
 use std::convert::TryInto;
 
 /// Environment name
-#[derive(Clap, Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
 pub enum EnvType {
     DeterministicBandit,
     BernoulliBandit,
@@ -15,7 +15,7 @@ pub enum EnvType {
     MemoryGame,
 }
 
-#[derive(Clap, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
 pub enum BanditArmPrior {
     Fixed,
     Uniform,

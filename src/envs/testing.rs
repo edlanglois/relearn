@@ -70,7 +70,7 @@ where
 /// The first environment sampled has reward 1 only on the first arm and 0s on the rest,
 /// the second environment sampled has reward 1 only on the second arm, etc.
 /// Wraps around to the first arm upon reaching the end.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoundRobinDeterministicBandits {
     pub num_arms: usize,
     good_arm: Cell<usize>,

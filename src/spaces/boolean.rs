@@ -11,17 +11,11 @@ use std::fmt;
 use tch::{Device, Kind, Tensor};
 
 /// A space containing a boolean value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BooleanSpace;
 
 impl BooleanSpace {
     pub const fn new() -> Self {
-        BooleanSpace
-    }
-}
-
-impl Default for BooleanSpace {
-    fn default() -> Self {
         BooleanSpace
     }
 }

@@ -10,7 +10,7 @@ use rand::{Rng, SeedableRng};
 use std::fmt;
 
 /// Configuration of an Epsilon-Greedy Tabular Q Learning Agent.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TabularQLearningAgentConfig {
     /// Probability of taking a random action.
     pub exploration_rate: f64,
@@ -51,7 +51,7 @@ where
 }
 
 /// An epsilon-greedy tabular Q learning.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TabularQLearningAgent<OS, AS> {
     pub observation_space: OS,
     pub action_space: AS,

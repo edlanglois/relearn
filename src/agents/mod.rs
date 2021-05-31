@@ -19,7 +19,7 @@ pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 use crate::logging::Logger;
 
 /// Description of an environment step
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Step<O, A> {
     /// The initial observation.
     pub observation: O,

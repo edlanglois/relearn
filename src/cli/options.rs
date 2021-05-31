@@ -7,7 +7,7 @@ use super::step_value::StepValueType;
 use crate::torch::Activation;
 use clap::{crate_authors, crate_description, crate_version, Clap};
 
-#[derive(Clap, Debug)]
+#[derive(Debug, Clone, PartialEq, Clap)]
 #[clap(
     version = crate_version!(),
     author = crate_authors!(),
@@ -189,6 +189,7 @@ impl OptimizerOptions for Options {
 }
 
 /// An option view that exposes value function options.
+#[derive(Debug, Clone, PartialEq)]
 pub struct ValueFnView<'a>(&'a Options);
 
 impl<'a> OptimizerOptions for ValueFnView<'a> {

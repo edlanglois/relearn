@@ -16,7 +16,7 @@ use std::marker::PhantomData;
 use tch::Tensor;
 
 /// A Cartesian product of spaces.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ProductSpace<T>(T);
 
 impl<T> ProductSpace<T> {

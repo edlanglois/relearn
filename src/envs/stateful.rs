@@ -5,7 +5,7 @@ use crate::spaces::Space;
 use rand::prelude::*;
 
 /// Creates a [`StatefulEnvironment`] out of an [`Environment`]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnvWithState<E: Environment> {
     pub env: E,
     state: Option<E::State>,
@@ -74,7 +74,7 @@ impl<E: Environment> StatefulEnvironment for EnvWithState<E> {
 }
 
 /// Adds state to the environments of an [`EnvDistribution`].
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DistWithState<D>(D);
 
 impl<D> DistWithState<D> {

@@ -45,7 +45,7 @@ use std::fmt;
 /// "[RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning][rl2]" by Duan et al.
 ///
 /// [rl2]: https://arxiv.org/pdf/1611.02779
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MetaEnv<E> {
     /// Environment distribution from which each trial's episode is sampled.
     pub env_distribution: E,
@@ -116,6 +116,8 @@ pub struct MetaEnvState<E: Environment> {
     inner_episode_done: bool,
 }
 
+// #[derive(...)] does not work because of the associated types
+
 impl<E> fmt::Debug for MetaEnvState<E>
 where
     E: Environment + fmt::Debug,
@@ -131,6 +133,54 @@ where
             .field("inner_episode_done", &self.inner_episode_done)
             .finish()
     }
+}
+
+impl<E> Clone for MetaEnvState<E>
+where
+    E: Environment + Clone,
+    <E as Environment>::State: Clone,
+    <<E as EnvStructure>::ActionSpace as Space>::Element: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner_env: self.inner_env.clone(),
+            inner_state: self.inner_state.clone(),
+            episode_index: self.episode_index,
+            prev_step_info: self.prev_step_info.clone(),
+            inner_episode_done: self.inner_episode_done,
+        }
+    }
+}
+
+impl<E> Copy for MetaEnvState<E>
+where
+    E: Environment + Copy,
+    <E as Environment>::State: Copy,
+    <<E as EnvStructure>::ActionSpace as Space>::Element: Copy,
+{
+}
+
+impl<E> PartialEq for MetaEnvState<E>
+where
+    E: Environment + PartialEq,
+    <E as Environment>::State: PartialEq,
+    <<E as EnvStructure>::ActionSpace as Space>::Element: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.inner_env == other.inner_env
+            && self.inner_state == other.inner_state
+            && self.episode_index == other.episode_index
+            && self.prev_step_info == other.prev_step_info
+            && self.inner_episode_done == other.inner_episode_done
+    }
+}
+
+impl<E> Eq for MetaEnvState<E>
+where
+    E: Environment + Eq,
+    <E as Environment>::State: Eq,
+    <<E as EnvStructure>::ActionSpace as Space>::Element: Eq,
+{
 }
 
 impl<E> Environment for MetaEnv<E>
@@ -220,7 +270,7 @@ where
 /// A meta reinforcement learning environment with internal state.
 ///
 /// See [`MetaEnv`] for more information.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatefulMetaEnv<E: EnvDistribution> {
     /// Environment distribution from which each trial's episode is sampled.
     pub env_distribution: E,

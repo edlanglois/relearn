@@ -6,7 +6,7 @@ use crate::utils::packed;
 use tch::{nn::Path, Reduction, Tensor};
 
 /// Generalized Advantage Estimator Config
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GaeConfig<VB> {
     pub gamma: f64,
     pub lambda: f64,
@@ -47,7 +47,7 @@ where
 /// High-Dimensional Continuous Control Using Generalized Advantage Estimation. ICLR  2016
 /// by John Schulman, Philipp Moritz, Sergey Levine, Michael I. Jordan, Pieter Abbeel
 /// <https://arxiv.org/pdf/1506.02438.pdf>
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Gae<V> {
     /// Clips the environment discount factor to be no more than this.
     pub gamma: f64,

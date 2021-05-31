@@ -18,7 +18,7 @@ use tch::{Device, Kind, Tensor};
 /// The feature vectors are
 /// * `1, 0, ..., 0` for `None`
 /// * `0, inner_feature_vector(x)` for `Some(x)`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OptionSpace<S> {
     pub inner: S,
 }

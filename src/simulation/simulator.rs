@@ -12,7 +12,7 @@ pub trait Simulation {
 }
 
 /// An agent-environment simulator with logging.
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Simulator<E, A, L, H> {
     environment: E,
     agent: A,

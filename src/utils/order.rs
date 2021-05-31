@@ -5,8 +5,8 @@ use std::cmp::{Ordering, PartialOrd};
 ///
 /// Note that [`ExpectOrd::partial_cmp`] will panic rather than return None.
 /// This is to ensure consistency between the [`PartialOrd`] methods
-/// and the [Ord] methods, as required by Ord.
-#[derive(Debug)]
+/// and the [`Ord`] methods, as required by `Ord`.
+#[derive(Debug, Default, Clone, Copy)]
 pub struct ExpectOrd<T> {
     value: T,
 }

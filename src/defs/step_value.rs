@@ -4,7 +4,7 @@ use crate::torch::step_value::{Gae, GaeConfig, Return, StepValue, StepValueBuild
 use tch::nn::Path;
 
 /// Step value definition
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum StepValueDef {
     Return,
     Gae(GaeConfig<SeqModDef>),

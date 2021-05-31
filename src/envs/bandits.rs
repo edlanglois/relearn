@@ -31,7 +31,7 @@ where
     }
 }
 /// Configuration for a Bandit environment with arm means drawn IID from some distribution.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PriorMeansBanditConfig<D> {
     /// The number of arms
     pub num_arms: usize,
@@ -69,7 +69,7 @@ where
 /// A multi-armed bandit
 ///
 /// The distribution of each arm has type `D`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Bandit<D> {
     distributions: Vec<D>,
 }
@@ -175,6 +175,7 @@ impl DeterministicBandit {
 /// "[RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning][rl2]" by Duan et al.
 ///
 /// [rl2]: https://arxiv.org/pdf/1611.02779
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UniformBernoulliBandits {
     /// Number of bandit arms.
     pub num_arms: usize,

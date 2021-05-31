@@ -14,7 +14,7 @@ use std::convert::TryInto;
 /// * Every action has a 0.2 chance of "slipping" and taking the opposite action.
 ///
 /// Described in "Bayesian Q-learning" by Dearden, Friedman and Russel (1998)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Chain {
     pub size: u64,
     pub discount_factor: f64,
@@ -98,7 +98,7 @@ impl Environment for Chain {
     }
 }
 
-#[derive(Debug, Copy, Clone, Indexed)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Indexed)]
 pub enum Move {
     Left,
     Right,

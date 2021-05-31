@@ -6,6 +6,7 @@ use std::slice::Iter;
 use std::vec::Drain;
 
 /// A step history buffer.
+#[derive(Debug, Clone, PartialEq)]
 pub struct HistoryBuffer<O, A> {
     /// Step history; episodes stored contiguously one after another.
     steps: Vec<Step<O, A>>,

@@ -7,18 +7,12 @@ use rand::SeedableRng;
 use std::fmt;
 
 /// Configuration setttings for a random agent.
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RandomAgentConfig;
 
 impl RandomAgentConfig {
     pub const fn new() -> Self {
         Self
-    }
-}
-
-impl Default for RandomAgentConfig {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -36,6 +30,7 @@ where
 }
 
 /// An agent that always acts randomly.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RandomAgent<AS> {
     action_space: AS,
     rng: StdRng,

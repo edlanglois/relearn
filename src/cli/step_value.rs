@@ -4,7 +4,7 @@ use crate::torch::step_value::GaeConfig;
 use clap::Clap;
 
 /// Agent step value type
-#[derive(Clap, Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
 pub enum StepValueType {
     Return,
     Gae,

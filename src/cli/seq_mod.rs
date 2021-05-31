@@ -5,7 +5,7 @@ use crate::torch::seq_modules::{RnnConfig, StackedConfig};
 use clap::Clap;
 
 /// Sequence module type
-#[derive(Clap, Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
 pub enum SeqModType {
     Mlp,
     GruMlp,

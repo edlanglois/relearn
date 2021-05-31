@@ -11,7 +11,7 @@ use rand_distr::Beta;
 use std::fmt;
 
 /// Configuration for [`BetaThompsonSamplingAgent`]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BetaThompsonSamplingAgentConfig {
     /// Number of posterior samples to draw.
     /// Takes the action with the highest mean sampled value.
@@ -54,7 +54,7 @@ where
 }
 
 /// A Thompson sampling agent for Bernoulli rewards with a Beta prior.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BetaThompsonSamplingAgent<OS, AS> {
     /// Environment observation space
     pub observation_space: OS,

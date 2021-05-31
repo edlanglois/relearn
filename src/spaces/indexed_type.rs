@@ -21,7 +21,7 @@ pub trait Indexed {
 }
 
 /// A space defined over an indexed type.
-#[derive(Clone)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IndexedTypeSpace<T: Indexed> {
     element_type: PhantomData<T>,
 }
@@ -34,13 +34,13 @@ impl<T: Indexed> IndexedTypeSpace<T> {
     }
 }
 
-impl<T: Indexed> Default for IndexedTypeSpace<T> {
-    fn default() -> Self {
-        Self::new()
+impl<T: Indexed> fmt::Debug for IndexedTypeSpace<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "IndexedTypeSpace<{}>", any::type_name::<T>())
     }
 }
 
-impl<T: Indexed> fmt::Debug for IndexedTypeSpace<T> {
+impl<T: Indexed> fmt::Display for IndexedTypeSpace<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "IndexedTypeSpace<{}>", any::type_name::<T>())
     }

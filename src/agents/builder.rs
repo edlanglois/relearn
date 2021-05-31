@@ -13,7 +13,7 @@ pub trait AgentBuilder<T, E: ?Sized> {
 }
 
 /// Error building an agent
-#[derive(Debug, Error)]
+#[derive(Error, Debug)]
 pub enum BuildAgentError {
     #[error("space bound(s) are too loose for this agent")]
     InvalidSpaceBounds,

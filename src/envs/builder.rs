@@ -14,7 +14,7 @@ pub trait EnvBuilder<E> {
 }
 
 /// Error building an environment
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 pub enum BuildEnvError {
     #[error(transparent)]
     BernoulliError(#[from] BernoulliError),

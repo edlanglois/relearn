@@ -22,10 +22,11 @@ use crate::spaces::{
 };
 use crate::utils::distributions::ArrayDistribution;
 use crate::EnvStructure;
+use std::fmt;
 use tch::{kind::Kind, nn, Device, Tensor};
 
 /// Configuration for [`TrpoAgent`]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TrpoAgentConfig<PB, POB, VB, VOB> {
     pub actor_config: PolicyValueNetActorConfig<PB, VB>,
     pub policy_optimizer_config: POB,
@@ -113,6 +114,48 @@ where
 
     /// Maximum policy KL divergence when taking a step.
     max_policy_step_kl: f64,
+}
+
+impl<OS, AS, P, PO, V, VO> fmt::Debug for TrpoAgent<OS, AS, P, PO, V, VO>
+where
+    OS: Space + fmt::Debug,
+    <OS as Space>::Element: fmt::Debug,
+    AS: Space + fmt::Debug,
+    <AS as Space>::Element: fmt::Debug,
+    P: fmt::Debug,
+    PO: fmt::Debug,
+    V: fmt::Debug,
+    VO: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TrpoAgent")
+            .field("actor", &self.actor)
+            .field("policy_optimizer", &self.policy_optimizer)
+            .field("value_optimizer", &self.value_optimizer)
+            .field("max_policy_step_kl", &self.max_policy_step_kl)
+            .finish()
+    }
+}
+
+impl<OS, AS, P, PO, V, VO> Clone for TrpoAgent<OS, AS, P, PO, V, VO>
+where
+    OS: Space + Clone,
+    <OS as Space>::Element: Clone,
+    AS: Space + Clone,
+    <AS as Space>::Element: Clone,
+    P: Clone,
+    PO: Clone,
+    V: Clone,
+    VO: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            actor: self.actor.clone(),
+            policy_optimizer: self.policy_optimizer.clone(),
+            value_optimizer: self.value_optimizer.clone(),
+            max_policy_step_kl: self.max_policy_step_kl,
+        }
+    }
 }
 
 impl<OS, AS, P, PO, V, VO> TrpoAgent<OS, AS, P, PO, V, VO>

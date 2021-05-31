@@ -16,7 +16,7 @@ use rand::prelude::*;
 ///     then the agent earns `+1` reward, otherwise it earns `-1` reward.
 ///     This step is terminal.
 /// * Every episode has length `HISTORY_LEN + 1`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MemoryGame {
     /// The number of actions.
     pub num_actions: usize,

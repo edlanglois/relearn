@@ -14,7 +14,7 @@ use crate::utils::distributions::{Bernoulli, Deterministic};
 use rand::distributions::Standard;
 
 /// Environment definition
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EnvDef {
     /// Multi-armed bandit with fixed arm means.
     FixedMeanBandit(DistributionType, FixedMeansBanditConfig),
@@ -26,7 +26,7 @@ pub enum EnvDef {
     MemoryGame(MemoryGameEnv),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DistributionType {
     Deterministic,
     Bernoulli,

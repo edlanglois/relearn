@@ -4,8 +4,8 @@ use rand::distributions::Distribution;
 use rand::Rng;
 use std::fmt;
 
-/// An index space; integers 0 .. size-1
-#[derive(Debug, Clone)]
+/// An index space; integers `0 .. size-1`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IndexSpace {
     pub size: usize,
 }

@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use tch::{Kind, Tensor};
 
 /// Categorical distribution(s).
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Categorical {
     /// Log probability of each event.
     ///

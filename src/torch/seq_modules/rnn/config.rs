@@ -4,7 +4,7 @@ use super::{Gru, Lstm};
 use tch::nn::Path;
 
 /// Configuration of a recurrent neural network.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RnnConfig {
     pub has_biases: bool,
 }

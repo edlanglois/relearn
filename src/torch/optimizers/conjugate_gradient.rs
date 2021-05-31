@@ -35,7 +35,7 @@ use std::convert::{Infallible, TryInto};
 use tch::{nn::VarStore, Tensor};
 
 /// Configuration for the Conjugate Gradient Optimizer
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ConjugateGradientOptimizerConfig {
     /// Number of CG iterations used to calculate A^-1 g
     pub iterations: u64,
@@ -66,7 +66,7 @@ impl OptimizerBuilder<ConjugateGradientOptimizer> for ConjugateGradientOptimizer
     type Error = Infallible;
 
     fn build_optimizer(&self, vs: &VarStore) -> Result<ConjugateGradientOptimizer, Infallible> {
-        Ok(ConjugateGradientOptimizer::new(vs, self.clone()))
+        Ok(ConjugateGradientOptimizer::new(vs, *self))
     }
 }
 
@@ -77,7 +77,7 @@ impl OptimizerBuilder<ConjugateGradientOptimizer> for ConjugateGradientOptimizer
 /// The search direction is computed using a conjugate gradient algorithm,
 /// which gives `x = A^{-1}g`, where `A` is a second order approximation of
 /// the constraint and `g` is the gradient of the loss function.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ConjugateGradientOptimizer {
     /// Parameters to optimize
     params: Vec<Tensor>,

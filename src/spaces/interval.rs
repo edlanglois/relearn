@@ -13,7 +13,7 @@ use std::{fmt, slice};
 use tch::Tensor;
 
 /// A closed interval of floating-point numbers.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IntervalSpace<T = f64> {
     pub low: T,
     pub high: T,

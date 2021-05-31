@@ -113,7 +113,7 @@ pub trait TrustRegionOptimizer: BaseOptimizer {
 }
 
 /// Error performing an optimization step.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Error)]
 pub enum OptimizerStepError {
     #[error("loss is not improving: (new) {loss} >= (prev) {loss_before}")]
     LossNotImproving { loss: f64, loss_before: f64 },

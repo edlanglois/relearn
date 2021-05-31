@@ -4,6 +4,7 @@ use std::convert::TryInto;
 use tch::{Device, Kind, Tensor};
 
 /// A deterministic distribution over size-0 vectors.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DeterministicEmptyVec {
     /// `batch_shape + [0]`
     sampling_shape: Vec<i64>,

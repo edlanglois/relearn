@@ -4,7 +4,7 @@ use std::borrow::Borrow;
 use tch::{nn::Path, Tensor};
 
 /// [`IterativeModule`] wrapper that also stores the state.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WithState<T: IterativeModule> {
     pub module: T,
     pub state: T::State,

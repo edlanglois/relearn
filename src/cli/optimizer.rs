@@ -6,7 +6,7 @@ use crate::torch::optimizers::{
 use clap::Clap;
 
 /// Optimizer name
-#[derive(Clap, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
 pub enum OptimizerType {
     Sgd,
     RmsProp,

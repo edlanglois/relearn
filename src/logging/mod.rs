@@ -10,7 +10,7 @@ use std::error::Error;
 use std::fmt;
 
 /// Simulation run events types.
-#[derive(Debug, Clone, Copy, PartialEq, Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Enum)]
 pub enum Event {
     Step,
     Episode,
@@ -18,7 +18,7 @@ pub enum Event {
 }
 
 /// A value that can be logged.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Loggable {
     /// Nothing. No data to log.
     /// Logging Nothing data may still produce a placeholder entry for the name.
@@ -90,7 +90,7 @@ impl Logger for () {
     fn done(&mut self, _: Event) {}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LogError<'a> {
     name: &'a str,
     value: Loggable,

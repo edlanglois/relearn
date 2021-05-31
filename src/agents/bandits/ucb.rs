@@ -9,7 +9,7 @@ use std::f64;
 use std::fmt;
 
 /// Configuration for a [`UCB1Agent`]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UCB1AgentConfig {
     /// Scale factor on the confidence interval; controls the exploration rate.
     ///
@@ -53,7 +53,7 @@ where
 /// A UCB1 Agent
 ///
 /// Applies UCB1 (Auer 2002) independently to each state.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UCB1Agent<OS, AS> {
     /// Environment observation space
     pub observation_space: OS,

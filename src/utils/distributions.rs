@@ -70,7 +70,7 @@ pub trait Bounded<T: PartialOrd> {
 /// A determistic distribution.
 ///
 /// Always produces the same value when sampled.
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Deterministic<T>(T);
 
 impl<T> Deterministic<T> {
@@ -98,7 +98,7 @@ impl<T> FromMean<T> for Deterministic<T> {
 }
 
 /// Bernoulli distribution that can sample floats
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Bernoulli(BoolBernoulli);
 impl Bernoulli {
     /// Create a new `Bernoulli` instance.

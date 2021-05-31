@@ -4,7 +4,7 @@ use std::iter;
 use tch::nn;
 
 /// Multi-Layer Perceptron Configuration
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MlpConfig {
     /// Sizes of the hidden layers
     pub hidden_sizes: Vec<usize>,

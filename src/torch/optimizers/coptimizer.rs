@@ -41,7 +41,7 @@ where
 }
 
 /// Configuration for the SGD optimizer.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SgdConfig {
     /// Learning rate
     pub learning_rate: f64,
@@ -82,7 +82,7 @@ impl TryFrom<&SgdConfig> for COptimizer {
 
 #[allow(clippy::doc_markdown)] // false positive on RMSProp
 /// Configuration for the RMSProp optimizer.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RmsPropConfig {
     /// Learning rate
     pub learning_rate: f64,
@@ -126,7 +126,7 @@ impl TryFrom<&RmsPropConfig> for COptimizer {
 }
 
 /// Configuration for the Adam optimizer.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AdamConfig {
     /// Learning rate
     pub learning_rate: f64,
@@ -163,7 +163,7 @@ impl TryFrom<&AdamConfig> for COptimizer {
 
 #[allow(clippy::doc_markdown)]
 /// Configuration for the AdamW optimizer.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AdamWConfig {
     /// Learning rate
     pub learning_rate: f64,

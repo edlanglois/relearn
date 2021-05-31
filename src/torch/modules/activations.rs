@@ -3,7 +3,7 @@ use clap::Clap;
 use tch::{nn, Tensor};
 
 /// Activation functions.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Clap)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
 pub enum Activation {
     /// No transformation
     Identity,

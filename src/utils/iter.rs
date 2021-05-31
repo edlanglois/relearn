@@ -77,7 +77,7 @@ impl<I: Iterator> ArgMaxBy for I {
 }
 
 /// Reason that the maximum does not exist.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PartialMaxError {
     /// The collection is empty, there is no maximum.
     Empty,

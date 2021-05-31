@@ -4,7 +4,7 @@ use crate::torch::ModuleBuilder;
 use tch::nn::{Path, Sequential};
 
 /// Sequence module definition
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SeqModDef {
     Mlp(MlpConfig),
     GruMlp(RnnMlpConfig),

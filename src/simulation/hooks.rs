@@ -38,7 +38,7 @@ impl<O, A, L: Logger + ?Sized, T: GenericSimulationHook> SimulationHook<O, A, L>
 }
 
 /// A hook that stops the simulation after a maximum number of steps.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct StepLimit {
     steps_remaining: u64,
 }
@@ -63,7 +63,7 @@ impl GenericSimulationHook for StepLimit {
 }
 
 /// A hook that stops the simulation after a maximum number of episodes.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct EpisodeLimit {
     episodes_remaining: u64,
 }
@@ -93,6 +93,7 @@ impl GenericSimulationHook for EpisodeLimit {
 }
 
 /// A simulation hook defined from a closure.
+#[derive(Debug, Clone, Copy)]
 pub struct ClosureHook<F> {
     f: F,
 }
@@ -114,7 +115,7 @@ where
 }
 
 /// A hook that logs step and episode statistics.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct StepLogger<OS, AS> {
     pub observation_space: OS,
     pub action_space: AS,
@@ -203,6 +204,7 @@ where
 }
 
 /// Count occurrences of each action by index.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IndexedActionCounter<AS> {
     pub action_space: AS,
     pub counts: Vec<u64>,
