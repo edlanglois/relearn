@@ -51,6 +51,7 @@ where
     V: StepValue,
     VOB: OptimizerBuilder<VO>,
 {
+    #[allow(clippy::type_complexity)]
     fn build_agent(
         &self,
         env: &E,

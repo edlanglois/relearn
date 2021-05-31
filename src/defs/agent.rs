@@ -42,6 +42,12 @@ pub enum AgentDef {
 
 // TODO: Return Box<dyn ActorAgent> where ActorAgent: Actor + Agent instead of Box<dyn Agent>
 
+/// The agent trait object for a given environment structure.
+pub type DynEnvAgent<E> = dyn Agent<
+    <<E as EnvStructure>::ObservationSpace as Space>::Element,
+    <<E as EnvStructure>::ActionSpace as Space>::Element,
+>;
+
 impl AgentDef {
     /// Construct an agent for the given environment structure.
     ///
@@ -50,15 +56,7 @@ impl AgentDef {
         &self,
         env: &E,
         seed: u64,
-    ) -> Result<
-        Box<
-            dyn Agent<
-                <<E as EnvStructure>::ObservationSpace as Space>::Element,
-                <<E as EnvStructure>::ActionSpace as Space>::Element,
-            >,
-        >,
-        BuildAgentError,
-    >
+    ) -> Result<Box<DynEnvAgent<E>>, BuildAgentError>
     where
         E: EnvStructure + ?Sized,
         <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace + 'static,
@@ -81,15 +79,7 @@ impl AgentDef {
         &self,
         env: &E,
         seed: u64,
-    ) -> Result<
-        Box<
-            dyn Agent<
-                <<E as EnvStructure>::ObservationSpace as Space>::Element,
-                <<E as EnvStructure>::ActionSpace as Space>::Element,
-            >,
-        >,
-        BuildAgentError,
-    >
+    ) -> Result<Box<DynEnvAgent<E>>, BuildAgentError>
     where
         E: EnvStructure + ?Sized,
         <E as EnvStructure>::ObservationSpace: RLObservationSpace + 'static,
