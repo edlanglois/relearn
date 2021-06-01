@@ -5,7 +5,7 @@ use criterion::{
 use ndarray::{Array, IxDyn};
 use std::array::IntoIter;
 use std::convert::{TryFrom, TryInto};
-use tch::{Device, IndexOp, Kind, Tensor};
+use tch::{nn, nn::Module, Device, IndexOp, Kind, Tensor};
 
 /// Tensor creation
 fn tensor_create(c: &mut Criterion) {
@@ -202,6 +202,72 @@ fn tensor_mul_sum(c: &mut Criterion) {
     }
 }
 
+fn nn_forward_cpu_gpu(c: &mut Criterion) {
+    let mut group = c.benchmark_group("nn_forward_cpu_gpu");
+    let num_inputs = 10;
+    let num_hidden = 256;
+    let num_outputs = 1;
+    let make_shallow_net = |vs: &nn::Path| {
+        nn::seq()
+            .add(nn::linear(
+                vs / "input",
+                num_inputs,
+                num_hidden,
+                Default::default(),
+            ))
+            .add_fn(Tensor::relu)
+            .add(nn::linear(
+                vs / "output",
+                num_hidden,
+                num_outputs,
+                Default::default(),
+            ))
+    };
+
+    {
+        let cpu_shallow_net = make_shallow_net(&nn::VarStore::new(Device::Cpu).root());
+        let cpu_input = Tensor::ones(&[num_inputs], (Kind::Float, Device::Cpu));
+        group.bench_function("cpu_shallow_net", |b| {
+            b.iter(|| cpu_shallow_net.forward(&cpu_input))
+        });
+    }
+
+    {
+        let gpu_shallow_net = make_shallow_net(&nn::VarStore::new(Device::Cuda(0)).root());
+        let gpu_input = Tensor::ones(&[num_inputs], (Kind::Float, Device::Cuda(0)));
+        group.bench_function("gpu_shallow_net", |b| {
+            b.iter(|| gpu_shallow_net.forward(&gpu_input))
+        });
+    }
+
+    {
+        let gpu_shallow_net = make_shallow_net(&nn::VarStore::new(Device::Cuda(0)).root());
+        let cpu_input = Tensor::ones(&[num_inputs], (Kind::Float, Device::Cpu));
+        group.bench_function("gpu_shallow_net_forward_cpu", |b| {
+            b.iter(|| gpu_shallow_net.forward(&cpu_input.to_device(Device::Cuda(0))))
+        });
+    }
+
+    {
+        let vs = nn::VarStore::new(Device::Cuda(0));
+        let _gpu_shallow_net = make_shallow_net(&vs.root());
+        group.bench_function("gpu_shallow_net_to_cpu", |b| {
+            b.iter(|| replicate_module(&vs, make_shallow_net, Device::Cpu))
+        });
+    }
+}
+
+fn replicate_module<F: FnOnce(&nn::Path) -> T, T>(
+    src_vs: &nn::VarStore,
+    f: F,
+    device: Device,
+) -> T {
+    let mut vs = nn::VarStore::new(device);
+    let module = f(&vs.root());
+    vs.copy(&src_vs).unwrap();
+    module
+}
+
 criterion_group!(
     benches,
     tensor_create,
@@ -212,5 +278,6 @@ criterion_group!(
     tensor_scatter,
     tensor_1d_scatter_fill,
     tensor_mul_sum,
+    nn_forward_cpu_gpu,
 );
 criterion_main!(benches);
