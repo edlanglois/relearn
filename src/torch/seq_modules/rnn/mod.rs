@@ -45,7 +45,9 @@ fn initialize_rnn_params(
 
     let device = vs.device();
     if device.is_cuda() && Cuda::cudnn_is_available() {
-        // I assume this must act on the tensors in-place?
+        // Flatten the weights in-place
+        // See https://github.com/pytorch/pytorch/blob/master/torch/csrc/api/src/nn/modules/rnn.cpp#L161
+        let _no_grad = tch::no_grad_guard();
         let _ = Tensor::internal_cudnn_rnn_flatten_weight(
             &params,
             params.len() as i64,
