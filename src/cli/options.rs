@@ -6,6 +6,8 @@ use super::seq_mod::SeqModType;
 use super::step_value::StepValueType;
 use crate::torch::Activation;
 use clap::{crate_authors, crate_description, crate_version, AppSettings, Clap};
+use std::{error::Error, fmt, str::FromStr};
+use tch::Device;
 
 #[derive(Debug, Clone, PartialEq, Clap)]
 #[clap(
@@ -65,6 +67,10 @@ pub struct Options {
     #[clap(long, help_heading = Some("AGENT OPTIONS"))]
     /// Number of samples for Thompson sampling agents.
     pub num_samples: Option<usize>,
+
+    #[clap(long, help_heading = Some("AGENT OPTIONS"))]
+    /// Device on which the agent parameters are stored [possible values: cpu, cuda, cuda:N]
+    pub device: Option<DeviceOpt>,
 
     // Policy options
     #[clap(long, arg_enum, help_heading = Some("AGENT POLICY OPTIONS"))]
@@ -211,3 +217,68 @@ impl<'a> OptimizerOptions for ValueFnView<'a> {
         self.0.value_fn_weight_decay
     }
 }
+
+/// Device wrapper implementing [`FromStr`]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeviceOpt(Device);
+
+impl DeviceOpt {
+    pub const fn new(device: Device) -> Self {
+        Self(device)
+    }
+}
+
+impl FromStr for DeviceOpt {
+    type Err = DeviceParseError;
+
+    fn from_str(s: &str) -> Result<Self, DeviceParseError> {
+        Ok(Self(parse_device(s)?))
+    }
+}
+
+impl From<Device> for DeviceOpt {
+    fn from(device: Device) -> Self {
+        Self(device)
+    }
+}
+
+impl From<DeviceOpt> for Device {
+    fn from(device_opt: DeviceOpt) -> Self {
+        device_opt.0
+    }
+}
+
+/// Parse from "cpu", "cuda", or "cuda:N" for non-negative integer N.
+///
+/// The match is ASCII case insensitive.
+fn parse_device(s: &str) -> Result<Device, DeviceParseError> {
+    if s.eq_ignore_ascii_case("cpu") {
+        return Ok(Device::Cpu);
+    }
+
+    let (name, index) = if let Some((name, index_str)) = s.split_once(':') {
+        let index = index_str.parse().map_err(|_| DeviceParseError)?;
+        (name, index)
+    } else {
+        (s, 0)
+    };
+    if name.eq_ignore_ascii_case("cuda") {
+        return Ok(Device::Cuda(index));
+    }
+    Err(DeviceParseError)
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub struct DeviceParseError;
+
+impl fmt::Display for DeviceParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Invalid device string. \
+               Options: \"cpu\", \"cuda\", or \"cuda:[INDEX]\" (case insensitive)",
+        )
+    }
+}
+
+impl Error for DeviceParseError {}

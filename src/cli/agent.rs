@@ -145,5 +145,8 @@ where
         if let Some(value_train_iters) = opts.value_fn_train_iters {
             self.value_train_iters = value_train_iters;
         }
+        if let Some(device) = opts.device {
+            self.device = device.into();
+        }
     }
 }
