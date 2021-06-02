@@ -5,13 +5,14 @@ use super::optimizer::{OptimizerOptions, OptimizerType};
 use super::seq_mod::SeqModType;
 use super::step_value::StepValueType;
 use crate::torch::Activation;
-use clap::{crate_authors, crate_description, crate_version, Clap};
+use clap::{crate_authors, crate_description, crate_version, AppSettings, Clap};
 
 #[derive(Debug, Clone, PartialEq, Clap)]
 #[clap(
     version = crate_version!(),
     author = crate_authors!(),
     about = crate_description!(),
+    setting = AppSettings::ColoredHelp,
     after_help = "Most options only apply for some environments/agents and are ignored otherwise.",
 )]
 pub struct Options {
