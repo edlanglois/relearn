@@ -23,7 +23,7 @@ use crate::spaces::{
 use crate::utils::distributions::ArrayDistribution;
 use crate::EnvStructure;
 use std::fmt;
-use tch::{kind::Kind, nn, Device, Tensor};
+use tch::{kind::Kind, Tensor};
 
 /// Configuration for [`TrpoAgent`]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -137,27 +137,6 @@ where
     }
 }
 
-impl<OS, AS, P, PO, V, VO> Clone for TrpoAgent<OS, AS, P, PO, V, VO>
-where
-    OS: Space + Clone,
-    <OS as Space>::Element: Clone,
-    AS: Space + Clone,
-    <AS as Space>::Element: Clone,
-    P: Clone,
-    PO: Clone,
-    V: Clone,
-    VO: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            actor: self.actor.clone(),
-            policy_optimizer: self.policy_optimizer.clone(),
-            value_optimizer: self.value_optimizer.clone(),
-            max_policy_step_kl: self.max_policy_step_kl,
-        }
-    }
-}
-
 impl<OS, AS, P, PO, V, VO> TrpoAgent<OS, AS, P, PO, V, VO>
 where
     OS: Space + BaseFeatureSpace,
@@ -178,12 +157,14 @@ where
         POB: OptimizerBuilder<PO>,
         VOB: OptimizerBuilder<VO>,
     {
-        let policy_vs = nn::VarStore::new(Device::Cpu);
-        let value_vs = nn::VarStore::new(Device::Cpu);
-        let actor = actor_config.build_actor(env, &policy_vs.root(), &value_vs.root());
+        let actor = actor_config.build_actor(env);
 
-        let policy_optimizer = policy_optimizer_config.build_optimizer(&policy_vs).unwrap();
-        let value_optimizer = value_optimizer_config.build_optimizer(&value_vs).unwrap();
+        let policy_optimizer = policy_optimizer_config
+            .build_optimizer(&actor.policy_variables)
+            .unwrap();
+        let value_optimizer = value_optimizer_config
+            .build_optimizer(&actor.value_variables)
+            .unwrap();
 
         Self {
             actor,
@@ -319,17 +300,16 @@ mod trpo {
     use crate::torch::optimizers::{AdamConfig, ConjugateGradientOptimizerConfig};
     use crate::torch::seq_modules::{GruMlp, RnnMlpConfig, WithState};
     use crate::torch::step_value::{Gae, GaeConfig, Return};
-    use tch::nn::Sequential;
+    use tch::{nn::Sequential, Device};
 
-    fn test_train_default_trpo<P, PB, V, VB>()
-    where
+    fn test_train_default_trpo<P, PB, V, VB>(
+        mut config: TrpoAgentConfig<PB, ConjugateGradientOptimizerConfig, VB, AdamConfig>,
+    ) where
         P: SequenceModule + StatefulIterativeModule,
         PB: ModuleBuilder<P> + Default,
         V: StepValue,
         VB: StepValueBuilder<V> + Default,
     {
-        let mut config =
-            TrpoAgentConfig::<PB, ConjugateGradientOptimizerConfig, VB, AdamConfig>::default();
         // Speed up learning for this simple environment
         config.actor_config.steps_per_epoch = 25;
         config.value_optimizer_config.learning_rate = 0.1;
@@ -344,17 +324,28 @@ mod trpo {
 
     #[test]
     fn default_mlp_return_learns_derministic_bandit() {
-        test_train_default_trpo::<Sequential, MlpConfig, Return, Return>();
+        test_train_default_trpo::<Sequential, MlpConfig, Return, Return>(Default::default());
+    }
+
+    #[test]
+    fn default_mlp_return_learns_derministic_bandit_cuda_if_available() {
+        let mut config = TrpoAgentConfig::default();
+        config.actor_config.device = Device::cuda_if_available();
+        test_train_default_trpo::<Sequential, MlpConfig, Return, Return>(config);
     }
 
     #[test]
     fn default_mlp_gae_mlp_learns_derministic_bandit() {
-        test_train_default_trpo::<Sequential, MlpConfig, Gae<Sequential>, GaeConfig<MlpConfig>>()
+        test_train_default_trpo::<Sequential, MlpConfig, Gae<Sequential>, GaeConfig<MlpConfig>>(
+            Default::default(),
+        )
     }
 
     #[test]
     fn default_gru_mlp_return_learns_derministic_bandit() {
-        test_train_default_trpo::<WithState<GruMlp>, RnnMlpConfig, Return, Return>()
+        test_train_default_trpo::<WithState<GruMlp>, RnnMlpConfig, Return, Return>(
+            Default::default(),
+        )
     }
 
     #[test]
@@ -364,7 +355,7 @@ mod trpo {
             RnnMlpConfig,
             Gae<Sequential>,
             GaeConfig<MlpConfig>,
-        >()
+        >(Default::default())
     }
 
     #[test]
@@ -374,6 +365,6 @@ mod trpo {
             RnnMlpConfig,
             Gae<WithState<GruMlp>>,
             GaeConfig<RnnMlpConfig>,
-        >()
+        >(Default::default())
     }
 }

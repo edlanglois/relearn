@@ -9,7 +9,7 @@ use crate::spaces::{
     Space,
 };
 use crate::{Actor, EnvStructure, Step};
-use tch::{nn::Path, Device, Tensor};
+use tch::{nn::VarStore, Device, Tensor};
 
 /// Configuration for [`PolicyValueNetActor`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -18,6 +18,7 @@ pub struct PolicyValueNetActorConfig<PB, VB> {
     pub value_train_iters: u64,
     pub policy_config: PB,
     pub value_config: VB,
+    pub device: Device,
 }
 
 impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
@@ -26,12 +27,14 @@ impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
         value_train_iters: u64,
         policy_config: PB,
         value_config: VB,
+        device: Device,
     ) -> Self {
         Self {
             steps_per_epoch,
             value_train_iters,
             policy_config,
             value_config,
+            device,
         }
     }
 }
@@ -47,6 +50,7 @@ where
             value_train_iters: 80,
             policy_config: Default::default(),
             value_config: Default::default(),
+            device: Device::Cpu,
         }
     }
 }
@@ -55,8 +59,6 @@ impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
     pub fn build_actor<E, P, V>(
         &self,
         env: &E,
-        policy_vs: &Path,
-        value_vs: &Path,
     ) -> PolicyValueNetActor<E::ObservationSpace, E::ActionSpace, P, V>
     where
         E: EnvStructure + ?Sized,
@@ -66,7 +68,7 @@ impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
         VB: StepValueBuilder<V>,
         V: StepValue,
     {
-        PolicyValueNetActor::new(env, self, policy_vs, value_vs)
+        PolicyValueNetActor::new(env, self)
     }
 }
 
@@ -76,7 +78,7 @@ impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
 /// Takes actions and records history.
 ///
 /// Accepts a callback function to update the model parameters.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub struct PolicyValueNetActor<OS, AS, P, V>
 where
     OS: Space,
@@ -107,11 +109,28 @@ where
     /// Number of step value update iterations per epoch.
     pub value_train_iters: u64,
 
+    /// Device on which model variables are stored.
+    pub device: Device,
+
     /// The policy module.
     pub policy: P,
 
+    /// Policy module variables.
+    pub policy_variables: VarStore,
+
+    /// A copy of the policy module (including parameters) on the CPU for fast actions.
+    ///
+    /// This is defined if the main policy module is not on the CPU.
+    cpu_policy: Option<P>,
+
+    /// Cpu policy variables if the main policy is not on the CPU.
+    cpu_policy_variables: Option<VarStore>,
+
     /// The value estimator module.
     pub value: V,
+
+    /// Value estimator module variables
+    pub value_variables: VarStore,
 
     /// The recorded step history.
     history: HistoryBuffer<OS::Element, AS::Element>,
@@ -128,14 +147,10 @@ where
     /// # Args
     /// * `env` - Environment structure.
     /// * `config` - `PolicyValueNetActor` configuration parameters.
-    /// * `policy_vs` - Path in which the policy network variables are stored
-    /// * `value_vs` - Path in which the value network variables are stored.
-    pub fn new<E, PB, VB>(
-        env: &E,
-        config: &PolicyValueNetActorConfig<PB, VB>,
-        policy_vs: &Path,
-        value_vs: &Path,
-    ) -> Self
+    /// * `device` - Device on which the policy and value networks are stored.
+    ///              If this is not CPU, a copy of the policy is maintained on the CPU for faster
+    ///              actions.
+    pub fn new<E, PB, VB>(env: &E, config: &PolicyValueNetActorConfig<PB, VB>) -> Self
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
         PB: ModuleBuilder<P>,
@@ -145,15 +160,30 @@ where
         let action_space = env.action_space();
         let max_steps_per_epoch = config.steps_per_epoch + config.steps_per_epoch / 10;
 
+        let policy_variables = VarStore::new(config.device);
         let policy = config.policy_config.build_module(
-            policy_vs,
+            &policy_variables.root(),
             observation_space.num_features(),
             action_space.num_distribution_params(),
         );
 
+        let (cpu_policy, cpu_policy_variables) = if config.device != Device::Cpu {
+            let mut cpu_policy_variables = VarStore::new(Device::Cpu);
+            let cpu_policy = config.policy_config.build_module(
+                &cpu_policy_variables.root(),
+                observation_space.num_features(),
+                action_space.num_distribution_params(),
+            );
+            cpu_policy_variables.copy(&policy_variables).unwrap();
+            (Some(cpu_policy), Some(cpu_policy_variables))
+        } else {
+            (None, None)
+        };
+
+        let value_variables = VarStore::new(config.device);
         let value = config
             .value_config
-            .build_step_value(value_vs, observation_space.num_features());
+            .build_step_value(&value_variables.root(), observation_space.num_features());
         let discount_factor = value.discount_factor(env.discount_factor());
 
         Self {
@@ -163,8 +193,13 @@ where
             steps_per_epoch: config.steps_per_epoch,
             max_steps_per_epoch,
             value_train_iters: config.value_train_iters,
+            device: config.device,
             policy,
+            policy_variables,
+            cpu_policy,
+            cpu_policy_variables,
             value,
+            value_variables,
             history: HistoryBuffer::new(Some(max_steps_per_epoch)),
         }
     }
@@ -177,15 +212,16 @@ where
     P: StatefulIterativeModule,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
+        let _no_grad = tch::no_grad_guard();
         let observation_features = self.observation_space.features(observation);
 
+        let policy = self.cpu_policy.as_mut().unwrap_or(&mut self.policy);
         if new_episode {
-            self.policy.reset();
+            policy.reset();
         }
-        tch::no_grad(|| {
-            let output = self.policy.step(&observation_features);
-            self.action_space.sample_element(&output)
-        })
+
+        let output = policy.step(&observation_features);
+        self.action_space.sample_element(&output)
     }
 }
 
@@ -256,7 +292,7 @@ where
             &self.observation_space,
             &self.action_space,
             self.discount_factor,
-            Device::Cpu,
+            self.device,
         );
 
         let entropy = update_policy(self, &features, logger);
@@ -271,6 +307,13 @@ where
                     epoch_log_scalar(logger, "value_loss_final", &value_loss);
                 }
             }
+        }
+
+        // Copy the updated variables to the CPU policy if there is one
+        if let Some(ref mut cpu_policy_variables) = self.cpu_policy_variables {
+            cpu_policy_variables
+                .copy(&self.policy_variables)
+                .expect("Variable mismatch between main policy and CPU policy");
         }
 
         epoch_log_scalar(logger, "num_steps", self.history.len() as f64);
