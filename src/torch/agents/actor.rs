@@ -9,7 +9,7 @@ use crate::spaces::{
     Space,
 };
 use crate::{Actor, EnvStructure, Step};
-use tch::{nn::Path, Tensor};
+use tch::{nn::Path, Device, Tensor};
 
 /// Configuration for [`PolicyValueNetActor`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -256,6 +256,7 @@ where
             &self.observation_space,
             &self.action_space,
             self.discount_factor,
+            Device::Cpu,
         );
 
         let entropy = update_policy(self, &features, logger);

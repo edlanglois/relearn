@@ -4,7 +4,7 @@ use crate::utils::packed::{self, PackedBatchSizes, PackingIndices};
 use crate::Step;
 use lazycell::LazyCell;
 use std::ops::Range;
-use tch::Tensor;
+use tch::{Device, Tensor};
 
 /// View packed history features
 pub trait PackedHistoryFeaturesView {
@@ -38,6 +38,9 @@ pub trait PackedHistoryFeaturesView {
 
     /// Packed rewards. A 1D f32 tensor.
     fn rewards(&self) -> &Tensor;
+
+    /// Device on which tensors will be placed.
+    fn device(&self) -> Device;
 }
 
 /// Packed history features with lazy evaluation and caching.
@@ -48,6 +51,7 @@ pub struct LazyPackedHistoryFeatures<'a, OS: Space, AS: Space> {
     observation_space: &'a OS,
     action_space: &'a AS,
     discount_factor: f64,
+    device: Device,
 
     cached_batch_sizes: LazyCell<Vec<i64>>,
     cached_batch_sizes_tensor: LazyCell<Tensor>,
@@ -64,6 +68,7 @@ impl<'a, OS: Space, AS: Space> LazyPackedHistoryFeatures<'a, OS, AS> {
         observation_space: &'a OS,
         action_space: &'a AS,
         discount_factor: f64,
+        device: Device,
     ) -> Self
     where
         I: IntoIterator<Item = Range<usize>>,
@@ -75,6 +80,7 @@ impl<'a, OS: Space, AS: Space> LazyPackedHistoryFeatures<'a, OS, AS> {
             observation_space,
             action_space,
             discount_factor,
+            device,
             cached_batch_sizes: LazyCell::new(),
             cached_batch_sizes_tensor: LazyCell::new(),
             cached_observation_features: LazyCell::new(),
@@ -95,6 +101,7 @@ impl<'a, OS: Space, AS: Space> LazyPackedHistoryFeatures<'a, OS, AS> {
             actions: self.cached_actions.into_inner(),
             returns: self.cached_returns.into_inner(),
             rewards: self.cached_rewards.into_inner(),
+            device: self.device,
         }
     }
 }
@@ -122,29 +129,49 @@ where
 
     fn batch_sizes_tensor(&self) -> &Tensor {
         self.cached_batch_sizes_tensor
-            .borrow_with(|| Tensor::of_slice(self.batch_sizes()))
+            .borrow_with(|| Tensor::of_slice(self.batch_sizes()).to(self.device))
     }
 
     fn observation_features(&self) -> &Tensor {
         self.cached_observation_features.borrow_with(|| {
-            packed_observation_features(self.steps, &self.episode_ranges, self.observation_space)
+            packed_observation_features(
+                self.steps,
+                &self.episode_ranges,
+                self.observation_space,
+                self.device,
+            )
         })
     }
 
     fn actions(&self) -> &Tensor {
-        self.cached_actions
-            .borrow_with(|| packed_actions(self.steps, &self.episode_ranges, self.action_space))
+        self.cached_actions.borrow_with(|| {
+            packed_actions(
+                self.steps,
+                &self.episode_ranges,
+                self.action_space,
+                self.device,
+            )
+        })
     }
 
     fn returns(&self) -> &Tensor {
         self.cached_returns.borrow_with(|| {
-            packed_returns(self.rewards(), self.batch_sizes(), self.discount_factor)
+            packed_returns(
+                self.rewards(),
+                self.batch_sizes(),
+                self.discount_factor,
+                self.device,
+            )
         })
     }
 
     fn rewards(&self) -> &Tensor {
         self.cached_rewards
-            .borrow_with(|| packed_rewards(self.steps, &self.episode_ranges))
+            .borrow_with(|| packed_rewards(self.steps, &self.episode_ranges, self.device))
+    }
+
+    fn device(&self) -> Device {
+        self.device
     }
 }
 
@@ -163,6 +190,7 @@ pub struct PackedHistoryFeatures {
     pub actions: Option<Tensor>,
     pub returns: Option<Tensor>,
     pub rewards: Option<Tensor>,
+    pub device: Device,
 }
 
 impl PackedHistoryFeaturesView for PackedHistoryFeatures {
@@ -210,6 +238,10 @@ impl PackedHistoryFeaturesView for PackedHistoryFeatures {
             .as_ref()
             .expect("rewards has not been evaluated")
     }
+
+    fn device(&self) -> Device {
+        self.device
+    }
 }
 
 /// Episode index ranges sorted in decreasing order of episode length.
@@ -234,6 +266,7 @@ pub fn packed_observation_features<OS, A>(
     steps: &[Step<OS::Element, A>],
     episode_ranges: &[Range<usize>],
     observation_space: &OS,
+    device: Device,
 ) -> Tensor
 where
     OS: BatchFeatureSpace<Tensor>,
@@ -241,22 +274,30 @@ where
     let _no_grad = tch::no_grad_guard();
     observation_space
         .batch_features(PackingIndices::from_sorted(episode_ranges).map(|i| &steps[i].observation))
+        .to(device)
 }
 
 pub fn packed_actions<O, AS>(
     steps: &[Step<O, AS::Element>],
     episode_ranges: &[Range<usize>],
     action_space: &AS,
+    device: Device,
 ) -> Tensor
 where
     AS: ReprSpace<Tensor>,
 {
     let _no_grad = tch::no_grad_guard();
-    action_space.batch_repr(PackingIndices::from_sorted(episode_ranges).map(|i| &steps[i].action))
+    action_space
+        .batch_repr(PackingIndices::from_sorted(episode_ranges).map(|i| &steps[i].action))
+        .to(device)
 }
 
 /// Packed step rewards. A 1D f32 tensor.
-pub fn packed_rewards<S, A>(steps: &[Step<S, A>], episode_ranges: &[Range<usize>]) -> Tensor {
+pub fn packed_rewards<S, A>(
+    steps: &[Step<S, A>],
+    episode_ranges: &[Range<usize>],
+    device: Device,
+) -> Tensor {
     let _no_grad = tch::no_grad_guard();
     #[allow(clippy::cast_possible_truncation)]
     Tensor::of_slice(
@@ -264,12 +305,19 @@ pub fn packed_rewards<S, A>(steps: &[Step<S, A>], episode_ranges: &[Range<usize>
             .map(|i| steps[i].reward as f32)
             .collect::<Vec<_>>(),
     )
+    .to(device)
 }
 
 /// Packed step returns (discounted rewards-to-go). A 1D f32 tensor.
-pub fn packed_returns(rewards: &Tensor, batch_sizes: &[i64], discount_factor: f64) -> Tensor {
+pub fn packed_returns(
+    rewards: &Tensor,
+    batch_sizes: &[i64],
+    discount_factor: f64,
+    device: Device,
+) -> Tensor {
     let _no_grad = tch::no_grad_guard();
     packed::packed_tensor_discounted_cumsum_from_end(rewards, batch_sizes, discount_factor)
+        .to(device)
 }
 
 /// Convert an iterator over steps into packed actions.
