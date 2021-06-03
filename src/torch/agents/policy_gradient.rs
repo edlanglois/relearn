@@ -5,7 +5,7 @@ use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use super::actor::{HistoryFeatures, PolicyValueNetActor, PolicyValueNetActorConfig};
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use crate::logging::Logger;
+use crate::logging::{Event, Logger};
 use crate::spaces::{
     BaseFeatureSpace, BatchFeatureSpace, FeatureSpace, ParameterizedDistributionSpace, ReprSpace,
     Space,
@@ -175,8 +175,12 @@ where
         let value_optimizer = &mut self.value_optimizer;
         self.actor.update(
             step,
-            |actor, features, _logger| policy_gradient_update(actor, features, policy_optimizer),
-            |actor, features, _logger| value_squared_error_update(actor, features, value_optimizer),
+            |actor, features, logger| {
+                policy_gradient_update(actor, features, policy_optimizer, logger)
+            },
+            |actor, features, logger| {
+                value_squared_error_update(actor, features, value_optimizer, logger)
+            },
             logger,
         );
     }
@@ -187,7 +191,8 @@ pub fn policy_gradient_update<OS, AS, P, V, PO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
     features: &HistoryFeatures<OS, AS>,
     optimizer: &mut PO,
-) -> Tensor
+    logger: &mut dyn Logger,
+) -> Option<Tensor>
 where
     OS: BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
@@ -195,6 +200,17 @@ where
     V: StepValue,
     PO: Optimizer,
 {
+    if features.episode_ranges().is_empty() {
+        logger
+            .log(
+                Event::Epoch,
+                "no_policy_step",
+                "Skipping policy update: empty history features".into(),
+            )
+            .unwrap();
+        return None;
+    }
+
     let step_values = tch::no_grad(|| actor.value.seq_packed(features));
 
     let policy_output = actor.policy.seq_packed(
@@ -212,7 +228,7 @@ where
 
     let _ = optimizer.backward_step(&policy_loss_fn).unwrap();
 
-    entropies.into_inner().unwrap().mean(Kind::Float)
+    Some(entropies.into_inner().unwrap().mean(Kind::Float))
 }
 
 /// Perform a single squared error loss value function update using the given history features.
@@ -220,16 +236,30 @@ pub fn value_squared_error_update<OS, AS, P, V, VO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
     features: &HistoryFeatures<OS, AS>,
     optimizer: &mut VO,
-) -> Tensor
+    logger: &mut dyn Logger,
+) -> Option<Tensor>
 where
     OS: BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor>,
     V: StepValue,
     VO: Optimizer,
 {
-    optimizer
-        .backward_step(&|| actor.value.loss(features).unwrap())
-        .unwrap()
+    if features.episode_ranges().is_empty() {
+        logger
+            .log(
+                Event::Epoch,
+                "no_value_step",
+                "Skipping value update: empty history featuers".into(),
+            )
+            .unwrap();
+        return None;
+    }
+
+    Some(
+        optimizer
+            .backward_step(&|| actor.value.loss(features).unwrap())
+            .unwrap(),
+    )
 }
 
 #[cfg(test)]

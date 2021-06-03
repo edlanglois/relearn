@@ -264,8 +264,8 @@ where
         update_value: G,
         logger: &mut dyn Logger,
     ) where
-        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
-        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
+        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Option<Tensor>,
+        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Option<Tensor>,
     {
         let episode_done = step.episode_done;
         self.history.push(step);
@@ -281,18 +281,18 @@ where
     /// Update the model parameters and clear the stored history.
     ///
     /// * `update_policy` - Callback function that performs a policy update
-    ///     and returns an estimate of the policy entropy.
+    ///     and optionally returns an estimate of the policy entropy.
     ///
     /// * `update_value` - Callback function that performs a value net update
-    ///     and returns the value function loss (pre- or post-update).
+    ///     and optionally returns the value function loss (pre- or post-update).
     ///     Will be called `value_train_iters` times if `value.trainable()` is true.
     ///
     /// * `logger` - Logger to which epoch statistics are logged. Forwarded to the callbacks.
 
     fn epoch_update<F, G>(&mut self, update_policy: F, mut update_value: G, logger: &mut dyn Logger)
     where
-        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
-        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Tensor,
+        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Option<Tensor>,
+        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Option<Tensor>,
     {
         let features = LazyPackedHistoryFeatures::new(
             self.history.steps(),
@@ -302,17 +302,23 @@ where
             self.discount_factor,
             self.device,
         );
+        epoch_log_scalar(logger, "num_steps", self.history.len() as f64);
+        epoch_log_scalar(logger, "num_episodes", self.history.num_episodes() as f64);
 
-        let entropy = update_policy(self, &features, logger);
+        if let Some(entropy) = update_policy(self, &features, logger) {
+            epoch_log_scalar(logger, "policy_entropy", &entropy);
+        }
 
         if self.value.trainable() {
             for i in 0..self.value_train_iters {
                 let value_loss = update_value(self, &features, logger);
 
-                if i == 0 {
-                    epoch_log_scalar(logger, "value_loss_initial", &value_loss);
-                } else if i == self.value_train_iters - 1 {
-                    epoch_log_scalar(logger, "value_loss_final", &value_loss);
+                if let Some(value_loss) = value_loss {
+                    if i == 0 {
+                        epoch_log_scalar(logger, "value_loss_initial", &value_loss);
+                    } else if i == self.value_train_iters - 1 {
+                        epoch_log_scalar(logger, "value_loss_final", &value_loss);
+                    }
                 }
             }
         }
@@ -324,9 +330,6 @@ where
                 .expect("Variable mismatch between main policy and CPU policy");
         }
 
-        epoch_log_scalar(logger, "num_steps", self.history.len() as f64);
-        epoch_log_scalar(logger, "num_episodes", self.history.num_episodes() as f64);
-        epoch_log_scalar(logger, "policy_entropy", &entropy);
         logger.done(Event::Epoch);
 
         self.history.clear();

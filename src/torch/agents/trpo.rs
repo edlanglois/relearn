@@ -214,8 +214,13 @@ where
                     logger,
                 )
             },
-            |actor, features, _logger| {
-                policy_gradient::value_squared_error_update(actor, features, value_optimizer)
+            |actor, features, logger| {
+                policy_gradient::value_squared_error_update(
+                    actor,
+                    features,
+                    value_optimizer,
+                    logger,
+                )
             },
             logger,
         );
@@ -228,7 +233,7 @@ fn trpo_update<OS, AS, P, PO, V>(
     policy_optimizer: &mut PO,
     max_policy_step_kl: f64,
     logger: &mut dyn Logger,
-) -> Tensor
+) -> Option<Tensor>
 where
     OS: BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
@@ -236,6 +241,17 @@ where
     PO: TrustRegionOptimizer,
     V: StepValue,
 {
+    if features.episode_ranges().is_empty() {
+        logger
+            .log(
+                Event::Epoch,
+                "no_policy_step",
+                "Skipping policy update: empty history features".into(),
+            )
+            .unwrap();
+        return None;
+    }
+
     let observation_features = features.observation_features();
     let batch_sizes = features.batch_sizes_tensor();
     let actions = features.actions();
@@ -288,7 +304,7 @@ where
         }
     }
 
-    initial_policy_entropy
+    Some(initial_policy_entropy)
 }
 
 #[cfg(test)]
