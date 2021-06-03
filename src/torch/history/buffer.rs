@@ -1,6 +1,8 @@
 //! Step history buffer
 use crate::Step;
+use std::iter;
 use std::iter::Scan;
+use std::num::NonZeroUsize;
 use std::ops::Range;
 use std::slice::Iter;
 use std::vec::Drain;
@@ -12,10 +14,20 @@ pub struct HistoryBuffer<O, A> {
     steps: Vec<Step<O, A>>,
     /// End index of each episode.
     episode_ends: Vec<usize>,
+    /// Include incomplete episodes with at least this length.
+    ///
+    /// * If `None`, incomplete episodes are never included.
+    /// * It does not make sense to include a size-0 "episode"
+    ///     because that an episoded ended on the last step,
+    ///     so 0 is disallowed.
+    include_incomplete_episode_len: Option<NonZeroUsize>,
 }
 
 impl<O, A> HistoryBuffer<O, A> {
-    pub fn new(capacity: Option<usize>) -> Self {
+    pub fn new(
+        capacity: Option<usize>,
+        include_incomplete_episode_len: Option<NonZeroUsize>,
+    ) -> Self {
         let steps = match capacity {
             Some(c) => Vec::with_capacity(c),
             None => Vec::new(),
@@ -23,6 +35,7 @@ impl<O, A> HistoryBuffer<O, A> {
         Self {
             steps,
             episode_ends: Vec::new(),
+            include_incomplete_episode_len,
         }
     }
 }
@@ -63,12 +76,26 @@ impl<O, A> HistoryBuffer<O, A> {
     }
 
     /// Iterate over episode ranges.
-    pub fn episode_ranges(&self) -> EpRangeIter {
-        self.episode_ends.iter().scan(0, |start, end| {
-            let range = *start..*end;
-            *start = *end;
-            Some(range)
-        })
+    pub fn episode_ranges(&self) -> impl Iterator<Item = Range<usize>> + '_ {
+        let num_steps = self.steps.len();
+
+        // Whether to include the final incomplete episode (if any)
+        let mut with_final_incomplete_episode = false;
+        if let Some(min_incomplete_len) = self.include_incomplete_episode_len {
+            let last_episode_end: usize = self.episode_ends.last().cloned().unwrap_or(0);
+            with_final_incomplete_episode =
+                (self.steps.len() - last_episode_end) >= min_incomplete_len.into();
+        }
+
+        self.episode_ends
+            .iter()
+            .cloned()
+            .chain(iter::once(num_steps).take(if with_final_incomplete_episode { 1 } else { 0 }))
+            .scan(0, move |start, end| {
+                let range = *start..end;
+                *start = end;
+                Some(range)
+            })
     }
 
     /// Iterate over episode lengths.
@@ -95,6 +122,3 @@ impl<O, A> HistoryBuffer<O, A> {
 }
 
 pub type EpLenIter<'a> = Scan<Iter<'a, usize>, usize, fn(&mut usize, &usize) -> Option<usize>>;
-
-pub type EpRangeIter<'a> =
-    Scan<Iter<'a, usize>, usize, fn(&mut usize, &usize) -> Option<Range<usize>>>;

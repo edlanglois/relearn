@@ -9,12 +9,14 @@ use crate::spaces::{
     Space,
 };
 use crate::{Actor, EnvStructure, Step};
+use std::num::NonZeroUsize;
 use tch::{nn::VarStore, Device, Tensor};
 
 /// Configuration for [`PolicyValueNetActor`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PolicyValueNetActorConfig<PB, VB> {
     pub steps_per_epoch: usize,
+    pub include_incomplete_episode_len: Option<NonZeroUsize>,
     pub value_train_iters: u64,
     pub policy_config: PB,
     pub value_config: VB,
@@ -24,6 +26,7 @@ pub struct PolicyValueNetActorConfig<PB, VB> {
 impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
     pub const fn new(
         steps_per_epoch: usize,
+        include_incomplete_episode_len: Option<NonZeroUsize>,
         value_train_iters: u64,
         policy_config: PB,
         value_config: VB,
@@ -31,6 +34,7 @@ impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
     ) -> Self {
         Self {
             steps_per_epoch,
+            include_incomplete_episode_len,
             value_train_iters,
             policy_config,
             value_config,
@@ -47,6 +51,7 @@ where
     fn default() -> Self {
         Self {
             steps_per_epoch: 1000,
+            include_incomplete_episode_len: Some(NonZeroUsize::new(10).unwrap()),
             value_train_iters: 80,
             policy_config: Default::default(),
             value_config: Default::default(),
@@ -200,7 +205,10 @@ where
             cpu_policy_variables,
             value,
             value_variables,
-            history: HistoryBuffer::new(Some(max_steps_per_epoch)),
+            history: HistoryBuffer::new(
+                Some(max_steps_per_epoch),
+                config.include_incomplete_episode_len,
+            ),
         }
     }
 }
