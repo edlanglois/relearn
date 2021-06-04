@@ -128,8 +128,9 @@ where
     }
 
     fn batch_sizes_tensor(&self) -> &Tensor {
+        // Must stay on the CPU
         self.cached_batch_sizes_tensor
-            .borrow_with(|| Tensor::of_slice(self.batch_sizes()).to(self.device))
+            .borrow_with(|| Tensor::of_slice(self.batch_sizes()))
     }
 
     fn observation_features(&self) -> &Tensor {
