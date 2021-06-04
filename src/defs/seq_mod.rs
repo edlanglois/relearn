@@ -1,6 +1,9 @@
-use crate::torch::modules::MlpConfig;
-use crate::torch::seq_modules::{GruMlp, LstmMlp, RnnMlpConfig, StatefulIterSeqModule, WithState};
-use crate::torch::ModuleBuilder;
+use crate::torch::{
+    agents::TrpoPolicyModule,
+    modules::MlpConfig,
+    seq_modules::{GruMlp, LstmMlp, RnnMlpConfig, StatefulIterSeqModule, WithState},
+    ModuleBuilder,
+};
 use tch::nn::{Path, Sequential};
 
 /// Sequence module definition
@@ -23,26 +26,40 @@ impl From<MlpConfig> for SeqModDef {
     }
 }
 
-impl ModuleBuilder<Box<dyn StatefulIterSeqModule>> for SeqModDef {
-    fn build_module(
-        &self,
-        vs: &Path,
-        in_dim: usize,
-        out_dim: usize,
-    ) -> Box<dyn StatefulIterSeqModule> {
-        match self {
-            SeqModDef::Mlp(config) => {
-                let m: Sequential = config.build_module(vs, in_dim, out_dim);
-                Box::new(m)
-            }
-            SeqModDef::GruMlp(config) => {
-                let m: WithState<GruMlp> = config.build_module(vs, in_dim, out_dim);
-                Box::new(m)
-            }
-            SeqModDef::LstmMlp(config) => {
-                let m: WithState<LstmMlp> = config.build_module(vs, in_dim, out_dim);
-                Box::new(m)
+// TODO: Make generic once std::marker::Unsize is stabilized:
+// impl<T> ModuleBuilder<Box<T>> for SeqModDef
+// where
+//      Sequential: Unsize<T>,
+//      WithState<GruMlp>: Unsize<T>,
+//      WithState<LstmMlp>: Usize<T>,
+// {
+//      ...
+//          Box::new(m) as Box<T>
+//      ...
+// }
+
+macro_rules! boxed_module_builder_for_seq_mod {
+    ($type:ty) => {
+        impl ModuleBuilder<Box<$type>> for SeqModDef {
+            fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Box<$type> {
+                match self {
+                    SeqModDef::Mlp(config) => {
+                        let m: Sequential = config.build_module(vs, in_dim, out_dim);
+                        Box::new(m)
+                    }
+                    SeqModDef::GruMlp(config) => {
+                        let m: WithState<GruMlp> = config.build_module(vs, in_dim, out_dim);
+                        Box::new(m)
+                    }
+                    SeqModDef::LstmMlp(config) => {
+                        let m: WithState<LstmMlp> = config.build_module(vs, in_dim, out_dim);
+                        Box::new(m)
+                    }
+                }
             }
         }
-    }
+    };
 }
+
+boxed_module_builder_for_seq_mod!(dyn StatefulIterSeqModule);
+boxed_module_builder_for_seq_mod!(dyn TrpoPolicyModule);

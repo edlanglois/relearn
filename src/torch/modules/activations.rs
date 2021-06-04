@@ -1,4 +1,5 @@
 //! Activation functions
+use crate::torch::backends::CudnnSupport;
 use clap::Clap;
 use tch::{nn, Tensor};
 
@@ -33,6 +34,12 @@ impl Activation {
             Sigmoid => nn::func(Tensor::sigmoid),
             Tanh => nn::func(Tensor::tanh),
         }
+    }
+}
+
+impl CudnnSupport for Activation {
+    fn has_cudnn_second_derivatives(&self) -> bool {
+        true
     }
 }
 

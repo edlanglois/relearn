@@ -1,5 +1,8 @@
 //! Torch components
+#[macro_use]
+mod macros;
 pub mod agents;
+pub mod backends;
 pub mod distributions;
 pub mod history;
 pub mod modules;

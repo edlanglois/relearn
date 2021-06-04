@@ -1,5 +1,6 @@
 use super::super::ModuleBuilder;
 use super::{IterativeModule, SequenceModule, StatefulIterativeModule};
+use crate::torch::backends::CudnnSupport;
 use std::borrow::Borrow;
 use tch::{nn::Path, Tensor};
 
@@ -62,6 +63,15 @@ where
     }
     fn step(&self, input: &Tensor, state: &Self::State) -> (Tensor, Self::State) {
         self.module.step(input, state)
+    }
+}
+
+impl<T> CudnnSupport for WithState<T>
+where
+    T: IterativeModule + CudnnSupport,
+{
+    fn has_cudnn_second_derivatives(&self) -> bool {
+        self.module.has_cudnn_second_derivatives()
     }
 }
 

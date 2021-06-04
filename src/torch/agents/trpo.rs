@@ -20,6 +20,7 @@ use crate::spaces::{
     BaseFeatureSpace, BatchFeatureSpace, FeatureSpace, ParameterizedDistributionSpace, ReprSpace,
     Space,
 };
+use crate::torch::backends::{CudnnSupport, WithCudnnEnabled};
 use crate::utils::distributions::ArrayDistribution;
 use crate::EnvStructure;
 use std::fmt;
@@ -190,7 +191,7 @@ impl<OS, AS, P, PO, V, VO> Agent<OS::Element, AS::Element> for TrpoAgent<OS, AS,
 where
     OS: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
-    P: SequenceModule + StatefulIterativeModule,
+    P: SequenceModule + StatefulIterativeModule + CudnnSupport,
     PO: TrustRegionOptimizer,
     V: StepValue,
     VO: Optimizer,
@@ -237,7 +238,7 @@ fn trpo_update<OS, AS, P, PO, V>(
 where
     OS: BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
-    P: SequenceModule,
+    P: SequenceModule + CudnnSupport,
     PO: TrustRegionOptimizer,
     V: StepValue,
 {
@@ -251,6 +252,12 @@ where
             .unwrap();
         return None;
     }
+
+    let _cudnn_disable_guard = if actor.policy.has_cudnn_second_derivatives() {
+        None
+    } else {
+        Some(WithCudnnEnabled::new(false))
+    };
 
     let observation_features = features.observation_features();
     let batch_sizes = features.batch_sizes_tensor();
@@ -321,7 +328,7 @@ mod trpo {
     fn test_train_default_trpo<P, PB, V, VB>(
         mut config: TrpoAgentConfig<PB, ConjugateGradientOptimizerConfig, VB, AdamConfig>,
     ) where
-        P: SequenceModule + StatefulIterativeModule,
+        P: SequenceModule + StatefulIterativeModule + CudnnSupport,
         PB: ModuleBuilder<P> + Default,
         V: StepValue,
         VB: StepValueBuilder<V> + Default,
@@ -382,5 +389,17 @@ mod trpo {
             Gae<WithState<GruMlp>>,
             GaeConfig<RnnMlpConfig>,
         >(Default::default())
+    }
+
+    #[test]
+    fn default_gru_mlp_gae_gru_mlp_derministic_bandit_cuda_if_available() {
+        let mut config = TrpoAgentConfig::default();
+        config.actor_config.device = Device::cuda_if_available();
+        test_train_default_trpo::<
+            WithState<GruMlp>,
+            RnnMlpConfig,
+            Gae<WithState<GruMlp>>,
+            GaeConfig<RnnMlpConfig>,
+        >(config)
     }
 }

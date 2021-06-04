@@ -1,6 +1,7 @@
 //! Gated Recurrent Unit
 use super::super::{seq_serial_map, IterativeModule, SequenceModule};
 use super::{initialize_rnn_params, CudnnRnnMode};
+use crate::torch::backends::CudnnSupport;
 use tch::{nn::Path, Device, IndexOp, Kind, Tensor};
 
 /// A single-layer Gated Recurrent Unit Network
@@ -111,6 +112,12 @@ impl SequenceModule for Gru {
             false, // bidirectional
         );
         outputs
+    }
+}
+
+impl CudnnSupport for Gru {
+    fn has_cudnn_second_derivatives(&self) -> bool {
+        false
     }
 }
 

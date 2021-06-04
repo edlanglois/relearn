@@ -1,5 +1,6 @@
 use super::super::{Activation, ModuleBuilder};
 use super::{IterativeModule, SequenceModule};
+use crate::torch::backends::CudnnSupport;
 use tch::{nn::Func, nn::Module, nn::Path, Tensor};
 
 /// A module stacked on top of a sequence.
@@ -63,6 +64,16 @@ where
         }
         data = data.apply(&self.top);
         (data, state)
+    }
+}
+
+impl<'a, T, U> CudnnSupport for Stacked<'a, T, U>
+where
+    T: CudnnSupport,
+    U: CudnnSupport,
+{
+    fn has_cudnn_second_derivatives(&self) -> bool {
+        self.seq.has_cudnn_second_derivatives() && self.top.has_cudnn_second_derivatives()
     }
 }
 

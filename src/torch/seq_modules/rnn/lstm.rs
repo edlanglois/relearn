@@ -1,6 +1,7 @@
 //! Long Short-Term Memory
 use super::super::{seq_serial_map, IterativeModule, SequenceModule};
 use super::{initialize_rnn_params, CudnnRnnMode};
+use crate::torch::backends::CudnnSupport;
 use tch::{nn::Path, Device, IndexOp, Kind, Tensor};
 
 /// A Single-layer Long Short-Term Memory Network.
@@ -124,6 +125,12 @@ impl SequenceModule for Lstm {
             false, // bidirectional
         );
         outputs
+    }
+}
+
+impl CudnnSupport for Lstm {
+    fn has_cudnn_second_derivatives(&self) -> bool {
+        false
     }
 }
 

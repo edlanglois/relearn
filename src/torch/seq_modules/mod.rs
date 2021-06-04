@@ -1,5 +1,4 @@
 //! Sequence modules. Like [`tch::nn::Module`] but operate on sequences of data.
-mod r#box;
 pub mod module;
 mod rnn;
 mod stacked;
@@ -112,6 +111,9 @@ pub trait StatefulIterativeModule {
 /// Sequence module with stateful iteration
 pub trait StatefulIterSeqModule: SequenceModule + StatefulIterativeModule {}
 impl<T: SequenceModule + StatefulIterativeModule> StatefulIterSeqModule for T {}
+
+box_impl_sequence_module!(dyn StatefulIterSeqModule);
+box_impl_stateful_iterative_module!(dyn StatefulIterSeqModule);
 
 /// Helper function to implement [`SequenceModule::seq_serial`] from a single-sequence closure.
 ///
