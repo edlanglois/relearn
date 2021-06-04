@@ -55,12 +55,19 @@ pub trait SequenceModule {
     ///     corresponds to a flattend Tensor of shape `[SEQ_LENGTH, BATCH_SIZE]`.
     ///
     /// * `batch_sizes` - The batch size of each in-sequence step index.
-    ///     A i64 tensor of shape `[MAX_SEQ_LENGTH]`.
+    ///     A i64 tensor of shape `[MAX_SEQ_LENGTH]`. **Must be on the CPU.**
     ///     Must be monotonically decreasing and positive.
     ///
     /// # Returns
     /// Packed output sequences in the same order as `inputs`.
     /// A tensor of shape `[TOTAL_STEPS, NUM_OUTPUT_FEATURES]`.
+    ///
+    /// # Panics
+    /// Panics if:
+    /// * `inputs` device does not match the model device
+    /// * `inputs` `NUM_INPUT_FEATURES` dimension does not match the model input features
+    /// * `inputs` `TOTAL_STEPS` dimension does not match the sum of `batch_size`
+    /// * `batch_sizes` device is not CPU
     fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor;
 }
 

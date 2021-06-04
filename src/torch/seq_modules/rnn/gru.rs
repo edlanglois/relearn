@@ -87,6 +87,11 @@ impl SequenceModule for Gru {
     }
 
     fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
+        if batch_sizes.device() != Device::Cpu {
+            // Panic here to prevent torch from segfaulting.
+            // See https://github.com/pytorch/pytorch/issues/59418
+            panic!("Batch sizes must be on the CPU");
+        }
         let initial_batch_size: i64 = batch_sizes.i(0).into();
         let num_layers = 1;
         let initial_state = Tensor::zeros(
