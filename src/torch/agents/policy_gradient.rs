@@ -339,4 +339,16 @@ mod policy_gradient {
             GaeConfig<RnnMlpConfig>,
         >(Default::default())
     }
+
+    #[test]
+    fn default_gru_mlp_gae_gru_mlp_derministic_bandit_cuda_if_available() {
+        let mut config = PolicyGradientAgentConfig::default();
+        config.actor_config.device = Device::cuda_if_available();
+        test_train_policy_gradient::<
+            WithState<GruMlp>,
+            RnnMlpConfig,
+            Gae<WithState<GruMlp>>,
+            GaeConfig<RnnMlpConfig>,
+        >(config)
+    }
 }
