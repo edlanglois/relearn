@@ -69,6 +69,52 @@ impl<E: EnvStructure + ?Sized> EnvStructure for Box<E> {
     }
 }
 
+/// Stored copy of an environment structure.
+///
+/// See [`EnvStructure`] for details.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StoredEnvStructure<OS: Space, AS: Space> {
+    pub observation_space: OS,
+    pub action_space: AS,
+    pub reward_range: (f64, f64),
+    pub discount_factor: f64,
+}
+
+impl<OS, AS> EnvStructure for StoredEnvStructure<OS, AS>
+where
+    OS: Space + Clone,
+    AS: Space + Clone,
+{
+    type ObservationSpace = OS;
+    type ActionSpace = AS;
+    fn observation_space(&self) -> Self::ObservationSpace {
+        self.observation_space.clone()
+    }
+    fn action_space(&self) -> Self::ActionSpace {
+        self.action_space.clone()
+    }
+    fn reward_range(&self) -> (f64, f64) {
+        self.reward_range
+    }
+    fn discount_factor(&self) -> f64 {
+        self.discount_factor
+    }
+}
+
+impl<E> From<&E> for StoredEnvStructure<E::ObservationSpace, E::ActionSpace>
+where
+    E: EnvStructure + ?Sized,
+{
+    fn from(env: &E) -> Self {
+        Self {
+            observation_space: env.observation_space(),
+            action_space: env.action_space(),
+            reward_range: env.reward_range(),
+            discount_factor: env.discount_factor(),
+        }
+    }
+}
+
 /// A reinforcement learning environment.
 ///
 /// This defines the environment dynamics and strucutre.
