@@ -15,7 +15,9 @@ pub use bandits::{
 pub use builder::{BuildEnvError, EnvBuilder, EnvDistBuilder};
 pub use chain::Chain;
 pub use memory::MemoryGame;
-pub use meta::{MetaEnv, MetaEnvConfig, MetaEnvState, StatefulMetaEnv};
+pub use meta::{
+    MetaEnv, MetaEnvConfig, MetaEnvState, MetaObservation, MetaObservationSpace, StatefulMetaEnv,
+};
 pub use stateful::{DistWithState, EnvWithState, WithState};
 
 use crate::spaces::Space;

@@ -119,13 +119,18 @@ impl<E> MetaEnv<E> {
 }
 
 /// Meta-environment observation space. See [`MetaEnv`] for details.
-pub type MetaObservationSpace<E> = ProductSpace<(
-    OptionSpace<<E as EnvStructure>::ObservationSpace>,
-    OptionSpace<ProductSpace<(<E as EnvStructure>::ActionSpace, IntervalSpace<f64>)>>,
+pub type MetaObservationSpace<OS, AS> = ProductSpace<(
+    OptionSpace<OS>,
+    OptionSpace<ProductSpace<(AS, IntervalSpace<f64>)>>,
     BooleanSpace,
 )>;
 
-fn meta_observation_space<E: EnvStructure + ?Sized>(env: &E) -> MetaObservationSpace<E> {
+/// Meta-environment observation type.
+pub type MetaObservation<O, A> = (Option<O>, Option<(A, f64)>, bool);
+
+fn meta_observation_space<E: EnvStructure + ?Sized>(
+    env: &E,
+) -> MetaObservationSpace<E::ObservationSpace, E::ActionSpace> {
     let (min_reward, max_reward) = env.reward_range();
     ProductSpace::new((
         OptionSpace::new(env.observation_space()),
@@ -141,7 +146,7 @@ impl<E> EnvStructure for MetaEnv<E>
 where
     E: EnvStructure,
 {
-    type ObservationSpace = MetaObservationSpace<E>;
+    type ObservationSpace = MetaObservationSpace<E::ObservationSpace, E::ActionSpace>;
     type ActionSpace = E::ActionSpace;
 
     fn observation_space(&self) -> Self::ObservationSpace {
@@ -360,7 +365,7 @@ impl<E: EnvDistribution> StatefulMetaEnv<E> {
 }
 
 impl<E: EnvDistribution> EnvStructure for StatefulMetaEnv<E> {
-    type ObservationSpace = MetaObservationSpace<E>;
+    type ObservationSpace = MetaObservationSpace<E::ObservationSpace, E::ActionSpace>;
     type ActionSpace = E::ActionSpace;
 
     fn observation_space(&self) -> Self::ObservationSpace {
