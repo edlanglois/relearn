@@ -9,8 +9,8 @@ mod stateful;
 pub mod testing;
 
 pub use bandits::{
-    Bandit, BernoulliBandit, DeterministicBandit, FixedMeansBanditConfig, PriorMeansBanditConfig,
-    UniformBernoulliBandits,
+    Bandit, BernoulliBandit, DeterministicBandit, FixedMeansBanditConfig, OneHotBandits,
+    PriorMeansBanditConfig, UniformBernoulliBandits,
 };
 pub use builder::{BuildEnvError, EnvBuilder, EnvDistBuilder};
 pub use chain::Chain;

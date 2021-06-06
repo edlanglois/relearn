@@ -222,6 +222,59 @@ impl EnvDistribution for UniformBernoulliBandits {
     }
 }
 
+/// Distribution over deterministic bandits in which one arm has reward 1 and the rest have 0.
+///
+/// The arm with reward 1 is sampled from a uniform random distribution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct OneHotBandits {
+    /// Number of bandit arms.
+    pub num_arms: usize,
+}
+
+impl OneHotBandits {
+    pub const fn new(num_arms: usize) -> Self {
+        Self { num_arms }
+    }
+}
+
+impl Default for OneHotBandits {
+    fn default() -> Self {
+        Self { num_arms: 2 }
+    }
+}
+
+impl EnvStructure for OneHotBandits {
+    type ObservationSpace = SingletonSpace;
+    type ActionSpace = IndexSpace;
+
+    fn observation_space(&self) -> Self::ObservationSpace {
+        SingletonSpace::new()
+    }
+
+    fn action_space(&self) -> Self::ActionSpace {
+        IndexSpace::new(self.num_arms)
+    }
+
+    fn reward_range(&self) -> (f64, f64) {
+        (0.0, 1.0)
+    }
+
+    fn discount_factor(&self) -> f64 {
+        1.0
+    }
+}
+
+impl EnvDistribution for OneHotBandits {
+    type Environment = DeterministicBandit;
+
+    fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment {
+        let mut means = vec![0.0; self.num_arms];
+        let index = rng.gen_range(0..self.num_arms);
+        means[index] = 1.0;
+        DeterministicBandit::from_means(means).unwrap()
+    }
+}
+
 #[cfg(test)]
 mod bernoulli_bandit {
     use super::super::testing;
@@ -286,7 +339,7 @@ mod deterministic_bandit {
 }
 
 #[cfg(test)]
-mod uniform_determistic_bandit {
+mod uniform_determistic_bandits {
     use super::super::testing;
     use super::*;
     use rand::SeedableRng;
@@ -294,6 +347,21 @@ mod uniform_determistic_bandit {
     #[test]
     fn run_sample() {
         let env_dist = UniformBernoulliBandits::new(3);
+        let mut rng = StdRng::seed_from_u64(284);
+        let env = env_dist.sample_environment(&mut rng);
+        testing::run_stateless(env, 1000, 286);
+    }
+}
+
+#[cfg(test)]
+mod needle_haystack_bandits {
+    use super::super::testing;
+    use super::*;
+    use rand::SeedableRng;
+
+    #[test]
+    fn run_sample() {
+        let env_dist = OneHotBandits::new(3);
         let mut rng = StdRng::seed_from_u64(284);
         let env = env_dist.sample_environment(&mut rng);
         testing::run_stateless(env, 1000, 286);

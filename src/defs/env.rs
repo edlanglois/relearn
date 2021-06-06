@@ -2,8 +2,8 @@ use super::AgentDef;
 use crate::agents::{Agent, BuildAgentError};
 use crate::envs::{
     Bandit, Chain as ChainEnv, DistWithState, EnvBuilder, EnvWithState, FixedMeansBanditConfig,
-    MemoryGame as MemoryGameEnv, MetaEnvConfig, PriorMeansBanditConfig, StatefulEnvironment,
-    StatefulMetaEnv, UniformBernoulliBandits,
+    MemoryGame as MemoryGameEnv, MetaEnvConfig, OneHotBandits, PriorMeansBanditConfig,
+    StatefulEnvironment, StatefulMetaEnv, UniformBernoulliBandits,
 };
 use crate::error::RLError;
 use crate::logging::{Loggable, Logger};
@@ -25,6 +25,8 @@ pub enum EnvDef {
     Chain(ChainEnv),
     /// The Memory Game environment
     MemoryGame(MemoryGameEnv),
+    /// Meta needle-haystack bandits environment
+    MetaOneHotBandits(MetaEnvConfig<OneHotBandits>),
     /// Meta uniform bernoulli bandits environment
     MetaUniformBernoulliBandits(MetaEnvConfig<UniformBernoulliBandits>),
 }
@@ -87,6 +89,11 @@ impl EnvDef {
             MemoryGame(config) => {
                 let env: EnvWithState<MemoryGameEnv> = config.build_env(env_seed)?;
                 finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
+            }
+            MetaOneHotBandits(config) => {
+                let env: StatefulMetaEnv<DistWithState<OneHotBandits>> =
+                    config.build_env(env_seed)?;
+                any_any_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
             }
             MetaUniformBernoulliBandits(config) => {
                 let env: StatefulMetaEnv<DistWithState<UniformBernoulliBandits>> =

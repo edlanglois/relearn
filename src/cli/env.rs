@@ -2,8 +2,8 @@
 use super::{Options, Update, WithUpdate};
 use crate::defs::{env::DistributionType, EnvDef};
 use crate::envs::{
-    Chain, FixedMeansBanditConfig, MemoryGame, MetaEnvConfig, PriorMeansBanditConfig,
-    UniformBernoulliBandits,
+    Chain, FixedMeansBanditConfig, MemoryGame, MetaEnvConfig, OneHotBandits,
+    PriorMeansBanditConfig, UniformBernoulliBandits,
 };
 use clap::Clap;
 use rand::distributions::Standard;
@@ -16,6 +16,7 @@ pub enum EnvType {
     BernoulliBandit,
     Chain,
     MemoryGame,
+    MetaOneHotBandits,
     MetaUniformBernoulliBandits,
 }
 
@@ -33,6 +34,7 @@ impl From<&Options> for EnvDef {
             BernoulliBandit => bandit_env_def(DistributionType::Bernoulli, opts),
             Chain => Self::Chain(opts.into()),
             MemoryGame => Self::MemoryGame(opts.into()),
+            MetaOneHotBandits => Self::MetaOneHotBandits(opts.into()),
             MetaUniformBernoulliBandits => Self::MetaUniformBernoulliBandits(opts.into()),
         }
     }
@@ -135,6 +137,20 @@ impl From<&Options> for UniformBernoulliBandits {
 }
 
 impl Update<&Options> for UniformBernoulliBandits {
+    fn update(&mut self, opts: &Options) {
+        if let Some(num_actions) = opts.num_actions {
+            self.num_arms = num_actions.try_into().unwrap();
+        }
+    }
+}
+
+impl From<&Options> for OneHotBandits {
+    fn from(opts: &Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for OneHotBandits {
     fn update(&mut self, opts: &Options) {
         if let Some(num_actions) = opts.num_actions {
             self.num_arms = num_actions.try_into().unwrap();
