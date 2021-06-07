@@ -4,6 +4,7 @@
 
 mod bandits;
 mod builder;
+mod meta;
 mod random;
 mod tabular;
 #[cfg(test)]
@@ -13,6 +14,7 @@ pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
 pub use builder::{AgentBuilder, BuildAgentError};
+pub use meta::ResettingMetaAgent;
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
