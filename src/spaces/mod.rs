@@ -1,4 +1,8 @@
 //! Spaces: runtime-defined types
+//!
+//! # `PartialOrd` for Spaces
+//! Spaces have a partial order such that for two spaces of the same type,
+//! `a < b` means that `a` is a strict subset of `b`.
 mod boolean;
 mod categorical;
 mod index;

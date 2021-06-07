@@ -12,7 +12,7 @@ use std::fmt;
 use tch::{Device, Kind, Tensor};
 
 /// A space containing a single element.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SingletonSpace;
 
 impl SingletonSpace {
@@ -167,6 +167,31 @@ mod space {
     fn contains_samples() {
         let space = SingletonSpace::new();
         testing::check_contains_samples(&space, 10);
+    }
+}
+
+#[cfg(test)]
+mod partial_ord {
+    use super::*;
+    use std::cmp::Ordering;
+
+    #[test]
+    fn eq() {
+        assert_eq!(SingletonSpace::new(), SingletonSpace::new());
+    }
+
+    #[test]
+    fn cmp_equal() {
+        assert_eq!(
+            SingletonSpace::new().cmp(&SingletonSpace::new()),
+            Ordering::Equal
+        );
+    }
+
+    #[test]
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    fn not_less() {
+        assert!(!(SingletonSpace::new() < SingletonSpace::new()));
     }
 }
 

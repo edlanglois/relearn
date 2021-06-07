@@ -12,7 +12,7 @@ use std::fmt;
 /// Wrapper space with a feature vector length of at least 1.
 ///
 /// Any generated features have value `0`.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NonEmptyFeatures<S> {
     inner: S,
 }

@@ -7,6 +7,7 @@ use crate::logging::Loggable;
 use crate::utils::array::BasicArray;
 use rand::distributions::Distribution;
 use rand::Rng;
+use std::cmp::Ordering;
 use std::fmt;
 use tch::{Device, Kind, Tensor};
 
@@ -31,6 +32,18 @@ impl Space for BooleanSpace {
 
     fn contains(&self, _value: &Self::Element) -> bool {
         true
+    }
+}
+
+impl PartialOrd for BooleanSpace {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for BooleanSpace {
+    fn cmp(&self, _other: &Self) -> Ordering {
+        Ordering::Equal
     }
 }
 
@@ -156,6 +169,30 @@ mod space {
     fn contains_samples() {
         let space = BooleanSpace::new();
         testing::check_contains_samples(&space, 10);
+    }
+}
+
+#[cfg(test)]
+mod partial_ord {
+    use super::*;
+
+    #[test]
+    fn eq() {
+        assert_eq!(BooleanSpace::new(), BooleanSpace::new());
+    }
+
+    #[test]
+    fn cmp_equal() {
+        assert_eq!(
+            BooleanSpace::new().cmp(&BooleanSpace::new()),
+            Ordering::Equal
+        );
+    }
+
+    #[test]
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    fn not_less() {
+        assert!(!(BooleanSpace::new() < BooleanSpace::new()));
     }
 }
 

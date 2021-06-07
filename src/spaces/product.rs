@@ -10,6 +10,7 @@ use impl_trait_for_tuples::impl_for_tuples;
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::array::IntoIter;
+use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::fmt;
 use std::marker::PhantomData;
@@ -39,6 +40,12 @@ impl<T: SpaceForTuples> Space for ProductSpace<T> {
 
     fn contains(&self, value: &Self::Element) -> bool {
         self.inner_spaces.contains(value)
+    }
+}
+
+impl<T: PartialOrdForTuples + PartialEq> PartialOrd for ProductSpace<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.inner_spaces.partial_cmp(&other.inner_spaces)
     }
 }
 
@@ -157,6 +164,11 @@ pub trait SpaceForTuples {
     fn contains(&self, value: &Self::Element) -> bool;
 }
 
+/// Private. Use [`PartialOrd`] instead.
+pub trait PartialOrdForTuples {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering>;
+}
+
 /// Private. Use [`FiniteSpace`] instead.
 pub trait FiniteSpaceForTuples: SpaceForTuples {
     fn size(&self) -> usize;
@@ -216,6 +228,38 @@ impl SpaceForTuples for Tuple {
 
     fn contains(&self, value: &Self::Element) -> bool {
         for_tuples!( #( self.Tuple.contains(&value.Tuple) )&* )
+    }
+}
+
+#[impl_for_tuples(0, 12)]
+#[tuple_types_custom_trait_bound(PartialOrd)]
+impl PartialOrdForTuples for Tuple {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // PartialOrd for factored data
+        //
+        // * `Equal` if all factors are `Equal`.
+        // * `Less` if all factors are `Equal` or `Less`, and at least one is `Less`.
+        // * `Greater` if all factors are `Equal` or `Greater` and at least one is `Greater`.
+        let mut state = Ordering::Equal;
+        for_tuples!( #(
+            match self.Tuple.partial_cmp(&other.Tuple) {
+                None => {return None}
+                Some(Ordering::Equal) => {}
+                Some(Ordering::Less) => {
+                    if state == Ordering::Greater {
+                        return None;
+                    }
+                    state = Ordering::Less;
+                }
+                Some(Ordering::Greater) => {
+                    if state == Ordering::Less {
+                        return None
+                    }
+                    state = Ordering::Greater;
+                }
+            }
+        )* );
+        Some(state)
     }
 }
 
@@ -426,6 +470,73 @@ mod space {
     fn mixed_not_contains_invalid() {
         let space = ProductSpace::new((IndexSpace::new(3), SingletonSpace::new()));
         assert!(!space.contains(&(4, ())));
+    }
+}
+
+#[cfg(test)]
+mod partial_ord {
+    use super::super::IntervalSpace;
+    use super::*;
+
+    #[test]
+    fn empty_eq() {
+        assert_eq!(ProductSpace::new(()), ProductSpace::new(()));
+    }
+
+    #[test]
+    fn empty_partial_cmp_equal() {
+        assert_eq!(
+            ProductSpace::new(()).partial_cmp(&ProductSpace::new(())),
+            Some(Ordering::Equal)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::eq_op)]
+    fn same_interval_eq() {
+        let s = ProductSpace::new((IntervalSpace::new(0.0, 1.0), IntervalSpace::new(2.0, 3.0)));
+        assert_eq!(s, s);
+    }
+
+    #[test]
+    fn same_interval_cmp_equal() {
+        let s = ProductSpace::new((IntervalSpace::new(0.0, 1.0), IntervalSpace::new(2.0, 3.0)));
+        assert_eq!(s.partial_cmp(&s), Some(Ordering::Equal));
+    }
+
+    #[test]
+    fn different_interval_ne() {
+        let a = ProductSpace::new((IntervalSpace::new(0.0, 1.0), IntervalSpace::new(2.0, 3.0)));
+        let b = ProductSpace::new((IntervalSpace::new(0.0, 1.0), IntervalSpace::new(0.0, 1.0)));
+        assert!(a != b);
+    }
+
+    #[test]
+    fn subset_interval_lt() {
+        let a = ProductSpace::new((IntervalSpace::new(0.2, 0.8), IntervalSpace::new(2.2, 2.8)));
+        let b = ProductSpace::new((IntervalSpace::new(0.0, 1.0), IntervalSpace::new(2.0, 3.0)));
+        assert!(a < b);
+    }
+
+    #[test]
+    fn partial_subset_interval_lt() {
+        let a = ProductSpace::new((IntervalSpace::new(0.2, 0.8), IntervalSpace::new(2.0, 3.0)));
+        let b = ProductSpace::new((IntervalSpace::new(0.0, 1.0), IntervalSpace::new(2.0, 3.0)));
+        assert!(a < b);
+    }
+
+    #[test]
+    fn superset_interval_lt() {
+        let a = ProductSpace::new((IntervalSpace::new(-0.2, 1.2), IntervalSpace::new(1.8, 3.2)));
+        let b = ProductSpace::new((IntervalSpace::new(0.0, 1.0), IntervalSpace::new(2.0, 3.0)));
+        assert!(a > b);
+    }
+
+    #[test]
+    fn mixed_subset_superset_incomparable() {
+        let a = ProductSpace::new((IntervalSpace::new(0.2, 0.8), IntervalSpace::new(1.8, 3.2)));
+        let b = ProductSpace::new((IntervalSpace::new(0.0, 1.0), IntervalSpace::new(2.0, 3.0)));
+        assert!(a.partial_cmp(&b).is_none());
     }
 }
 

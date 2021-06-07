@@ -3,7 +3,9 @@ use super::{CategoricalSpace, FiniteSpace, Space};
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::any;
+use std::cmp::Ordering;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
 /// An indexed set of finitely many possiblities.
@@ -21,7 +23,7 @@ pub trait Indexed {
 }
 
 /// A space defined over an indexed type.
-#[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Copy)]
 pub struct IndexedTypeSpace<T: Indexed> {
     element_type: PhantomData<T>,
 }
@@ -52,6 +54,30 @@ impl<T: Indexed> Space for IndexedTypeSpace<T> {
     fn contains(&self, _element: &Self::Element) -> bool {
         true
     }
+}
+
+impl<T: Indexed> PartialEq for IndexedTypeSpace<T> {
+    fn eq(&self, _other: &Self) -> bool {
+        true // There is only one kind of IndexedTypeSpace<T>
+    }
+}
+
+impl<T: Indexed> Eq for IndexedTypeSpace<T> {}
+
+impl<T: Indexed> PartialOrd for IndexedTypeSpace<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T: Indexed> Ord for IndexedTypeSpace<T> {
+    fn cmp(&self, _other: &Self) -> Ordering {
+        Ordering::Equal
+    }
+}
+
+impl<T: Indexed> Hash for IndexedTypeSpace<T> {
+    fn hash<H: Hasher>(&self, _state: &mut H) {}
 }
 
 // Subspaces
@@ -182,6 +208,41 @@ mod space {
     #[test]
     fn from_index_invalid_enum() {
         check_from_index_invalid::<TestEnum>();
+    }
+}
+
+#[cfg(test)]
+mod partial_ord {
+    use super::*;
+    use rust_rl_derive::Indexed;
+
+    #[derive(Debug, Indexed)]
+    enum TestEnum {
+        A,
+        B,
+        C,
+    }
+
+    #[test]
+    fn eq() {
+        assert_eq!(
+            IndexedTypeSpace::<TestEnum>::new(),
+            IndexedTypeSpace::<TestEnum>::new()
+        );
+    }
+
+    #[test]
+    fn cmp_equal() {
+        assert_eq!(
+            IndexedTypeSpace::<TestEnum>::new().cmp(&IndexedTypeSpace::<TestEnum>::new()),
+            Ordering::Equal
+        );
+    }
+
+    #[test]
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    fn not_less() {
+        assert!(!(IndexedTypeSpace::<TestEnum>::new() < IndexedTypeSpace::<TestEnum>::new()));
     }
 }
 

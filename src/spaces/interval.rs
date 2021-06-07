@@ -9,6 +9,7 @@ use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
 use rand_distr::{Gamma, StandardNormal};
+use std::cmp::Ordering;
 use std::{fmt, slice};
 use tch::Tensor;
 
@@ -47,6 +48,20 @@ impl<T: Float + PartialOrd> Space for IntervalSpace<T> {
 
     fn contains(&self, value: &Self::Element) -> bool {
         &self.low <= value && value <= &self.high && value.is_finite()
+    }
+}
+
+impl<T: PartialOrd> PartialOrd for IntervalSpace<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.low == other.low && self.high == other.high {
+            Some(Ordering::Equal)
+        } else if self.low >= other.low && self.high <= other.high {
+            Some(Ordering::Less)
+        } else if self.low <= other.low && self.high >= other.high {
+            Some(Ordering::Greater)
+        } else {
+            None
+        }
     }
 }
 
@@ -271,6 +286,60 @@ mod space {
     #[should_panic]
     fn empty_interval_panics() {
         let _ = IntervalSpace::new(1.0, 0.0);
+    }
+}
+
+#[cfg(test)]
+mod partial_ord {
+    use super::*;
+
+    #[test]
+    fn same_eq() {
+        assert_eq!(IntervalSpace::new(0.0, 1.0), IntervalSpace::new(0.0, 1.0));
+    }
+
+    #[test]
+    fn same_cmp_equal() {
+        assert_eq!(
+            IntervalSpace::new(0.0, 1.0).partial_cmp(&IntervalSpace::new(0.0, 1.0)),
+            Some(Ordering::Equal)
+        );
+    }
+
+    #[test]
+    fn different_ne() {
+        assert!(IntervalSpace::new(0.0, 1.0) != IntervalSpace::new(0.5, 1.0));
+    }
+
+    #[test]
+    fn subset_lt() {
+        assert!(IntervalSpace::new(0.0, 1.0) < IntervalSpace::new(-1.0, 1.0));
+    }
+
+    #[test]
+    fn same_le() {
+        assert!(IntervalSpace::new(0.0, 1.0) <= IntervalSpace::new(0.0, 1.0));
+    }
+
+    #[test]
+    fn superset_lt() {
+        assert!(IntervalSpace::new(0.0, 1.0) > IntervalSpace::new(0.2, 0.8));
+    }
+
+    #[test]
+    fn disjoint_incomparable() {
+        assert_eq!(
+            IntervalSpace::new(0.0, 1.0).partial_cmp(&IntervalSpace::new(2.0, 3.0)),
+            None
+        );
+    }
+
+    #[test]
+    fn intersecting_incomparable() {
+        assert_eq!(
+            IntervalSpace::new(0.0, 2.0).partial_cmp(&IntervalSpace::new(1.0, 3.0)),
+            None
+        );
     }
 }
 

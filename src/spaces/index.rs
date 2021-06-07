@@ -2,6 +2,7 @@
 use super::{CategoricalSpace, FiniteSpace, Space};
 use rand::distributions::Distribution;
 use rand::Rng;
+use std::cmp::Ordering;
 use std::fmt;
 
 /// An index space; integers `0 .. size-1`
@@ -27,6 +28,18 @@ impl Space for IndexSpace {
 
     fn contains(&self, value: &Self::Element) -> bool {
         value < &self.size
+    }
+}
+
+impl PartialOrd for IndexSpace {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for IndexSpace {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.size.cmp(&other.size)
     }
 }
 
@@ -83,6 +96,42 @@ mod space {
     fn contains_samples(#[values(1, 5)] size: usize) {
         let space = IndexSpace::new(size);
         testing::check_contains_samples(&space, 100);
+    }
+}
+
+#[cfg(test)]
+mod partial_ord {
+    use super::*;
+
+    #[test]
+    fn same_eq() {
+        assert_eq!(IndexSpace::new(2), IndexSpace::new(2));
+    }
+
+    #[test]
+    fn same_cmp_equal() {
+        assert_eq!(IndexSpace::new(2).cmp(&IndexSpace::new(2)), Ordering::Equal);
+    }
+
+    #[test]
+    fn different_not_eq() {
+        assert!(IndexSpace::new(2) != IndexSpace::new(1));
+    }
+
+    #[test]
+    fn same_le() {
+        assert!(IndexSpace::new(2) <= IndexSpace::new(2));
+    }
+
+    #[test]
+    fn smaller_lt() {
+        assert!(IndexSpace::new(1) < IndexSpace::new(2));
+    }
+
+    #[test]
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    fn larger_not_lt() {
+        assert!(!(IndexSpace::new(3) < IndexSpace::new(1)));
     }
 }
 
