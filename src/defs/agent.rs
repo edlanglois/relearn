@@ -28,6 +28,7 @@ pub enum AgentDef {
     PolicyGradient(
         Box<PolicyGradientAgentConfig<SeqModDef, OptimizerDef, StepValueDef, OptimizerDef>>,
     ),
+    /// Trust region policy optimizer
     Trpo(
         Box<
             TrpoAgentConfig<
