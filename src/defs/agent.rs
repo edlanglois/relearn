@@ -91,9 +91,11 @@ impl AgentDef {
                 .build_agent(env, seed)
                 .map(|a| Box::new(a) as _),
             PolicyGradient(config) => config
+                .as_ref()
                 .build_agent(env, seed)
                 .map(|a: PolicyGradientBoxedAgent<_, _>| Box::new(a) as _),
             Trpo(config) => config
+                .as_ref()
                 .build_agent(env, seed)
                 .map(|a: TrpoBoxedAgent<_, _>| Box::new(a) as _),
             _ => Err(BuildAgentError::InvalidSpaceBounds),
