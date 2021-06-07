@@ -24,11 +24,11 @@ pub trait Indexed {
 
 /// A space defined over an indexed type.
 #[derive(Default, Clone, Copy)]
-pub struct IndexedTypeSpace<T: Indexed> {
+pub struct IndexedTypeSpace<T> {
     element_type: PhantomData<T>,
 }
 
-impl<T: Indexed> IndexedTypeSpace<T> {
+impl<T> IndexedTypeSpace<T> {
     pub fn new() -> Self {
         Self {
             element_type: PhantomData,
@@ -36,19 +36,19 @@ impl<T: Indexed> IndexedTypeSpace<T> {
     }
 }
 
-impl<T: Indexed> fmt::Debug for IndexedTypeSpace<T> {
+impl<T> fmt::Debug for IndexedTypeSpace<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "IndexedTypeSpace<{}>", any::type_name::<T>())
     }
 }
 
-impl<T: Indexed> fmt::Display for IndexedTypeSpace<T> {
+impl<T> fmt::Display for IndexedTypeSpace<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "IndexedTypeSpace<{}>", any::type_name::<T>())
     }
 }
 
-impl<T: Indexed> Space for IndexedTypeSpace<T> {
+impl<T> Space for IndexedTypeSpace<T> {
     type Element = T;
 
     fn contains(&self, _element: &Self::Element) -> bool {
@@ -56,27 +56,27 @@ impl<T: Indexed> Space for IndexedTypeSpace<T> {
     }
 }
 
-impl<T: Indexed> PartialEq for IndexedTypeSpace<T> {
+impl<T> PartialEq for IndexedTypeSpace<T> {
     fn eq(&self, _other: &Self) -> bool {
         true // There is only one kind of IndexedTypeSpace<T>
     }
 }
 
-impl<T: Indexed> Eq for IndexedTypeSpace<T> {}
+impl<T> Eq for IndexedTypeSpace<T> {}
 
-impl<T: Indexed> PartialOrd for IndexedTypeSpace<T> {
+impl<T> PartialOrd for IndexedTypeSpace<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<T: Indexed> Ord for IndexedTypeSpace<T> {
+impl<T> Ord for IndexedTypeSpace<T> {
     fn cmp(&self, _other: &Self) -> Ordering {
         Ordering::Equal
     }
 }
 
-impl<T: Indexed> Hash for IndexedTypeSpace<T> {
+impl<T> Hash for IndexedTypeSpace<T> {
     fn hash<H: Hasher>(&self, _state: &mut H) {}
 }
 
