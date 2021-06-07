@@ -14,7 +14,7 @@ pub trait SimulationHook<O, A, L: Logger + ?Sized> {
     /// * `logger` - A logger.
     ///
     /// # Returns
-    /// Whether the simulation should continue or stop after this step.
+    /// Whether the simulation should continue after this step.
     fn call(&mut self, step: &Step<O, A>, logger: &mut L) -> bool;
 }
 
@@ -27,7 +27,7 @@ pub trait GenericSimulationHook {
     /// * `logger` - A logger.
     ///
     /// # Returns
-    /// Whether the simulation should continue or stop after this step.
+    /// Whether the simulation should continue after this step.
     fn call<O, A, L: Logger + ?Sized>(&mut self, step: &Step<O, A>, logger: &mut L) -> bool;
 }
 
@@ -223,6 +223,48 @@ impl<O, AS: FiniteSpace, L: Logger + ?Sized> SimulationHook<O, AS::Element, L>
 {
     fn call(&mut self, step: &Step<O, AS::Element>, _: &mut L) -> bool {
         self.counts[self.action_space.to_index(&step.action)] += 1;
+        true
+    }
+}
+
+/// Collect reward statistics.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct RewardStatistics {
+    /// Total reward for completed episodes
+    total_episode_reward: f64,
+    /// Reward for the current incomplete episode
+    partial_reward: f64,
+    /// Number of completed steps
+    num_steps: u64,
+    /// Number of completed episodes
+    num_episodes: u64,
+}
+
+impl RewardStatistics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Mean reward per step.
+    pub fn mean_step_reward(&self) -> f64 {
+        (self.total_episode_reward + self.partial_reward) / (self.num_steps as f64)
+    }
+
+    /// Mean reward per episode.
+    pub fn mean_episode_reward(&self) -> f64 {
+        self.total_episode_reward / (self.num_episodes as f64)
+    }
+}
+
+impl GenericSimulationHook for RewardStatistics {
+    fn call<O, A, L: Logger + ?Sized>(&mut self, step: &Step<O, A>, _logger: &mut L) -> bool {
+        self.partial_reward += step.reward;
+        self.num_steps += 1;
+        if step.episode_done {
+            self.total_episode_reward += self.partial_reward;
+            self.partial_reward = 0.0;
+            self.num_episodes += 1;
+        }
         true
     }
 }
