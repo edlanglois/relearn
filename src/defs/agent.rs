@@ -50,9 +50,7 @@ pub type DynEnvAgent<E> = dyn Agent<
 >;
 
 impl AgentDef {
-    /// Construct an agent for the given environment structure.
-    ///
-    /// The observation and action spaces must both be finite.
+    /// Construct an agent for an environment with finite observation and action spaces.
     pub fn build_finite_finite<E>(
         &self,
         env: &E,
@@ -72,7 +70,7 @@ impl AgentDef {
         }
     }
 
-    /// Construct an agent for the given environment structure and generic spaces.
+    /// Construct an agent for an environment with arbitrary observation and action spaces.
     ///
     /// There is no trait specialization so this will fail if the agent cannot be built for
     /// arbitrary spaces, even if it can for the specific instance this function is called with.
