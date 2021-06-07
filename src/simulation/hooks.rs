@@ -2,6 +2,7 @@
 use crate::agents::Step;
 use crate::logging::{Event, Loggable, Logger};
 use crate::spaces::{ElementRefInto, FiniteSpace};
+use impl_trait_for_tuples::impl_for_tuples;
 
 /// A simulation hook.
 ///
@@ -183,23 +184,21 @@ where
 // TODO: Generate for other tuple sizes with a macro
 // Consider impl_trait_for_tuples crate
 
+// For a tuple of hooks, continue if all allow continuing.
+
 impl GenericSimulationHook for () {
     fn call<O, A, L: Logger + ?Sized>(&mut self, _: &Step<O, A>, _: &mut L) -> bool {
         true
     }
 }
 
-/// For a pair of hooks, continue if either allow continuing.
-impl<O, A, L, T0, T1> SimulationHook<O, A, L> for (T0, T1)
+#[impl_for_tuples(1, 12)]
+impl<O, A, L> SimulationHook<O, A, L> for Tuple
 where
     L: Logger + ?Sized,
-    T0: SimulationHook<O, A, L>,
-    T1: SimulationHook<O, A, L>,
 {
     fn call(&mut self, step: &Step<O, A>, logger: &mut L) -> bool {
-        let result_0 = self.0.call(step, logger);
-        let result_1 = self.1.call(step, logger);
-        result_0 && result_1
+        for_tuples!( #( self.Tuple.call(step, logger) )&* )
     }
 }
 
