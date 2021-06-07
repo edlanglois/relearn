@@ -351,6 +351,12 @@ mod uniform_determistic_bandits {
         let env = env_dist.sample_environment(&mut rng);
         testing::run_stateless(env, 1000, 286);
     }
+
+    #[test]
+    fn subset_env_structure() {
+        let env_dist = UniformBernoulliBandits::new(3);
+        testing::check_env_distribution_structure(&env_dist, 2);
+    }
 }
 
 #[cfg(test)]
@@ -365,5 +371,11 @@ mod needle_haystack_bandits {
         let mut rng = StdRng::seed_from_u64(284);
         let env = env_dist.sample_environment(&mut rng);
         testing::run_stateless(env, 1000, 286);
+    }
+
+    #[test]
+    fn subset_env_structure() {
+        let env_dist = OneHotBandits::new(3);
+        testing::check_env_distribution_structure(&env_dist, 2);
     }
 }

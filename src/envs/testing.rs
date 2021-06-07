@@ -1,13 +1,13 @@
 //! Environment testing utilities
 use super::{
     DeterministicBandit, EnvDistribution, EnvStructure, Environment, IntoStateful,
-    StatefulEnvironment,
+    StatefulEnvironment, StoredEnvStructure,
 };
 use crate::agents::{RandomAgent, Step};
 use crate::simulation;
 use crate::simulation::hooks::{ClosureHook, StepLimit};
 use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space};
-use rand::rngs::StdRng;
+use rand::{rngs::StdRng, SeedableRng};
 use std::cell::Cell;
 use std::fmt::Debug;
 
@@ -64,6 +64,49 @@ where
             StepLimit::new(num_steps),
         ),
     );
+}
+
+/// Test that the [`EnvStructure`] of an [`EnvDistribution`] is a superset of its sampled envs.
+#[allow(clippy::float_cmp)] // discount factor should be exactly equal
+pub fn check_env_distribution_structure<D>(env_dist: &D, num_samples: usize)
+where
+    D: EnvDistribution + ?Sized,
+    <D as EnvStructure>::ObservationSpace: PartialOrd + Debug,
+    <D as EnvStructure>::ActionSpace: PartialOrd + Debug,
+{
+    let env_structure = StoredEnvStructure::from(env_dist);
+    let (dist_reward_min, dist_reward_max) = env_structure.reward_range;
+
+    let mut rng = StdRng::seed_from_u64(75);
+    for _ in 0..num_samples {
+        let env = env_dist.sample_environment(&mut rng);
+        assert!(
+            env.observation_space() <= env_structure.observation_space,
+            "{:?} </= {:?}",
+            env.observation_space(),
+            env_structure.observation_space,
+        );
+        assert!(
+            env.action_space() <= env_structure.action_space,
+            "{:?} </= {:?}",
+            env.action_space(),
+            env_structure.action_space,
+        );
+        let (env_reward_min, env_reward_max) = env.reward_range();
+        assert!(
+            dist_reward_min <= env_reward_min,
+            "{} </= {}",
+            dist_reward_min,
+            env_reward_min
+        );
+        assert!(
+            dist_reward_max >= env_reward_max,
+            "{} >/= {}",
+            dist_reward_max,
+            env_reward_max
+        );
+        assert_eq!(env.discount_factor(), env_structure.discount_factor);
+    }
 }
 
 /// Deterministic multi-armed bandit "distribution" with a different goal arm on each sample.
