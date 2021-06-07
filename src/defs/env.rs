@@ -1,5 +1,6 @@
+use super::agent::{ForAnyAny, ForFiniteFinite};
 use super::AgentDef;
-use crate::agents::{Agent, BuildAgentError};
+use crate::agents::{Agent, AgentBuilder};
 use crate::envs::{
     Bandit, Chain as ChainEnv, DistWithState, EnvBuilder, EnvWithState, FixedMeansBanditConfig,
     MemoryGame as MemoryGameEnv, MetaEnvConfig, OneHotBandits, PriorMeansBanditConfig,
@@ -10,7 +11,7 @@ use crate::logging::{Loggable, Logger};
 use crate::simulation::{
     hooks::StepLogger, GenericSimulationHook, Simulation, SimulationHook, Simulator,
 };
-use crate::spaces::{ElementRefInto, FiniteSpace, RLActionSpace, RLObservationSpace, Space};
+use crate::spaces::{ElementRefInto, Space};
 use crate::utils::distributions::{Bernoulli, Deterministic};
 use rand::distributions::Standard;
 
@@ -58,90 +59,64 @@ impl EnvDef {
         L: Logger + 'static,
         H: GenericSimulationHook + 'static,
     {
+        /// Construct a boxed agent-environment simulation
+        macro_rules! boxed_simulation {
+            ($env_type:ty, $env_config:expr, $agent_builder:ty) => {{
+                let env: Box<$env_type> = Box::new($env_config.build_env(env_seed)?);
+                // TODO: Box the agent too?
+                let agent = <$agent_builder>::new(agent_def).build_agent(&env, agent_seed)?;
+                logging_boxed_simulator(env, agent, logger, hook)
+            }};
+        }
+
         use EnvDef::*;
         Ok(match self {
             FixedMeanBandit(dist_type, config) => match dist_type {
                 DistributionType::Deterministic => {
-                    let env: EnvWithState<Bandit<Deterministic<f64>>> =
-                        config.build_env(env_seed)?;
-                    finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
+                    boxed_simulation!(
+                        EnvWithState<Bandit<Deterministic<f64>>>,
+                        config,
+                        ForFiniteFinite<_>
+                    )
                 }
                 DistributionType::Bernoulli => {
-                    let env: EnvWithState<Bandit<Bernoulli>> = config.build_env(env_seed)?;
-                    finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
+                    boxed_simulation!(EnvWithState<Bandit<Bernoulli>>, config, ForFiniteFinite<_>)
                 }
             },
             UniformMeanBandit(dist_type, config) => match dist_type {
                 DistributionType::Deterministic => {
-                    let env: EnvWithState<Bandit<Deterministic<f64>>> =
-                        config.build_env(env_seed)?;
-                    finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
+                    boxed_simulation!(
+                        EnvWithState<Bandit<Deterministic<f64>>>,
+                        config,
+                        ForFiniteFinite<_>
+                    )
                 }
                 DistributionType::Bernoulli => {
-                    let env: EnvWithState<Bandit<Bernoulli>> = config.build_env(env_seed)?;
-                    finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
+                    boxed_simulation!(EnvWithState<Bandit<Bernoulli>>, config, ForFiniteFinite<_>)
                 }
             },
             Chain(config) => {
-                let env: EnvWithState<ChainEnv> = config.build_env(env_seed)?;
-                finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
+                boxed_simulation!(EnvWithState<ChainEnv>, config, ForFiniteFinite<_>)
             }
             MemoryGame(config) => {
-                let env: EnvWithState<MemoryGameEnv> = config.build_env(env_seed)?;
-                finite_finite_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
+                boxed_simulation!(EnvWithState<MemoryGameEnv>, config, ForFiniteFinite<_>)
             }
             MetaOneHotBandits(config) => {
-                let env: StatefulMetaEnv<DistWithState<OneHotBandits>> =
-                    config.build_env(env_seed)?;
-                any_any_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
+                boxed_simulation!(
+                    StatefulMetaEnv<DistWithState<OneHotBandits>>,
+                    config,
+                    ForAnyAny<_>
+                )
             }
             MetaUniformBernoulliBandits(config) => {
-                let env: StatefulMetaEnv<DistWithState<UniformBernoulliBandits>> =
-                    config.build_env(env_seed)?;
-                any_any_simulator(Box::new(env), agent_def, logger, hook, agent_seed)?
+                boxed_simulation!(
+                    StatefulMetaEnv<DistWithState<UniformBernoulliBandits>>,
+                    config,
+                    ForAnyAny<_>
+                )
             }
         })
     }
-}
-
-/// Make a boxed simulator for an environment with a finite observation and action space.
-fn finite_finite_simulator<OS, AS, L, H>(
-    environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
-    agent_def: &AgentDef,
-    logger: L,
-    hook: H,
-    agent_seed: u64,
-) -> Result<Box<dyn Simulation>, BuildAgentError>
-where
-    OS: RLObservationSpace + FiniteSpace + 'static,
-    <OS as Space>::Element: Clone,
-    AS: RLActionSpace + FiniteSpace + 'static,
-    L: Logger + 'static,
-    H: SimulationHook<OS::Element, AS::Element, L> + 'static,
-{
-    let agent = agent_def.build_finite_finite(&environment, agent_seed)?;
-    Ok(logging_boxed_simulator(environment, agent, logger, hook))
-}
-
-/// Make a boxed simulator for an environment with any observation and action space.
-///
-/// Fails if the agent requires a more specialized bound on the observation or action spaces.
-fn any_any_simulator<OS, AS, L, H>(
-    environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
-    agent_def: &AgentDef,
-    logger: L,
-    hook: H,
-    agent_seed: u64,
-) -> Result<Box<dyn Simulation>, BuildAgentError>
-where
-    OS: RLObservationSpace + 'static,
-    <OS as Space>::Element: Clone,
-    AS: RLActionSpace + 'static,
-    L: Logger + 'static,
-    H: SimulationHook<OS::Element, AS::Element, L> + 'static,
-{
-    let agent = agent_def.build_any_any(&environment, agent_seed)?;
-    Ok(logging_boxed_simulator(environment, agent, logger, hook))
 }
 
 /// Make a boxed simulator with an extra logging hook.

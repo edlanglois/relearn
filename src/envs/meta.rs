@@ -150,7 +150,7 @@ fn meta_observation_space<E: EnvStructure + ?Sized>(
 pub struct InnerEnvStructure<T, U>(U, PhantomData<T>);
 
 impl<T, U> InnerEnvStructure<T, U> {
-    pub fn new(inner_env: U) -> Self {
+    pub const fn new(inner_env: U) -> Self {
         Self(inner_env, PhantomData)
     }
 }
