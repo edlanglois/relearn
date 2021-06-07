@@ -117,6 +117,12 @@ where
     }
 }
 
+impl<D> From<D> for DistWithState<D> {
+    fn from(env_dist: D) -> Self {
+        Self::new(env_dist)
+    }
+}
+
 /// Supports conversion to a stateful environment
 pub trait WithState {
     type Output;
