@@ -17,18 +17,20 @@ use tch::Tensor;
 
 /// A Cartesian product of spaces.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ProductSpace<T>(T);
+pub struct ProductSpace<T> {
+    pub inner_spaces: T,
+}
 
 impl<T> ProductSpace<T> {
     /// Initialize from a tuple of spaces.
-    pub const fn new(spaces: T) -> Self {
-        Self(spaces)
+    pub const fn new(inner_spaces: T) -> Self {
+        Self { inner_spaces }
     }
 }
 
 impl<T: DisplayForTuple> fmt::Display for ProductSpace<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.fmt(f)
+        self.inner_spaces.fmt(f)
     }
 }
 
@@ -36,31 +38,31 @@ impl<T: SpaceForTuples> Space for ProductSpace<T> {
     type Element = <T as SpaceForTuples>::Element;
 
     fn contains(&self, value: &Self::Element) -> bool {
-        self.0.contains(value)
+        self.inner_spaces.contains(value)
     }
 }
 
 impl<T: FiniteSpaceForTuples> FiniteSpace for ProductSpace<T> {
     fn size(&self) -> usize {
-        self.0.size()
+        self.inner_spaces.size()
     }
 
     fn to_index(&self, element: &Self::Element) -> usize {
-        self.0.to_index(element)
+        self.inner_spaces.to_index(element)
     }
 
     fn from_index(&self, index: usize) -> Option<Self::Element> {
-        self.0.from_index(index)
+        self.inner_spaces.from_index(index)
     }
 
     fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
-        self.0.from_index_unchecked(index)
+        self.inner_spaces.from_index_unchecked(index)
     }
 }
 
 impl<T: BaseFeatureSpaceForTuples> BaseFeatureSpace for ProductSpace<T> {
     fn num_features(&self) -> usize {
-        self.0.num_features()
+        self.inner_spaces.num_features()
     }
 }
 
@@ -81,7 +83,7 @@ where
     T: FeatureSpaceOutForTuples<U>,
 {
     fn features_out(&self, element: &Self::Element, out: &mut U, zeroed: bool) {
-        self.0.features_out(element, out, zeroed);
+        self.inner_spaces.features_out(element, out, zeroed);
     }
 }
 
@@ -112,7 +114,7 @@ where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a,
     {
-        self.0
+        self.inner_spaces
             .batch_features_out(elements, out, zeroed, PhantomData);
     }
 }
@@ -122,7 +124,7 @@ where
     T: SpaceForTuples + SampleSpaceForTuples,
 {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
-        self.0.sample(rng)
+        self.inner_spaces.sample(rng)
     }
 }
 
