@@ -29,7 +29,7 @@ pub struct IndexedTypeSpace<T> {
 }
 
 impl<T> IndexedTypeSpace<T> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             element_type: PhantomData,
         }
