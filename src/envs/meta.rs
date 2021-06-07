@@ -455,7 +455,7 @@ mod meta_env_bandits {
     #[test]
     fn stateful_run() {
         let mut env = StatefulMetaEnv::new(
-            testing::RoundRobinDeterministicBandits::new(2).with_state(),
+            testing::RoundRobinDeterministicBandits::new(2).into_stateful(),
             3,
             0,
         );
@@ -532,7 +532,7 @@ mod meta_env_bandits {
     #[test]
     fn stateful_expected_steps() {
         let mut env = StatefulMetaEnv::new(
-            testing::RoundRobinDeterministicBandits::new(2).with_state(),
+            testing::RoundRobinDeterministicBandits::new(2).into_stateful(),
             3,
             0,
         );

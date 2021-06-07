@@ -1,5 +1,5 @@
 //! Agent testing utilities
-use crate::envs::{DeterministicBandit, EnvWithState, WithState};
+use crate::envs::{DeterministicBandit, EnvWithState, IntoStateful};
 use crate::simulation;
 use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 use crate::{Actor, Agent, EnvStructure};
@@ -14,7 +14,7 @@ where
     A: Agent<(), usize> + Actor<(), usize>,
     F: FnOnce(&EnvWithState<DeterministicBandit>) -> A,
 {
-    let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).with_state(0);
+    let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).into_stateful(0);
     let mut agent = make_agent(&env);
 
     // Training

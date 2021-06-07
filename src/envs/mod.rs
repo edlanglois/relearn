@@ -18,7 +18,7 @@ pub use memory::MemoryGame;
 pub use meta::{
     MetaEnv, MetaEnvConfig, MetaEnvState, MetaObservation, MetaObservationSpace, StatefulMetaEnv,
 };
-pub use stateful::{DistWithState, EnvWithState, WithState};
+pub use stateful::{DistWithState, EnvWithState, IntoStateful};
 
 use crate::spaces::Space;
 use rand::rngs::StdRng;
@@ -247,7 +247,8 @@ pub trait EnvDistribution: EnvStructure {
     ///           seeding any internal randomness of the environment dynamics.
     fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment;
 
-    fn with_state(self) -> DistWithState<Self>
+    /// Convert a distribution of stateless envs. to a distribution of stateful envs.
+    fn into_stateful(self) -> DistWithState<Self>
     where
         Self: Sized,
         Self::Environment: Environment,

@@ -113,7 +113,7 @@ where
 
     fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment {
         let seed = rng.gen();
-        self.0.sample_environment(rng).with_state(seed)
+        self.0.sample_environment(rng).into_stateful(seed)
     }
 }
 
@@ -124,17 +124,17 @@ impl<D> From<D> for DistWithState<D> {
 }
 
 /// Supports conversion to a stateful environment
-pub trait WithState {
+pub trait IntoStateful {
     type Output;
 
     /// Convert into a stateful environment.
-    fn with_state(self, seed: u64) -> Self::Output;
+    fn into_stateful(self, seed: u64) -> Self::Output;
 }
 
-impl<E: Environment> WithState for E {
+impl<E: Environment> IntoStateful for E {
     type Output = EnvWithState<Self>;
 
-    fn with_state(self, seed: u64) -> Self::Output {
+    fn into_stateful(self, seed: u64) -> Self::Output {
         Self::Output::new(self, seed)
     }
 }
@@ -147,6 +147,6 @@ impl<E: Environment, B: EnvBuilder<E>> EnvBuilder<EnvWithState<E>> for B {
         // Add an arbitrary offset for the dynamics seed.
         // Want to avoid collissions with other seed derivations.
         let dynamics_seed = seed.wrapping_add(135);
-        Ok(self.build_env(structure_seed)?.with_state(dynamics_seed))
+        Ok(self.build_env(structure_seed)?.into_stateful(dynamics_seed))
     }
 }

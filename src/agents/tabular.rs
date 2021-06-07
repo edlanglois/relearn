@@ -163,7 +163,7 @@ where
 mod tabular_q_learning {
     use super::super::testing;
     use super::*;
-    use crate::envs::{DeterministicBandit, WithState};
+    use crate::envs::{DeterministicBandit, IntoStateful};
     use crate::simulation;
     use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 
@@ -179,7 +179,7 @@ mod tabular_q_learning {
 
     #[test]
     fn explore_exploit() {
-        let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).with_state(0);
+        let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).into_stateful(0);
 
         // The agent explores
         let config = TabularQLearningAgentConfig::new(0.95);

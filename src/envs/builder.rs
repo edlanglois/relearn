@@ -52,7 +52,7 @@ where
     <Self as EnvDistribution>::Environment: Environment,
 {
     fn build_env_dist(&self) -> DistWithState<Self> {
-        self.clone().with_state()
+        self.clone().into_stateful()
     }
 }
 
