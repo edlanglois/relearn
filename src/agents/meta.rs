@@ -1,6 +1,8 @@
 //! Meta agents
 use super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use crate::envs::{EnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure};
+use crate::envs::{
+    EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
+};
 use crate::logging::Logger;
 use crate::spaces::{SampleSpace, Space};
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -18,12 +20,7 @@ where
         env: &E,
         seed: u64,
     ) -> Result<ResettingMetaAgent<Self, A, OS, AS>, BuildAgentError> {
-        let inner_env_structure = StoredEnvStructure {
-            observation_space: env.observation_space().inner_spaces.0.inner,
-            action_space: env.action_space(),
-            reward_range: env.reward_range(),
-            discount_factor: env.discount_factor(),
-        };
+        let inner_env_structure = StoredEnvStructure::from(&InnerEnvStructure::<E, &E>::new(env));
         Ok(ResettingMetaAgent::new(
             self.clone(),
             inner_env_structure,

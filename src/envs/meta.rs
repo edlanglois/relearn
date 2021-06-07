@@ -6,7 +6,9 @@ use super::{
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
+use std::borrow::Borrow;
 use std::fmt;
+use std::marker::PhantomData;
 
 /// Configuration for a meta environment
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -128,6 +130,7 @@ pub type MetaObservationSpace<OS, AS> = ProductSpace<(
 /// Meta-environment observation type.
 pub type MetaObservation<O, A> = (Option<O>, Option<(A, f64)>, bool);
 
+/// Construct the meta observation space for an inner environment structure.
 fn meta_observation_space<E: EnvStructure + ?Sized>(
     env: &E,
 ) -> MetaObservationSpace<E::ObservationSpace, E::ActionSpace> {
@@ -140,6 +143,39 @@ fn meta_observation_space<E: EnvStructure + ?Sized>(
         ))),
         BooleanSpace::new(),
     ))
+}
+
+/// Wrapper that provides the inner environment structure of a meta environment.
+pub struct InnerEnvStructure<T, U>(U, PhantomData<T>);
+
+impl<T, U> InnerEnvStructure<T, U> {
+    pub fn new(inner_env: U) -> Self {
+        Self(inner_env, PhantomData)
+    }
+}
+
+impl<T, U, OS, AS> EnvStructure for InnerEnvStructure<T, U>
+where
+    T: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
+    U: Borrow<T>,
+    OS: Space,
+    AS: Space,
+{
+    type ObservationSpace = OS;
+    type ActionSpace = AS;
+
+    fn observation_space(&self) -> Self::ObservationSpace {
+        self.0.borrow().observation_space().inner_spaces.0.inner
+    }
+    fn action_space(&self) -> Self::ActionSpace {
+        self.0.borrow().action_space()
+    }
+    fn reward_range(&self) -> (f64, f64) {
+        self.0.borrow().reward_range()
+    }
+    fn discount_factor(&self) -> f64 {
+        self.0.borrow().discount_factor()
+    }
 }
 
 impl<E> EnvStructure for MetaEnv<E>
