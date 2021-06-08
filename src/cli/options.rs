@@ -52,7 +52,6 @@ pub struct Options {
     pub episodes_per_trial: Option<usize>,
 
     // Agent args
-    #[clap(arg_enum)]
     /// Agent type
     pub agent: AgentType,
 

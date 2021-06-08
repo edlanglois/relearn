@@ -1,4 +1,4 @@
-use super::agent::{ForAnyAny, ForFiniteFinite};
+use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
 use super::AgentDef;
 use crate::agents::{Agent, AgentBuilder};
 use crate::envs::{
@@ -105,14 +105,14 @@ impl EnvDef {
                 boxed_simulation!(
                     StatefulMetaEnv<DistWithState<OneHotBandits>>,
                     config,
-                    ForAnyAny<_>
+                    ForMetaFiniteFinite<_>
                 )
             }
             MetaUniformBernoulliBandits(config) => {
                 boxed_simulation!(
                     StatefulMetaEnv<DistWithState<UniformBernoulliBandits>>,
                     config,
-                    ForAnyAny<_>
+                    ForMetaFiniteFinite<_>
                 )
             }
         })

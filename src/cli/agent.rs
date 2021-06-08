@@ -4,11 +4,13 @@ use crate::agents::{
 };
 use crate::defs::AgentDef;
 use crate::torch::agents::{PolicyGradientAgentConfig, PolicyValueNetActorConfig, TrpoAgentConfig};
-use clap::Clap;
+use clap::{ArgEnum, Clap};
+use std::fmt;
+use std::str::FromStr;
 
-/// Agent name
+/// Concrete agent type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
-pub enum AgentType {
+pub enum ConcreteAgentType {
     Random,
     TabularQLearning,
     BetaThompsonSampling,
@@ -17,17 +19,80 @@ pub enum AgentType {
     Trpo,
 }
 
+impl fmt::Display for ConcreteAgentType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", Self::VARIANTS[*self as usize])
+    }
+}
+
+/// Wrapper agent type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
+pub enum AgentWrapperType {
+    ResettingMeta,
+}
+
+impl fmt::Display for AgentWrapperType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", Self::VARIANTS[*self as usize])
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AgentType {
+    /// Base concrete agent
+    pub base: ConcreteAgentType,
+    /// Agent wrappers; applied right to left
+    pub wrappers: Vec<AgentWrapperType>,
+}
+
+impl fmt::Display for AgentType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for wrapper in &self.wrappers {
+            write!(f, "{}:", wrapper)?;
+        }
+        write!(f, "{}", self.base)
+    }
+}
+
+impl FromStr for AgentType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let case_insensitive = true;
+        if let Some((wrapper_str, base_str)) = s.rsplit_once(':') {
+            let base = ConcreteAgentType::from_str(base_str, case_insensitive)?;
+            let wrappers = wrapper_str
+                .split(':')
+                .map(|ws| AgentWrapperType::from_str(ws, case_insensitive))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Self { base, wrappers })
+        } else {
+            Ok(Self {
+                base: ConcreteAgentType::from_str(s, case_insensitive)?,
+                wrappers: Vec::new(),
+            })
+        }
+    }
+}
+
 impl From<&Options> for AgentDef {
     fn from(opts: &Options) -> Self {
-        use AgentType::*;
-        match opts.agent {
+        use AgentWrapperType::*;
+        use ConcreteAgentType::*;
+        let mut agent_def = match opts.agent.base {
             Random => Self::Random,
             TabularQLearning => Self::TabularQLearning(opts.into()),
             BetaThompsonSampling => Self::BetaThompsonSampling(opts.into()),
             UCB1 => Self::UCB1(From::from(opts)),
             PolicyGradient => Self::PolicyGradient(Box::new(opts.into())),
             Trpo => Self::Trpo(Box::new(opts.into())),
+        };
+        for wrapper in opts.agent.wrappers.iter().rev() {
+            agent_def = match wrapper {
+                ResettingMeta => Self::ResettingMeta(Box::new(agent_def)),
+            };
         }
+        agent_def
     }
 }
 

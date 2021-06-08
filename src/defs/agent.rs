@@ -1,9 +1,9 @@
 use super::{OptimizerDef, SeqModDef, StepValueDef};
 use crate::agents::{
     Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError, RandomAgentConfig,
-    TabularQLearningAgentConfig, UCB1AgentConfig,
+    ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
-use crate::envs::EnvStructure;
+use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::spaces::{FiniteSpace, RLActionSpace, RLObservationSpace, Space};
 use crate::torch::agents::{
     PolicyGradientAgentConfig, PolicyGradientBoxedAgent, TrpoAgentConfig, TrpoBoxedAgent,
@@ -40,6 +40,8 @@ pub enum AgentDef {
             >,
         >,
     ),
+    /// Applies a non-meta agent to a meta environment by resetting between trials
+    ResettingMeta(Box<AgentDef>),
 }
 
 /// Wrapper implementing [`AgentBuilder`] for [`AgentDef`] for any observation and action space.
@@ -110,6 +112,46 @@ where
             TabularQLearning(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
             BetaThompsonSampling(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
             UCB1(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            agent_def => ForAnyAny::new(agent_def).build_agent(env, seed),
+        }
+    }
+}
+
+/// Wrapper implementing [`AgentBuilder`] for [`AgentDef`] for meta finite obs/action spaces.
+///
+/// Specifically, it is the inner observation space that must be finite.
+/// The outer observation space is not finite.
+///
+/// There is no trait specialization so this will fail for those agents that require a tighter
+/// bounds on the observation and actions paces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ForMetaFiniteFinite<T>(T);
+
+impl<T> ForMetaFiniteFinite<T> {
+    pub const fn new(agent_def: T) -> Self {
+        Self(agent_def)
+    }
+}
+
+impl<T, E, OS, AS> AgentBuilder<Box<DynEnvAgent<E>>, E> for ForMetaFiniteFinite<T>
+where
+    T: Borrow<AgentDef>,
+    E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
+    <E as EnvStructure>::ObservationSpace: RLObservationSpace + 'static,
+    OS: RLObservationSpace + FiniteSpace + Clone + 'static,
+    <OS as Space>::Element: Clone,
+    AS: RLActionSpace + FiniteSpace + Clone + 'static,
+    <AS as Space>::Element: Clone,
+{
+    fn build_agent(&self, env: &E, seed: u64) -> Result<Box<DynEnvAgent<E>>, BuildAgentError> {
+        use AgentDef::*;
+
+        match self.0.borrow() {
+            ResettingMeta(inner_agent_def) => Ok(Box::new(ResettingMetaAgent::new(
+                ForFiniteFinite::new(inner_agent_def.as_ref().clone()),
+                (&InnerEnvStructure::<E, &E>::new(env)).into(),
+                seed,
+            )) as _),
             agent_def => ForAnyAny::new(agent_def).build_agent(env, seed),
         }
     }
