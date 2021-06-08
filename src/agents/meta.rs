@@ -1,8 +1,6 @@
 //! Meta agents
 use super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use crate::envs::{
-    EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
-};
+use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace, StoredEnvStructure};
 use crate::logging::Logger;
 use crate::spaces::{SampleSpace, Space};
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -71,7 +69,7 @@ where
     }
 }
 
-impl<B, A, OS, AS> Actor<MetaObservation<OS::Element, AS::Element>, AS::Element>
+impl<B, A, OS, AS> Actor<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>
     for ResettingMetaAgent<B, A, OS, AS>
 where
     B: AgentBuilder<A, StoredEnvStructure<OS, AS>>,
@@ -83,7 +81,7 @@ where
 {
     fn act(
         &mut self,
-        observation: &MetaObservation<OS::Element, AS::Element>,
+        observation: &<MetaObservationSpace<OS, AS> as Space>::Element,
         new_episode: bool,
     ) -> AS::Element {
         let (inner_observation, step_info, episode_done) = observation;
@@ -132,7 +130,7 @@ where
     }
 }
 
-impl<B, A, OS, AS> Agent<MetaObservation<OS::Element, AS::Element>, AS::Element>
+impl<B, A, OS, AS> Agent<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>
     for ResettingMetaAgent<B, A, OS, AS>
 where
     B: AgentBuilder<A, StoredEnvStructure<OS, AS>>,
@@ -144,7 +142,7 @@ where
 {
     fn act(
         &mut self,
-        observation: &MetaObservation<OS::Element, AS::Element>,
+        observation: &<MetaObservationSpace<OS, AS> as Space>::Element,
         new_episode: bool,
     ) -> AS::Element {
         Actor::act(self, observation, new_episode)
@@ -152,7 +150,7 @@ where
 
     fn update(
         &mut self,
-        _step: Step<MetaObservation<OS::Element, AS::Element>, AS::Element>,
+        _step: Step<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>,
         _logger: &mut dyn Logger,
     ) {
         // Does not learn on a meta level

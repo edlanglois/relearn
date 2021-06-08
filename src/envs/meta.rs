@@ -127,9 +127,6 @@ pub type MetaObservationSpace<OS, AS> = ProductSpace<(
     BooleanSpace,
 )>;
 
-/// Meta-environment observation type.
-pub type MetaObservation<O, A> = (Option<O>, Option<(A, f64)>, bool);
-
 /// Construct the meta observation space for an inner environment structure.
 fn meta_observation_space<E: EnvStructure + ?Sized>(
     env: &E,

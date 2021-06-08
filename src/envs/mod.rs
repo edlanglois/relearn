@@ -16,8 +16,7 @@ pub use builder::{BuildEnvError, EnvBuilder, EnvDistBuilder};
 pub use chain::Chain;
 pub use memory::MemoryGame;
 pub use meta::{
-    InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaEnvState, MetaObservation, MetaObservationSpace,
-    StatefulMetaEnv,
+    InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaEnvState, MetaObservationSpace, StatefulMetaEnv,
 };
 pub use stateful::{DistWithState, EnvWithState, IntoStateful};
 
