@@ -4,13 +4,18 @@ use crate::agents::{
     ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
-use crate::spaces::{FiniteSpace, RLActionSpace, RLObservationSpace, Space};
+use crate::logging::Loggable;
+use crate::spaces::{
+    BatchFeatureSpace, ElementRefInto, FeatureSpace, FiniteSpace, ParameterizedDistributionSpace,
+    SampleSpace, Space,
+};
 use crate::torch::agents::{
     PolicyGradientAgentConfig, PolicyGradientBoxedAgent, TrpoAgentConfig, TrpoBoxedAgent,
 };
 use crate::torch::optimizers::ConjugateGradientOptimizerConfig;
 use std::borrow::Borrow;
 use std::fmt::Debug;
+use tch::Tensor;
 
 /// Agent definition
 #[derive(Debug, Clone, PartialEq)]
@@ -43,6 +48,21 @@ pub enum AgentDef {
     /// Applies a non-meta agent to a meta environment by resetting between trials
     ResettingMeta(Box<AgentDef>),
 }
+
+/// A comprehensive space trait for use by RL agents.
+///
+/// This includes most interfaces required by any agent, environment, or simulator
+/// excluding interfaces that can only apply to some spaces, like [`FiniteSpace`].
+pub trait RLSpace: Space + SampleSpace + ElementRefInto<Loggable> + Debug {}
+impl<T: Space + SampleSpace + ElementRefInto<Loggable> + Debug> RLSpace for T {}
+
+/// Comprehensive observation space for use in reinforcement learning
+pub trait RLObservationSpace: RLSpace + FeatureSpace<Tensor> + BatchFeatureSpace<Tensor> {}
+impl<T: RLSpace + FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>> RLObservationSpace for T {}
+
+/// Comprehensive action space for use in reinforcement learning
+pub trait RLActionSpace: RLSpace + ParameterizedDistributionSpace<Tensor> {}
+impl<T: RLSpace + ParameterizedDistributionSpace<Tensor>> RLActionSpace for T {}
 
 /// Wrapper implementing [`AgentBuilder`] for [`AgentDef`] for any observation and action space.
 ///

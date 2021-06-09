@@ -11,7 +11,6 @@ mod interval;
 mod nonempty_features;
 mod option;
 mod product;
-mod rl;
 mod singleton;
 #[cfg(test)]
 pub mod testing;
@@ -24,7 +23,6 @@ pub use interval::IntervalSpace;
 pub use nonempty_features::NonEmptyFeatures;
 pub use option::OptionSpace;
 pub use product::ProductSpace;
-pub use rl::{RLActionSpace, RLObservationSpace, RLSpace};
 pub use singleton::SingletonSpace;
 
 use crate::utils::distributions::ArrayDistribution;
