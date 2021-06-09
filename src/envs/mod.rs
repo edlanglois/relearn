@@ -2,6 +2,7 @@
 mod bandits;
 mod builder;
 mod chain;
+mod mdps;
 mod memory;
 mod meta;
 mod stateful;
