@@ -13,7 +13,7 @@ pub mod agents;
 pub mod cli;
 pub mod defs;
 pub mod envs;
-pub mod error;
+mod error;
 pub mod logging;
 pub mod simulation;
 pub mod spaces;
