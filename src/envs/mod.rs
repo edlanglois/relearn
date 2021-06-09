@@ -6,6 +6,7 @@ mod mdps;
 mod memory;
 mod meta;
 mod stateful;
+mod step_limit;
 #[cfg(test)]
 pub mod testing;
 
@@ -20,6 +21,7 @@ pub use meta::{
     InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaEnvState, MetaObservationSpace, StatefulMetaEnv,
 };
 pub use stateful::{DistWithState, EnvWithState, IntoStateful};
+pub use step_limit::StepLimit;
 
 use crate::spaces::Space;
 use rand::rngs::StdRng;
