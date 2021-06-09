@@ -1,4 +1,4 @@
-use super::{EnvStructure, Environment};
+use super::{BuildEnvError, EnvBuilder, EnvStructure, Environment};
 use crate::spaces::{IndexSpace, Space};
 use rand::prelude::*;
 
@@ -30,6 +30,13 @@ impl Default for MemoryGame {
             num_actions: 2,
             history_len: 1,
         }
+    }
+}
+
+/// `MemoryGame` is its own configuration
+impl EnvBuilder<Self> for MemoryGame {
+    fn build_env(&self, _seed: u64) -> Result<Self, BuildEnvError> {
+        Ok(*self)
     }
 }
 
@@ -107,7 +114,7 @@ impl Environment for MemoryGame {
 }
 
 #[cfg(test)]
-mod memory_game {
+mod tests {
     use super::super::testing;
     use super::*;
 

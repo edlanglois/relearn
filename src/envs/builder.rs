@@ -25,17 +25,6 @@ pub trait EnvDistBuilder<E> {
     fn build_env_dist(&self) -> E;
 }
 
-/// Non-stateful, cloneable environments can build themselves.
-///
-/// This allows using the environment as a configuration definition for itself,
-/// avoiding the need for a duplicate structure to hold the same content,
-/// and is useful for specifying wrapped environment configurations.
-impl<E: Environment + Clone> EnvBuilder<Self> for E {
-    fn build_env(&self, _seed: u64) -> Result<Self, BuildEnvError> {
-        Ok(self.clone())
-    }
-}
-
 /// Clonable environment distributions can build themselves.
 ///
 /// Allows using an environment distribution as its own configuration.

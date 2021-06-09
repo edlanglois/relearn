@@ -1,5 +1,5 @@
 //! Chain environment
-use super::{EnvStructure, Environment};
+use super::{BuildEnvError, EnvBuilder, EnvStructure, Environment};
 use crate::spaces::{IndexSpace, IndexedTypeSpace, Space};
 use rand::prelude::*;
 use rust_rl_derive::Indexed;
@@ -35,6 +35,13 @@ impl Default for Chain {
             size: 5,
             discount_factor: 0.95,
         }
+    }
+}
+
+/// Chain is its own configuration
+impl EnvBuilder<Self> for Chain {
+    fn build_env(&self, _seed: u64) -> Result<Self, BuildEnvError> {
+        Ok(*self)
     }
 }
 
@@ -114,8 +121,7 @@ impl Move {
 }
 
 #[cfg(test)]
-#[allow(clippy::module_inception)]
-mod chain {
+mod tests {
     use super::super::testing;
     use super::*;
 
