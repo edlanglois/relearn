@@ -11,7 +11,7 @@ description = "Run reinforcement learning experiments"
 # To get
 # https://github.com/clap-rs/clap/issues/2022
 # https://github.com/clap-rs/clap/issues/2528
-clap = { git = "https://github.com/edlanglois/clap.git", branch = "master" }
+clap = { git = "https://github.com/clap-rs/clap.git", branch = "master" }
 enum-map = "1.1"
 impl-trait-for-tuples = "0.2"
 lazycell = "1.3"
