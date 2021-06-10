@@ -14,6 +14,7 @@ pub use bandits::{
     PriorMeansBanditConfig, UniformBernoulliBandits,
 };
 pub use chain::Chain;
+pub use mdps::DirichletRandomMdps;
 pub use memory::MemoryGame;
 pub use meta::{
     InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaEnvState, MetaObservationSpace, StatefulMetaEnv,

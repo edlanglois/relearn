@@ -2,8 +2,8 @@
 use super::{Options, Update, WithUpdate};
 use crate::defs::{env::DistributionType, EnvDef};
 use crate::envs::{
-    Chain, FixedMeansBanditConfig, MemoryGame, MetaEnvConfig, OneHotBandits,
-    PriorMeansBanditConfig, UniformBernoulliBandits,
+    Chain, DirichletRandomMdps, FixedMeansBanditConfig, MemoryGame, MetaEnvConfig, OneHotBandits,
+    PriorMeansBanditConfig, StepLimit, UniformBernoulliBandits, Wrapped,
 };
 use clap::Clap;
 use rand::distributions::Standard;
@@ -18,6 +18,7 @@ pub enum EnvType {
     MemoryGame,
     MetaOneHotBandits,
     MetaUniformBernoulliBandits,
+    MetaDirichletMdps,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
@@ -36,6 +37,7 @@ impl From<&Options> for EnvDef {
             MemoryGame => Self::MemoryGame(opts.into()),
             MetaOneHotBandits => Self::MetaOneHotBandits(opts.into()),
             MetaUniformBernoulliBandits => Self::MetaUniformBernoulliBandits(opts.into()),
+            MetaDirichletMdps => Self::MetaDirichletMdps(opts.into()),
         }
     }
 }
@@ -130,6 +132,44 @@ where
     }
 }
 
+impl<'a, T, W> From<&'a Options> for Wrapped<T, W>
+where
+    T: From<&'a Options>,
+    W: From<&'a Options>,
+{
+    fn from(opts: &'a Options) -> Self {
+        Wrapped {
+            inner: opts.into(),
+            wrapper: opts.into(),
+        }
+    }
+}
+
+impl<'a, T, W> Update<&'a Options> for Wrapped<T, W>
+where
+    T: Update<&'a Options>,
+    W: Update<&'a Options>,
+{
+    fn update(&mut self, opts: &'a Options) {
+        self.inner.update(opts);
+        self.wrapper.update(opts);
+    }
+}
+
+impl From<&Options> for StepLimit {
+    fn from(opts: &Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for StepLimit {
+    fn update(&mut self, opts: &Options) {
+        if let Some(max_steps_per_episode) = opts.max_steps_per_episode {
+            self.max_steps_per_episode = max_steps_per_episode;
+        }
+    }
+}
+
 impl From<&Options> for UniformBernoulliBandits {
     fn from(opts: &Options) -> Self {
         Self::default().with_update(opts)
@@ -154,6 +194,26 @@ impl Update<&Options> for OneHotBandits {
     fn update(&mut self, opts: &Options) {
         if let Some(num_actions) = opts.num_actions {
             self.num_arms = num_actions.try_into().unwrap();
+        }
+    }
+}
+
+impl From<&Options> for DirichletRandomMdps {
+    fn from(opts: &Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for DirichletRandomMdps {
+    fn update(&mut self, opts: &Options) {
+        if let Some(num_states) = opts.num_states {
+            self.num_states = num_states.try_into().unwrap();
+        }
+        if let Some(num_actions) = opts.num_actions {
+            self.num_actions = num_actions.try_into().unwrap();
+        }
+        if let Some(discount_factor) = opts.discount_factor {
+            self.discount_factor = discount_factor;
         }
     }
 }

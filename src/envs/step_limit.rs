@@ -1,6 +1,6 @@
 use super::{
-    BuildEnvError, EnvBuilder, EnvStructure, EnvWrapper, Environment, InnerStructureWrapper,
-    Wrapped,
+    BuildEnvError, EnvBuilder, EnvDistBuilder, EnvStructure, EnvWrapper, Environment,
+    InnerStructureWrapper, Wrapped,
 };
 use crate::spaces::Space;
 use rand::{rngs::StdRng, Rng};
@@ -86,6 +86,18 @@ where
             inner: self.inner.build_env(seed)?,
             wrapper: self.wrapper,
         })
+    }
+}
+
+impl<B, D> EnvDistBuilder<Wrapped<D, StepLimit>> for Wrapped<B, StepLimit>
+where
+    B: EnvDistBuilder<D>,
+{
+    fn build_env_dist(&self) -> Wrapped<D, StepLimit> {
+        Wrapped {
+            inner: self.inner.build_env_dist(),
+            wrapper: self.wrapper,
+        }
     }
 }
 

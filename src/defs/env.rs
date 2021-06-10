@@ -2,9 +2,10 @@ use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
 use super::AgentDef;
 use crate::agents::{Agent, AgentBuilder};
 use crate::envs::{
-    Bandit, Chain as ChainEnv, EnvBuilder, EnvWithState, FixedMeansBanditConfig,
-    MemoryGame as MemoryGameEnv, MetaEnvConfig, OneHotBandits, PriorMeansBanditConfig,
-    StatefulEnvironment, StatefulMetaEnv, UniformBernoulliBandits, WithState, Wrapped,
+    Bandit, Chain as ChainEnv, DirichletRandomMdps, EnvBuilder, EnvWithState,
+    FixedMeansBanditConfig, MemoryGame as MemoryGameEnv, MetaEnvConfig, OneHotBandits,
+    PriorMeansBanditConfig, StatefulEnvironment, StatefulMetaEnv, StepLimit,
+    UniformBernoulliBandits, WithState, Wrapped,
 };
 use crate::error::RLError;
 use crate::logging::{Loggable, Logger};
@@ -30,6 +31,8 @@ pub enum EnvDef {
     MetaOneHotBandits(MetaEnvConfig<OneHotBandits>),
     /// Meta uniform bernoulli bandits environment
     MetaUniformBernoulliBandits(MetaEnvConfig<UniformBernoulliBandits>),
+    /// Meta dirichlet MDPs environment
+    MetaDirichletMdps(MetaEnvConfig<Wrapped<DirichletRandomMdps, StepLimit>>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -111,6 +114,13 @@ impl EnvDef {
             MetaUniformBernoulliBandits(config) => {
                 boxed_simulation!(
                     StatefulMetaEnv<Wrapped<UniformBernoulliBandits, WithState>>,
+                    config,
+                    ForMetaFiniteFinite<_>
+                )
+            }
+            MetaDirichletMdps(config) => {
+                boxed_simulation!(
+                    StatefulMetaEnv<Wrapped<Wrapped<DirichletRandomMdps, StepLimit>, WithState>>,
                     config,
                     ForMetaFiniteFinite<_>
                 )

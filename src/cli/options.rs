@@ -51,6 +51,10 @@ pub struct Options {
     /// Number of inner episodes per trial in meta environments.
     pub episodes_per_trial: Option<usize>,
 
+    #[clap(long, help_heading = Some("ENVIRONMENT OPTIONS"))]
+    /// Max steps per episode; for environments with a step limit
+    pub max_steps_per_episode: Option<u64>,
+
     // Agent args
     /// Agent type
     pub agent: AgentType,

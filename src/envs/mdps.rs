@@ -1,5 +1,5 @@
 //! Generic Markov Decision Processes
-use super::{EnvDistribution, EnvStructure, Environment};
+use super::{EnvDistBuilder, EnvDistribution, EnvStructure, Environment};
 use crate::spaces::IndexSpace;
 use crate::spaces::Space;
 use ndarray::{Array2, Axis};
@@ -90,6 +90,7 @@ where
 /// "[RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning][rl2]" by Duan et al.
 ///
 /// [rl2]: https://arxiv.org/pdf/1611.02779
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DirichletRandomMdps {
     pub num_states: usize,
     pub num_actions: usize,
@@ -109,6 +110,12 @@ impl Default for DirichletRandomMdps {
             reward_prior_stddev: 1.0,
             discount_factor: 1.0, // Assumes that a step limit will be placed on the episodes
         }
+    }
+}
+
+impl EnvDistBuilder<Self> for DirichletRandomMdps {
+    fn build_env_dist(&self) -> Self {
+        *self
     }
 }
 
