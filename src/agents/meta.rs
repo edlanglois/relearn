@@ -161,7 +161,7 @@ where
 mod resetting_meta {
     use super::super::{UCB1Agent, UCB1AgentConfig};
     use super::*;
-    use crate::envs::{DistWithState, OneHotBandits, StatefulMetaEnv};
+    use crate::envs::{OneHotBandits, StatefulMetaEnv, WithState, Wrapped};
     use crate::simulation;
     use crate::simulation::hooks::{RewardStatistics, StepLimit};
 
@@ -171,7 +171,7 @@ mod resetting_meta {
         let num_arms = 3;
         let num_episodes_per_trial = 20;
         let mut env = StatefulMetaEnv::new(
-            DistWithState::from(OneHotBandits::new(num_arms)),
+            Wrapped::new(OneHotBandits::new(num_arms), WithState),
             num_episodes_per_trial,
             0,
         );

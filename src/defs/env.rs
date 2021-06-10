@@ -2,9 +2,9 @@ use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
 use super::AgentDef;
 use crate::agents::{Agent, AgentBuilder};
 use crate::envs::{
-    Bandit, Chain as ChainEnv, DistWithState, EnvBuilder, EnvWithState, FixedMeansBanditConfig,
+    Bandit, Chain as ChainEnv, EnvBuilder, EnvWithState, FixedMeansBanditConfig,
     MemoryGame as MemoryGameEnv, MetaEnvConfig, OneHotBandits, PriorMeansBanditConfig,
-    StatefulEnvironment, StatefulMetaEnv, UniformBernoulliBandits,
+    StatefulEnvironment, StatefulMetaEnv, UniformBernoulliBandits, WithState, Wrapped,
 };
 use crate::error::RLError;
 use crate::logging::{Loggable, Logger};
@@ -103,14 +103,14 @@ impl EnvDef {
             }
             MetaOneHotBandits(config) => {
                 boxed_simulation!(
-                    StatefulMetaEnv<DistWithState<OneHotBandits>>,
+                    StatefulMetaEnv<Wrapped<OneHotBandits, WithState>>,
                     config,
                     ForMetaFiniteFinite<_>
                 )
             }
             MetaUniformBernoulliBandits(config) => {
                 boxed_simulation!(
-                    StatefulMetaEnv<DistWithState<UniformBernoulliBandits>>,
+                    StatefulMetaEnv<Wrapped<UniformBernoulliBandits, WithState>>,
                     config,
                     ForMetaFiniteFinite<_>
                 )

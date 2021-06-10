@@ -1,5 +1,7 @@
 //! Multi-armed bandit environments
-use super::{BuildEnvError, EnvBuilder, EnvDistribution, EnvStructure, Environment};
+use super::{
+    BuildEnvError, EnvBuilder, EnvDistBuilder, EnvDistribution, EnvStructure, Environment,
+};
 use crate::spaces::{IndexSpace, SingletonSpace, Space};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use rand::distributions::{Distribution, Standard, Uniform};
@@ -222,6 +224,13 @@ impl EnvDistribution for UniformBernoulliBandits {
     }
 }
 
+/// [`UniformBernoulliBandits`] can build itself by cloning
+impl EnvDistBuilder<Self> for UniformBernoulliBandits {
+    fn build_env_dist(&self) -> Self {
+        *self
+    }
+}
+
 /// Distribution over deterministic bandits in which one arm has reward 1 and the rest have 0.
 ///
 /// The arm with reward 1 is sampled from a uniform random distribution.
@@ -272,6 +281,13 @@ impl EnvDistribution for OneHotBandits {
         let index = rng.gen_range(0..self.num_arms);
         means[index] = 1.0;
         DeterministicBandit::from_means(means).unwrap()
+    }
+}
+
+/// [`OneHotBandits`] can build itself by cloning
+impl EnvDistBuilder<Self> for OneHotBandits {
+    fn build_env_dist(&self) -> Self {
+        *self
     }
 }
 

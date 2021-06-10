@@ -1,10 +1,27 @@
 //! Converting an `Environment` into a `StatefulEnvironment`
-use super::{BuildEnvError, EnvBuilder, EnvDistribution, Environment, StatefulEnvironment};
+use super::{
+    BuildEnvError, EnvBuilder, EnvDistBuilder, EnvWrapper, Environment, InnerStructureWrapper,
+    StatefulEnvironment, Wrapped,
+};
 use crate::envs::EnvStructure;
 use crate::spaces::Space;
-use rand::prelude::*;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
-/// Creates a [`StatefulEnvironment`] out of an [`Environment`]
+/// A wrapper that adds internal state to an environment.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct WithState;
+
+impl<E: Environment> EnvWrapper<E> for WithState {
+    type Wrapped = EnvWithState<E>;
+
+    fn wrap<R: Rng + ?Sized>(&self, env: E, rng: &mut R) -> Self::Wrapped {
+        EnvWithState::new(env, rng.gen())
+    }
+}
+
+impl<E: EnvStructure> InnerStructureWrapper<E> for WithState {}
+
+/// Wraps an [`Environment`] as a [`StatefulEnvironment`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnvWithState<E: Environment> {
     pub env: E,
@@ -73,56 +90,7 @@ impl<E: Environment> StatefulEnvironment for EnvWithState<E> {
     }
 }
 
-/// Adds state to the environments of an [`EnvDistribution`].
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DistWithState<D>(D);
-
-impl<D> DistWithState<D> {
-    pub const fn new(env_dist: D) -> Self {
-        Self(env_dist)
-    }
-}
-
-impl<D: EnvStructure> EnvStructure for DistWithState<D> {
-    type ObservationSpace = D::ObservationSpace;
-    type ActionSpace = D::ActionSpace;
-
-    fn observation_space(&self) -> Self::ObservationSpace {
-        self.0.observation_space()
-    }
-
-    fn action_space(&self) -> Self::ActionSpace {
-        self.0.action_space()
-    }
-
-    fn reward_range(&self) -> (f64, f64) {
-        self.0.reward_range()
-    }
-
-    fn discount_factor(&self) -> f64 {
-        self.0.discount_factor()
-    }
-}
-
-impl<D> EnvDistribution for DistWithState<D>
-where
-    D: EnvDistribution,
-    <D as EnvDistribution>::Environment: Environment,
-{
-    type Environment = EnvWithState<D::Environment>;
-
-    fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment {
-        let seed = rng.gen();
-        self.0.sample_environment(rng).into_stateful(seed)
-    }
-}
-
-impl<D> From<D> for DistWithState<D> {
-    fn from(env_dist: D) -> Self {
-        Self::new(env_dist)
-    }
-}
-
+// TODO: Remove?
 /// Supports conversion to a stateful environment
 pub trait IntoStateful {
     type Output;
@@ -148,5 +116,23 @@ impl<E: Environment, B: EnvBuilder<E>> EnvBuilder<EnvWithState<E>> for B {
         // Want to avoid collissions with other seed derivations.
         let dynamics_seed = seed.wrapping_add(135);
         Ok(self.build_env(structure_seed)?.into_stateful(dynamics_seed))
+    }
+}
+
+impl<E, B: EnvBuilder<E>> EnvBuilder<Wrapped<E, WithState>> for B {
+    fn build_env(&self, seed: u64) -> Result<Wrapped<E, WithState>, BuildEnvError> {
+        Ok(Wrapped {
+            inner: self.build_env(seed)?,
+            wrapper: WithState,
+        })
+    }
+}
+
+impl<T, B: EnvDistBuilder<T>> EnvDistBuilder<Wrapped<T, WithState>> for B {
+    fn build_env_dist(&self) -> Wrapped<T, WithState> {
+        Wrapped {
+            inner: self.build_env_dist(),
+            wrapper: WithState,
+        }
     }
 }

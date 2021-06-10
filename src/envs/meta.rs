@@ -477,7 +477,7 @@ where
 #[cfg(test)]
 #[allow(clippy::float_cmp)] // Comparing exact reward values; 0.0 or 1.0 without error
 mod meta_env_bandits {
-    use super::super::testing;
+    use super::super::{testing, WithState, Wrapped};
     use super::*;
 
     #[test]
@@ -489,7 +489,7 @@ mod meta_env_bandits {
     #[test]
     fn stateful_run() {
         let mut env = StatefulMetaEnv::new(
-            testing::RoundRobinDeterministicBandits::new(2).into_stateful(),
+            Wrapped::new(testing::RoundRobinDeterministicBandits::new(2), WithState),
             3,
             0,
         );
@@ -566,7 +566,7 @@ mod meta_env_bandits {
     #[test]
     fn stateful_expected_steps() {
         let mut env = StatefulMetaEnv::new(
-            testing::RoundRobinDeterministicBandits::new(2).into_stateful(),
+            Wrapped::new(testing::RoundRobinDeterministicBandits::new(2), WithState),
             3,
             0,
         );
