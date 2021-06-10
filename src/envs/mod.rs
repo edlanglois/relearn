@@ -1,6 +1,5 @@
 //! Reinforcement learning environments
 mod bandits;
-mod builder;
 mod chain;
 mod mdps;
 mod memory;
@@ -14,7 +13,6 @@ pub use bandits::{
     Bandit, BernoulliBandit, DeterministicBandit, FixedMeansBanditConfig, OneHotBandits,
     PriorMeansBanditConfig, UniformBernoulliBandits,
 };
-pub use builder::{BuildEnvError, EnvBuilder, EnvDistBuilder};
 pub use chain::Chain;
 pub use memory::MemoryGame;
 pub use meta::{
@@ -24,8 +22,11 @@ pub use stateful::{EnvWithState, IntoStateful, WithState};
 pub use step_limit::StepLimit;
 
 use crate::spaces::Space;
+use rand::distributions::BernoulliError;
 use rand::{rngs::StdRng, Rng};
+use std::convert::Infallible;
 use std::f64;
+use thiserror::Error;
 
 /// The external structure of a reinforcement learning environment.
 pub trait EnvStructure {
@@ -232,6 +233,30 @@ impl<E: StatefulEnvironment + ?Sized> StatefulEnvironment for Box<E> {
     }
 }
 
+/// Builds an environment
+pub trait EnvBuilder<E> {
+    /// Build an environment instance.
+    ///
+    /// # Args
+    /// * `seed` - Seed for pseudo-randomness used by the environment.
+    ///     Includes both randomization of the environment structure, and
+    ///     random sampling of step outcomes within this structure.
+    fn build_env(&self, seed: u64) -> Result<E, BuildEnvError>;
+}
+
+/// Error building an environment
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum BuildEnvError {
+    #[error(transparent)]
+    BernoulliError(#[from] BernoulliError),
+}
+
+impl From<Infallible> for BuildEnvError {
+    fn from(_: Infallible) -> Self {
+        unreachable!();
+    }
+}
+
 /// A distribution of environments sharing the same structure.
 ///
 /// The spaces / intervals of each sampled environment must be equal to
@@ -260,6 +285,11 @@ pub trait EnvDistribution: EnvStructure {
             wrapper,
         }
     }
+}
+
+/// Builds an environment distribution.
+pub trait EnvDistBuilder<E> {
+    fn build_env_dist(&self) -> E;
 }
 
 /// Can wrap an environment.
