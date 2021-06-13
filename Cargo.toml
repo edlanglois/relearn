@@ -21,7 +21,7 @@ num-traits = "0.2"
 rand = "0.8"
 rand_distr = "0.4"
 rust_rl_derive = { path = "rust_rl_derive" }
-tch = { git = "https://github.com/edlanglois/tch-rs.git", branch = "master" }
+tch = { git = "https://github.com/LaurentMazare/tch-rs.git", branch = "master" }
 thiserror = "1.0"
 
 [dev-dependencies]
