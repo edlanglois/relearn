@@ -1,11 +1,12 @@
 //! Command-line options
-use super::agent::AgentType;
+use super::agent::{AgentType, AgentWrapperType, ConcreteAgentType};
 use super::env::{BanditArmPrior, EnvType};
 use super::optimizer::{OptimizerOptions, OptimizerType};
 use super::seq_mod::SeqModType;
 use super::step_value::StepValueType;
 use crate::torch::Activation;
-use clap::{crate_authors, crate_description, crate_version, AppSettings, Clap};
+use clap::{crate_authors, crate_description, crate_version, AppSettings, ArgEnum, Clap};
+use once_cell::sync::OnceCell;
 use std::{error::Error, fmt, str::FromStr};
 use tch::Device;
 
@@ -57,6 +58,7 @@ pub struct Options {
 
     // Agent args
     /// Agent type
+    #[clap(long_about = agent_long_about())]
     pub agent: AgentType,
 
     #[clap(long, help_heading = Some("AGENT OPTIONS"))]
@@ -179,6 +181,50 @@ pub struct Options {
     #[clap(long, help_heading = Some("SIMULATION OPTIONS"))]
     /// Maximum number of experiment steps
     pub max_steps: Option<u64>,
+}
+
+/// Stores the agent argument help message.
+///
+/// The `(long_)about` argument method takes a &str.
+/// We construct a help message using format! which
+///     1) involves a runtime function and
+///     2) returns a String.
+/// Since we are using the derive method of construcing `Options`,
+/// there is no local context in which to store the formatted string
+/// so that a reference can be given to `(long_)about`.
+///
+/// Instead, we use a static string and set its value at runtime.
+static AGENT_ABOUT: OnceCell<String> = OnceCell::new();
+
+/// Agent argument long about message
+fn agent_long_about() -> &'static str {
+    AGENT_ABOUT.get_or_init(|| {
+        format!(
+            "Agent type. Format: [<wrapper>:]*<base-agent>
+
+base-agent: {}
+wrapper: {}
+",
+            StringListDisplay(ConcreteAgentType::VARIANTS),
+            StringListDisplay(AgentWrapperType::VARIANTS)
+        )
+    })
+}
+
+/// Wrapper for displaying a list of strings
+struct StringListDisplay<'a, 'b>(&'a [&'b str]);
+impl<'a, 'b> fmt::Display for StringListDisplay<'a, 'b> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut first = true;
+        for s in self.0 {
+            if !first {
+                write!(f, ", ")?
+            }
+            first = false;
+            write!(f, "{}", s)?;
+        }
+        Ok(())
+    }
 }
 
 impl Options {
