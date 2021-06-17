@@ -138,7 +138,7 @@ where
     W: From<&'a Options>,
 {
     fn from(opts: &'a Options) -> Self {
-        Wrapped {
+        Self {
             inner: opts.into(),
             wrapper: opts.into(),
         }
