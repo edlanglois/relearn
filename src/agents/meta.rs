@@ -1,7 +1,7 @@
 //! Meta agents
 use super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace, StoredEnvStructure};
-use crate::logging::Logger;
+use crate::logging::TimeSeriesLogger;
 use crate::spaces::{SampleSpace, Space};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -151,7 +151,7 @@ where
     fn update(
         &mut self,
         _step: Step<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>,
-        _logger: &mut dyn Logger,
+        _logger: &mut dyn TimeSeriesLogger,
     ) {
         // Does not learn on a meta level
     }

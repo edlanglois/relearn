@@ -1,5 +1,5 @@
 //! Command-line logger
-use super::{Event, LogError, Loggable, Logger};
+use super::{Event, LogError, Loggable, TimeSeriesLogger};
 use enum_map::{enum_map, EnumMap};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -8,7 +8,7 @@ use std::fmt;
 use std::ops::Drop;
 use std::time::{Duration, Instant};
 
-/// Logger that writes summaries to stderr.
+/// Time series logger that writes summaries to stderr.
 #[derive(Debug, Clone)]
 pub struct CLILogger {
     events: EnumMap<Event, EventLog>,
@@ -65,7 +65,7 @@ impl CLILogger {
     }
 }
 
-impl Logger for CLILogger {
+impl TimeSeriesLogger for CLILogger {
     fn log<'a>(
         &mut self,
         event: Event,
@@ -89,7 +89,7 @@ impl Logger for CLILogger {
         Ok(())
     }
 
-    fn done(&mut self, event: Event) {
+    fn end_event(&mut self, event: Event) {
         let event_info = &mut self.events[event];
         event_info.index += 1;
 

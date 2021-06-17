@@ -2,7 +2,7 @@ use super::hooks::SimulationHook;
 /// Simulation trait and Simulator structs.
 use crate::agents::{Actor, Agent, Step};
 use crate::envs::{EnvStructure, StatefulEnvironment};
-use crate::logging::Logger;
+use crate::logging::TimeSeriesLogger;
 use crate::spaces::Space;
 
 /// Runs a simulation.
@@ -39,7 +39,7 @@ where
         <<E as EnvStructure>::ObservationSpace as Space>::Element,
         <<E as EnvStructure>::ActionSpace as Space>::Element,
     >,
-    L: Logger,
+    L: TimeSeriesLogger,
     H: SimulationHook<
         <<E as EnvStructure>::ObservationSpace as Space>::Element,
         <<E as EnvStructure>::ActionSpace as Space>::Element,
@@ -76,7 +76,8 @@ where
             <<E as EnvStructure>::ObservationSpace as Space>::Element,
             <<E as EnvStructure>::ActionSpace as Space>::Element,
         > + ?Sized,
-    L: Logger, // Not ?Sized because can't convert &(Logger + ?Sized) => &mut dyn Logger
+    // Not ?Sized because can't convert &(TimeSeriesLogger + ?Sized) => &mut dyn TimeSeriesLogger
+    L: TimeSeriesLogger,
     H: SimulationHook<
             <<E as EnvStructure>::ObservationSpace as Space>::Element,
             <<E as EnvStructure>::ActionSpace as Space>::Element,
@@ -133,7 +134,7 @@ where
             <<E as EnvStructure>::ObservationSpace as Space>::Element,
             <<E as EnvStructure>::ActionSpace as Space>::Element,
         > + ?Sized,
-    L: Logger + ?Sized,
+    L: TimeSeriesLogger + ?Sized,
     H: SimulationHook<
             <<E as EnvStructure>::ObservationSpace as Space>::Element,
             <<E as EnvStructure>::ActionSpace as Space>::Element,

@@ -3,7 +3,7 @@ use super::super::history::{HistoryBuffer, LazyPackedHistoryFeatures};
 use super::super::seq_modules::StatefulIterativeModule;
 use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::ModuleBuilder;
-use crate::logging::{Event, Logger};
+use crate::logging::{Event, TimeSeriesLogger};
 use crate::spaces::{
     BaseFeatureSpace, FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace, ReprSpace,
     Space,
@@ -262,10 +262,10 @@ where
         step: Step<OS::Element, AS::Element>,
         update_policy: F,
         update_value: G,
-        logger: &mut dyn Logger,
+        logger: &mut dyn TimeSeriesLogger,
     ) where
-        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Option<Tensor>,
-        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Option<Tensor>,
+        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn TimeSeriesLogger) -> Option<Tensor>,
+        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn TimeSeriesLogger) -> Option<Tensor>,
     {
         let episode_done = step.episode_done;
         self.history.push(step);
@@ -289,10 +289,14 @@ where
     ///
     /// * `logger` - Logger to which epoch statistics are logged. Forwarded to the callbacks.
 
-    fn epoch_update<F, G>(&mut self, update_policy: F, mut update_value: G, logger: &mut dyn Logger)
-    where
-        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Option<Tensor>,
-        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn Logger) -> Option<Tensor>,
+    fn epoch_update<F, G>(
+        &mut self,
+        update_policy: F,
+        mut update_value: G,
+        logger: &mut dyn TimeSeriesLogger,
+    ) where
+        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn TimeSeriesLogger) -> Option<Tensor>,
+        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn TimeSeriesLogger) -> Option<Tensor>,
     {
         let features = LazyPackedHistoryFeatures::new(
             self.history.steps(),
@@ -330,7 +334,7 @@ where
                 .expect("Variable mismatch between main policy and CPU policy");
         }
 
-        logger.done(Event::Epoch);
+        logger.end_event(Event::Epoch);
 
         self.history.clear();
     }
@@ -339,7 +343,7 @@ where
 /// Log a value with the epoch event.
 fn epoch_log_scalar<L, V>(logger: &mut L, name: &str, value: V)
 where
-    L: Logger + ?Sized,
+    L: TimeSeriesLogger + ?Sized,
     V: Into<f64>,
 {
     logger.log(Event::Epoch, name, value.into().into()).unwrap();

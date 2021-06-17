@@ -15,7 +15,7 @@ use super::super::ModuleBuilder;
 use super::actor::{HistoryFeatures, PolicyValueNetActor, PolicyValueNetActorConfig};
 use super::policy_gradient;
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use crate::logging::{Event, Logger};
+use crate::logging::{Event, TimeSeriesLogger};
 use crate::spaces::{
     BaseFeatureSpace, BatchFeatureSpace, FeatureSpace, ParameterizedDistributionSpace, ReprSpace,
     Space,
@@ -200,7 +200,7 @@ where
         Actor::act(self, observation, new_episode)
     }
 
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn Logger) {
+    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn TimeSeriesLogger) {
         let policy_optimizer = &mut self.policy_optimizer;
         let value_optimizer = &mut self.value_optimizer;
         let max_policy_step_kl = self.max_policy_step_kl;
@@ -233,7 +233,7 @@ fn trpo_update<OS, AS, P, PO, V>(
     features: &HistoryFeatures<OS, AS>,
     policy_optimizer: &mut PO,
     max_policy_step_kl: f64,
-    logger: &mut dyn Logger,
+    logger: &mut dyn TimeSeriesLogger,
 ) -> Option<Tensor>
 where
     OS: BatchFeatureSpace<Tensor>,

@@ -1,7 +1,7 @@
 //! Tabular agents
 use super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::envs::EnvStructure;
-use crate::logging::Logger;
+use crate::logging::TimeSeriesLogger;
 use crate::spaces::{FiniteSpace, SampleSpace};
 use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
@@ -134,7 +134,7 @@ where
         }
     }
 
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn Logger) {
+    fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {
         let obs_idx = self.observation_space.to_index(&step.observation);
         let act_idx = self.action_space.to_index(&step.action);
 

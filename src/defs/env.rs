@@ -8,7 +8,7 @@ use crate::envs::{
     UniformBernoulliBandits, WithState, Wrapped,
 };
 use crate::error::RLError;
-use crate::logging::{Loggable, Logger};
+use crate::logging::{Loggable, TimeSeriesLogger};
 use crate::simulation::{
     hooks::StepLogger, GenericSimulationHook, Simulation, SimulationHook, Simulator,
 };
@@ -59,7 +59,7 @@ impl EnvDef {
         hook: H,
     ) -> Result<Box<dyn Simulation>, RLError>
     where
-        L: Logger + 'static,
+        L: TimeSeriesLogger + 'static,
         H: GenericSimulationHook + 'static,
     {
         /// Construct a boxed agent-environment simulation
@@ -140,7 +140,7 @@ where
     OS: Space + ElementRefInto<Loggable> + 'static,
     <OS as Space>::Element: Clone,
     AS: Space + ElementRefInto<Loggable> + 'static,
-    L: Logger + 'static,
+    L: TimeSeriesLogger + 'static,
     H: SimulationHook<OS::Element, AS::Element, L> + 'static,
 {
     let log_hook = StepLogger::new(environment.observation_space(), environment.action_space());

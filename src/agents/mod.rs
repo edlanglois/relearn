@@ -18,7 +18,7 @@ pub use meta::ResettingMetaAgent;
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
-use crate::logging::Logger;
+use crate::logging::TimeSeriesLogger;
 
 /// Description of an environment step
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -84,7 +84,7 @@ pub trait Agent<O, A> {
     ///
     /// # Args
     /// * `step`: The environment step resulting from the  most recent call to [`Actor::act`].
-    fn update(&mut self, step: Step<O, A>, logger: &mut dyn Logger);
+    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger);
 }
 
 impl<T, O, A> Agent<O, A> for Box<T>
@@ -95,7 +95,7 @@ where
         T::act(self, observation, new_episode)
     }
 
-    fn update(&mut self, step: Step<O, A>, logger: &mut dyn Logger) {
+    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
         T::update(self, step, logger)
     }
 }

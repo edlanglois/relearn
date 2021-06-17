@@ -1,7 +1,7 @@
 //! Thompson sampling bandit agent
 use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::envs::EnvStructure;
-use crate::logging::Logger;
+use crate::logging::TimeSeriesLogger;
 use crate::spaces::FiniteSpace;
 use crate::utils::iter::ArgMaxBy;
 use ndarray::{Array, Array2, Axis};
@@ -171,7 +171,7 @@ where
         self.action_space.from_index(act_idx).unwrap()
     }
 
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn Logger) {
+    fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {
         let obs_idx = self.observation_space.to_index(&step.observation);
         let act_idx = self.action_space.to_index(&step.action);
 

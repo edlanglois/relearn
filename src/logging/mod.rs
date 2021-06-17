@@ -55,21 +55,35 @@ impl From<String> for Loggable {
     }
 }
 
-/// Log statistics from a simulation run.
-pub trait Logger {
-    /// Log a value.
+// TODO: Make generic over Event? E: Enum
+
+/// Logs named values associated with a time series of recurring events.
+///
+/// # Events
+/// An event represents the duration of time that starts when the last instance of that event
+/// ended (or when the logger was created) and ends `TimeSeriesLogger::end_event` is called.
+/// In this way, each event type creates a partitining of time into instances of that event.
+///
+/// Examples of events include an environment step, an environment episode, or a training epoch.
+///
+/// Values are logged to a particular event type and become associated with the currently active
+/// instance of that event. Logging the same name multiple times during an event is allowed but
+/// discouraged; prefer using a finer grained event instead. If the same value _is_ logged
+/// multiple times in an event then the logger may behave in an implementation-dependent way
+/// like logging both values or using only the last.
+///
+/// # Values
+/// Logged values must be of type [`Loggable`].
+/// The same variant must be used every time a value is logged for the same name.
+pub trait TimeSeriesLogger {
+    /// Log a value associated with the active instance of an event.
     ///
     /// # Args
     /// * `event` - The event type associated with this value.
     /// * `name` - The name that identifies this value.
     /// * `value` - The value to log.
     ///
-    /// Each logged value is associated with an event type and a name.
-    /// When multiple values are logged for the same event type and name during an event,
-    /// only the last is used.
-    /// Values may be aggregated across events in a logger-dependent fashion.
-    ///
-    /// An "event" refers to the period between calls to `Logger::done` for that event type.
+    /// An "event" refers to the period between calls to `TimeSeriesLogger::end_event` for that event type.
     ///
     /// # Returns
     /// May return an error if the logged value is structurally incompatible
@@ -77,17 +91,17 @@ pub trait Logger {
     fn log<'a>(&mut self, event: Event, name: &'a str, value: Loggable)
         -> Result<(), LogError<'a>>;
 
-    /// Mark the end of an event.
-    fn done(&mut self, event: Event);
+    /// End an event instance.
+    fn end_event(&mut self, event: Event);
 }
 
-/// Logger that does nothing
-impl Logger for () {
+/// Time series logger that does nothing
+impl TimeSeriesLogger for () {
     fn log<'a>(&mut self, _: Event, _: &'a str, _: Loggable) -> Result<(), LogError<'a>> {
         Ok(())
     }
 
-    fn done(&mut self, _: Event) {}
+    fn end_event(&mut self, _: Event) {}
 }
 
 #[derive(Debug, Clone)]

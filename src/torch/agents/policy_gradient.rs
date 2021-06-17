@@ -5,7 +5,7 @@ use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use super::actor::{HistoryFeatures, PolicyValueNetActor, PolicyValueNetActorConfig};
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use crate::logging::{Event, Logger};
+use crate::logging::{Event, TimeSeriesLogger};
 use crate::spaces::{
     BaseFeatureSpace, BatchFeatureSpace, FeatureSpace, ParameterizedDistributionSpace, ReprSpace,
     Space,
@@ -170,7 +170,7 @@ where
         Actor::act(self, observation, new_episode)
     }
 
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn Logger) {
+    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn TimeSeriesLogger) {
         let policy_optimizer = &mut self.policy_optimizer;
         let value_optimizer = &mut self.value_optimizer;
         self.actor.update(
@@ -191,7 +191,7 @@ pub fn policy_gradient_update<OS, AS, P, V, PO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
     features: &HistoryFeatures<OS, AS>,
     optimizer: &mut PO,
-    logger: &mut dyn Logger,
+    logger: &mut dyn TimeSeriesLogger,
 ) -> Option<Tensor>
 where
     OS: BatchFeatureSpace<Tensor>,
@@ -236,7 +236,7 @@ pub fn value_squared_error_update<OS, AS, P, V, VO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
     features: &HistoryFeatures<OS, AS>,
     optimizer: &mut VO,
-    logger: &mut dyn Logger,
+    logger: &mut dyn TimeSeriesLogger,
 ) -> Option<Tensor>
 where
     OS: BatchFeatureSpace<Tensor>,
