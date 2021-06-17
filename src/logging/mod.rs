@@ -55,6 +55,16 @@ impl From<String> for Loggable {
     }
 }
 
+/// Log named values
+pub trait Logger {
+    /// Log a value
+    ///
+    /// # Args
+    /// * `id` - An identifier for the value.
+    /// * `value` - The value to log.
+    fn log<'a>(&mut self, id: &'a str, value: Loggable) -> Result<(), LogError<'a>>;
+}
+
 // TODO: Make generic over Event? E: Enum
 
 /// Logs named values associated with a time series of recurring events.
@@ -83,7 +93,8 @@ pub trait TimeSeriesLogger {
     /// * `name` - The name that identifies this value.
     /// * `value` - The value to log.
     ///
-    /// An "event" refers to the period between calls to `TimeSeriesLogger::end_event` for that event type.
+    /// An "event" refers to the period between calls to [`TimeSeriesLogger::end_event`]
+    /// for that event type.
     ///
     /// # Returns
     /// May return an error if the logged value is structurally incompatible
@@ -93,6 +104,23 @@ pub trait TimeSeriesLogger {
 
     /// End an event instance.
     fn end_event(&mut self, event: Event);
+
+    /// Creates a wrapper [`Logger`] that logs all values to a specific event type.
+    ///
+    /// This does not create or end event instances,
+    /// it just creates a wrapper around [`TimeSeriesLogger::log`] with a fixed event.
+    fn event_logger(&mut self, event: Event) -> TimeSeriesEventLogger;
+}
+
+pub struct TimeSeriesEventLogger<'a> {
+    logger: &'a mut dyn TimeSeriesLogger,
+    event: Event,
+}
+
+impl<'a> Logger for TimeSeriesEventLogger<'a> {
+    fn log<'b>(&mut self, id: &'b str, value: Loggable) -> Result<(), LogError<'b>> {
+        self.logger.log(self.event, id, value)
+    }
 }
 
 /// Time series logger that does nothing
@@ -102,6 +130,13 @@ impl TimeSeriesLogger for () {
     }
 
     fn end_event(&mut self, _: Event) {}
+
+    fn event_logger(&mut self, event: Event) -> TimeSeriesEventLogger {
+        TimeSeriesEventLogger {
+            logger: self,
+            event,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

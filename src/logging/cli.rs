@@ -1,5 +1,5 @@
 //! Command-line logger
-use super::{Event, LogError, Loggable, TimeSeriesLogger};
+use super::{Event, LogError, Loggable, TimeSeriesEventLogger, TimeSeriesLogger};
 use enum_map::{enum_map, EnumMap};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -104,6 +104,13 @@ impl TimeSeriesLogger for CLILogger {
         }
 
         self.display();
+    }
+
+    fn event_logger(&mut self, event: Event) -> TimeSeriesEventLogger {
+        TimeSeriesEventLogger {
+            logger: self,
+            event,
+        }
     }
 }
 
