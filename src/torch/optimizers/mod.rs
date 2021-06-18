@@ -5,6 +5,7 @@ mod coptimizer;
 pub use conjugate_gradient::{ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig};
 pub use coptimizer::{AdamConfig, AdamWConfig, RmsPropConfig, SgdConfig};
 
+use crate::logging::Logger;
 use std::error::Error;
 use tch::{nn::VarStore, Tensor};
 use thiserror::Error;
@@ -25,6 +26,7 @@ pub trait Optimizer: BaseOptimizer {
     /// * `loss_fn` - Loss function to minimize.
     ///     Called to obtain the loss tensor, which is back-propagated to obtain a gradient.
     ///     Always evaluated at least once; may be evaluated multiple times.
+    /// * `logger` - Logger for statistics and other information about the step.
     ///
     /// # Returns
     /// The initial value of `loss_fn` on success.
@@ -36,11 +38,17 @@ pub trait Optimizer: BaseOptimizer {
     /// For example, [`COptimizer`] sets parameters to NaN when the loss is NaN.
     ///
     /// [`COptimizer`]: tch::COptimizer
-    fn backward_step(&mut self, loss_fn: &dyn Fn() -> Tensor)
-        -> Result<Tensor, OptimizerStepError>;
+    fn backward_step(
+        &mut self,
+        loss_fn: &dyn Fn() -> Tensor,
+        logger: &mut dyn Logger,
+    ) -> Result<Tensor, OptimizerStepError>;
 }
 
-/// Optimizer that minimizes a loss tensor.
+/// Optimizer that minimizes a loss tensor using a single gradient evaluation per step.
+///
+/// Specifically, each step may use the gradient at the initial point of the step
+/// and makes no further gradient evaluations.
 pub trait OnceOptimizer: BaseOptimizer {
     /// Perform an optimization step (parameter update).
     ///
@@ -53,7 +61,7 @@ pub trait OnceOptimizer: BaseOptimizer {
     /// For example, [`COptimizer`] sets parameters to NaN when the loss is NaN.
     ///
     /// [`COptimizer`]: tch::COptimizer
-    fn step_once(&self) -> Result<(), OptimizerStepError>;
+    fn step_once(&self, logger: &mut dyn Logger) -> Result<(), OptimizerStepError>;
 
     /// Apply a backward step pass, update the gradients, and perform an optimization step.
     ///
@@ -61,6 +69,7 @@ pub trait OnceOptimizer: BaseOptimizer {
     ///
     /// # Args
     /// * `loss` - Loss tensor. Back-propagation is applied to this tensor to obtain a gradient.
+    /// * `logger` - Logger for statistics and other information about the step.
     ///
     /// # Returns
     /// The initial value of `loss_fn` on success.
@@ -72,16 +81,21 @@ pub trait OnceOptimizer: BaseOptimizer {
     /// For example, [`COptimizer`] sets parameters to NaN when the loss is NaN.
     ///
     /// [`COptimizer`]: tch::COptimizer
-    fn backward_step_once(&mut self, loss: &Tensor) -> Result<(), OptimizerStepError>;
+    fn backward_step_once(
+        &mut self,
+        loss: &Tensor,
+        logger: &mut dyn Logger,
+    ) -> Result<(), OptimizerStepError>;
 }
 
 impl<T: OnceOptimizer> Optimizer for T {
     fn backward_step(
         &mut self,
         loss_fn: &dyn Fn() -> Tensor,
+        logger: &mut dyn Logger,
     ) -> Result<Tensor, OptimizerStepError> {
         let loss = loss_fn();
-        self.backward_step_once(&loss)?;
+        self.backward_step_once(&loss, logger)?;
         Ok(loss)
     }
 }
@@ -103,12 +117,15 @@ pub trait TrustRegionOptimizer: BaseOptimizer {
     ///
     /// * `max_distance` - Upper bound on the distance value for this step.
     ///
+    /// * `logger` - Logger for statistics and other information about the step.
+    ///
     /// # Returns
     /// The initial loss value on success.
     fn trust_region_backward_step(
         &self,
         loss_distance_fn: &dyn Fn() -> (Tensor, Tensor),
         max_distance: f64,
+        logger: &mut dyn Logger,
     ) -> Result<f64, OptimizerStepError>;
 }
 
@@ -163,7 +180,7 @@ mod testing {
         let loss_fn = || m.mv(&x).dot(&x) / 2 + b.dot(&x);
 
         for _ in 0..num_steps {
-            let _ = optimizer.backward_step(&loss_fn).unwrap();
+            let _ = optimizer.backward_step(&loss_fn, &mut ()).unwrap();
         }
 
         let expected = Tensor::of_slice(&[-1.0, 1.0]);
@@ -201,7 +218,7 @@ mod testing {
 
         for _ in 0..num_steps {
             x_last.detach().copy_(&x);
-            let result = optimizer.trust_region_backward_step(&loss_distance_fn, 0.001);
+            let result = optimizer.trust_region_backward_step(&loss_distance_fn, 0.001, &mut ());
             match result {
                 Err(OptimizerStepError::LossNotImproving {
                     loss: _,

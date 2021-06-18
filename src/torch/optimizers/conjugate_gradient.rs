@@ -30,6 +30,7 @@
 
 use super::super::utils;
 use super::{BaseOptimizer, OptimizerBuilder, OptimizerStepError, TrustRegionOptimizer};
+use crate::logging::Logger;
 use std::borrow::Borrow;
 use std::convert::{Infallible, TryInto};
 use tch::{nn::VarStore, Tensor};
@@ -106,6 +107,7 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
         &self,
         loss_distance_fn: &dyn Fn() -> (Tensor, Tensor),
         max_distance: f64,
+        logger: &mut dyn Logger,
     ) -> Result<f64, OptimizerStepError> {
         let (loss, distance) = loss_distance_fn();
 
@@ -147,6 +149,7 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
             x if x.is_nan() => 1.0,
             x => x,
         };
+        logger.log("step_size", step_size.into()).unwrap();
 
         let descent_step = step_size * step_dir;
         let initial_loss: f64 = loss.into();
@@ -405,7 +408,8 @@ mod cg_optimizer {
     {
         for _ in 0..num_steps {
             on_step();
-            let result = optimizer.trust_region_backward_step(&loss_distance_fn, max_distance);
+            let result =
+                optimizer.trust_region_backward_step(&loss_distance_fn, max_distance, &mut ());
             match result {
                 Err(OptimizerStepError::LossNotImproving {
                     loss: _,

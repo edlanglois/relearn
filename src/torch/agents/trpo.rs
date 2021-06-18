@@ -15,7 +15,7 @@ use super::super::ModuleBuilder;
 use super::actor::{HistoryFeatures, PolicyValueNetActor, PolicyValueNetActorConfig};
 use super::policy_gradient;
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use crate::logging::{Event, TimeSeriesLogger};
+use crate::logging::{Logger, TimeSeriesEventLogger, TimeSeriesLogger};
 use crate::spaces::{
     BaseFeatureSpace, BatchFeatureSpace, FeatureSpace, ParameterizedDistributionSpace, ReprSpace,
     Space,
@@ -233,7 +233,7 @@ fn trpo_update<OS, AS, P, PO, V>(
     features: &HistoryFeatures<OS, AS>,
     policy_optimizer: &mut PO,
     max_policy_step_kl: f64,
-    logger: &mut dyn TimeSeriesLogger,
+    logger: &mut TimeSeriesEventLogger,
 ) -> Option<Tensor>
 where
     OS: BatchFeatureSpace<Tensor>,
@@ -245,7 +245,6 @@ where
     if features.episode_ranges().is_empty() {
         logger
             .log(
-                Event::Epoch,
                 "no_policy_step",
                 "Skipping policy update: empty history features".into(),
             )
@@ -299,15 +298,16 @@ where
         (loss, distance)
     };
 
-    let result =
-        policy_optimizer.trust_region_backward_step(&policy_loss_distance_fn, max_policy_step_kl);
+    let result = policy_optimizer.trust_region_backward_step(
+        &policy_loss_distance_fn,
+        max_policy_step_kl,
+        logger,
+    );
     if let Err(error) = result {
         match error {
             OptimizerStepError::NaNLoss => panic!("NaN loss in policy optimization"),
             OptimizerStepError::NaNConstraint => panic!("NaN constraint in policy optimization"),
-            e => logger
-                .log(Event::Epoch, "no_policy_step", e.to_string().into())
-                .unwrap(),
+            e => logger.log("no_policy_step", e.to_string().into()).unwrap(),
         }
     }
 

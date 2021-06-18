@@ -1,5 +1,6 @@
 //! Torch optimizer wrappers and configuration
 use super::{BaseOptimizer, OnceOptimizer, OptimizerBuilder, OptimizerStepError};
+use crate::logging::Logger;
 use std::convert::{TryFrom, TryInto};
 use tch::{nn::VarStore, COptimizer, TchError, Tensor};
 
@@ -10,17 +11,21 @@ impl BaseOptimizer for COptimizer {
 }
 
 impl OnceOptimizer for COptimizer {
-    fn step_once(&self) -> Result<(), OptimizerStepError> {
+    fn step_once(&self, _logger: &mut dyn Logger) -> Result<(), OptimizerStepError> {
         // I'm not sure what errors it is possible for torch to raise here
         // Anything that isn't essentially a type error should be converted to OptimizerStepError.
         Self::step(self).unwrap();
         Ok(())
     }
 
-    fn backward_step_once(&mut self, loss: &Tensor) -> Result<(), OptimizerStepError> {
+    fn backward_step_once(
+        &mut self,
+        loss: &Tensor,
+        logger: &mut dyn Logger,
+    ) -> Result<(), OptimizerStepError> {
         BaseOptimizer::zero_grad(self);
         loss.backward();
-        self.step_once()
+        self.step_once(logger)
     }
 }
 
@@ -227,7 +232,7 @@ mod coptimizer {
         let mut optimizer = SgdConfig::default().build_optimizer(&vs).unwrap();
         #[allow(clippy::eq_op)]
         let _ = optimizer
-            .backward_step(&(|| (&x / &x).sum(Kind::Float)))
+            .backward_step(&(|| (&x / &x).sum(Kind::Float)), &mut ())
             .unwrap();
     }
 

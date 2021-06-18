@@ -3,7 +3,7 @@ use super::super::history::{HistoryBuffer, LazyPackedHistoryFeatures};
 use super::super::seq_modules::StatefulIterativeModule;
 use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::ModuleBuilder;
-use crate::logging::{Event, TimeSeriesLogger};
+use crate::logging::{Event, Logger, TimeSeriesEventLogger, TimeSeriesLogger};
 use crate::spaces::{
     BaseFeatureSpace, FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace, ReprSpace,
     Space,
@@ -264,8 +264,8 @@ where
         update_value: G,
         logger: &mut dyn TimeSeriesLogger,
     ) where
-        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn TimeSeriesLogger) -> Option<Tensor>,
-        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn TimeSeriesLogger) -> Option<Tensor>,
+        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut TimeSeriesEventLogger) -> Option<Tensor>,
+        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut TimeSeriesEventLogger) -> Option<Tensor>,
     {
         let episode_done = step.episode_done;
         self.history.push(step);
@@ -274,7 +274,12 @@ where
         if history_len >= self.max_steps_per_epoch
             || (history_len >= self.steps_per_epoch && episode_done)
         {
-            self.epoch_update(update_policy, update_value, logger);
+            self.epoch_update(
+                update_policy,
+                update_value,
+                &mut logger.event_logger(Event::Epoch),
+            );
+            logger.end_event(Event::Epoch);
         }
     }
 
@@ -293,10 +298,10 @@ where
         &mut self,
         update_policy: F,
         mut update_value: G,
-        logger: &mut dyn TimeSeriesLogger,
+        logger: &mut TimeSeriesEventLogger,
     ) where
-        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut dyn TimeSeriesLogger) -> Option<Tensor>,
-        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut dyn TimeSeriesLogger) -> Option<Tensor>,
+        F: FnOnce(&Self, &HistoryFeatures<OS, AS>, &mut TimeSeriesEventLogger) -> Option<Tensor>,
+        G: FnMut(&Self, &HistoryFeatures<OS, AS>, &mut TimeSeriesEventLogger) -> Option<Tensor>,
     {
         let features = LazyPackedHistoryFeatures::new(
             self.history.steps(),
@@ -306,11 +311,11 @@ where
             self.discount_factor,
             self.device,
         );
-        epoch_log_scalar(logger, "num_steps", self.history.len() as f64);
-        epoch_log_scalar(logger, "num_episodes", self.history.num_episodes() as f64);
+        log_scalar(logger, "num_steps", self.history.len() as f64);
+        log_scalar(logger, "num_episodes", self.history.num_episodes() as f64);
 
         if let Some(entropy) = update_policy(self, &features, logger) {
-            epoch_log_scalar(logger, "policy_entropy", &entropy);
+            log_scalar(logger, "policy_entropy", &entropy);
         }
 
         if self.value.trainable() {
@@ -319,9 +324,9 @@ where
 
                 if let Some(value_loss) = value_loss {
                     if i == 0 {
-                        epoch_log_scalar(logger, "value_loss_initial", &value_loss);
+                        log_scalar(logger, "value_loss_initial", &value_loss);
                     } else if i == self.value_train_iters - 1 {
-                        epoch_log_scalar(logger, "value_loss_final", &value_loss);
+                        log_scalar(logger, "value_loss_final", &value_loss);
                     }
                 }
             }
@@ -334,17 +339,15 @@ where
                 .expect("Variable mismatch between main policy and CPU policy");
         }
 
-        logger.end_event(Event::Epoch);
-
         self.history.clear();
     }
 }
 
-/// Log a value with the epoch event.
-fn epoch_log_scalar<L, V>(logger: &mut L, name: &str, value: V)
+/// Log a scalar value
+fn log_scalar<L, V>(logger: &mut L, name: &str, value: V)
 where
-    L: TimeSeriesLogger + ?Sized,
+    L: Logger + ?Sized,
     V: Into<f64>,
 {
-    logger.log(Event::Epoch, name, value.into().into()).unwrap();
+    logger.log(name, value.into().into()).unwrap();
 }

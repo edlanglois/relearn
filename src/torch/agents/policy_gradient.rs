@@ -5,7 +5,7 @@ use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use super::actor::{HistoryFeatures, PolicyValueNetActor, PolicyValueNetActorConfig};
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
-use crate::logging::{Event, TimeSeriesLogger};
+use crate::logging::{Logger, TimeSeriesEventLogger, TimeSeriesLogger};
 use crate::spaces::{
     BaseFeatureSpace, BatchFeatureSpace, FeatureSpace, ParameterizedDistributionSpace, ReprSpace,
     Space,
@@ -191,7 +191,7 @@ pub fn policy_gradient_update<OS, AS, P, V, PO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
     features: &HistoryFeatures<OS, AS>,
     optimizer: &mut PO,
-    logger: &mut dyn TimeSeriesLogger,
+    logger: &mut TimeSeriesEventLogger,
 ) -> Option<Tensor>
 where
     OS: BatchFeatureSpace<Tensor>,
@@ -203,7 +203,6 @@ where
     if features.episode_ranges().is_empty() {
         logger
             .log(
-                Event::Epoch,
                 "no_policy_step",
                 "Skipping policy update: empty history features".into(),
             )
@@ -226,7 +225,7 @@ where
         -(log_probs * &step_values).mean(Kind::Float)
     };
 
-    let _ = optimizer.backward_step(&policy_loss_fn).unwrap();
+    let _ = optimizer.backward_step(&policy_loss_fn, logger).unwrap();
 
     Some(entropies.into_inner().unwrap().mean(Kind::Float))
 }
@@ -236,7 +235,7 @@ pub fn value_squared_error_update<OS, AS, P, V, VO>(
     actor: &PolicyValueNetActor<OS, AS, P, V>,
     features: &HistoryFeatures<OS, AS>,
     optimizer: &mut VO,
-    logger: &mut dyn TimeSeriesLogger,
+    logger: &mut TimeSeriesEventLogger,
 ) -> Option<Tensor>
 where
     OS: BatchFeatureSpace<Tensor>,
@@ -247,7 +246,6 @@ where
     if features.episode_ranges().is_empty() {
         logger
             .log(
-                Event::Epoch,
                 "no_value_step",
                 "Skipping value update: empty history featuers".into(),
             )
@@ -257,7 +255,7 @@ where
 
     Some(
         optimizer
-            .backward_step(&|| actor.value.loss(features).unwrap())
+            .backward_step(&|| actor.value.loss(features).unwrap(), logger)
             .unwrap(),
     )
 }
