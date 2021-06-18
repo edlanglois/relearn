@@ -123,6 +123,13 @@ impl<'a> Logger for TimeSeriesEventLogger<'a> {
     }
 }
 
+/// Logger that does nothing
+impl Logger for () {
+    fn log<'a>(&mut self, _id: &'a str, _value: Loggable) -> Result<(), LogError<'a>> {
+        Ok(())
+    }
+}
+
 /// Time series logger that does nothing
 impl TimeSeriesLogger for () {
     fn log<'a>(&mut self, _: Event, _: &'a str, _: Loggable) -> Result<(), LogError<'a>> {
