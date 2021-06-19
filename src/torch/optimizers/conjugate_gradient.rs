@@ -160,6 +160,7 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
             loss_distance_fn,
             max_distance,
             initial_loss,
+            logger,
         )?;
 
         Ok(initial_loss)
@@ -174,6 +175,7 @@ impl ConjugateGradientOptimizer {
         loss_constraint_fn: &F,
         max_constraint_value: f64,
         initial_loss: f64,
+        logger: &mut dyn Logger,
     ) -> Result<(), OptimizerStepError>
     where
         F: Fn() -> (Tensor, Tensor) + ?Sized,
@@ -186,6 +188,7 @@ impl ConjugateGradientOptimizer {
 
         let mut loss = initial_loss;
         let mut constraint_val = f64::INFINITY;
+        logger.log("initial_loss", loss.into()).unwrap();
         for i in 0..self.config.max_backtracks {
             let ratio = self.config.backtrack_ratio.powi(i.try_into().unwrap());
 
@@ -204,9 +207,15 @@ impl ConjugateGradientOptimizer {
             loss = loss_tensor.into();
             constraint_val = constraint_tensor.into();
             if loss < initial_loss && constraint_val <= max_constraint_value {
+                logger.log("num_backtracks", (i as f64).into()).unwrap();
                 break;
             }
         }
+
+        logger.log("final_loss", loss.into()).unwrap();
+        logger
+            .log("final_constraint_val", constraint_val.into())
+            .unwrap();
 
         let result = if loss.is_nan() {
             Err(OptimizerStepError::NaNLoss)
