@@ -208,6 +208,7 @@ impl ConjugateGradientOptimizer {
             constraint_val = constraint_tensor.into();
             if loss < initial_loss && constraint_val <= max_constraint_value {
                 logger.log("num_backtracks", (i as f64).into()).unwrap();
+                logger.log("step_scale", ratio.into()).unwrap();
                 break;
             }
         }
