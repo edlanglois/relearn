@@ -4,10 +4,11 @@ pub mod cli;
 
 pub use cli::CLILogger;
 use enum_map::Enum;
+use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::convert::From;
-use std::error::Error;
+use std::convert::{AsRef, From, Into};
 use std::fmt;
+use thiserror::Error;
 
 /// Simulation run events types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Enum)]
@@ -18,7 +19,7 @@ pub enum Event {
 }
 
 /// A value that can be logged.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Loggable {
     /// Nothing. No data to log.
     /// Logging Nothing data may still produce a placeholder entry for the name.
@@ -60,9 +61,21 @@ pub trait Logger {
     /// Log a value
     ///
     /// # Args
-    /// * `id` - An identifier for the value.
+    /// * `name` - A name identifying the value.
     /// * `value` - The value to log.
-    fn log<'a>(&mut self, id: &'a str, value: Loggable) -> Result<(), LogError<'a>>;
+    fn log(&mut self, name: &'static str, value: Loggable) -> Result<(), LogError> {
+        self.id_log(name.into(), value)
+    }
+
+    /// Log a value for a given hierarchical ID.
+    ///
+    /// # Args
+    /// * `id` - The identifier for the value.
+    /// * `value` - The value to log.
+    fn id_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError>;
+
+    /// Create a view on the logger that adds a scope prefix to all logged ids.
+    fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn Logger>;
 }
 
 // TODO: Make generic over Event? E: Enum
@@ -99,8 +112,14 @@ pub trait TimeSeriesLogger {
     /// # Returns
     /// May return an error if the logged value is structurally incompatible
     /// with previous values logged under the same name.
-    fn log<'a>(&mut self, event: Event, name: &'a str, value: Loggable)
-        -> Result<(), LogError<'a>>;
+    fn log(&mut self, event: Event, name: &'static str, value: Loggable) -> Result<(), LogError> {
+        self.id_log(event, name.into(), value)
+    }
+
+    /// Log a value for a given hierarchical id.
+    ///
+    /// See [`TimeSeriesLogger::log`] for details.
+    fn id_log(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError>;
 
     /// End an event instance.
     fn end_event(&mut self, event: Event);
@@ -110,29 +129,117 @@ pub trait TimeSeriesLogger {
     /// This does not create or end event instances,
     /// it just creates a wrapper around [`TimeSeriesLogger::log`] with a fixed event.
     fn event_logger(&mut self, event: Event) -> TimeSeriesEventLogger;
+
+    /// Create a view on the logger that adds a scope prefix to all logged ids.
+    fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn TimeSeriesLogger>;
 }
 
 pub struct TimeSeriesEventLogger<'a> {
-    logger: &'a mut dyn TimeSeriesLogger,
+    logger: &'a mut (dyn TimeSeriesLogger + 'a),
     event: Event,
 }
 
 impl<'a> Logger for TimeSeriesEventLogger<'a> {
-    fn log<'b>(&mut self, id: &'b str, value: Loggable) -> Result<(), LogError<'b>> {
-        self.logger.log(self.event, id, value)
+    fn id_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+        self.logger.id_log(self.event, id, value)
+    }
+
+    fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn Logger> {
+        ScopedLogger::new(self, scope)
+    }
+}
+
+/// Wraps a logger by adding a scope (prefix) to all ids.
+pub struct ScopedLogger<'a, L: 'a + ?Sized> {
+    logger: &'a mut L,
+    prefix: Id,
+}
+
+impl<'a, L: ?Sized> ScopedLogger<'a, L> {
+    pub fn new<S: Into<Cow<'static, str>>>(logger: &'a mut L, scope: S) -> Self {
+        Self {
+            logger,
+            prefix: Id::from(scope),
+        }
+    }
+}
+
+impl<'a> Logger for ScopedLogger<'a, dyn Logger> {
+    fn log(&mut self, name: &'static str, value: Loggable) -> Result<(), LogError> {
+        let mut full_id = self.prefix.clone();
+        full_id.push(name.into());
+        self.logger.id_log(full_id, value)
+    }
+
+    fn id_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+        let mut full_id = self.prefix.clone();
+        full_id.append(id);
+        self.logger.id_log(full_id, value)
+    }
+
+    fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn Logger> {
+        // Copy and extend the prefix rather than wrapper the existing ScopedLogger
+        // This way, a nested scope is represented by a single ScopedLogger not a tower of
+        // ScopedLoggers that would each create a copy of the partial scope when invoked.
+        let mut prefix = self.prefix.clone();
+        prefix.push(scope.into());
+        ScopedLogger {
+            logger: self.logger,
+            prefix,
+        }
+    }
+}
+
+impl<'a> TimeSeriesLogger for ScopedLogger<'a, dyn TimeSeriesLogger> {
+    fn log(&mut self, event: Event, name: &'static str, value: Loggable) -> Result<(), LogError> {
+        let mut full_id = self.prefix.clone();
+        full_id.push(name.into());
+        self.id_log(event, full_id, value)
+    }
+
+    fn id_log(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError> {
+        let mut full_id = self.prefix.clone();
+        full_id.append(id);
+        self.logger.id_log(event, full_id, value)
+    }
+
+    fn end_event(&mut self, event: Event) {
+        self.logger.end_event(event);
+    }
+
+    fn event_logger(&mut self, event: Event) -> TimeSeriesEventLogger {
+        TimeSeriesEventLogger {
+            logger: self,
+            event,
+        }
+    }
+
+    fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn TimeSeriesLogger> {
+        // Copy and extend the prefix rather than wrapper the existing ScopedLogger
+        // This way, a nested scope is represented by a single ScopedLogger not a tower of
+        // ScopedLoggers that would each create a copy of the partial scope when invoked.
+        let mut prefix = self.prefix.clone();
+        prefix.push(scope.into());
+        ScopedLogger {
+            logger: self.logger,
+            prefix,
+        }
     }
 }
 
 /// Logger that does nothing
 impl Logger for () {
-    fn log<'a>(&mut self, _id: &'a str, _value: Loggable) -> Result<(), LogError<'a>> {
+    fn id_log(&mut self, _id: Id, _value: Loggable) -> Result<(), LogError> {
         Ok(())
+    }
+    fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn Logger> {
+        ScopedLogger::new(self, scope)
     }
 }
 
 /// Time series logger that does nothing
 impl TimeSeriesLogger for () {
-    fn log<'a>(&mut self, _: Event, _: &'a str, _: Loggable) -> Result<(), LogError<'a>> {
+    fn id_log(&mut self, _event: Event, _id: Id, _value: Loggable) -> Result<(), LogError> {
         Ok(())
     }
 
@@ -144,33 +251,83 @@ impl TimeSeriesLogger for () {
             event,
         }
     }
+
+    fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn TimeSeriesLogger> {
+        ScopedLogger::new(self, scope)
+    }
 }
 
-#[derive(Debug, Clone)]
-pub struct LogError<'a> {
-    name: &'a str,
+/// A hierarchical identifier.
+///
+/// The identifier consists of the top-level namespace first,
+/// followed by inner namespaces, then the identifier name.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct Id(SmallVec<[Cow<'static, str>; 6]>);
+
+impl Id {
+    /// Create a new `Id` instance.
+    ///
+    /// # Errors
+    /// If the given name hierarchy does not have at least one element (the name).
+    pub fn new<T: Into<SmallVec<[Cow<'static, str>; 6]>>>(names: T) -> Result<Self, LogError> {
+        let names = names.into();
+        if names.is_empty() {
+            return Err(LogError::InvalidEmptyId);
+        }
+        Ok(Self(names))
+    }
+
+    pub fn from_name<T: Into<Cow<'static, str>>>(name: T) -> Self {
+        Self((&[name.into()] as &[_]).into())
+    }
+
+    /// Append another ID onto this one creating a more deeply nested namespace.
+    ///
+    /// The new ID is placed inside the namespace created by self.
+    pub fn append(&mut self, mut other: Self) {
+        self.0.append(&mut other.0)
+    }
+
+    /// Push a name into the namespace. The new name is on the inside.
+    pub fn push(&mut self, name: Cow<'static, str>) {
+        self.0.push(name)
+    }
+}
+
+impl<T: Into<Cow<'static, str>>> From<T> for Id {
+    fn from(name: T) -> Self {
+        Self::from_name(name)
+    }
+}
+
+impl fmt::Display for Id {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0[0].as_ref())?;
+        for name in &self.0[1..] {
+            write!(f, "/{}", name.as_ref())?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug, Clone, PartialEq)]
+pub enum LogError {
+    #[error("ID name list must not be empty")]
+    InvalidEmptyId,
+    #[error(transparent)]
+    IncompatibleValue(#[from] Box<IncompatibleValueError>),
+}
+
+#[derive(Error, Debug, Clone, PartialEq)]
+#[error("\"{id}\": Incompatible value {value:?}, expected {expected}")]
+pub struct IncompatibleValueError {
+    id: Id,
     value: Loggable,
     expected: String,
 }
 
-impl<'a> LogError<'a> {
-    pub const fn new(name: &'a str, value: Loggable, expected: String) -> Self {
-        Self {
-            name,
-            value,
-            expected,
-        }
+impl From<IncompatibleValueError> for LogError {
+    fn from(value: IncompatibleValueError) -> Self {
+        Self::IncompatibleValue(Box::new(value))
     }
 }
-
-impl<'a> fmt::Display for LogError<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "\"{}\": incompatible value {:?}, expected {}",
-            self.name, self.value, self.expected
-        )
-    }
-}
-
-impl<'a> Error for LogError<'a> {}

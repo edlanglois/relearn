@@ -830,6 +830,7 @@ dependencies = [
  "rand_distr",
  "rstest",
  "rust_rl_derive",
+ "smallvec",
  "tch",
  "thiserror",
 ]
@@ -937,6 +938,12 @@ dependencies = [
  "ryu",
  "serde",
 ]
+
+[[package]]
+name = "smallvec"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "socket2"

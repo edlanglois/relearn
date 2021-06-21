@@ -344,7 +344,7 @@ where
 }
 
 /// Log a scalar value
-fn log_scalar<L, V>(logger: &mut L, name: &str, value: V)
+fn log_scalar<L, V>(logger: &mut L, name: &'static str, value: V)
 where
     L: Logger + ?Sized,
     V: Into<f64>,

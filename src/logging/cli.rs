@@ -1,8 +1,11 @@
 //! Command-line logger
-use super::{Event, LogError, Loggable, TimeSeriesEventLogger, TimeSeriesLogger};
+use super::{
+    Event, Id, IncompatibleValueError, LogError, Loggable, ScopedLogger, TimeSeriesEventLogger,
+    TimeSeriesLogger,
+};
 use enum_map::{enum_map, EnumMap};
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{btree_map, BTreeMap};
 use std::convert::TryInto;
 use std::fmt;
 use std::ops::Drop;
@@ -55,8 +58,8 @@ impl CLILogger {
             );
             println!(" ====");
 
-            for (name, aggregator) in &mut event_log.aggregators {
-                println!("{}: {}", name, aggregator);
+            for (id, aggregator) in &mut event_log.aggregators {
+                println!("{}: {}", id, aggregator);
                 aggregator.clear();
             }
             event_log.summary_start_index = event_log.index;
@@ -66,25 +69,24 @@ impl CLILogger {
 }
 
 impl TimeSeriesLogger for CLILogger {
-    fn log<'a>(
-        &mut self,
-        event: Event,
-        name: &'a str,
-        value: Loggable,
-    ) -> Result<(), LogError<'a>> {
-        // The entry API does not currently support lookup with Borrow + IntoOwned
-        // Eventually raw_entry can be used but it is not stable yet.
-        // For now, make separate get() / insert() calls.
-        // The duplicated lookup with insert will only occur once per name since we never remove
-        // aggregators.
+    fn id_log<'a>(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError> {
         let aggregators = &mut self.events[event].aggregators;
-        if let Some(aggregator) = aggregators.get_mut(name) {
-            if let Err((value, expected)) = aggregator.set_pending(value) {
-                return Err(LogError::new(name, value, expected));
+        match aggregators.entry(id) {
+            btree_map::Entry::Vacant(e) => {
+                e.insert(Aggregator::new(value));
             }
-        } else {
-            let old_value = aggregators.insert(name.into(), Aggregator::new(value));
-            assert!(old_value.is_none());
+            btree_map::Entry::Occupied(mut e) => {
+                if let Err((value, expected)) = e.get_mut().set_pending(value) {
+                    // TODO Try to get the original id back instead of copying.
+                    // Maybe raw_entry will allow it once stable?
+                    return Err(IncompatibleValueError {
+                        id: e.key().clone(),
+                        value,
+                        expected,
+                    }
+                    .into());
+                }
+            }
         }
         Ok(())
     }
@@ -112,6 +114,10 @@ impl TimeSeriesLogger for CLILogger {
             event,
         }
     }
+
+    fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn TimeSeriesLogger> {
+        ScopedLogger::new(self, scope)
+    }
 }
 
 impl Drop for CLILogger {
@@ -130,7 +136,7 @@ struct EventLog {
     /// Duration of this summary period to the most recent update
     summary_duration: Duration,
     /// An aggregator for each log entry.
-    aggregators: BTreeMap<String, Aggregator>,
+    aggregators: BTreeMap<Id, Aggregator>,
 }
 
 impl EventLog {

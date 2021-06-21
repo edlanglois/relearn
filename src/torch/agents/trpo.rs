@@ -242,6 +242,7 @@ where
     PO: TrustRegionOptimizer,
     V: StepValue,
 {
+    let mut logger = logger.scope("trpo");
     if features.episode_ranges().is_empty() {
         logger
             .log(
@@ -301,7 +302,7 @@ where
     let result = policy_optimizer.trust_region_backward_step(
         &policy_loss_distance_fn,
         max_policy_step_kl,
-        logger,
+        &mut logger,
     );
     if let Err(error) = result {
         match error {
