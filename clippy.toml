@@ -44,4 +44,5 @@ doc-valid-idents = [
 	# Additions
 	"cuDNN",
 	"CuDNN",
+	"PyTorch",
 ]
