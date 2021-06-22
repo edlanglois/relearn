@@ -510,7 +510,7 @@ mod meta_env_bandits {
         // Inner state is terminal.
         let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng);
         assert_eq!(reward, 1.0);
-        assert_eq!(trial_done, false);
+        assert!(!trial_done);
         let state = maybe_state.unwrap();
         assert_eq!(env.observe(&state, &mut rng), (None, Some((0, 1.0)), true));
 
@@ -518,7 +518,7 @@ mod meta_env_bandits {
         // The action is ignored and a new inner episode is started.
         let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng);
         assert_eq!(reward, 0.0);
-        assert_eq!(trial_done, false);
+        assert!(!trial_done);
         let state = maybe_state.unwrap();
         assert_eq!(env.observe(&state, &mut rng), (Some(()), None, false));
 
@@ -527,7 +527,7 @@ mod meta_env_bandits {
         // Inner state is terminal
         let (maybe_state, reward, trial_done) = env.step(state, &1, &mut rng);
         assert_eq!(reward, 0.0);
-        assert_eq!(trial_done, false);
+        assert!(!trial_done);
         let state = maybe_state.unwrap();
         assert_eq!(env.observe(&state, &mut rng), (None, Some((1, 0.0)), true));
 
@@ -535,7 +535,7 @@ mod meta_env_bandits {
         // The action is ignored and a new inner episode is started.
         let (maybe_state, reward, trial_done) = env.step(state, &1, &mut rng);
         assert_eq!(reward, 0.0);
-        assert_eq!(trial_done, false);
+        assert!(!trial_done);
         let state = maybe_state.unwrap();
         assert_eq!(env.observe(&state, &mut rng), (Some(()), None, false));
 
@@ -545,7 +545,7 @@ mod meta_env_bandits {
         // This inner episode was the last in the trial so the trial is done.
         let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng);
         assert_eq!(reward, 1.0);
-        assert_eq!(trial_done, true);
+        assert!(trial_done);
         let state = maybe_state.unwrap();
         assert_eq!(env.observe(&state, &mut rng), (None, Some((0, 1.0)), true));
 
@@ -558,7 +558,7 @@ mod meta_env_bandits {
         // Inner state is terminal.
         let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng);
         assert_eq!(reward, 0.0);
-        assert_eq!(trial_done, false);
+        assert!(!trial_done);
         let state = maybe_state.unwrap();
         assert_eq!(env.observe(&state, &mut rng), (None, Some((0, 0.0)), true));
     }
@@ -580,14 +580,14 @@ mod meta_env_bandits {
         // Inner state is terminal.
         let (observation, reward, trial_done) = env.step(&0);
         assert_eq!(reward, 1.0);
-        assert_eq!(trial_done, false);
+        assert!(!trial_done);
         assert_eq!(observation, Some((None, Some((0, 1.0)), true)));
 
         // Trial 0; Ep 1; Init.
         // The action is ignored and a new inner episode is started.
         let (observation, reward, trial_done) = env.step(&0);
         assert_eq!(reward, 0.0);
-        assert_eq!(trial_done, false);
+        assert!(!trial_done);
         assert_eq!(observation, Some((Some(()), None, false)));
 
         // Trial 0; Ep 1; Step 0
@@ -595,14 +595,14 @@ mod meta_env_bandits {
         // Inner state is terminal
         let (observation, reward, trial_done) = env.step(&1);
         assert_eq!(reward, 0.0);
-        assert_eq!(trial_done, false);
+        assert!(!trial_done);
         assert_eq!(observation, Some((None, Some((1, 0.0)), true)));
 
         // Trial 0; Ep 2; Init.
         // The action is ignored and a new inner episode is started.
         let (observation, reward, trial_done) = env.step(&1);
         assert_eq!(reward, 0.0);
-        assert_eq!(trial_done, false);
+        assert!(!trial_done);
         assert_eq!(observation, Some((Some(()), None, false)));
 
         // Trial 0; Ep 2; Step 0
@@ -611,7 +611,7 @@ mod meta_env_bandits {
         // This inner episode was the last in the trial so the trial is done.
         let (observation, reward, trial_done) = env.step(&0);
         assert_eq!(reward, 1.0);
-        assert_eq!(trial_done, true);
+        assert!(trial_done);
         assert_eq!(observation, Some((None, Some((0, 1.0)), true)));
 
         // Trial 1; Ep 1; Init.
@@ -623,7 +623,7 @@ mod meta_env_bandits {
         // Inner state is terminal.
         let (observation, reward, trial_done) = env.step(&0);
         assert_eq!(reward, 0.0);
-        assert_eq!(trial_done, false);
+        assert!(!trial_done);
         assert_eq!(observation, Some((None, Some((0, 0.0)), true)));
     }
 }
