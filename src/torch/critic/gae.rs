@@ -1,6 +1,6 @@
 //! Generalized Advantage Estimation
 use super::super::history::PackedHistoryFeaturesView;
-use super::{StepValue, StepValueBuilder};
+use super::{Critic, CriticBuilder};
 use crate::torch::{seq_modules::SequenceModule, ModuleBuilder};
 use crate::utils::packed;
 use tch::{nn::Path, Reduction, Tensor};
@@ -23,12 +23,12 @@ impl<VB: Default> Default for GaeConfig<VB> {
     }
 }
 
-impl<VB, V> StepValueBuilder<Gae<V>> for GaeConfig<VB>
+impl<VB, V> CriticBuilder<Gae<V>> for GaeConfig<VB>
 where
     VB: ModuleBuilder<V>,
     V: SequenceModule,
 {
-    fn build_step_value(&self, vs: &Path, in_dim: usize) -> Gae<V> {
+    fn build_critic(&self, vs: &Path, in_dim: usize) -> Gae<V> {
         Gae {
             gamma: self.gamma,
             lambda: self.lambda,
@@ -37,7 +37,7 @@ where
     }
 }
 
-/// Generalized Advantage Estimator for step values.
+/// Generalized Advantage Estimator critic.
 ///
 /// # Note
 /// Currently does not properly handle non-terminal end-of-episode.
@@ -59,7 +59,7 @@ pub struct Gae<V> {
     pub value_fn: V,
 }
 
-impl<V> StepValue for Gae<V>
+impl<V> Critic for Gae<V>
 where
     V: SequenceModule,
 {

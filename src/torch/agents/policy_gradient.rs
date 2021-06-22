@@ -1,7 +1,7 @@
 //! Vanilla Policy Gradient
+use super::super::critic::{Critic, CriticBuilder};
 use super::super::history::PackedHistoryFeaturesView;
 use super::super::seq_modules::{SequenceModule, StatefulIterativeModule};
-use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::{ModuleBuilder, Optimizer, OptimizerBuilder};
 use super::actor::{HistoryFeatures, PolicyValueNetActor, PolicyValueNetActorConfig};
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
@@ -48,8 +48,8 @@ where
     PB: ModuleBuilder<P>,
     P: SequenceModule + StatefulIterativeModule,
     POB: OptimizerBuilder<PO>,
-    VB: StepValueBuilder<V>,
-    V: StepValue,
+    VB: CriticBuilder<V>,
+    V: Critic,
     VOB: OptimizerBuilder<VO>,
 {
     #[allow(clippy::type_complexity)]
@@ -112,7 +112,7 @@ impl<OS, AS, P, PO, V, VO> PolicyGradientAgent<OS, AS, P, PO, V, VO>
 where
     OS: Space + BaseFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
-    V: StepValue,
+    V: Critic,
 {
     pub fn new<E, PB, VB, POB, VOB>(
         env: &E,
@@ -123,7 +123,7 @@ where
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
         PB: ModuleBuilder<P>,
-        VB: StepValueBuilder<V>,
+        VB: CriticBuilder<V>,
         POB: OptimizerBuilder<PO>,
         VOB: OptimizerBuilder<VO>,
     {
@@ -163,7 +163,7 @@ where
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
     P: SequenceModule + StatefulIterativeModule,
     PO: Optimizer,
-    V: StepValue,
+    V: Critic,
     VO: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
@@ -197,7 +197,7 @@ where
     OS: BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
     P: SequenceModule,
-    V: StepValue,
+    V: Critic,
     PO: Optimizer,
 {
     if features.episode_ranges().is_empty() {
@@ -210,7 +210,7 @@ where
         return None;
     }
 
-    let step_values = tch::no_grad(|| actor.value.seq_packed(features));
+    let critics = tch::no_grad(|| actor.value.seq_packed(features));
 
     let policy_output = actor.policy.seq_packed(
         features.observation_features(),
@@ -222,7 +222,7 @@ where
         let action_distributions = actor.action_space.distribution(&policy_output);
         let log_probs = action_distributions.log_probs(features.actions());
         entropies.set(Some(action_distributions.entropy()));
-        -(log_probs * &step_values).mean(Kind::Float)
+        -(log_probs * &critics).mean(Kind::Float)
     };
 
     let _ = optimizer.backward_step(&policy_loss_fn, logger).unwrap();
@@ -240,7 +240,7 @@ pub fn value_squared_error_update<OS, AS, P, V, VO>(
 where
     OS: BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor>,
-    V: StepValue,
+    V: Critic,
     VO: Optimizer,
 {
     if features.episode_ranges().is_empty() {
@@ -265,10 +265,10 @@ where
 mod policy_gradient {
     use super::*;
     use crate::agents::testing;
+    use crate::torch::critic::{Gae, GaeConfig, Return};
     use crate::torch::modules::MlpConfig;
     use crate::torch::optimizers::AdamConfig;
     use crate::torch::seq_modules::{GruMlp, RnnMlpConfig, WithState};
-    use crate::torch::step_value::{Gae, GaeConfig, Return};
     use tch::{nn::Sequential, Device};
 
     fn test_train_policy_gradient<P, PB, V, VB>(
@@ -276,8 +276,8 @@ mod policy_gradient {
     ) where
         P: SequenceModule + StatefulIterativeModule,
         PB: ModuleBuilder<P> + Default,
-        V: StepValue,
-        VB: StepValueBuilder<V> + Default,
+        V: Critic,
+        VB: CriticBuilder<V> + Default,
     {
         // Speed up learning for this simple environment
         config.actor_config.steps_per_epoch = 25;

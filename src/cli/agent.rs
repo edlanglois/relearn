@@ -1,4 +1,4 @@
-use super::{options::ValueFnView, Options, Update, WithUpdate};
+use super::{options::CriticView, Options, Update, WithUpdate};
 use crate::agents::{
     BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
@@ -152,12 +152,12 @@ where
     PB: Update<&'a Options>,
     POB: Update<&'a Options>,
     VB: Update<&'a Options>,
-    VOB: for<'b> Update<&'b ValueFnView<'a>>,
+    VOB: for<'b> Update<&'b CriticView<'a>>,
 {
     fn update(&mut self, opts: &'a Options) {
         self.actor_config.update(opts);
         self.policy_optimizer_config.update(opts);
-        self.value_optimizer_config.update(&opts.value_fn_view());
+        self.value_optimizer_config.update(&opts.critic_view());
     }
 }
 
@@ -175,12 +175,12 @@ where
     PB: Update<&'a Options>,
     POB: Update<&'a Options>,
     VB: Update<&'a Options>,
-    VOB: for<'b> Update<&'b ValueFnView<'a>>,
+    VOB: for<'b> Update<&'b CriticView<'a>>,
 {
     fn update(&mut self, opts: &'a Options) {
         self.actor_config.update(opts);
         self.policy_optimizer_config.update(opts);
-        self.value_optimizer_config.update(&opts.value_fn_view());
+        self.value_optimizer_config.update(&opts.critic_view());
         if let Some(max_policy_step_kl) = opts.max_policy_step_kl {
             self.max_policy_step_kl = max_policy_step_kl;
         }
@@ -207,7 +207,7 @@ where
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
             self.steps_per_epoch = steps_per_epoch;
         }
-        if let Some(value_train_iters) = opts.value_fn_train_iters {
+        if let Some(value_train_iters) = opts.critic_train_iters {
             self.value_train_iters = value_train_iters;
         }
         if let Some(device) = opts.device {

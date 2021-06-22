@@ -1,4 +1,4 @@
-use super::{OptimizerDef, SeqModDef, StepValueDef};
+use super::{CriticDef, OptimizerDef, SeqModDef};
 use crate::agents::{
     Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError, RandomAgentConfig,
     ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
@@ -32,18 +32,11 @@ pub enum AgentDef {
     UCB1(UCB1AgentConfig),
     /// Policy gradient
     PolicyGradient(
-        Box<PolicyGradientAgentConfig<SeqModDef, OptimizerDef, StepValueDef, OptimizerDef>>,
+        Box<PolicyGradientAgentConfig<SeqModDef, OptimizerDef, CriticDef, OptimizerDef>>,
     ),
     /// Trust region policy optimizer
     Trpo(
-        Box<
-            TrpoAgentConfig<
-                SeqModDef,
-                ConjugateGradientOptimizerConfig,
-                StepValueDef,
-                OptimizerDef,
-            >,
-        >,
+        Box<TrpoAgentConfig<SeqModDef, ConjugateGradientOptimizerConfig, CriticDef, OptimizerDef>>,
     ),
     /// Applies a non-meta agent to a meta environment by resetting between trials
     ResettingMeta(Box<AgentDef>),

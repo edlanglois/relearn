@@ -1,7 +1,7 @@
 //! Basic policy network actor
+use super::super::critic::{Critic, CriticBuilder};
 use super::super::history::{HistoryBuffer, LazyPackedHistoryFeatures};
 use super::super::seq_modules::StatefulIterativeModule;
-use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::ModuleBuilder;
 use crate::logging::{Event, Logger, TimeSeriesEventLogger, TimeSeriesLogger};
 use crate::spaces::{
@@ -70,8 +70,8 @@ impl<PB, VB> PolicyValueNetActorConfig<PB, VB> {
         <E as EnvStructure>::ObservationSpace: Space + BaseFeatureSpace,
         <E as EnvStructure>::ActionSpace: ParameterizedDistributionSpace<Tensor>,
         PB: ModuleBuilder<P>,
-        VB: StepValueBuilder<V>,
-        V: StepValue,
+        VB: CriticBuilder<V>,
+        V: Critic,
     {
         PolicyValueNetActor::new(env, self)
     }
@@ -145,7 +145,7 @@ impl<OS, AS, P, V> PolicyValueNetActor<OS, AS, P, V>
 where
     OS: Space + BaseFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
-    V: StepValue,
+    V: Critic,
 {
     /// Create a new `PolicyValueNetActor`
     ///
@@ -159,7 +159,7 @@ where
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
         PB: ModuleBuilder<P>,
-        VB: StepValueBuilder<V>,
+        VB: CriticBuilder<V>,
     {
         let observation_space = NonEmptyFeatures::new(env.observation_space());
         let action_space = env.action_space();
@@ -188,7 +188,7 @@ where
         let value_variables = VarStore::new(config.device);
         let value = config
             .value_config
-            .build_step_value(&value_variables.root(), observation_space.num_features());
+            .build_critic(&value_variables.root(), observation_space.num_features());
         let discount_factor = value.discount_factor(env.discount_factor());
 
         Self {
@@ -240,7 +240,7 @@ impl<OS, AS, P, V> PolicyValueNetActor<OS, AS, P, V>
 where
     OS: FeatureSpace<Tensor>,
     AS: ReprSpace<Tensor>,
-    V: StepValue,
+    V: Critic,
 {
     /// Perform a step update and update the model paramters if enough data has been accumulated.
     ///

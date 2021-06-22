@@ -19,7 +19,7 @@ cargo run --release -- \
     --gae-lambda 0.3 \
     --steps-per-epoch 25000 \
     --policy gru-mlp \
-    --step-value gae \
+    --critic gae \
     --rnn-hidden-size 256 \
     --hidden-sizes \
     --device cuda

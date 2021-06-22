@@ -1,9 +1,9 @@
 //! Command-line options
 use super::agent::{AgentType, AgentWrapperType, ConcreteAgentType};
+use super::critic::CriticType;
 use super::env::{BanditArmPrior, EnvType};
 use super::optimizer::{OptimizerOptions, OptimizerType};
 use super::seq_mod::SeqModType;
-use super::step_value::StepValueType;
 use crate::torch::Activation;
 use clap::{crate_authors, crate_description, crate_version, AppSettings, ArgEnum, Clap};
 use once_cell::sync::OnceCell;
@@ -98,16 +98,16 @@ pub struct Options {
     /// Policy rnn output activation function
     pub rnn_output_activation: Option<Activation>,
 
-    // Value function options
-    #[clap(long, arg_enum, help_heading = Some("AGENT VALUE FN OPTIONS"))]
-    /// Agent step value type
-    pub step_value: Option<StepValueType>,
+    // Critic options
+    #[clap(long, arg_enum, help_heading = Some("AGENT CRITIC OPTIONS"))]
+    /// Agent critic type
+    pub critic: Option<CriticType>,
 
-    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIONS"))]
+    #[clap(long, help_heading = Some("AGENT CRITIC OPTIONS"))]
     /// Maximum discount factor used by GAE
     pub gae_discount_factor: Option<f64>,
 
-    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIONS"))]
+    #[clap(long, help_heading = Some("AGENT CRITIC OPTIONS"))]
     /// Lambda interpolation factor used by GAE
     pub gae_lambda: Option<f64>,
 
@@ -132,25 +132,25 @@ pub struct Options {
     /// Max policy KL divergence per update step; for trust-region methods.
     pub max_policy_step_kl: Option<f64>,
 
-    #[clap(long, arg_enum, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
-    /// Agent value function optimizer type
-    pub value_fn_optimizer: Option<OptimizerType>,
+    #[clap(long, arg_enum, help_heading = Some("AGENT CRITIC OPTIMIZER OPTIONS"))]
+    /// Agent critic optimizer type
+    pub critic_optimizer: Option<OptimizerType>,
 
-    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
-    /// Agent value function optimizer learning rate
-    pub value_fn_learning_rate: Option<f64>,
+    #[clap(long, help_heading = Some("AGENT CRITIC OPTIMIZER OPTIONS"))]
+    /// Agent critic optimizer learning rate
+    pub critic_learning_rate: Option<f64>,
 
-    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
-    /// Agent value function optimizer momentum
-    pub value_fn_momentum: Option<f64>,
+    #[clap(long, help_heading = Some("AGENT CRITIC OPTIMIZER OPTIONS"))]
+    /// Agent critic optimizer momentum
+    pub critic_momentum: Option<f64>,
 
-    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
-    /// Agent value function optimizer weight decay (L2 regularization)
-    pub value_fn_weight_decay: Option<f64>,
+    #[clap(long, help_heading = Some("AGENT CRITIC OPTIMIZER OPTIONS"))]
+    /// Agent critic optimizer weight decay (L2 regularization)
+    pub critic_weight_decay: Option<f64>,
 
-    #[clap(long, help_heading = Some("AGENT VALUE FN OPTIMIZER OPTIONS"))]
-    /// Number of value function training iterations per epoch
-    pub value_fn_train_iters: Option<u64>,
+    #[clap(long, help_heading = Some("AGENT CRITIC OPTIMIZER OPTIONS"))]
+    /// Number of critic training iterations per epoch
+    pub critic_train_iters: Option<u64>,
 
     // Conjugate Gradient Optimizer options
     #[clap(long, help_heading = Some("CONJUGATE GRADIENT OPTIMIZER OPTIONS"))]
@@ -228,8 +228,8 @@ impl<'a, 'b> fmt::Display for StringListDisplay<'a, 'b> {
 }
 
 impl Options {
-    pub const fn value_fn_view(&self) -> ValueFnView {
-        ValueFnView(self)
+    pub const fn critic_view(&self) -> CriticView {
+        CriticView(self)
     }
 }
 
@@ -248,22 +248,22 @@ impl OptimizerOptions for Options {
     }
 }
 
-/// An option view that exposes value function options.
+/// An option view that exposes critic options.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ValueFnView<'a>(&'a Options);
+pub struct CriticView<'a>(&'a Options);
 
-impl<'a> OptimizerOptions for ValueFnView<'a> {
+impl<'a> OptimizerOptions for CriticView<'a> {
     fn type_(&self) -> Option<OptimizerType> {
-        self.0.value_fn_optimizer
+        self.0.critic_optimizer
     }
     fn learning_rate(&self) -> Option<f64> {
-        self.0.value_fn_learning_rate
+        self.0.critic_learning_rate
     }
     fn momentum(&self) -> Option<f64> {
-        self.0.value_fn_momentum
+        self.0.critic_momentum
     }
     fn weight_decay(&self) -> Option<f64> {
-        self.0.value_fn_weight_decay
+        self.0.critic_weight_decay
     }
 }
 

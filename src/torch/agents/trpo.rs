@@ -5,12 +5,12 @@
 //! International conference on machine learning. PMLR, 2015.
 //! <https://arxiv.org/abs/1502.05477>
 
+use super::super::critic::{Critic, CriticBuilder};
 use super::super::history::PackedHistoryFeaturesView;
 use super::super::optimizers::{
     Optimizer, OptimizerBuilder, OptimizerStepError, TrustRegionOptimizer,
 };
 use super::super::seq_modules::{SequenceModule, StatefulIterativeModule};
-use super::super::step_value::{StepValue, StepValueBuilder};
 use super::super::ModuleBuilder;
 use super::actor::{HistoryFeatures, PolicyValueNetActor, PolicyValueNetActorConfig};
 use super::policy_gradient;
@@ -78,8 +78,8 @@ where
     PB: ModuleBuilder<P>,
     P: SequenceModule + StatefulIterativeModule,
     POB: OptimizerBuilder<PO>,
-    VB: StepValueBuilder<V>,
-    V: StepValue,
+    VB: CriticBuilder<V>,
+    V: Critic,
     VOB: OptimizerBuilder<VO>,
 {
     #[allow(clippy::type_complexity)]
@@ -142,7 +142,7 @@ impl<OS, AS, P, PO, V, VO> TrpoAgent<OS, AS, P, PO, V, VO>
 where
     OS: Space + BaseFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
-    V: StepValue,
+    V: Critic,
 {
     pub fn new<E, PB, VB, POB, VOB>(
         env: &E,
@@ -154,7 +154,7 @@ where
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
         PB: ModuleBuilder<P>,
-        VB: StepValueBuilder<V>,
+        VB: CriticBuilder<V>,
         POB: OptimizerBuilder<PO>,
         VOB: OptimizerBuilder<VO>,
     {
@@ -193,7 +193,7 @@ where
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
     P: SequenceModule + StatefulIterativeModule + CudnnSupport,
     PO: TrustRegionOptimizer,
-    V: StepValue,
+    V: Critic,
     VO: Optimizer,
 {
     fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
@@ -240,7 +240,7 @@ where
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
     P: SequenceModule + CudnnSupport,
     PO: TrustRegionOptimizer,
-    V: StepValue,
+    V: Critic,
 {
     let mut logger = logger.scope("trpo");
     if features.episode_ranges().is_empty() {
@@ -263,16 +263,16 @@ where
     let batch_sizes = features.batch_sizes_tensor();
     let actions = features.actions();
 
-    let (step_values, initial_distribution, initial_log_probs, initial_policy_entropy) = {
+    let (critics, initial_distribution, initial_log_probs, initial_policy_entropy) = {
         let _no_grad = tch::no_grad_guard();
 
-        let step_values = actor.value.seq_packed(features);
+        let critics = actor.value.seq_packed(features);
         let policy_output = actor.policy.seq_packed(observation_features, batch_sizes);
         let distribution = actor.action_space.distribution(&policy_output);
         let log_probs = distribution.log_probs(actions);
         let entropy = distribution.entropy().mean(Kind::Float);
 
-        (step_values, distribution, log_probs, entropy)
+        (critics, distribution, log_probs, entropy)
     };
 
     let policy_loss_distance_fn = || {
@@ -281,7 +281,7 @@ where
 
         let log_probs = distribution.log_probs(actions);
         let likelihood_ratio = (log_probs - &initial_log_probs).exp();
-        let loss = -(likelihood_ratio * &step_values).mean(Kind::Float);
+        let loss = -(likelihood_ratio * &critics).mean(Kind::Float);
 
         // NOTE:
         // The [TRPO paper] and [Garage] use `KL(old_policy || new_policy)` while
@@ -320,10 +320,10 @@ where
 mod trpo {
     use super::*;
     use crate::agents::testing;
+    use crate::torch::critic::{Gae, GaeConfig, Return};
     use crate::torch::modules::MlpConfig;
     use crate::torch::optimizers::{AdamConfig, ConjugateGradientOptimizerConfig};
     use crate::torch::seq_modules::{GruMlp, RnnMlpConfig, WithState};
-    use crate::torch::step_value::{Gae, GaeConfig, Return};
     use tch::{nn::Sequential, Device};
 
     fn test_train_default_trpo<P, PB, V, VB>(
@@ -331,8 +331,8 @@ mod trpo {
     ) where
         P: SequenceModule + StatefulIterativeModule + CudnnSupport,
         PB: ModuleBuilder<P> + Default,
-        V: StepValue,
-        VB: StepValueBuilder<V> + Default,
+        V: Critic,
+        VB: CriticBuilder<V> + Default,
     {
         // Speed up learning for this simple environment
         config.actor_config.steps_per_epoch = 25;

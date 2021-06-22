@@ -1,4 +1,4 @@
-//! RL step value functions
+//! RL Critics
 mod gae;
 
 pub use gae::{Gae, GaeConfig};
@@ -6,12 +6,27 @@ pub use gae::{Gae, GaeConfig};
 use super::history::PackedHistoryFeaturesView;
 use tch::{nn::Path, Tensor};
 
-/// A step value function for use in the policy gradient.
-pub trait StepValue {
-    /// Whether this step values function has trainable internal parameters
+/// Critic for a reinforcement learning environment.
+///
+/// Assigns a score to each state-action pair in a trajectory.
+/// The score may depend on past states and actions in the trajectory and on future rewards.
+/// Higher scores represent better outcomes than lower scores.
+///
+/// This use of "Critic" is prehaps more expansive than the typical use:
+/// it does not just refer to a runtime evaluator of expected future reward given the observed
+/// trajectory so far, but instead includes a retrospective evaluation of states and actions given
+/// the empirical future trajectory.
+pub trait Critic {
+    /// Whether this critic has trainable internal parameters
     fn trainable(&self) -> bool;
 
-    /// The discount factor to use when calculating step returns.
+    /// Get the discount factor to use when calculating step returns.
+    ///
+    /// Some critics will use a reduced discount factor for reduced variance
+    /// at the cost of extra bias.
+    ///
+    /// This information is required by the caller so that it can be provided to the
+    /// `PackedHistoryFeaturesView`, which only supports a single choice of discount factor.
     ///
     /// # Args
     /// * `env_discount_factor` - The discount factor specified by the environment.
@@ -19,7 +34,7 @@ pub trait StepValue {
         env_discount_factor
     }
 
-    /// Evaluate the step values packed sequences of steps.
+    /// Provide values for a packed sequence of steps.
     ///
     /// # Args
     /// * `features` - A view of the packed step history features.
@@ -30,18 +45,18 @@ pub trait StepValue {
 
     /// The loss of any trainable internal variables given the observed history features.
     ///
-    /// Returns None if and only if trainable() is false.
+    /// Returns `None` if and only if [`Critic::trainable`] is false.
     fn loss(&self, features: &dyn PackedHistoryFeaturesView) -> Option<Tensor>;
 }
 
-/// Build a [`StepValue`] instance.
-pub trait StepValueBuilder<T> {
-    /// Build a new [`StepValue`] instance.
+/// Build a [`Critic`] instance.
+pub trait CriticBuilder<T> {
+    /// Build a new [`Critic`] instance.
     ///
     /// # Args
     /// * `vs` - Variable store and namespace.
     /// * `in_dim` - Number of input feature dimensions.
-    fn build_step_value(&self, vs: &Path, in_dim: usize) -> T;
+    fn build_critic(&self, vs: &Path, in_dim: usize) -> T;
 }
 
 /// Value steps using the empirical discounted step return.
@@ -54,7 +69,7 @@ pub trait StepValueBuilder<T> {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Return;
 
-impl StepValue for Return {
+impl Critic for Return {
     fn trainable(&self) -> bool {
         false
     }
@@ -68,13 +83,13 @@ impl StepValue for Return {
     }
 }
 
-impl StepValueBuilder<Self> for Return {
-    fn build_step_value(&self, _: &Path, _: usize) -> Self {
+impl CriticBuilder<Self> for Return {
+    fn build_critic(&self, _: &Path, _: usize) -> Self {
         Return
     }
 }
 
-impl<T: StepValue + ?Sized> StepValue for Box<T> {
+impl<T: Critic + ?Sized> Critic for Box<T> {
     fn trainable(&self) -> bool {
         T::trainable(self)
     }

@@ -7,7 +7,7 @@ pub use actor::{PolicyValueNetActor, PolicyValueNetActorConfig};
 pub use policy_gradient::{PolicyGradientAgent, PolicyGradientAgentConfig};
 pub use trpo::{TrpoAgent, TrpoAgentConfig};
 
-use super::step_value::StepValue;
+use super::critic::Critic;
 use crate::torch::{
     backends::CudnnSupport,
     optimizers::ConjugateGradientOptimizer,
@@ -21,7 +21,7 @@ pub type PolicyGradientBoxedAgent<OS, AS> = PolicyGradientAgent<
     AS,
     Box<dyn StatefulIterSeqModule>,
     COptimizer,
-    Box<dyn StepValue>,
+    Box<dyn Critic>,
     COptimizer,
 >;
 
@@ -31,7 +31,7 @@ pub type TrpoBoxedAgent<OS, AS> = TrpoAgent<
     AS,
     Box<dyn TrpoPolicyModule>,
     ConjugateGradientOptimizer,
-    Box<dyn StepValue>,
+    Box<dyn Critic>,
     COptimizer,
 >;
 
