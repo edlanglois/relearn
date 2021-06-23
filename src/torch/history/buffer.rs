@@ -1,10 +1,8 @@
 //! Step history buffer
 use crate::Step;
-use std::iter;
-use std::iter::Scan;
+use std::iter::FusedIterator;
 use std::num::NonZeroUsize;
 use std::ops::Range;
-use std::slice::Iter;
 use std::vec::Drain;
 
 /// A step history buffer.
@@ -70,27 +68,18 @@ impl<O, A> HistoryBuffer<O, A> {
         &self.steps
     }
 
-    /// Iterate over episode ranges.
-    pub fn episode_ranges(&self) -> impl Iterator<Item = Range<usize>> + '_ {
-        let num_steps = self.steps.len();
-
+    /// Iterate over episode index ranges.
+    pub fn episode_ranges(&self) -> EpisodeRangeIter {
         // Whether to include the final incomplete episode (if any)
-        let mut with_final_incomplete_episode = false;
+        let mut last_end = None;
         if let Some(min_incomplete_len) = self.include_incomplete_episode_len {
-            let last_episode_end: usize = self.episode_ends.last().cloned().unwrap_or(0);
-            with_final_incomplete_episode =
-                (self.steps.len() - last_episode_end) >= min_incomplete_len.into();
+            let last_complete_end: usize = self.episode_ends.last().cloned().unwrap_or(0);
+            let num_steps = self.steps.len();
+            if (num_steps - last_complete_end) >= min_incomplete_len.into() {
+                last_end = Some(num_steps);
+            }
         }
-
-        self.episode_ends
-            .iter()
-            .cloned()
-            .chain(iter::once(num_steps).take(if with_final_incomplete_episode { 1 } else { 0 }))
-            .scan(0, move |start, end| {
-                let range = *start..end;
-                *start = end;
-                Some(range)
-            })
+        EpisodeRangeIter::new(&self.episode_ends, last_end)
     }
 
     /// Creates draining iterators for the stored steps and episode ends.
@@ -107,3 +96,53 @@ impl<O, A> HistoryBuffer<O, A> {
     }
 }
 
+pub struct EpisodeRangeIter<'a> {
+    /// Remaining episode ends
+    episode_ends: &'a [usize],
+    /// An optional episode "end" following the last index of `episode_ends`
+    ///
+    /// This is used to include a final incomplete episode in the list of episode ranges.
+    last: Option<usize>,
+    /// The current episode start.
+    start: usize,
+}
+
+impl<'a> EpisodeRangeIter<'a> {
+    pub const fn new(episode_ends: &'a [usize], last: Option<usize>) -> Self {
+        Self {
+            episode_ends,
+            last,
+            start: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for EpisodeRangeIter<'a> {
+    type Item = Range<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((&end, rest)) = self.episode_ends.split_first() {
+            let range = self.start..end;
+            self.start = end;
+            self.episode_ends = rest;
+            Some(range)
+        } else if let Some(end) = self.last {
+            let range = self.start..end;
+            self.last = None;
+            Some(range)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let mut len = self.episode_ends.len();
+        if self.last.is_some() {
+            len += 1;
+        }
+        (len, Some(len))
+    }
+}
+
+impl<'a> ExactSizeIterator for EpisodeRangeIter<'a> {}
+impl<'a> FusedIterator for EpisodeRangeIter<'a> {}
