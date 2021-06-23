@@ -312,7 +312,11 @@ where
             self.device,
         );
         log_scalar(logger, "num_steps", self.history.len() as f64);
-        log_scalar(logger, "num_episodes", self.history.num_episodes() as f64);
+        log_scalar(
+            logger,
+            "num_episodes",
+            self.history.num_complete_episodes() as f64,
+        );
 
         if let Some(entropy) = update_policy(self, &features, logger) {
             log_scalar(logger, "policy_entropy", &entropy);

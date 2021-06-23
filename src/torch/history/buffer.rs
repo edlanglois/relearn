@@ -52,7 +52,7 @@ impl<O, A> HistoryBuffer<O, A> {
     }
 
     /// Number of completed episodes in the buffer.
-    pub fn num_episodes(&self) -> usize {
+    pub fn num_complete_episodes(&self) -> usize {
         self.episode_ends.len()
     }
 
@@ -68,11 +68,6 @@ impl<O, A> HistoryBuffer<O, A> {
     /// View the stored steps
     pub fn steps(&self) -> &[Step<O, A>] {
         &self.steps
-    }
-
-    /// View the stored episode ends.
-    pub fn episode_ends(&self) -> &[usize] {
-        &self.episode_ends
     }
 
     /// Iterate over episode ranges.
@@ -98,15 +93,6 @@ impl<O, A> HistoryBuffer<O, A> {
             })
     }
 
-    /// Iterate over episode lengths.
-    pub fn episode_lengths(&self) -> EpLenIter {
-        self.episode_ends.iter().scan(0, |start, end| {
-            let length = *end - *start;
-            *start = *end;
-            Some(length)
-        })
-    }
-
     /// Creates draining iterators for the stored steps and episode ends.
     ///
     /// This fully resets the history buffer once both are drained or dropped.
@@ -121,4 +107,3 @@ impl<O, A> HistoryBuffer<O, A> {
     }
 }
 
-pub type EpLenIter<'a> = Scan<Iter<'a, usize>, usize, fn(&mut usize, &usize) -> Option<usize>>;
