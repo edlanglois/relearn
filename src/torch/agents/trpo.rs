@@ -263,16 +263,16 @@ where
     let batch_sizes = features.batch_sizes_tensor();
     let actions = features.actions();
 
-    let (critics, initial_distribution, initial_log_probs, initial_policy_entropy) = {
+    let (step_values, initial_distribution, initial_log_probs, initial_policy_entropy) = {
         let _no_grad = tch::no_grad_guard();
 
-        let critics = actor.value.seq_packed(features);
+        let step_values = actor.value.seq_packed(features);
         let policy_output = actor.policy.seq_packed(observation_features, batch_sizes);
         let distribution = actor.action_space.distribution(&policy_output);
         let log_probs = distribution.log_probs(actions);
         let entropy = distribution.entropy().mean(Kind::Float);
 
-        (critics, distribution, log_probs, entropy)
+        (step_values, distribution, log_probs, entropy)
     };
 
     let policy_loss_distance_fn = || {
@@ -281,7 +281,7 @@ where
 
         let log_probs = distribution.log_probs(actions);
         let likelihood_ratio = (log_probs - &initial_log_probs).exp();
-        let loss = -(likelihood_ratio * &critics).mean(Kind::Float);
+        let loss = -(likelihood_ratio * &step_values).mean(Kind::Float);
 
         // NOTE:
         // The [TRPO paper] and [Garage] use `KL(old_policy || new_policy)` while

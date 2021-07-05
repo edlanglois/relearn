@@ -210,7 +210,7 @@ where
         return None;
     }
 
-    let critics = tch::no_grad(|| actor.value.seq_packed(features));
+    let step_values = tch::no_grad(|| actor.value.seq_packed(features));
 
     let policy_output = actor.policy.seq_packed(
         features.observation_features(),
@@ -222,7 +222,7 @@ where
         let action_distributions = actor.action_space.distribution(&policy_output);
         let log_probs = action_distributions.log_probs(features.actions());
         entropies.set(Some(action_distributions.entropy()));
-        -(log_probs * &critics).mean(Kind::Float)
+        -(log_probs * &step_values).mean(Kind::Float)
     };
 
     let _ = optimizer.backward_step(&policy_loss_fn, logger).unwrap();
