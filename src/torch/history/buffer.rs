@@ -115,6 +115,18 @@ impl<'a> EpisodeRangeIter<'a> {
             start: 0,
         }
     }
+
+    /// Number of steps represented by the remaining episode ranges.
+    pub fn num_steps(&self) -> usize {
+        let end = if let Some(last) = self.last {
+            last
+        } else if let Some(last) = self.episode_ends.last() {
+            *last
+        } else {
+            self.start
+        };
+        end - self.start
+    }
 }
 
 impl<'a> Iterator for EpisodeRangeIter<'a> {
