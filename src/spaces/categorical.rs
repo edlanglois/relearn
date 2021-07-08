@@ -81,7 +81,7 @@ impl<S: CategoricalSpace> FeatureSpaceOut<Tensor> for S {
         if !zeroed {
             let _ = out.zero_();
         }
-        let _ = out.scatter_1(
+        let _ = out.scatter_value_(
             -1,
             &Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu)),
             1,
@@ -102,7 +102,7 @@ impl<S: CategoricalSpace> BatchFeatureSpaceOut<Tensor> for S {
             .into_iter()
             .map(|element| self.to_index(element) as i64)
             .collect();
-        let _ = out.scatter_1(-1, &Tensor::of_slice(&indices).unsqueeze(-1), 1);
+        let _ = out.scatter_value_(-1, &Tensor::of_slice(&indices).unsqueeze(-1), 1);
     }
 }
 

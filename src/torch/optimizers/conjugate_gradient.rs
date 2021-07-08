@@ -327,7 +327,7 @@ where
 
         let flat_output = utils::flatten_tensors(&hpv);
         // flat_output + reg_coeff * vector
-        flat_output.g_add(&vector.g_mul1(self.reg_coeff))
+        flat_output.g_add(&vector.g_mul_scalar(self.reg_coeff))
     }
 }
 

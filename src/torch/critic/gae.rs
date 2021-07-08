@@ -79,7 +79,7 @@ where
                 features.observation_features(),
                 features.batch_sizes_tensor(),
             )
-            .squeeze1(-1);
+            .squeeze_dim(-1);
 
         // Packed estimated value for the observed successor states.
         // Assumes that all end-of-episodes are terminal and have value 0.
@@ -113,7 +113,7 @@ where
                     features.observation_features(),
                     features.batch_sizes_tensor(),
                 )
-                .squeeze1(-1)
+                .squeeze_dim(-1)
                 .mse_loss(features.returns(), Reduction::Mean),
         )
     }

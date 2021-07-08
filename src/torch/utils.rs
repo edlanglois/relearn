@@ -13,12 +13,12 @@ use tch::{Kind, TchError, Tensor};
 pub fn f_one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Result<Tensor, TchError> {
     let mut shape = labels.size();
     shape.push(num_classes as i64);
-    Tensor::f_zeros(&shape, (kind, labels.device()))?.f_scatter_1(-1, &labels.unsqueeze(-1), 1)
+    Tensor::f_zeros(&shape, (kind, labels.device()))?.f_scatter_value_(-1, &labels.unsqueeze(-1), 1)
 }
 
 pub fn f_one_hot_out(labels: &Tensor, out: &mut Tensor) -> Result<(), TchError> {
     let _ = out.f_zero_()?;
-    let _ = out.f_scatter_1(-1, &labels.unsqueeze(-1), 1)?;
+    let _ = out.f_scatter_value_(-1, &labels.unsqueeze(-1), 1)?;
     Ok(())
 }
 

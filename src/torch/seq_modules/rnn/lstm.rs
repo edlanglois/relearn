@@ -113,7 +113,7 @@ impl SequenceModule for Lstm {
         let initial_state = [zeros.shallow_clone(), zeros];
 
         let has_biases = self.params.len() > 2;
-        let (outputs, _, _) = Tensor::lstm1(
+        let (outputs, _, _) = Tensor::lstm_data(
             inputs,
             batch_sizes,
             &initial_state,

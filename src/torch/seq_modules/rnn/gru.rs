@@ -100,7 +100,7 @@ impl SequenceModule for Gru {
             (inputs.kind(), inputs.device()),
         );
         let has_biases = self.params.len() > 2;
-        let (outputs, _) = Tensor::gru1(
+        let (outputs, _) = Tensor::gru_data(
             inputs,
             batch_sizes,
             &initial_state,

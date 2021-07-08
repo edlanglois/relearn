@@ -50,27 +50,27 @@ impl ArrayDistribution<Tensor, Tensor> for Categorical {
     }
 
     fn sample(&self) -> Tensor {
-        self.logits.exp().multinomial(1, true).squeeze1(-1)
+        self.logits.exp().multinomial(1, true).squeeze_dim(-1)
     }
 
     fn log_probs(&self, elements: &Tensor) -> Tensor {
         self.logits
             .gather(-1, &elements.unsqueeze(-1), false)
-            .squeeze1(-1)
+            .squeeze_dim(-1)
     }
 
     fn entropy(&self) -> Tensor {
         let clamped_logits = clamp_float_min(&self.logits)
             .map_err(|kind| format!("logits must be f32 or f64, not {:?}", kind))
             .unwrap();
-        -(clamped_logits * self.logits.exp()).sum1(&[-1], false, Kind::Float)
+        -(clamped_logits * self.logits.exp()).sum_dim_intlist(&[-1], false, Kind::Float)
     }
 
     fn kl_divergence_from(&self, other: &Self) -> Tensor {
         let clamped_rel_logits = clamp_float_min(&(&self.logits - &other.logits))
             .map_err(|kind| format!("logits must be f32 or f64, not {:?}", kind))
             .unwrap();
-        (clamped_rel_logits * self.logits.exp()).sum1(&[-1], false, Kind::Float)
+        (clamped_rel_logits * self.logits.exp()).sum_dim_intlist(&[-1], false, Kind::Float)
     }
 }
 

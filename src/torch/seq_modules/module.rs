@@ -60,7 +60,7 @@ mod sequence_module {
 
     #[test]
     fn seq_serial_feature_dim_changed() {
-        let m = nn::func(|x| x.sum1(&[-1], true, Kind::Float));
+        let m = nn::func(|x| x.sum_dim_intlist(&[-1], true, Kind::Float));
         let batch_size = 1;
         let seq_len = 3;
         let in_features = 2;
@@ -115,7 +115,7 @@ mod iterative_module {
 
     #[test]
     fn feature_dim_changed() {
-        let m = nn::func(|x| x.sum1(&[-1], true, Kind::Float));
+        let m = nn::func(|x| x.sum_dim_intlist(&[-1], true, Kind::Float));
         let batch_size: usize = 1;
         let input = Tensor::of_slice(&[0.0, 1.0, 2.0]).view((batch_size as i64, 3));
 

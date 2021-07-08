@@ -28,7 +28,7 @@ impl<T: IterativeModule> StatefulIterativeModule for WithState<T> {
     fn step(&mut self, input: &Tensor) -> Tensor {
         let (output, new_state) = self.module.step(&input.unsqueeze(0), &self.state);
         self.state = new_state;
-        output.squeeze1(0)
+        output.squeeze_dim(0)
     }
     fn reset(&mut self) {
         self.state = self.module.initial_state(1);

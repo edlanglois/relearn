@@ -72,7 +72,7 @@ where
     T: Copy + Float + PartialOrd + tch::kind::Element,
 {
     fn repr(&self, element: &Self::Element) -> Tensor {
-        Tensor::of_slice(slice::from_ref(element)).squeeze_1(0)
+        Tensor::of_slice(slice::from_ref(element)).squeeze_dim_(0)
     }
 
     fn batch_repr<'a, I>(&self, elements: I) -> Tensor
