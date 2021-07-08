@@ -9,6 +9,7 @@ pub mod history;
 pub mod modules;
 pub mod optimizers;
 pub mod seq_modules;
+pub mod updaters;
 pub mod utils;
 
 pub use modules::{Activation, ModuleBuilder};

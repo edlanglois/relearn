@@ -7,9 +7,11 @@ mod critic;
 pub mod env;
 mod optimizer;
 mod seq_mod;
+mod updater;
 
 pub use agent::AgentDef;
 pub use critic::CriticDef;
 pub use env::EnvDef;
 pub use optimizer::OptimizerDef;
 pub use seq_mod::SeqModDef;
+pub use updater::{CriticUpdaterDef, PolicyUpdaterDef};

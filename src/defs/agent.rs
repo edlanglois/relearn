@@ -1,4 +1,4 @@
-use super::{CriticDef, OptimizerDef, SeqModDef};
+use super::{CriticDef, CriticUpdaterDef, PolicyUpdaterDef, SeqModDef};
 use crate::agents::{
     Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError, RandomAgentConfig,
     ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
@@ -9,10 +9,7 @@ use crate::spaces::{
     BatchFeatureSpace, ElementRefInto, FeatureSpace, FiniteSpace, ParameterizedDistributionSpace,
     SampleSpace, Space,
 };
-use crate::torch::agents::{
-    PolicyGradientAgentConfig, PolicyGradientBoxedAgent, TrpoAgentConfig, TrpoBoxedAgent,
-};
-use crate::torch::optimizers::ConjugateGradientOptimizerConfig;
+use crate::torch::agents::{ActorCriticBoxedAgent, ActorCriticConfig};
 use std::borrow::Borrow;
 use std::fmt::Debug;
 use tch::Tensor;
@@ -30,14 +27,8 @@ pub enum AgentDef {
     BetaThompsonSampling(BetaThompsonSamplingAgentConfig),
     /// UCB1 agent from Auer 2002
     UCB1(UCB1AgentConfig),
-    /// Policy gradient
-    PolicyGradient(
-        Box<PolicyGradientAgentConfig<SeqModDef, OptimizerDef, CriticDef, OptimizerDef>>,
-    ),
-    /// Trust region policy optimizer
-    Trpo(
-        Box<TrpoAgentConfig<SeqModDef, ConjugateGradientOptimizerConfig, CriticDef, OptimizerDef>>,
-    ),
+    /// Torch actor-critic agent
+    ActorCritic(Box<ActorCriticConfig<SeqModDef, PolicyUpdaterDef, CriticDef, CriticUpdaterDef>>),
     /// Applies a non-meta agent to a meta environment by resetting between trials
     ResettingMeta(Box<AgentDef>),
 }
@@ -86,14 +77,10 @@ where
             Random => RandomAgentConfig::new()
                 .build_agent(env, seed)
                 .map(|a| Box::new(a) as _),
-            PolicyGradient(config) => config
+            ActorCritic(config) => config
                 .as_ref()
                 .build_agent(env, seed)
-                .map(|a: PolicyGradientBoxedAgent<_, _>| Box::new(a) as _),
-            Trpo(config) => config
-                .as_ref()
-                .build_agent(env, seed)
-                .map(|a: TrpoBoxedAgent<_, _>| Box::new(a) as _),
+                .map(|a: ActorCriticBoxedAgent<_, _>| Box::new(a) as _),
             _ => Err(BuildAgentError::InvalidSpaceBounds),
         }
     }

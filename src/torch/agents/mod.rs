@@ -1,44 +1,34 @@
 //! Reinforcement learning agents using torch
-mod actor;
-mod policy_gradient;
-mod trpo;
+mod actor_critic;
+#[cfg(test)]
+mod tests;
 
-pub use actor::{PolicyValueNetActor, PolicyValueNetActorConfig};
-pub use policy_gradient::{PolicyGradientAgent, PolicyGradientAgentConfig};
-pub use trpo::{TrpoAgent, TrpoAgentConfig};
+pub use actor_critic::{ActorCriticAgent, ActorCriticConfig};
 
-use super::critic::Critic;
-use crate::torch::{
+use super::{
     backends::CudnnSupport,
-    optimizers::ConjugateGradientOptimizer,
-    seq_modules::{SequenceModule, StatefulIterSeqModule, StatefulIterativeModule},
+    critic::Critic,
+    seq_modules::{SequenceModule, StatefulIterativeModule},
+    updaters::{UpdateCritic, UpdatePolicy},
 };
-use tch::{COptimizer, Tensor};
+use tch::Tensor;
 
-/// Policy gradient agent with a boxed policy and value function.
-pub type PolicyGradientBoxedAgent<OS, AS> = PolicyGradientAgent<
+// TODO: Remove Box<> inside UpdatePolicy & UpdateCritic
+
+/// Actor critic agent with boxed components.
+pub type ActorCriticBoxedAgent<OS, AS> = ActorCriticAgent<
     OS,
     AS,
-    Box<dyn StatefulIterSeqModule>,
-    COptimizer,
+    Box<dyn ACPolicyModule>,
+    Box<dyn UpdatePolicy<Box<dyn ACPolicyModule>, Box<dyn Critic>, AS>>,
     Box<dyn Critic>,
-    COptimizer,
+    Box<dyn UpdateCritic<Box<dyn Critic>>>,
 >;
 
-/// TRPO agent with a boxed policy and value function.
-pub type TrpoBoxedAgent<OS, AS> = TrpoAgent<
-    OS,
-    AS,
-    Box<dyn TrpoPolicyModule>,
-    ConjugateGradientOptimizer,
-    Box<dyn Critic>,
-    COptimizer,
->;
+/// Unified policy module trait required by [`ActorCriticBoxedAgent`].
+pub trait ACPolicyModule: SequenceModule + StatefulIterativeModule + CudnnSupport {}
+impl<T: SequenceModule + StatefulIterativeModule + CudnnSupport + ?Sized> ACPolicyModule for T {}
 
-/// Unified policy module trait required by [`TrpoBoxedAgent`].
-pub trait TrpoPolicyModule: SequenceModule + StatefulIterativeModule + CudnnSupport {}
-impl<T: SequenceModule + StatefulIterativeModule + CudnnSupport + ?Sized> TrpoPolicyModule for T {}
-
-box_impl_sequence_module!(dyn TrpoPolicyModule);
-box_impl_stateful_iterative_module!(dyn TrpoPolicyModule);
-box_impl_cudnn_support!(dyn TrpoPolicyModule);
+box_impl_sequence_module!(dyn ACPolicyModule);
+box_impl_stateful_iterative_module!(dyn ACPolicyModule);
+box_impl_cudnn_support!(dyn ACPolicyModule);

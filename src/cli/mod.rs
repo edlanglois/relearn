@@ -5,6 +5,7 @@ mod env;
 mod optimizer;
 mod options;
 mod seq_mod;
+mod updater;
 
 pub use options::Options;
 

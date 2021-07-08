@@ -149,8 +149,8 @@ pub struct Options {
     pub critic_weight_decay: Option<f64>,
 
     #[clap(long, help_heading = Some("AGENT CRITIC OPTIMIZER OPTIONS"))]
-    /// Number of critic training iterations per epoch
-    pub critic_train_iters: Option<u64>,
+    /// Number of critic optimizer step iterations per epoch
+    pub critic_opt_iters: Option<u64>,
 
     // Conjugate Gradient Optimizer options
     #[clap(long, help_heading = Some("CONJUGATE GRADIENT OPTIMIZER OPTIONS"))]

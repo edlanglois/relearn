@@ -1,9 +1,9 @@
-use super::{options::CriticView, Options, Update, WithUpdate};
+use super::{Options, Update, WithUpdate};
 use crate::agents::{
     BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
-use crate::defs::AgentDef;
-use crate::torch::agents::{PolicyGradientAgentConfig, PolicyValueNetActorConfig, TrpoAgentConfig};
+use crate::defs::{AgentDef, CriticDef, CriticUpdaterDef, PolicyUpdaterDef, SeqModDef};
+use crate::torch::agents::ActorCriticConfig;
 use clap::{ArgEnum, Clap};
 use std::fmt;
 use std::str::FromStr;
@@ -84,8 +84,22 @@ impl From<&Options> for AgentDef {
             TabularQLearning => Self::TabularQLearning(opts.into()),
             BetaThompsonSampling => Self::BetaThompsonSampling(opts.into()),
             UCB1 => Self::UCB1(From::from(opts)),
-            PolicyGradient => Self::PolicyGradient(Box::new(opts.into())),
-            Trpo => Self::Trpo(Box::new(opts.into())),
+            PolicyGradient => {
+                let config = ActorCriticConfig {
+                    policy_updater_config: PolicyUpdaterDef::default_policy_gradient(),
+                    ..ActorCriticConfig::default()
+                }
+                .with_update(opts);
+                Self::ActorCritic(Box::new(config))
+            }
+            Trpo => {
+                let config = ActorCriticConfig {
+                    policy_updater_config: PolicyUpdaterDef::default_trpo(),
+                    ..ActorCriticConfig::default()
+                }
+                .with_update(opts);
+                Self::ActorCritic(Box::new(config))
+            }
         };
         for wrapper in opts.agent.wrappers.iter().rev() {
             agent_def = match wrapper {
@@ -138,77 +152,16 @@ impl Update<&Options> for UCB1AgentConfig {
     }
 }
 
-impl<'a, PB, POB, VB, VOB> From<&'a Options> for PolicyGradientAgentConfig<PB, POB, VB, VOB>
-where
-    Self: Default + Update<&'a Options>,
+impl Update<&Options>
+    for ActorCriticConfig<SeqModDef, PolicyUpdaterDef, CriticDef, CriticUpdaterDef>
 {
-    fn from(opts: &'a Options) -> Self {
-        Self::default().with_update(opts)
-    }
-}
-
-impl<'a, PB, POB, VB, VOB> Update<&'a Options> for PolicyGradientAgentConfig<PB, POB, VB, VOB>
-where
-    PB: Update<&'a Options>,
-    POB: Update<&'a Options>,
-    VB: Update<&'a Options>,
-    VOB: for<'b> Update<&'b CriticView<'a>>,
-{
-    fn update(&mut self, opts: &'a Options) {
-        self.actor_config.update(opts);
-        self.policy_optimizer_config.update(opts);
-        self.value_optimizer_config.update(&opts.critic_view());
-    }
-}
-
-impl<'a, PB, POB, VB, VOB> From<&'a Options> for TrpoAgentConfig<PB, POB, VB, VOB>
-where
-    Self: Default + Update<&'a Options>,
-{
-    fn from(opts: &'a Options) -> Self {
-        Self::default().with_update(opts)
-    }
-}
-
-impl<'a, PB, POB, VB, VOB> Update<&'a Options> for TrpoAgentConfig<PB, POB, VB, VOB>
-where
-    PB: Update<&'a Options>,
-    POB: Update<&'a Options>,
-    VB: Update<&'a Options>,
-    VOB: for<'b> Update<&'b CriticView<'a>>,
-{
-    fn update(&mut self, opts: &'a Options) {
-        self.actor_config.update(opts);
-        self.policy_optimizer_config.update(opts);
-        self.value_optimizer_config.update(&opts.critic_view());
-        if let Some(max_policy_step_kl) = opts.max_policy_step_kl {
-            self.max_policy_step_kl = max_policy_step_kl;
-        }
-    }
-}
-
-impl<'a, PB, VB> From<&'a Options> for PolicyValueNetActorConfig<PB, VB>
-where
-    Self: Default + Update<&'a Options>,
-{
-    fn from(opts: &'a Options) -> Self {
-        Self::default().with_update(opts)
-    }
-}
-
-impl<'a, PB, VB> Update<&'a Options> for PolicyValueNetActorConfig<PB, VB>
-where
-    PB: Update<&'a Options>,
-    VB: Update<&'a Options>,
-{
-    fn update(&mut self, opts: &'a Options) {
+    fn update(&mut self, opts: &Options) {
         self.policy_config.update(opts);
-        self.value_config.update(opts);
+        self.policy_updater_config.update(opts);
+        self.critic_config.update(opts);
+        self.critic_updater_config.update(opts);
         if let Some(steps_per_epoch) = opts.steps_per_epoch {
             self.steps_per_epoch = steps_per_epoch;
-        }
-        if let Some(value_train_iters) = opts.critic_train_iters {
-            self.value_train_iters = value_train_iters;
         }
         if let Some(device) = opts.device {
             self.device = device.into();

@@ -1,5 +1,5 @@
 use crate::torch::{
-    agents::TrpoPolicyModule,
+    agents::ACPolicyModule,
     modules::MlpConfig,
     seq_modules::{GruMlp, LstmMlp, RnnMlpConfig, StatefulIterSeqModule, WithState},
     ModuleBuilder,
@@ -62,4 +62,4 @@ macro_rules! boxed_module_builder_for_seq_mod {
 }
 
 boxed_module_builder_for_seq_mod!(dyn StatefulIterSeqModule);
-boxed_module_builder_for_seq_mod!(dyn TrpoPolicyModule);
+boxed_module_builder_for_seq_mod!(dyn ACPolicyModule);
