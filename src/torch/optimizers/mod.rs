@@ -18,7 +18,7 @@ pub trait BaseOptimizer {
 
 /// Optimizer that minimizes a loss function.
 pub trait Optimizer: BaseOptimizer {
-    /// Apply an optimization step using the gradient of a loss function.
+    /// Perform a loss minimization step using the gradient of a loss function.
     ///
     /// Obtains gradients by backpropagating the result of `loss_fn`.
     ///
@@ -50,7 +50,7 @@ pub trait Optimizer: BaseOptimizer {
 /// Specifically, each step may use the gradient at the initial point of the step
 /// and makes no further gradient evaluations.
 pub trait OnceOptimizer: BaseOptimizer {
-    /// Perform an optimization step (parameter update).
+    /// Perform a loss minimization step (parameter update).
     ///
     /// Uses the existing gradients stored with the parameter tensor.
     ///
