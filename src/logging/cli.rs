@@ -105,6 +105,14 @@ impl TimeSeriesLogger for CLILogger {
             return;
         }
 
+        // Don't display at the end of a step
+        if event == Event::EnvStep
+            || event == Event::AgentPolicyOptStep
+            || event == Event::AgentValueOptStep
+        {
+            return;
+        }
+
         self.display();
     }
 

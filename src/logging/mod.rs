@@ -19,12 +19,16 @@ pub enum Event {
     EnvStep,
     /// Environment episode
     EnvEpisode,
-    // TODO: Use or remove
-    /*
-    /// Agent optimization step
+    /// Agent policy optimization step
     ///
     /// One parameter update step using a (mini)-batch of data.
-    AgentOptStep,
+    AgentPolicyOptStep,
+    /// Agent value optimization step
+    ///
+    /// One parameter update step using a (mini)-batch of data.
+    AgentValueOptStep,
+    /*
+    // TODO: Use or remove
     /// Agent optimization epoch
     ///
     /// A set of optimization steps that collectively perform a single pass

@@ -91,8 +91,10 @@ where
         let result = optimizer.trust_region_backward_step(
             &policy_loss_distance_fn,
             self.max_policy_step_kl,
-            &mut logger.event_logger(Event::AgentOptPeriod),
+            &mut logger.event_logger(Event::AgentPolicyOptStep),
         );
+        logger.end_event(Event::AgentPolicyOptStep);
+
         if let Err(error) = result {
             match error {
                 OptimizerStepError::NaNLoss => panic!("NaN loss in policy optimization"),
