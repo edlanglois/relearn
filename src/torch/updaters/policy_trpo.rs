@@ -6,7 +6,7 @@ use super::super::{
     seq_modules::SequenceModule,
 };
 use super::{PolicyStats, UpdatePolicyWithOptimizer};
-use crate::logging::{Event, TimeSeriesLogger};
+use crate::logging::{Event, TimeSeriesLogger, TimeSeriesLoggerHelper};
 use crate::spaces::ParameterizedDistributionSpace;
 use crate::utils::distributions::ArrayDistribution;
 use tch::{Kind, Tensor};
@@ -101,13 +101,7 @@ where
                 OptimizerStepError::NaNConstraint => {
                     panic!("NaN constraint in policy optimization")
                 }
-                e => logger
-                    .log(
-                        Event::AgentOptPeriod,
-                        "no_policy_step",
-                        e.to_string().into(),
-                    )
-                    .unwrap(),
+                e => logger.unwrap_log(Event::AgentOptPeriod, "no_policy_step", e.to_string()),
             }
         }
 

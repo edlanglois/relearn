@@ -5,7 +5,7 @@ use super::super::updaters::{UpdateCritic, UpdatePolicy, UpdaterBuilder};
 use super::super::ModuleBuilder;
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::envs::EnvStructure;
-use crate::logging::{Event, Logger, TimeSeriesLogger};
+use crate::logging::{Event, Logger, LoggerHelper, TimeSeriesLogger, TimeSeriesLoggerHelper};
 use crate::spaces::{
     BaseFeatureSpace, BatchFeatureSpace, FeatureSpace, NonEmptyFeatures,
     ParameterizedDistributionSpace, ReprSpace, Space,
@@ -278,16 +278,10 @@ where
         let episode_ranges = self.history.episode_ranges();
         let num_steps = episode_ranges.num_steps();
 
-        history_logger
-            .log("num_steps", (num_steps as f64).into())
-            .unwrap();
-        history_logger
-            .log("num_episodes", (episode_ranges.len() as f64).into())
-            .unwrap();
+        history_logger.unwrap_log_scalar("num_steps", num_steps as f64);
+        history_logger.unwrap_log_scalar("num_episodes", episode_ranges.len() as f64);
         if num_steps == 0 {
-            history_logger
-                .log("no_model_update", "Skipping update; empty history".into())
-                .unwrap();
+            history_logger.unwrap_log("no_model_update", "Skipping update; empty history");
             return;
         }
 
@@ -300,9 +294,7 @@ where
             &mut policy_logger,
         );
         if let Some(entropy) = policy_stats.entropy {
-            policy_logger
-                .log(Event::AgentOptPeriod, "entropy", entropy.into())
-                .unwrap();
+            policy_logger.unwrap_log_scalar(Event::AgentOptPeriod, "entropy", entropy);
         }
 
         let mut critic_logger = logger.scope("critic");

@@ -30,7 +30,7 @@
 
 use super::super::utils;
 use super::{BaseOptimizer, OptimizerBuilder, OptimizerStepError, TrustRegionOptimizer};
-use crate::logging::Logger;
+use crate::logging::{Logger, LoggerHelper};
 use std::borrow::Borrow;
 use std::convert::{Infallible, TryInto};
 use tch::{nn::VarStore, Tensor};
@@ -149,7 +149,7 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
             x if x.is_nan() => 1.0,
             x => x,
         };
-        logger.log("step_size", step_size.into()).unwrap();
+        logger.unwrap_log("step_size", step_size);
 
         let descent_step = step_size * step_dir;
         let initial_loss: f64 = loss.into();
@@ -188,7 +188,7 @@ impl ConjugateGradientOptimizer {
 
         let mut loss = initial_loss;
         let mut constraint_val = f64::INFINITY;
-        logger.log("initial_loss", loss.into()).unwrap();
+        logger.unwrap_log("initial_loss", loss);
         for i in 0..self.config.max_backtracks {
             let ratio = self.config.backtrack_ratio.powi(i.try_into().unwrap());
 
@@ -207,16 +207,14 @@ impl ConjugateGradientOptimizer {
             loss = loss_tensor.into();
             constraint_val = constraint_tensor.into();
             if loss < initial_loss && constraint_val <= max_constraint_value {
-                logger.log("num_backtracks", (i as f64).into()).unwrap();
-                logger.log("step_scale", ratio.into()).unwrap();
+                logger.unwrap_log("num_backtracks", i as f64);
+                logger.unwrap_log("step_scale", ratio);
                 break;
             }
         }
 
-        logger.log("final_loss", loss.into()).unwrap();
-        logger
-            .log("final_constraint_val", constraint_val.into())
-            .unwrap();
+        logger.unwrap_log("final_loss", loss);
+        logger.unwrap_log("final_constraint_val", constraint_val);
 
         let result = if loss.is_nan() {
             Err(OptimizerStepError::NaNLoss)

@@ -1,6 +1,6 @@
 use super::super::{critic::Critic, history::PackedHistoryFeaturesView, optimizers::Optimizer};
 use super::UpdateCriticWithOptimizer;
-use crate::logging::{Event, TimeSeriesLogger};
+use crate::logging::{Event, TimeSeriesLogger, TimeSeriesLoggerHelper};
 
 // TODO: Move the MSE training from critic/ to here
 
@@ -43,17 +43,9 @@ where
             logger.end_event(Event::AgentValueOptStep);
 
             if i == 0 {
-                logger
-                    .log(
-                        Event::AgentOptPeriod,
-                        "initial_loss",
-                        f64::from(loss).into(),
-                    )
-                    .unwrap();
+                logger.unwrap_log_scalar(Event::AgentOptPeriod, "initial_loss", loss);
             } else if i == self.optimizer_iters - 1 {
-                logger
-                    .log(Event::AgentOptPeriod, "final_loss", f64::from(loss).into())
-                    .unwrap();
+                logger.unwrap_log_scalar(Event::AgentOptPeriod, "final_loss", loss);
             }
         }
     }

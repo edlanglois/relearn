@@ -105,6 +105,20 @@ pub trait Logger {
     fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn Logger>;
 }
 
+/// Generic helper methods for logging
+pub trait LoggerHelper: Logger {
+    #[inline]
+    fn unwrap_log_scalar<T: Into<f64>>(&mut self, name: &'static str, value: T) {
+        self.unwrap_log(name, value.into());
+    }
+    #[inline]
+    fn unwrap_log<T: Into<Loggable>>(&mut self, name: &'static str, value: T) {
+        self.log(name, value.into()).unwrap();
+    }
+}
+
+impl<T: Logger + ?Sized> LoggerHelper for T {}
+
 // TODO: Make generic over Event? E: Enum
 
 /// Logs named values associated with a time series of recurring events.
@@ -160,6 +174,19 @@ pub trait TimeSeriesLogger {
     /// Create a view on the logger that adds a scope prefix to all logged ids.
     fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn TimeSeriesLogger>;
 }
+
+/// Generic helper methods for logging
+pub trait TimeSeriesLoggerHelper: TimeSeriesLogger {
+    #[inline]
+    fn unwrap_log_scalar<T: Into<f64>>(&mut self, event: Event, name: &'static str, value: T) {
+        self.unwrap_log(event, name, value.into());
+    }
+    #[inline]
+    fn unwrap_log<T: Into<Loggable>>(&mut self, event: Event, name: &'static str, value: T) {
+        self.log(event, name, value.into()).unwrap()
+    }
+}
+impl<T: TimeSeriesLogger + ?Sized> TimeSeriesLoggerHelper for T {}
 
 pub struct TimeSeriesEventLogger<'a> {
     logger: &'a mut (dyn TimeSeriesLogger + 'a),

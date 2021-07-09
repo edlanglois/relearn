@@ -1,6 +1,6 @@
 //! Simulator hooks.
 use crate::agents::Step;
-use crate::logging::{Event, Loggable, TimeSeriesLogger};
+use crate::logging::{Event, Loggable, LoggerHelper, TimeSeriesLogger};
 use crate::spaces::{ElementRefInto, FiniteSpace};
 use impl_trait_for_tuples::impl_for_tuples;
 
@@ -148,40 +148,22 @@ where
     L: TimeSeriesLogger + ?Sized,
 {
     fn call(&mut self, step: &Step<OS::Element, AS::Element>, logger: &mut L) -> bool {
-        logger
-            .log(Event::EnvStep, "reward", step.reward.into())
-            .unwrap();
-        logger
-            .log(
-                Event::EnvStep,
-                "observation",
-                self.observation_space.elem_ref_into(&step.observation),
-            )
-            .unwrap();
-        logger
-            .log(
-                Event::EnvStep,
-                "action",
-                self.action_space.elem_ref_into(&step.action),
-            )
-            .unwrap();
+        let mut step_logger = logger.event_logger(Event::EnvStep);
+        step_logger.unwrap_log_scalar("reward", step.reward);
+        step_logger.unwrap_log(
+            "observation",
+            self.observation_space.elem_ref_into(&step.observation),
+        );
+        step_logger.unwrap_log("action", self.action_space.elem_ref_into(&step.action));
         logger.end_event(Event::EnvStep);
 
         self.episode_length += 1;
         self.episode_reward += step.reward;
         if step.episode_done {
-            logger
-                .log(
-                    Event::EnvEpisode,
-                    "length",
-                    (self.episode_length as f64).into(),
-                )
-                .unwrap();
+            let mut episode_logger = logger.event_logger(Event::EnvEpisode);
+            episode_logger.unwrap_log("length", self.episode_length as f64);
             self.episode_length = 0;
-
-            logger
-                .log(Event::EnvEpisode, "reward", self.episode_reward.into())
-                .unwrap();
+            episode_logger.unwrap_log("reward", self.episode_reward);
             self.episode_reward = 0.0;
             logger.end_event(Event::EnvEpisode);
         }
