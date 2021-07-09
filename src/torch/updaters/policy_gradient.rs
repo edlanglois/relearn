@@ -46,7 +46,10 @@ where
         };
 
         let _ = optimizer
-            .backward_step(&policy_loss_fn, &mut logger.event_logger(Event::Epoch))
+            .backward_step(
+                &policy_loss_fn,
+                &mut logger.event_logger(Event::AgentOptPeriod),
+            )
             .unwrap();
 
         let entropy = entropies.into_inner().unwrap().mean(Kind::Float).into();

@@ -34,7 +34,7 @@ where
         if !critic.trainable() {
             return;
         }
-        let mut logger = logger.event_logger(Event::Epoch);
+        let mut logger = logger.event_logger(Event::AgentOptPeriod);
 
         let loss_fn = || critic.loss(features).unwrap();
 

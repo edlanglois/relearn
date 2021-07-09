@@ -89,51 +89,6 @@
 //! May only use the past history within an episode, not from the future or across episodes.
 //! Some critics use value functions to improve their value estimates.
 //!
-//! ## Time Scales
-//! This section describes the terms used for various time scales or repeated events that occur in
-//! the course of training a reinforcement learning agent.
-//! Some of these appear in the [`Event`] enum used for [logging](crate::logging).
-//!
-//! [`Event`]: crate::logging::Event
-//!
-//! ### (Environment) Step
-//! A single environment transition from one state to another given an action.
-//! The [`Step`] structure stores the observable parts of a step.
-//! [`Event::Step`] refers to this.
-//!
-//! [`Step`]: crate::agents::Step
-//! [`Event::Step`]: crate::logging::Event::Step
-//!
-//! ### Optimization Step
-//! One successful parameter update performed by an optimization algorithm.
-//!
-//! ### Episode
-//! A sequence of environment steps each starting from the successor state of the previous.
-//! See above for more details.
-//!
-//! ### Trial
-//! Used only for [meta environments](crate::envs::MetaEnv).
-//! An episode of the meta environment, which consists of several inner episodes.
-//!
-//! ### Epoch
-//! A set of optimization steps (possibly using mini-batches) that collectively have performed one
-//! update for each example in the training data set. In the case of random sampling of
-//! mini-batches, when the total number of optimization steps times the mini-batch size equals the
-//! size of the training data.
-//!
-//! In the context of reinforcement learning, "epoch" is sometimes used to refer to one period of
-//! the data-collection-then-model-update cycle. I use _period_ for this instead.
-//! An "epoch" and a "period" are the same when data collection is synchronous and each example
-//! is used in exactly one optimization step.
-//!
-//! ### Period
-//! One cycle of data collection followed by model updates. A period may contain multiple epochs if
-//! the model update makes several passes over the collected data.
-//!
-//! This name is non-standard. It was chosen because it extends the geological time period analogy
-//! of "epochs" and seems appropriate for describing the periodic data-collection and model
-//! update loop.
-//!
 #![warn(clippy::cast_lossless)]
 #![warn(clippy::cast_possible_truncation)]
 #![warn(clippy::doc_markdown)]

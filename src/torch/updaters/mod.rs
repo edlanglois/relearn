@@ -22,7 +22,6 @@ use super::history::PackedHistoryFeaturesView;
 use crate::logging::TimeSeriesLogger;
 use tch::nn::VarStore;
 
-// TODO: Logger::Epoch => Logger::Period
 // TODO: Remove ActionSpace
 
 /// Build an updater

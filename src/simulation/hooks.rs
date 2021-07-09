@@ -148,37 +148,42 @@ where
     L: TimeSeriesLogger + ?Sized,
 {
     fn call(&mut self, step: &Step<OS::Element, AS::Element>, logger: &mut L) -> bool {
-        use Event::*;
-        logger.log(Step, "reward", step.reward.into()).unwrap();
+        logger
+            .log(Event::EnvStep, "reward", step.reward.into())
+            .unwrap();
         logger
             .log(
-                Step,
+                Event::EnvStep,
                 "observation",
                 self.observation_space.elem_ref_into(&step.observation),
             )
             .unwrap();
         logger
             .log(
-                Step,
+                Event::EnvStep,
                 "action",
                 self.action_space.elem_ref_into(&step.action),
             )
             .unwrap();
-        logger.end_event(Event::Step);
+        logger.end_event(Event::EnvStep);
 
         self.episode_length += 1;
         self.episode_reward += step.reward;
         if step.episode_done {
             logger
-                .log(Episode, "length", (self.episode_length as f64).into())
+                .log(
+                    Event::EnvEpisode,
+                    "length",
+                    (self.episode_length as f64).into(),
+                )
                 .unwrap();
             self.episode_length = 0;
 
             logger
-                .log(Episode, "reward", self.episode_reward.into())
+                .log(Event::EnvEpisode, "reward", self.episode_reward.into())
                 .unwrap();
             self.episode_reward = 0.0;
-            logger.end_event(Episode);
+            logger.end_event(Event::EnvEpisode);
         }
 
         true

@@ -11,11 +11,34 @@ use std::fmt;
 use thiserror::Error;
 
 /// Simulation run events types.
+///
+/// Each describes a recurring event that partitions time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Enum)]
 pub enum Event {
-    Step,
-    Episode,
-    Epoch,
+    /// Environment step
+    EnvStep,
+    /// Environment episode
+    EnvEpisode,
+    // TODO: Use or remove
+    /*
+    /// Agent optimization step
+    ///
+    /// One parameter update step using a (mini)-batch of data.
+    AgentOptStep,
+    /// Agent optimization epoch
+    ///
+    /// A set of optimization steps that collectively perform a single pass
+    /// through all training data for the period.
+    AgentOptEpoch,
+    */
+    /// Agent optimization period
+    ///
+    /// For synchronous agents with a collect-data-then-optimize-parameters loop,
+    /// this is one iteration of that loop.
+    ///
+    /// The name "period" is, to my knowledge, non-standard but extends the geological time scale
+    /// analogy of "epoch" and seems appropriate for the periodic nature of synchronous RL agents.
+    AgentOptPeriod,
 }
 
 /// A value that can be logged.

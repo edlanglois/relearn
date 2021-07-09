@@ -5,7 +5,7 @@ use super::super::updaters::{UpdateCritic, UpdatePolicy, UpdaterBuilder};
 use super::super::ModuleBuilder;
 use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
 use crate::envs::EnvStructure;
-use crate::logging::{Event, TimeSeriesLogger};
+use crate::logging::{Event, Logger, TimeSeriesLogger};
 use crate::spaces::{
     BaseFeatureSpace, BatchFeatureSpace, FeatureSpace, NonEmptyFeatures,
     ParameterizedDistributionSpace, ReprSpace, Space,
@@ -273,23 +273,20 @@ where
             self.discount_factor,
             self.device,
         );
-        // TODO: Event::Period
-        let mut history_logger = logger.scope("history");
+        let mut update_logger = logger.event_logger(Event::AgentOptPeriod);
+        let mut history_logger = update_logger.scope("history");
         let episode_ranges = self.history.episode_ranges();
         let num_steps = episode_ranges.num_steps();
-        log_scalar(&mut history_logger, "num_steps", num_steps as f64);
-        log_scalar(
-            &mut history_logger,
-            "num_episodes",
-            episode_ranges.len() as f64,
-        );
+
+        history_logger
+            .log("num_steps", (num_steps as f64).into())
+            .unwrap();
+        history_logger
+            .log("num_episodes", (episode_ranges.len() as f64).into())
+            .unwrap();
         if num_steps == 0 {
-            logger
-                .log(
-                    Event::Epoch,
-                    "no_model_update",
-                    "Skipping update; empty history".into(),
-                )
+            history_logger
+                .log("no_model_update", "Skipping update; empty history".into())
                 .unwrap();
             return;
         }
@@ -303,7 +300,9 @@ where
             &mut policy_logger,
         );
         if let Some(entropy) = policy_stats.entropy {
-            log_scalar(&mut policy_logger, "entropy", entropy);
+            policy_logger
+                .log(Event::AgentOptPeriod, "entropy", entropy.into())
+                .unwrap();
         }
 
         let mut critic_logger = logger.scope("critic");
@@ -318,14 +317,6 @@ where
         }
 
         self.history.clear();
-        logger.end_event(Event::Epoch);
+        logger.end_event(Event::AgentOptPeriod);
     }
-}
-
-fn log_scalar<L, V>(logger: &mut L, name: &'static str, value: V)
-where
-    L: TimeSeriesLogger + ?Sized,
-    V: Into<f64>,
-{
-    logger.log(Event::Epoch, name, value.into().into()).unwrap()
 }

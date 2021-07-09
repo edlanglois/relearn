@@ -91,7 +91,7 @@ where
         let result = optimizer.trust_region_backward_step(
             &policy_loss_distance_fn,
             self.max_policy_step_kl,
-            &mut logger.event_logger(Event::Epoch),
+            &mut logger.event_logger(Event::AgentOptPeriod),
         );
         if let Err(error) = result {
             match error {
@@ -100,7 +100,11 @@ where
                     panic!("NaN constraint in policy optimization")
                 }
                 e => logger
-                    .log(Event::Epoch, "no_policy_step", e.to_string().into())
+                    .log(
+                        Event::AgentOptPeriod,
+                        "no_policy_step",
+                        e.to_string().into(),
+                    )
                     .unwrap(),
             }
         }
