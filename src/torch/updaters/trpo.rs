@@ -12,6 +12,11 @@ use crate::utils::distributions::ArrayDistribution;
 use tch::{Kind, Tensor};
 
 /// Trust region policy update rule.
+///
+/// # Reference
+/// [Trust Region Policy Optimization][trpo] by Schulman et al.
+///
+/// [trpo]: https://arxiv.org/abs/1502.05477
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TrpoPolicyUpdateRule {
     /// Maximum policy KL divergence when taking a step.
