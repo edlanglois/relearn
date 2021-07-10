@@ -10,12 +10,12 @@
 //! allows details about the optimizer type to be hidden.
 mod critic_loss;
 mod policy_gradient;
-mod policy_trpo;
+mod trpo;
 mod with_optimizer;
 
 pub use critic_loss::CriticLossUpdateRule;
 pub use policy_gradient::PolicyGradientUpdateRule;
-pub use policy_trpo::TrpoPolicyUpdateRule;
+pub use trpo::TrpoPolicyUpdateRule;
 pub use with_optimizer::WithOptimizer;
 
 use super::history::PackedHistoryFeaturesView;
