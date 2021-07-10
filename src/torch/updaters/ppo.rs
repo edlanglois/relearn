@@ -18,7 +18,7 @@ use tch::{Kind, Tensor};
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct PpoPolicyUpdateRule {
     // pub minibatch_size: usize, // TODO: Support minibatches
-    pub num_epochs: usize,
+    pub num_epochs: u64,
     pub clip_distance: f64,
 }
 

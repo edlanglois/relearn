@@ -5,8 +5,8 @@ use crate::torch::critic::Critic;
 use crate::torch::optimizers::{ConjugateGradientOptimizerConfig, OptimizerBuilder};
 use crate::torch::seq_modules::SequenceModule;
 use crate::torch::updaters::{
-    CriticLossUpdateRule, PolicyGradientUpdateRule, TrpoPolicyUpdateRule, UpdateCritic,
-    UpdatePolicy, UpdaterBuilder, WithOptimizer,
+    CriticLossUpdateRule, PolicyGradientUpdateRule, PpoPolicyUpdateRule, TrpoPolicyUpdateRule,
+    UpdateCritic, UpdatePolicy, UpdaterBuilder, WithOptimizer,
 };
 use tch::{nn::VarStore, Tensor};
 
@@ -15,6 +15,7 @@ use tch::{nn::VarStore, Tensor};
 pub enum PolicyUpdaterDef {
     PolicyGradient(PolicyGradientUpdateRule, OptimizerDef),
     Trpo(TrpoPolicyUpdateRule, ConjugateGradientOptimizerConfig),
+    Ppo(PpoPolicyUpdateRule, OptimizerDef),
 }
 
 impl Default for PolicyUpdaterDef {
@@ -32,6 +33,9 @@ impl PolicyUpdaterDef {
             TrpoPolicyUpdateRule::default(),
             ConjugateGradientOptimizerConfig::default(),
         )
+    }
+    pub fn default_ppo() -> Self {
+        Self::Ppo(PpoPolicyUpdateRule::default(), OptimizerDef::default())
     }
 }
 
@@ -51,6 +55,10 @@ where
             Trpo(update_rule, cg_optimizer_config) => Box::new(WithOptimizer {
                 update_rule: *update_rule,
                 optimizer: cg_optimizer_config.build_optimizer(vs).unwrap(),
+            }),
+            Ppo(update_rule, optimizer_def) => Box::new(WithOptimizer {
+                update_rule: *update_rule,
+                optimizer: optimizer_def.build_optimizer(vs).unwrap(),
             }),
         }
     }

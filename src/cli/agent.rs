@@ -17,6 +17,7 @@ pub enum ConcreteAgentType {
     UCB1,
     PolicyGradient,
     Trpo,
+    Ppo,
 }
 
 impl fmt::Display for ConcreteAgentType {
@@ -95,6 +96,14 @@ impl From<&Options> for AgentDef {
             Trpo => {
                 let config = ActorCriticConfig {
                     policy_updater_config: PolicyUpdaterDef::default_trpo(),
+                    ..ActorCriticConfig::default()
+                }
+                .with_update(opts);
+                Self::ActorCritic(Box::new(config))
+            }
+            Ppo => {
+                let config = ActorCriticConfig {
+                    policy_updater_config: PolicyUpdaterDef::default_ppo(),
                     ..ActorCriticConfig::default()
                 }
                 .with_update(opts);

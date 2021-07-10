@@ -129,6 +129,14 @@ pub struct Options {
     pub weight_decay: Option<f64>,
 
     #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
+    /// Number of policy epochs per update period
+    pub policy_epochs: Option<u64>,
+
+    #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
+    /// Clip distance for proximal policy optimization
+    pub ppo_clip_distance: Option<f64>,
+
+    #[clap(long, help_heading = Some("AGENT OPTIMIZER OPTIONS"))]
     /// Max policy KL divergence per update step; for trust-region methods.
     pub max_policy_step_kl: Option<f64>,
 
