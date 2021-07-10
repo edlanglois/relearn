@@ -10,11 +10,13 @@
 //! allows details about the optimizer type to be hidden.
 mod critic_loss;
 mod policy_gradient;
+mod ppo;
 mod trpo;
 mod with_optimizer;
 
 pub use critic_loss::CriticLossUpdateRule;
 pub use policy_gradient::PolicyGradientUpdateRule;
+pub use ppo::PpoPolicyUpdateRule;
 pub use trpo::TrpoPolicyUpdateRule;
 pub use with_optimizer::WithOptimizer;
 
