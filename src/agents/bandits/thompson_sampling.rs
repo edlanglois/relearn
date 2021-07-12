@@ -1,5 +1,5 @@
 //! Thompson sampling bandit agent
-use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
+use super::super::{Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::FiniteSpace;
@@ -65,6 +65,8 @@ pub struct BetaThompsonSamplingAgent<OS, AS> {
     /// Number of posterior samples to draw.
     /// Takes the action with the highest mean sampled value.
     pub num_samples: usize,
+    /// Mode of actor behaviour
+    pub mode: ActorMode,
 
     /// Count of low and high rewards for each observation-action pair.
     low_high_reward_counts: Array2<(u64, u64)>,
@@ -93,6 +95,7 @@ where
             action_space,
             reward_threshold,
             num_samples,
+            mode: ActorMode::Training,
             low_high_reward_counts,
             rng: StdRng::seed_from_u64(seed),
         }
@@ -113,36 +116,12 @@ where
     }
 }
 
-impl<OS, AS> Actor<OS::Element, AS::Element> for BetaThompsonSamplingAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
-    fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
-        let obs_idx = self.observation_space.to_index(observation);
-        // Counts are initalized to 1 so no risk of 0/0
-        let act_idx = self
-            .low_high_reward_counts
-            .index_axis(Axis(0), obs_idx)
-            .mapv(|(beta, alpha)| alpha as f64 / (alpha + beta) as f64)
-            .into_iter()
-            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
-            .expect("Empty action space");
-        self.action_space.from_index(act_idx).unwrap()
-    }
-}
-
-impl<OS, AS> Agent<OS::Element, AS::Element> for BetaThompsonSamplingAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
-    fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
-        let obs_idx = self.observation_space.to_index(observation);
+impl<OS, AS> BetaThompsonSamplingAgent<OS, AS> {
+    /// Take a training-mode action in terms of indices.
+    fn act_training(&mut self, obs_idx: usize) -> usize {
         let num_samples = self.num_samples;
         let rng = &mut self.rng;
-        let act_idx = self
-            .low_high_reward_counts
+        self.low_high_reward_counts
             .index_axis(Axis(0), obs_idx)
             .mapv(|(beta, alpha)| -> f64 {
                 // Explanation for the rng reference:
@@ -167,10 +146,42 @@ where
             })
             .into_iter()
             .argmax_by(|a, b| a.partial_cmp(b).unwrap())
-            .expect("Empty action space");
-        self.action_space.from_index(act_idx).unwrap()
+            .expect("Empty action space")
     }
 
+    /// Take a release-mode (greedy) action in terms of indices.
+    fn act_release(&mut self, obs_idx: usize) -> usize {
+        // Take the action with highest posterior mean
+        // Counts are initalized to 1 so no risk of 0/0
+        self.low_high_reward_counts
+            .index_axis(Axis(0), obs_idx)
+            .mapv(|(beta, alpha)| alpha as f64 / (alpha + beta) as f64)
+            .into_iter()
+            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
+            .expect("Empty action space")
+    }
+}
+
+impl<OS, AS> Actor<OS::Element, AS::Element> for BetaThompsonSamplingAgent<OS, AS>
+where
+    OS: FiniteSpace,
+    AS: FiniteSpace,
+{
+    fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
+        let obs_idx = self.observation_space.to_index(observation);
+        let act_idx = match self.mode {
+            ActorMode::Training => self.act_training(obs_idx),
+            ActorMode::Release => self.act_release(obs_idx),
+        };
+        self.action_space.from_index(act_idx).unwrap()
+    }
+}
+
+impl<OS, AS> Agent<OS::Element, AS::Element> for BetaThompsonSamplingAgent<OS, AS>
+where
+    OS: FiniteSpace,
+    AS: FiniteSpace,
+{
     fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {
         let obs_idx = self.observation_space.to_index(&step.observation);
         let act_idx = self.action_space.to_index(&step.action);
@@ -184,6 +195,12 @@ where
         } else {
             reward_count.0 += 1;
         }
+    }
+}
+
+impl<OS, AS> SetActorMode for BetaThompsonSamplingAgent<OS, AS> {
+    fn set_actor_mode(&mut self, mode: ActorMode) {
+        self.mode = mode
     }
 }
 

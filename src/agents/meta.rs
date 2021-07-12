@@ -1,5 +1,5 @@
 //! Meta agents
-use super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
+use super::{Actor, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace, StoredEnvStructure};
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::{SampleSpace, Space};
@@ -140,14 +140,6 @@ where
     AS: SampleSpace,
     <AS as Space>::Element: Clone,
 {
-    fn act(
-        &mut self,
-        observation: &<MetaObservationSpace<OS, AS> as Space>::Element,
-        new_episode: bool,
-    ) -> AS::Element {
-        Actor::act(self, observation, new_episode)
-    }
-
     fn update(
         &mut self,
         _step: Step<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>,
@@ -157,9 +149,12 @@ where
     }
 }
 
+/// Never learns on a meta level. Always acts like "Release" mode.
+impl<B, A, OS: Space, AS> SetActorMode for ResettingMetaAgent<B, A, OS, AS> {}
+
 #[cfg(test)]
 mod resetting_meta {
-    use super::super::{UCB1Agent, UCB1AgentConfig};
+    use super::super::{ActorMode, UCB1Agent, UCB1AgentConfig};
     use super::*;
     use crate::envs::{OneHotBandits, StatefulMetaEnv, WithState, Wrapped};
     use crate::simulation;
@@ -179,6 +174,7 @@ mod resetting_meta {
             config.build_agent(&env, 0).unwrap();
 
         let mut hooks = (RewardStatistics::new(), StepLimit::new(1000));
+        agent.set_actor_mode(ActorMode::Release);
         simulation::run_actor(&mut env, &mut agent, &mut (), &mut hooks);
 
         assert!(hooks.0.mean_episode_reward() > 0.7 * (num_episodes_per_trial - num_arms) as f64);

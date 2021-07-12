@@ -1,4 +1,4 @@
-use super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
+use super::{Actor, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::SampleSpace;
@@ -52,10 +52,6 @@ impl<O, AS: SampleSpace> Actor<O, AS::Element> for RandomAgent<AS> {
 }
 
 impl<O, AS: SampleSpace> Agent<O, AS::Element> for RandomAgent<AS> {
-    fn act(&mut self, observation: &O, new_episode: bool) -> AS::Element {
-        Actor::act(self, observation, new_episode)
-    }
-
     fn update(&mut self, _step: Step<O, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {}
 }
 
@@ -64,3 +60,5 @@ impl<AS: fmt::Display> fmt::Display for RandomAgent<AS> {
         write!(f, "RandomAgent({})", self.action_space)
     }
 }
+
+impl<AS> SetActorMode for RandomAgent<AS> {}

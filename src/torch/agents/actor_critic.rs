@@ -3,7 +3,7 @@ use super::super::history::{HistoryBuffer, LazyPackedHistoryFeatures};
 use super::super::seq_modules::StatefulIterativeModule;
 use super::super::updaters::{UpdateCritic, UpdatePolicy, UpdaterBuilder};
 use super::super::ModuleBuilder;
-use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
+use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::{Event, Logger, LoggerHelper, TimeSeriesLogger, TimeSeriesLoggerHelper};
 use crate::spaces::{
@@ -237,10 +237,6 @@ where
     PU: UpdatePolicy<P, C, AS>,
     CU: UpdateCritic<C>,
 {
-    fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
-        Actor::act(self, observation, new_episode)
-    }
-
     fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn TimeSeriesLogger) {
         let episode_done = step.episode_done;
         self.history.push(step);
@@ -312,3 +308,5 @@ where
         logger.end_event(Event::AgentOptPeriod);
     }
 }
+
+impl<OS: Space, AS: Space, P, PU, C, CU> SetActorMode for ActorCriticAgent<OS, AS, P, PU, C, CU> {}

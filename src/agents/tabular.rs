@@ -1,5 +1,5 @@
 //! Tabular agents
-use super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
+use super::{Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::{FiniteSpace, SampleSpace};
@@ -59,6 +59,7 @@ pub struct TabularQLearningAgent<OS, AS> {
     pub exploration_rate: f64,
     pub state_action_counts: Array2<u32>,
     pub state_action_values: Array2<f64>,
+    pub mode: ActorMode,
 
     rng: StdRng,
 }
@@ -86,6 +87,7 @@ where
             exploration_rate,
             state_action_counts,
             state_action_values,
+            mode: ActorMode::Training,
             rng: StdRng::seed_from_u64(seed),
         }
     }
@@ -111,13 +113,18 @@ where
     AS: FiniteSpace + SampleSpace,
 {
     fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
-        let obs_idx = self.observation_space.to_index(observation);
-        let act_idx = self
-            .state_action_values
-            .index_axis(Axis(0), obs_idx)
-            .argmax()
-            .unwrap();
-        self.action_space.from_index(act_idx).unwrap()
+        if self.mode == ActorMode::Training && self.rng.gen::<f64>() < self.exploration_rate {
+            // Random exploration with probability `exploration_rate` when in training mode
+            self.action_space.sample(&mut self.rng)
+        } else {
+            let obs_idx = self.observation_space.to_index(observation);
+            let act_idx = self
+                .state_action_values
+                .index_axis(Axis(0), obs_idx)
+                .argmax()
+                .unwrap();
+            self.action_space.from_index(act_idx).unwrap()
+        }
     }
 }
 
@@ -126,14 +133,6 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace + SampleSpace,
 {
-    fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
-        if self.rng.gen::<f64>() < self.exploration_rate {
-            self.action_space.sample(&mut self.rng)
-        } else {
-            Actor::act(self, observation, new_episode)
-        }
-    }
-
     fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {
         let obs_idx = self.observation_space.to_index(&step.observation);
         let act_idx = self.action_space.to_index(&step.action);
@@ -159,6 +158,12 @@ where
     }
 }
 
+impl<OS, AS> SetActorMode for TabularQLearningAgent<OS, AS> {
+    fn set_actor_mode(&mut self, mode: ActorMode) {
+        self.mode = mode;
+    }
+}
+
 #[cfg(test)]
 mod tabular_q_learning {
     use super::super::testing;
@@ -181,7 +186,7 @@ mod tabular_q_learning {
     fn explore_exploit() {
         let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).into_stateful(0);
 
-        // The agent explores
+        // The initial mode explores
         let config = TabularQLearningAgentConfig::new(0.95);
         let mut agent = config.build_agent(&env, 0).unwrap();
         let mut explore_hooks = (
@@ -193,7 +198,8 @@ mod tabular_q_learning {
         assert!(action_1_count > 300);
         assert!(action_1_count < 700);
 
-        // The actor exploits
+        // Release mode exploits
+        agent.set_actor_mode(ActorMode::Release);
         let mut exploit_hooks = (
             IndexedActionCounter::new(env.action_space()),
             StepLimit::new(1000),

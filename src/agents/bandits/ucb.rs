@@ -1,5 +1,5 @@
 //! Upper confidence bound bandit agent.
-use super::super::{Actor, Agent, AgentBuilder, BuildAgentError, Step};
+use super::super::{Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::FiniteSpace;
@@ -66,6 +66,9 @@ pub struct UCB1Agent<OS, AS> {
     /// tutorial Introduction to Bandits: Algorithms and Theory (2011).
     pub exploration_rate: f64,
 
+    /// Mode of actor behaviour
+    pub mode: ActorMode,
+
     // Parameters to scale the reward to [0, 1]
     reward_scale_factor: f64,
     reward_shift: f64,
@@ -110,6 +113,7 @@ where
             observation_space,
             action_space,
             exploration_rate,
+            mode: ActorMode::Training,
             reward_scale_factor,
             reward_shift,
             state_action_mean_reward,
@@ -133,6 +137,33 @@ where
     }
 }
 
+impl<OS, AS> UCB1Agent<OS, AS> {
+    /// Take a training-mode action in terms of indices.
+    fn act_training(&mut self, obs_idx: usize) -> usize {
+        let log_squared_visit_count = 2.0 * (self.state_visit_count[obs_idx] as f64).ln();
+        let ucb = self
+            .state_action_count
+            .index_axis(Axis(0), obs_idx)
+            .mapv(|action_count| {
+                (log_squared_visit_count / (action_count as f64)).sqrt() * self.exploration_rate
+            })
+            + self.state_action_mean_reward.index_axis(Axis(0), obs_idx);
+        ucb.into_iter()
+            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
+            .expect("Empty action space")
+    }
+
+    /// Take a release-mode (greedy) action in terms of indices.
+    fn act_release(&mut self, obs_idx: usize) -> usize {
+        // Take the action with the largest action count
+        self.state_action_count
+            .index_axis(Axis(0), obs_idx)
+            .into_iter()
+            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
+            .expect("Empty action space")
+    }
+}
+
 impl<OS, AS> Actor<OS::Element, AS::Element> for UCB1Agent<OS, AS>
 where
     OS: FiniteSpace,
@@ -140,13 +171,10 @@ where
 {
     fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
         let obs_idx = self.observation_space.to_index(observation);
-        // Take the action with the largest action count
-        let act_idx = self
-            .state_action_count
-            .index_axis(Axis(0), obs_idx)
-            .into_iter()
-            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
-            .expect("Empty action space");
+        let act_idx = match self.mode {
+            ActorMode::Training => self.act_training(obs_idx),
+            ActorMode::Release => self.act_release(obs_idx),
+        };
         self.action_space.from_index(act_idx).unwrap()
     }
 }
@@ -156,22 +184,6 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
-        let obs_idx = self.observation_space.to_index(observation);
-        let log_squared_visit_count = 2.0 * (self.state_visit_count[obs_idx] as f64).ln();
-        let ucb = self
-            .state_action_count
-            .index_axis(Axis(0), obs_idx)
-            .mapv(|action_count| {
-                (log_squared_visit_count / (action_count as f64)).sqrt() * self.exploration_rate
-            })
-            + self.state_action_mean_reward.index_axis(Axis(0), obs_idx);
-        let act_idx = ucb
-            .into_iter()
-            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
-            .expect("Empty action space");
-        self.action_space.from_index(act_idx).unwrap()
-    }
     fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {
         let obs_idx = self.observation_space.to_index(&step.observation);
         let act_idx = self.action_space.to_index(&step.action);
@@ -186,6 +198,12 @@ where
             .get_mut((obs_idx, act_idx))
             .unwrap();
         *mean_reward += (scaled_reward - *mean_reward) / (*state_action_count as f64);
+    }
+}
+
+impl<OS, AS> SetActorMode for UCB1Agent<OS, AS> {
+    fn set_actor_mode(&mut self, mode: ActorMode) {
+        self.mode = mode
     }
 }
 

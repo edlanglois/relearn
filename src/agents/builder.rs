@@ -5,6 +5,9 @@ use thiserror::Error;
 pub trait AgentBuilder<T, E: ?Sized> {
     /// Build an agent for the given environment structure.
     ///
+    /// If the agent supports [`ActorMode`],
+    /// then it must be initialized in [`Training`][ActorMode::Training] mode.
+    ///
     /// # Args:
     /// `env` - The structure of the environment in which the agent is to operate.
     /// `seed` - A number used to seed the agent's random state,

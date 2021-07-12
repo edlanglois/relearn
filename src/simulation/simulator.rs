@@ -116,9 +116,8 @@ where
     }
 }
 
-/// Run an actor-environment simulation.
+/// Run an actor-environment simulation without reward feedback.
 ///
-/// An actor never learns between episodes.
 /// An actor may depend on history from the current episode.
 ///
 /// # Args
