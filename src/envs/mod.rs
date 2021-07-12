@@ -78,7 +78,7 @@ impl<E: EnvStructure + ?Sized> EnvStructure for Box<E> {
 ///
 /// See [`EnvStructure`] for details.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct StoredEnvStructure<OS: Space, AS: Space> {
+pub struct StoredEnvStructure<OS, AS> {
     pub observation_space: OS,
     pub action_space: AS,
     pub reward_range: (f64, f64),

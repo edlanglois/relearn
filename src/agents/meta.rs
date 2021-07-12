@@ -28,7 +28,7 @@ where
 }
 
 /// Lifts a regular agent to act on a meta environment by resetting between each trial.
-pub struct ResettingMetaAgent<B, A, OS: Space, AS: Space> {
+pub struct ResettingMetaAgent<B, A, OS: Space, AS> {
     inner_agent_builder: B,
     inner_env_structure: StoredEnvStructure<OS, AS>,
     rng: StdRng,
