@@ -3,7 +3,6 @@
 //! More agents can be found in [`crate::torch::agents`].
 
 mod bandits;
-mod builder;
 mod meta;
 mod random;
 mod tabular;
@@ -13,12 +12,13 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
-pub use builder::{AgentBuilder, BuildAgentError};
 pub use meta::ResettingMetaAgent;
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
 use crate::logging::TimeSeriesLogger;
+use tch::TchError;
+use thiserror::Error;
 
 /// Description of an environment step
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -119,4 +119,29 @@ pub trait SetActorMode {
         // The default implementation just ignores the mode.
         // Many actors only have a single kind of behaviour.
     }
+}
+
+/// Build an agent instance.
+pub trait AgentBuilder<T, E: ?Sized> {
+    /// Build an agent for the given environment structure.
+    ///
+    /// If the agent supports [`ActorMode`]
+    /// then the agent must be initialized in [`Training`][`ActorMode::Training`] mode.
+    ///
+    /// # Args:
+    /// `env` - The structure of the environment in which the agent is to operate.
+    /// `seed` - A number used to seed the agent's random state,
+    ///          for those agents that use deterministic pseudo-random number generation.
+    fn build_agent(&self, env: &E, seed: u64) -> Result<T, BuildAgentError>;
+}
+
+/// Error building an agent
+#[derive(Error, Debug)]
+pub enum BuildAgentError {
+    #[error("space bound(s) are too loose for this agent")]
+    InvalidSpaceBounds,
+    #[error("reward range must not be unbounded")]
+    UnboundedReward,
+    #[error(transparent)]
+    TorchError(#[from] TchError),
 }
