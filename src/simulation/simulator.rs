@@ -43,7 +43,6 @@ where
     H: SimulationHook<
         <<E as EnvStructure>::ObservationSpace as Space>::Element,
         <<E as EnvStructure>::ActionSpace as Space>::Element,
-        L,
     >,
 {
     fn run(&mut self) {
@@ -81,7 +80,6 @@ where
     H: SimulationHook<
             <<E as EnvStructure>::ObservationSpace as Space>::Element,
             <<E as EnvStructure>::ActionSpace as Space>::Element,
-            L,
         > + ?Sized,
 {
     let mut observation = environment.reset();
@@ -137,7 +135,6 @@ where
     H: SimulationHook<
             <<E as EnvStructure>::ObservationSpace as Space>::Element,
             <<E as EnvStructure>::ActionSpace as Space>::Element,
-            L,
         > + ?Sized,
 {
     let mut observation = environment.reset();

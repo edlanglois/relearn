@@ -141,7 +141,7 @@ where
     <OS as Space>::Element: Clone,
     AS: Space + ElementRefInto<Loggable> + 'static,
     L: TimeSeriesLogger + 'static,
-    H: SimulationHook<OS::Element, AS::Element, L> + 'static,
+    H: SimulationHook<OS::Element, AS::Element> + 'static,
 {
     let log_hook = StepLogger::new(environment.observation_space(), environment.action_space());
     Box::new(Simulator::new(environment, agent, logger, (log_hook, hook)))
