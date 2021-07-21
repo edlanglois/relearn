@@ -8,25 +8,23 @@ use crate::spaces::Space;
 
 /// An agent-environment simulator with logging.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Simulator<E, A, H, L> {
+pub struct Simulator<E, A, H> {
     environment: E,
     agent: A,
-    logger: L,
     hook: H,
 }
 
-impl<E, A, H, L> Simulator<E, A, H, L> {
-    pub const fn new(environment: E, agent: A, hook: H, logger: L) -> Self {
+impl<E, A, H> Simulator<E, A, H> {
+    pub const fn new(environment: E, agent: A, hook: H) -> Self {
         Self {
             environment,
             agent,
             hook,
-            logger,
         }
     }
 }
 
-impl<E, A, H, L> RunSimulation for Simulator<E, A, H, L>
+impl<E, A, H> RunSimulation for Simulator<E, A, H>
 where
     E: StatefulEnvironment,
     <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
@@ -38,14 +36,13 @@ where
         <<E as EnvStructure>::ObservationSpace as Space>::Element,
         <<E as EnvStructure>::ActionSpace as Space>::Element,
     >,
-    L: TimeSeriesLogger,
 {
-    fn run_simulation(&mut self) {
+    fn run_simulation(&mut self, logger: &mut dyn TimeSeriesLogger) {
         run_agent(
             &mut self.environment,
             &mut self.agent,
             &mut self.hook,
-            &mut self.logger,
+            logger,
         );
     }
 }
@@ -57,8 +54,12 @@ where
 /// * `agent` - The agent to simulate.
 /// * `hook` - A simulation hook run on each step. Controls when the simulation stops.
 /// * `logger` - The logger to use.
-pub fn run_agent<E, A, H, L>(environment: &mut E, agent: &mut A, hook: &mut H, logger: &mut L)
-where
+pub fn run_agent<E, A, H>(
+    environment: &mut E,
+    agent: &mut A,
+    hook: &mut H,
+    logger: &mut dyn TimeSeriesLogger,
+) where
     // The ?Sized allows this function to be called with types
     // (&mut dyn Environment, &mut dyn Agent, ...
     // In that case it only needs to be instantiated once and can work with trait pointers.
@@ -74,8 +75,6 @@ where
             <<E as EnvStructure>::ObservationSpace as Space>::Element,
             <<E as EnvStructure>::ActionSpace as Space>::Element,
         > + ?Sized,
-    // Not ?Sized because can't convert &(TimeSeriesLogger + ?Sized) => &mut dyn TimeSeriesLogger
-    L: TimeSeriesLogger,
 {
     let mut observation = environment.reset();
     let mut new_episode = true;
