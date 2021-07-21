@@ -1,15 +1,10 @@
+//! Simulation trait and Simulator structs.
 use super::hooks::SimulationHook;
-/// Simulation trait and Simulator structs.
+use super::RunSimulation;
 use crate::agents::{Actor, Agent, Step};
 use crate::envs::{EnvStructure, StatefulEnvironment};
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::Space;
-
-/// Runs a simulation.
-pub trait RunSimulation {
-    /// Run a simulation
-    fn run_simulation(&mut self);
-}
 
 /// An agent-environment simulator with logging.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
