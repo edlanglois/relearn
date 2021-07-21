@@ -1,4 +1,4 @@
-//! Simulation trait and Simulator structs.
+//! Serial (single-thread) simulation.
 use super::hooks::SimulationHook;
 use super::RunSimulation;
 use crate::agents::{Actor, Agent, Step};
