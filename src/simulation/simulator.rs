@@ -6,9 +6,9 @@ use crate::logging::TimeSeriesLogger;
 use crate::spaces::Space;
 
 /// Runs a simulation.
-pub trait Simulation {
+pub trait RunSimulation {
     /// Run a simulation
-    fn run(&mut self);
+    fn run_simulation(&mut self);
 }
 
 /// An agent-environment simulator with logging.
@@ -31,7 +31,7 @@ impl<E, A, L, H> Simulator<E, A, L, H> {
     }
 }
 
-impl<E, A, L, H> Simulation for Simulator<E, A, L, H>
+impl<E, A, L, H> RunSimulation for Simulator<E, A, L, H>
 where
     E: StatefulEnvironment,
     <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
@@ -45,7 +45,7 @@ where
         <<E as EnvStructure>::ActionSpace as Space>::Element,
     >,
 {
-    fn run(&mut self) {
+    fn run_simulation(&mut self) {
         run_agent(
             &mut self.environment,
             &mut self.agent,

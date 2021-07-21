@@ -16,6 +16,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let logger = CLILogger::new(Duration::from_millis(1000), true);
     let mut simulation =
         env_def.build_simulation(&agent_def, opts.seed, opts.seed + 1, logger, ())?;
-    simulation.run();
+    simulation.run_simulation();
     Ok(())
 }

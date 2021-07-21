@@ -10,7 +10,7 @@ use crate::envs::{
 use crate::error::RLError;
 use crate::logging::{Loggable, TimeSeriesLogger};
 use crate::simulation::{
-    hooks::StepLogger, GenericSimulationHook, Simulation, SimulationHook, Simulator,
+    hooks::StepLogger, GenericSimulationHook, RunSimulation, SimulationHook, Simulator,
 };
 use crate::spaces::{ElementRefInto, Space};
 use crate::utils::distributions::{Bernoulli, Deterministic};
@@ -57,7 +57,7 @@ impl EnvDef {
         agent_seed: u64,
         logger: L,
         hook: H,
-    ) -> Result<Box<dyn Simulation>, RLError>
+    ) -> Result<Box<dyn RunSimulation>, RLError>
     where
         L: TimeSeriesLogger + 'static,
         H: GenericSimulationHook + 'static,
@@ -135,7 +135,7 @@ fn logging_boxed_simulator<OS, AS, L, H>(
     agent: Box<dyn Agent<OS::Element, AS::Element>>,
     logger: L,
     hook: H,
-) -> Box<dyn Simulation>
+) -> Box<dyn RunSimulation>
 where
     OS: Space + ElementRefInto<Loggable> + 'static,
     <OS as Space>::Element: Clone,
