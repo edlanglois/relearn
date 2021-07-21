@@ -23,8 +23,8 @@ where
         simulation::run_agent(
             &mut env,
             &mut agent,
-            &mut (),
             &mut StepLimit::new(num_train_steps),
+            &mut (),
         );
     }
 
@@ -35,7 +35,7 @@ where
     let mut hooks = (action_counter, StepLimit::new(num_eval_steps));
 
     agent.set_actor_mode(ActorMode::Release);
-    simulation::run_actor(&mut env, &mut agent, &mut (), &mut hooks);
+    simulation::run_actor(&mut env, &mut agent, &mut hooks, &mut ());
 
     let action_1_count = hooks.0.counts[1];
     assert!(action_1_count >= ((num_eval_steps as f64) * threshold) as u64);

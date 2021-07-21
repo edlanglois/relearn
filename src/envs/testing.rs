@@ -49,7 +49,6 @@ where
     simulation::run_agent(
         env,
         &mut agent,
-        &mut (),
         &mut (
             ClosureHook::from(|step: &Step<_, _>| -> bool {
                 assert!(step.reward >= min_reward);
@@ -63,6 +62,7 @@ where
             }),
             StepLimit::new(num_steps),
         ),
+        &mut (),
     );
 }
 

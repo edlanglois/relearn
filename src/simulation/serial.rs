@@ -8,25 +8,25 @@ use crate::spaces::Space;
 
 /// An agent-environment simulator with logging.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Simulator<E, A, L, H> {
+pub struct Simulator<E, A, H, L> {
     environment: E,
     agent: A,
     logger: L,
     hook: H,
 }
 
-impl<E, A, L, H> Simulator<E, A, L, H> {
-    pub const fn new(environment: E, agent: A, logger: L, hook: H) -> Self {
+impl<E, A, H, L> Simulator<E, A, H, L> {
+    pub const fn new(environment: E, agent: A, hook: H, logger: L) -> Self {
         Self {
             environment,
             agent,
-            logger,
             hook,
+            logger,
         }
     }
 }
 
-impl<E, A, L, H> RunSimulation for Simulator<E, A, L, H>
+impl<E, A, H, L> RunSimulation for Simulator<E, A, H, L>
 where
     E: StatefulEnvironment,
     <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
@@ -34,18 +34,18 @@ where
         <<E as EnvStructure>::ObservationSpace as Space>::Element,
         <<E as EnvStructure>::ActionSpace as Space>::Element,
     >,
-    L: TimeSeriesLogger,
     H: SimulationHook<
         <<E as EnvStructure>::ObservationSpace as Space>::Element,
         <<E as EnvStructure>::ActionSpace as Space>::Element,
     >,
+    L: TimeSeriesLogger,
 {
     fn run_simulation(&mut self) {
         run_agent(
             &mut self.environment,
             &mut self.agent,
-            &mut self.logger,
             &mut self.hook,
+            &mut self.logger,
         );
     }
 }
@@ -55,9 +55,9 @@ where
 /// # Args
 /// * `environment` - The environment to simulate.
 /// * `agent` - The agent to simulate.
-/// * `logger` - The logger to use.
 /// * `hook` - A simulation hook run on each step. Controls when the simulation stops.
-pub fn run_agent<E, A, L, H>(environment: &mut E, agent: &mut A, logger: &mut L, hook: &mut H)
+/// * `logger` - The logger to use.
+pub fn run_agent<E, A, H, L>(environment: &mut E, agent: &mut A, hook: &mut H, logger: &mut L)
 where
     // The ?Sized allows this function to be called with types
     // (&mut dyn Environment, &mut dyn Agent, ...
@@ -70,12 +70,12 @@ where
             <<E as EnvStructure>::ObservationSpace as Space>::Element,
             <<E as EnvStructure>::ActionSpace as Space>::Element,
         > + ?Sized,
-    // Not ?Sized because can't convert &(TimeSeriesLogger + ?Sized) => &mut dyn TimeSeriesLogger
-    L: TimeSeriesLogger,
     H: SimulationHook<
             <<E as EnvStructure>::ObservationSpace as Space>::Element,
             <<E as EnvStructure>::ActionSpace as Space>::Element,
         > + ?Sized,
+    // Not ?Sized because can't convert &(TimeSeriesLogger + ?Sized) => &mut dyn TimeSeriesLogger
+    L: TimeSeriesLogger,
 {
     let mut observation = environment.reset();
     let mut new_episode = true;
@@ -116,9 +116,9 @@ where
 /// # Args
 /// * `environment` - The environment to simulate.
 /// * `actor` - The actor to simulate.
-/// * `logger` - The logger to use. Passed to hook calls.
 /// * `hook` - A simulation hook run on each step. Controls when the simulation stops.
-pub fn run_actor<E, A, L, H>(environment: &mut E, actor: &mut A, logger: &mut L, hook: &mut H)
+/// * `logger` - The logger to use. Passed to hook calls.
+pub fn run_actor<E, A, H, L>(environment: &mut E, actor: &mut A, hook: &mut H, logger: &mut L)
 where
     E: StatefulEnvironment + ?Sized,
     <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
@@ -126,11 +126,11 @@ where
             <<E as EnvStructure>::ObservationSpace as Space>::Element,
             <<E as EnvStructure>::ActionSpace as Space>::Element,
         > + ?Sized,
-    L: TimeSeriesLogger + ?Sized,
     H: SimulationHook<
             <<E as EnvStructure>::ObservationSpace as Space>::Element,
             <<E as EnvStructure>::ActionSpace as Space>::Element,
         > + ?Sized,
+    L: TimeSeriesLogger + ?Sized,
 {
     let mut observation = environment.reset();
     let mut new_episode = true;

@@ -175,7 +175,7 @@ mod resetting_meta {
 
         let mut hooks = (RewardStatistics::new(), StepLimit::new(1000));
         agent.set_actor_mode(ActorMode::Release);
-        simulation::run_actor(&mut env, &mut agent, &mut (), &mut hooks);
+        simulation::run_actor(&mut env, &mut agent, &mut hooks, &mut ());
 
         assert!(hooks.0.mean_episode_reward() > 0.7 * (num_episodes_per_trial - num_arms) as f64);
     }

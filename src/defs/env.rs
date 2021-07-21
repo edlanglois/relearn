@@ -48,15 +48,15 @@ impl EnvDef {
     /// * `agent_def` - Agent definition.
     /// * `env_seed` - Random seed used for the environment.
     /// * `agent_seed` - Random seed used for the agent.
-    /// * `logger` - A logger used to log the simulation statistics. Pass () for no logging.
     /// * `hook` - A hook called on each step of the simulation. Pass () for no hook.
-    pub fn build_simulation<L, H>(
+    /// * `logger` - A logger used to log the simulation statistics. Pass () for no logging.
+    pub fn build_simulation<H, L>(
         &self,
         agent_def: &AgentDef,
         env_seed: u64,
         agent_seed: u64,
-        logger: L,
         hook: H,
+        logger: L,
     ) -> Result<Box<dyn RunSimulation>, RLError>
     where
         L: TimeSeriesLogger + 'static,
@@ -68,7 +68,7 @@ impl EnvDef {
                 let env: Box<$env_type> = Box::new($env_config.build_env(env_seed)?);
                 // TODO: Box the agent too?
                 let agent = <$agent_builder>::new(agent_def).build_agent(&env, agent_seed)?;
-                logging_boxed_simulator(env, agent, logger, hook)
+                logging_boxed_simulator(env, agent, hook, logger)
             }};
         }
 
@@ -130,19 +130,19 @@ impl EnvDef {
 }
 
 /// Make a boxed simulator with an extra logging hook.
-fn logging_boxed_simulator<OS, AS, L, H>(
+fn logging_boxed_simulator<OS, AS, H, L>(
     environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
     agent: Box<dyn Agent<OS::Element, AS::Element>>,
-    logger: L,
     hook: H,
+    logger: L,
 ) -> Box<dyn RunSimulation>
 where
     OS: Space + ElementRefInto<Loggable> + 'static,
     <OS as Space>::Element: Clone,
     AS: Space + ElementRefInto<Loggable> + 'static,
-    L: TimeSeriesLogger + 'static,
     H: SimulationHook<OS::Element, AS::Element> + 'static,
+    L: TimeSeriesLogger + 'static,
 {
     let log_hook = StepLogger::new(environment.observation_space(), environment.action_space());
-    Box::new(Simulator::new(environment, agent, logger, (log_hook, hook)))
+    Box::new(Simulator::new(environment, agent, (log_hook, hook), logger))
 }

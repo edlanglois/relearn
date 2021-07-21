@@ -193,7 +193,7 @@ mod tabular_q_learning {
             IndexedActionCounter::new(env.action_space()),
             StepLimit::new(1000),
         );
-        simulation::run_agent(&mut env, &mut agent, &mut (), &mut explore_hooks);
+        simulation::run_agent(&mut env, &mut agent, &mut explore_hooks, &mut ());
         let action_1_count = explore_hooks.0.counts[1];
         assert!(action_1_count > 300);
         assert!(action_1_count < 700);
@@ -204,7 +204,7 @@ mod tabular_q_learning {
             IndexedActionCounter::new(env.action_space()),
             StepLimit::new(1000),
         );
-        simulation::run_actor(&mut env, &mut agent, &mut (), &mut exploit_hooks);
+        simulation::run_actor(&mut env, &mut agent, &mut exploit_hooks, &mut ());
         assert!(exploit_hooks.0.counts[1] > 900);
     }
 }
