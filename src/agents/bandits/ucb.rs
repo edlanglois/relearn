@@ -1,6 +1,7 @@
 //! Upper confidence bound bandit agent.
 use super::super::{
-    Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, FiniteSpaceAgent, SetActorMode, Step,
+    Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, FiniteSpaceAgent, OffPolicyAgent,
+    SetActorMode, Step,
 };
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
@@ -170,6 +171,8 @@ impl Agent<usize, usize> for BaseUCB1Agent {
         *mean_reward += (scaled_reward - *mean_reward) / (*state_action_count as f64);
     }
 }
+
+impl OffPolicyAgent for BaseUCB1Agent {}
 
 impl SetActorMode for BaseUCB1Agent {
     fn set_actor_mode(&mut self, mode: ActorMode) {

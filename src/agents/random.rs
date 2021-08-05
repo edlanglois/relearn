@@ -1,4 +1,4 @@
-use super::{Actor, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
+use super::{Actor, Agent, AgentBuilder, BuildAgentError, OffPolicyAgent, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::SampleSpace;
@@ -54,6 +54,8 @@ impl<O, AS: SampleSpace> Actor<O, AS::Element> for RandomAgent<AS> {
 impl<O, AS: SampleSpace> Agent<O, AS::Element> for RandomAgent<AS> {
     fn update(&mut self, _step: Step<O, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {}
 }
+
+impl<AS> OffPolicyAgent for RandomAgent<AS> {}
 
 impl<AS: fmt::Display> fmt::Display for RandomAgent<AS> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

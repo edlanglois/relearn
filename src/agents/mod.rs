@@ -3,7 +3,9 @@
 //! More agents can be found in [`crate::torch::agents`].
 
 mod bandits;
+mod batch_update;
 mod finite;
+pub mod history;
 mod meta;
 mod random;
 mod tabular;
@@ -13,6 +15,7 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
+pub use batch_update::{BatchUpdate, BatchUpdateAgent, OffPolicyAgent};
 use finite::FiniteSpaceAgent;
 pub use meta::ResettingMetaAgent;
 pub use random::{RandomAgent, RandomAgentConfig};

@@ -1,6 +1,7 @@
 //! Tabular agents
 use super::{
-    Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, FiniteSpaceAgent, SetActorMode, Step,
+    Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, FiniteSpaceAgent, OffPolicyAgent,
+    SetActorMode, Step,
 };
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
@@ -133,6 +134,8 @@ impl Agent<usize, usize> for BaseTabularQLearningAgent {
         self.state_action_values[idx] += weight * value;
     }
 }
+
+impl OffPolicyAgent for BaseTabularQLearningAgent {}
 
 impl SetActorMode for BaseTabularQLearningAgent {
     fn set_actor_mode(&mut self, mode: ActorMode) {
