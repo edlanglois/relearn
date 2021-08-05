@@ -1,8 +1,10 @@
 //! Tabular agents
-use super::{Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
+use super::{
+    Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, FiniteSpaceAgent, SetActorMode, Step,
+};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
-use crate::spaces::{FiniteSpace, SampleSpace};
+use crate::spaces::{FiniteSpace, IndexSpace};
 use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
 use rand::rngs::StdRng;
@@ -28,21 +30,18 @@ impl Default for TabularQLearningAgentConfig {
     }
 }
 
-impl<E> AgentBuilder<TabularQLearningAgent<E::ObservationSpace, E::ActionSpace>, E>
-    for TabularQLearningAgentConfig
+impl<E> AgentBuilder<BaseTabularQLearningAgent, E> for TabularQLearningAgentConfig
 where
-    E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: FiniteSpace,
-    <E as EnvStructure>::ActionSpace: FiniteSpace,
+    E: EnvStructure<ObservationSpace = IndexSpace, ActionSpace = IndexSpace> + ?Sized,
 {
     fn build_agent(
         &self,
         env: &E,
         seed: u64,
-    ) -> Result<TabularQLearningAgent<E::ObservationSpace, E::ActionSpace>, BuildAgentError> {
-        Ok(TabularQLearningAgent::new(
-            env.observation_space(),
-            env.action_space(),
+    ) -> Result<BaseTabularQLearningAgent, BuildAgentError> {
+        Ok(BaseTabularQLearningAgent::new(
+            env.observation_space().size(),
+            env.action_space().size(),
             env.discount_factor(),
             self.exploration_rate,
             seed,
@@ -50,11 +49,14 @@ where
     }
 }
 
-/// An epsilon-greedy tabular Q learning.
+/// An epsilon-greedy tabular Q learning agent.
+pub type TabularQLearningAgent<OS, AS> = FiniteSpaceAgent<BaseTabularQLearningAgent, OS, AS>;
+
+/// Base epsilon-greedy tabular Q learning agent.
+///
+/// Implemented only for index observation and action spaces.
 #[derive(Debug, Clone, PartialEq)]
-pub struct TabularQLearningAgent<OS, AS> {
-    pub observation_space: OS,
-    pub action_space: AS,
+pub struct BaseTabularQLearningAgent {
     pub discount_factor: f64,
     pub exploration_rate: f64,
     pub state_action_counts: Array2<u32>,
@@ -64,25 +66,17 @@ pub struct TabularQLearningAgent<OS, AS> {
     rng: StdRng,
 }
 
-impl<OS, AS> TabularQLearningAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
+impl BaseTabularQLearningAgent {
     pub fn new(
-        observation_space: OS,
-        action_space: AS,
+        num_observations: usize,
+        num_actions: usize,
         discount_factor: f64,
         exploration_rate: f64,
         seed: u64,
     ) -> Self {
-        let num_observations = observation_space.size();
-        let num_actions = action_space.size();
         let state_action_counts = Array::from_elem((num_observations, num_actions), 0);
         let state_action_values = Array::from_elem((num_observations, num_actions), 0.0);
         Self {
-            observation_space,
-            action_space,
             discount_factor,
             exploration_rate,
             state_action_counts,
@@ -93,47 +87,33 @@ where
     }
 }
 
-impl<OS, AS> fmt::Display for TabularQLearningAgent<OS, AS>
-where
-    OS: fmt::Display,
-    AS: fmt::Display,
-{
+impl fmt::Display for BaseTabularQLearningAgent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "TabularQLearningAgent({}, {}, {}, {})",
-            self.observation_space, self.action_space, self.discount_factor, self.exploration_rate
+            "BaseTabularQLearningAgent(γ={}, ϵ={})",
+            self.discount_factor, self.exploration_rate
         )
     }
 }
 
-impl<OS, AS> Actor<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace + SampleSpace,
-{
-    fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
+impl Actor<usize, usize> for BaseTabularQLearningAgent {
+    fn act(&mut self, observation: &usize, _new_episode: bool) -> usize {
         if self.mode == ActorMode::Training && self.rng.gen::<f64>() < self.exploration_rate {
             // Random exploration with probability `exploration_rate` when in training mode
-            self.action_space.sample(&mut self.rng)
+            let (_, num_actions) = self.state_action_counts.dim();
+            self.rng.gen_range(0..num_actions)
         } else {
-            let obs_idx = self.observation_space.to_index(observation);
-            let act_idx = self
-                .state_action_values
-                .index_axis(Axis(0), obs_idx)
+            self.state_action_values
+                .index_axis(Axis(0), *observation)
                 .argmax()
-                .unwrap();
-            self.action_space.from_index(act_idx).unwrap()
+                .unwrap()
         }
     }
 }
 
-impl<OS, AS> TabularQLearningAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
-    fn indexed_update(&mut self, step: &Step<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
+impl Agent<usize, usize> for BaseTabularQLearningAgent {
+    fn update(&mut self, step: Step<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
         let discounted_next_value = match step.next_observation {
             None => 0.0,
             Some(next_observation) => {
@@ -154,20 +134,7 @@ where
     }
 }
 
-impl<OS, AS> Agent<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace + SampleSpace,
-{
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn TimeSeriesLogger) {
-        self.indexed_update(
-            &super::indexed_step(&step, &self.observation_space, &self.action_space),
-            logger,
-        )
-    }
-}
-
-impl<OS, AS> SetActorMode for TabularQLearningAgent<OS, AS> {
+impl SetActorMode for BaseTabularQLearningAgent {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         self.mode = mode;
     }
@@ -185,7 +152,9 @@ mod tabular_q_learning {
     fn learns_determinstic_bandit() {
         let config = TabularQLearningAgentConfig::default();
         testing::train_deterministic_bandit(
-            |env_structure| config.build_agent(env_structure, 0).unwrap(),
+            |env_structure| -> TabularQLearningAgent<_, _> {
+                config.build_agent(env_structure, 0).unwrap()
+            },
             1000,
             0.9,
         );
@@ -197,7 +166,7 @@ mod tabular_q_learning {
 
         // The initial mode explores
         let config = TabularQLearningAgentConfig::new(0.95);
-        let mut agent = config.build_agent(&env, 0).unwrap();
+        let mut agent: TabularQLearningAgent<_, _> = config.build_agent(&env, 0).unwrap();
         let mut explore_hooks = (
             IndexedActionCounter::new(env.action_space()),
             StepLimit::new(1000),

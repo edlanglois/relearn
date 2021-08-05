@@ -1,8 +1,10 @@
 //! Upper confidence bound bandit agent.
-use super::super::{Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
+use super::super::{
+    Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, FiniteSpaceAgent, SetActorMode, Step,
+};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
-use crate::spaces::FiniteSpace;
+use crate::spaces::{FiniteSpace, IndexSpace};
 use crate::utils::iter::ArgMaxBy;
 use ndarray::{Array, Array1, Array2, Axis};
 use std::f64;
@@ -30,20 +32,14 @@ impl Default for UCB1AgentConfig {
     }
 }
 
-impl<E> AgentBuilder<UCB1Agent<E::ObservationSpace, E::ActionSpace>, E> for UCB1AgentConfig
+impl<E> AgentBuilder<BaseUCB1Agent, E> for UCB1AgentConfig
 where
-    E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: FiniteSpace,
-    <E as EnvStructure>::ActionSpace: FiniteSpace,
+    E: EnvStructure<ObservationSpace = IndexSpace, ActionSpace = IndexSpace> + ?Sized,
 {
-    fn build_agent(
-        &self,
-        env: &E,
-        _seed: u64,
-    ) -> Result<UCB1Agent<E::ObservationSpace, E::ActionSpace>, BuildAgentError> {
-        UCB1Agent::new(
-            env.observation_space(),
-            env.action_space(),
+    fn build_agent(&self, env: &E, _seed: u64) -> Result<BaseUCB1Agent, BuildAgentError> {
+        BaseUCB1Agent::new(
+            env.observation_space().size(),
+            env.action_space().size(),
             env.reward_range(),
             self.exploration_rate,
         )
@@ -53,13 +49,14 @@ where
 /// A UCB1 Agent
 ///
 /// Applies UCB1 (Auer 2002) independently to each state.
-#[derive(Debug, Clone, PartialEq)]
-pub struct UCB1Agent<OS, AS> {
-    /// Environment observation space
-    pub observation_space: OS,
-    /// Environment action space
-    pub action_space: AS,
+pub type UCB1Agent<OS, AS> = FiniteSpaceAgent<BaseUCB1Agent, OS, AS>;
 
+/// Base UCB1 Agent
+///
+/// Applies UCB1 (Auer 2002) independently to each state.
+/// Defined for index observation and action spaces.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BaseUCB1Agent {
     /// Scale factor on the confidence interval; controls the exploration rate.
     ///
     /// A value of 0.2 is recommended by Audibert and Munos in their ICML
@@ -81,14 +78,10 @@ pub struct UCB1Agent<OS, AS> {
     state_visit_count: Array1<u64>,
 }
 
-impl<OS, AS> UCB1Agent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
+impl BaseUCB1Agent {
     pub fn new(
-        observation_space: OS,
-        action_space: AS,
+        num_observations: usize,
+        num_actions: usize,
         reward_range: (f64, f64),
         exploration_rate: f64,
     ) -> Result<Self, BuildAgentError> {
@@ -101,17 +94,12 @@ where
         let reward_scale_factor = reward_width.recip();
         let reward_shift = -min_reward;
 
-        let num_observations = observation_space.size();
-        let num_actions = action_space.size();
-
         // Initialize to 1 success and 1 failure for each arm
         let state_action_mean_reward = Array::from_elem((num_observations, num_actions), 0.5);
         let state_action_count = Array::from_elem((num_observations, num_actions), 2);
         let state_visit_count = Array::from_elem((num_observations,), 2 * num_actions as u64);
 
         Ok(Self {
-            observation_space,
-            action_space,
             exploration_rate,
             mode: ActorMode::Training,
             reward_scale_factor,
@@ -123,22 +111,14 @@ where
     }
 }
 
-impl<OS, AS> fmt::Display for UCB1Agent<OS, AS>
-where
-    OS: fmt::Display,
-    AS: fmt::Display,
-{
+impl fmt::Display for BaseUCB1Agent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "UCB1Agent({}, {}, {})",
-            self.observation_space, self.action_space, self.exploration_rate
-        )
+        write!(f, "BaseUCB1Agent(ϵ={})", self.exploration_rate)
     }
 }
 
-impl<OS, AS> UCB1Agent<OS, AS> {
-    /// Take a training-mode action in terms of indices.
+impl BaseUCB1Agent {
+    /// Take a training-mode action.
     fn act_training(&mut self, obs_idx: usize) -> usize {
         let log_squared_visit_count = 2.0 * (self.state_visit_count[obs_idx] as f64).ln();
         let ucb = self
@@ -153,7 +133,7 @@ impl<OS, AS> UCB1Agent<OS, AS> {
             .expect("Empty action space")
     }
 
-    /// Take a release-mode (greedy) action in terms of indices.
+    /// Take a release-mode (greedy) action.
     fn act_release(&mut self, obs_idx: usize) -> usize {
         // Take the action with the largest action count
         self.state_action_count
@@ -164,44 +144,34 @@ impl<OS, AS> UCB1Agent<OS, AS> {
     }
 }
 
-impl<OS, AS> Actor<OS::Element, AS::Element> for UCB1Agent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
-    fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
-        let obs_idx = self.observation_space.to_index(observation);
-        let act_idx = match self.mode {
-            ActorMode::Training => self.act_training(obs_idx),
-            ActorMode::Release => self.act_release(obs_idx),
-        };
-        self.action_space.from_index(act_idx).unwrap()
+impl Actor<usize, usize> for BaseUCB1Agent {
+    fn act(&mut self, observation: &usize, _new_episode: bool) -> usize {
+        match self.mode {
+            ActorMode::Training => self.act_training(*observation),
+            ActorMode::Release => self.act_release(*observation),
+        }
     }
 }
 
-impl<OS, AS> Agent<OS::Element, AS::Element> for UCB1Agent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {
-        let obs_idx = self.observation_space.to_index(&step.observation);
-        let act_idx = self.action_space.to_index(&step.action);
-
+impl Agent<usize, usize> for BaseUCB1Agent {
+    fn update(&mut self, step: Step<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
         let scaled_reward = (step.reward + self.reward_shift) * self.reward_scale_factor;
 
-        self.state_visit_count[obs_idx] += 1;
-        let state_action_count = self.state_action_count.get_mut((obs_idx, act_idx)).unwrap();
+        self.state_visit_count[step.observation] += 1;
+        let state_action_count = self
+            .state_action_count
+            .get_mut((step.observation, step.action))
+            .unwrap();
         *state_action_count += 1;
         let mean_reward = self
             .state_action_mean_reward
-            .get_mut((obs_idx, act_idx))
+            .get_mut((step.observation, step.action))
             .unwrap();
         *mean_reward += (scaled_reward - *mean_reward) / (*state_action_count as f64);
     }
 }
 
-impl<OS, AS> SetActorMode for UCB1Agent<OS, AS> {
+impl SetActorMode for BaseUCB1Agent {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         self.mode = mode
     }
@@ -216,7 +186,7 @@ mod ucb1_agent {
     fn learns_determinstic_bandit() {
         let config = UCB1AgentConfig::default();
         testing::train_deterministic_bandit(
-            |env_structure| config.build_agent(env_structure, 0).unwrap(),
+            |env_structure| -> UCB1Agent<_, _> { config.build_agent(env_structure, 0).unwrap() },
             1000,
             0.9,
         );

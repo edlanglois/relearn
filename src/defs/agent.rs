@@ -1,7 +1,8 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyUpdaterDef, SeqModDef};
 use crate::agents::{
-    Agent, AgentBuilder, BetaThompsonSamplingAgentConfig, BuildAgentError, RandomAgentConfig,
-    ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
+    Agent, AgentBuilder, BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig,
+    BuildAgentError, RandomAgentConfig, ResettingMetaAgent, TabularQLearningAgent,
+    TabularQLearningAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::Loggable;
@@ -109,9 +110,15 @@ where
     fn build_agent(&self, env: &E, seed: u64) -> Result<Box<DynEnvAgent<E>>, BuildAgentError> {
         use AgentDef::*;
         match self.0.borrow() {
-            TabularQLearning(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
-            BetaThompsonSampling(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
-            UCB1(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            TabularQLearning(config) => config
+                .build_agent(env, seed)
+                .map(|a: TabularQLearningAgent<_, _>| Box::new(a) as _),
+            BetaThompsonSampling(config) => config
+                .build_agent(env, seed)
+                .map(|a: BetaThompsonSamplingAgent<_, _>| Box::new(a) as _),
+            UCB1(config) => config
+                .build_agent(env, seed)
+                .map(|a: UCB1Agent<_, _>| Box::new(a) as _),
             agent_def => ForAnyAny::new(agent_def).build_agent(env, seed),
         }
     }
@@ -147,11 +154,13 @@ where
         use AgentDef::*;
 
         match self.0.borrow() {
-            ResettingMeta(inner_agent_def) => Ok(Box::new(ResettingMetaAgent::new(
-                ForFiniteFinite::new(inner_agent_def.as_ref().clone()),
-                (&InnerEnvStructure::<E, &E>::new(env)).into(),
-                seed,
-            )) as _),
+            ResettingMeta(inner_agent_def) => {
+                Ok(Box::new(ResettingMetaAgent::<_, Box<_>, _, _>::new(
+                    ForFiniteFinite::new(inner_agent_def.as_ref().clone()),
+                    (&InnerEnvStructure::<E, &E>::new(env)).into(),
+                    seed,
+                )) as _)
+            }
             agent_def => ForAnyAny::new(agent_def).build_agent(env, seed),
         }
     }

@@ -1,8 +1,10 @@
 //! Thompson sampling bandit agent
-use super::super::{Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
+use super::super::{
+    Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, FiniteSpaceAgent, SetActorMode, Step,
+};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
-use crate::spaces::FiniteSpace;
+use crate::spaces::{FiniteSpace, IndexSpace};
 use crate::utils::iter::ArgMaxBy;
 use ndarray::{Array, Array2, Axis};
 use rand::distributions::Distribution;
@@ -30,22 +32,18 @@ impl Default for BetaThompsonSamplingAgentConfig {
     }
 }
 
-impl<E> AgentBuilder<BetaThompsonSamplingAgent<E::ObservationSpace, E::ActionSpace>, E>
-    for BetaThompsonSamplingAgentConfig
+impl<E> AgentBuilder<BaseBetaThompsonSamplingAgent, E> for BetaThompsonSamplingAgentConfig
 where
-    E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: FiniteSpace,
-    <E as EnvStructure>::ActionSpace: FiniteSpace,
+    E: EnvStructure<ObservationSpace = IndexSpace, ActionSpace = IndexSpace> + ?Sized,
 {
     fn build_agent(
         &self,
         env: &E,
         seed: u64,
-    ) -> Result<BetaThompsonSamplingAgent<E::ObservationSpace, E::ActionSpace>, BuildAgentError>
-    {
-        Ok(BetaThompsonSamplingAgent::new(
-            env.observation_space(),
-            env.action_space(),
+    ) -> Result<BaseBetaThompsonSamplingAgent, BuildAgentError> {
+        Ok(BaseBetaThompsonSamplingAgent::new(
+            env.observation_space().size(),
+            env.action_space().size(),
             env.reward_range(),
             self.num_samples,
             seed,
@@ -54,12 +52,14 @@ where
 }
 
 /// A Thompson sampling agent for Bernoulli rewards with a Beta prior.
+pub type BetaThompsonSamplingAgent<OS, AS> =
+    FiniteSpaceAgent<BaseBetaThompsonSamplingAgent, OS, AS>;
+
+/// Base Thompson sampling agent for Bernoulli rewards with a Beta prior.
+///
+/// Implemented only for index action and observation spaces.
 #[derive(Debug, Clone, PartialEq)]
-pub struct BetaThompsonSamplingAgent<OS, AS> {
-    /// Environment observation space
-    pub observation_space: OS,
-    /// Environment action space
-    pub action_space: AS,
+pub struct BaseBetaThompsonSamplingAgent {
     /// Reward is partitioned into high/low separated by this threshold.
     pub reward_threshold: f64,
     /// Number of posterior samples to draw.
@@ -74,25 +74,18 @@ pub struct BetaThompsonSamplingAgent<OS, AS> {
     rng: StdRng,
 }
 
-impl<OS, AS> BetaThompsonSamplingAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
+impl BaseBetaThompsonSamplingAgent {
     pub fn new(
-        observation_space: OS,
-        action_space: AS,
+        num_observations: usize,
+        num_actions: usize,
         reward_range: (f64, f64),
         num_samples: usize,
         seed: u64,
     ) -> Self {
         let (reward_min, reward_max) = reward_range;
         let reward_threshold = (reward_min + reward_max) / 2.0;
-        let low_high_reward_counts =
-            Array::from_elem((observation_space.size(), action_space.size()), (1, 1));
+        let low_high_reward_counts = Array::from_elem((num_observations, num_actions), (1, 1));
         Self {
-            observation_space,
-            action_space,
             reward_threshold,
             num_samples,
             mode: ActorMode::Training,
@@ -102,22 +95,18 @@ where
     }
 }
 
-impl<OS, AS> fmt::Display for BetaThompsonSamplingAgent<OS, AS>
-where
-    OS: fmt::Display,
-    AS: fmt::Display,
-{
+impl fmt::Display for BaseBetaThompsonSamplingAgent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "BetaThompsonSamplingAgent({}, {}, {})",
-            self.observation_space, self.action_space, self.reward_threshold
+            "BaseBetaThompsonSamplingAgent({})",
+            self.reward_threshold
         )
     }
 }
 
-impl<OS, AS> BetaThompsonSamplingAgent<OS, AS> {
-    /// Take a training-mode action in terms of indices.
+impl BaseBetaThompsonSamplingAgent {
+    /// Take a training-mode action.
     fn act_training(&mut self, obs_idx: usize) -> usize {
         let num_samples = self.num_samples;
         let rng = &mut self.rng;
@@ -149,10 +138,10 @@ impl<OS, AS> BetaThompsonSamplingAgent<OS, AS> {
             .expect("Empty action space")
     }
 
-    /// Take a release-mode (greedy) action in terms of indices.
+    /// Take a release-mode (greedy) action.
     fn act_release(&mut self, obs_idx: usize) -> usize {
         // Take the action with highest posterior mean
-        // Counts are initalized to 1 so no risk of 0/0
+        // Counts are initalized to 1 so there is no risk of 0/0
         self.low_high_reward_counts
             .index_axis(Axis(0), obs_idx)
             .mapv(|(beta, alpha)| alpha as f64 / (alpha + beta) as f64)
@@ -162,33 +151,20 @@ impl<OS, AS> BetaThompsonSamplingAgent<OS, AS> {
     }
 }
 
-impl<OS, AS> Actor<OS::Element, AS::Element> for BetaThompsonSamplingAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
-    fn act(&mut self, observation: &OS::Element, _new_episode: bool) -> AS::Element {
-        let obs_idx = self.observation_space.to_index(observation);
-        let act_idx = match self.mode {
-            ActorMode::Training => self.act_training(obs_idx),
-            ActorMode::Release => self.act_release(obs_idx),
-        };
-        self.action_space.from_index(act_idx).unwrap()
+impl Actor<usize, usize> for BaseBetaThompsonSamplingAgent {
+    fn act(&mut self, observation: &usize, _new_episode: bool) -> usize {
+        match self.mode {
+            ActorMode::Training => self.act_training(*observation),
+            ActorMode::Release => self.act_release(*observation),
+        }
     }
 }
 
-impl<OS, AS> Agent<OS::Element, AS::Element> for BetaThompsonSamplingAgent<OS, AS>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {
-        let obs_idx = self.observation_space.to_index(&step.observation);
-        let act_idx = self.action_space.to_index(&step.action);
-
+impl Agent<usize, usize> for BaseBetaThompsonSamplingAgent {
+    fn update(&mut self, step: Step<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
         let reward_count = self
             .low_high_reward_counts
-            .get_mut((obs_idx, act_idx))
+            .get_mut((step.observation, step.action))
             .unwrap();
         if step.reward > self.reward_threshold {
             reward_count.1 += 1;
@@ -198,7 +174,7 @@ where
     }
 }
 
-impl<OS, AS> SetActorMode for BetaThompsonSamplingAgent<OS, AS> {
+impl SetActorMode for BaseBetaThompsonSamplingAgent {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         self.mode = mode
     }
@@ -213,7 +189,9 @@ mod beta_thompson_sampling {
     fn learns_determinstic_bandit() {
         let config = BetaThompsonSamplingAgentConfig::default();
         testing::train_deterministic_bandit(
-            |env_structure| config.build_agent(env_structure, 0).unwrap(),
+            |env_structure| -> BetaThompsonSamplingAgent<_, _> {
+                config.build_agent(env_structure, 0).unwrap()
+            },
             1000,
             0.9,
         );

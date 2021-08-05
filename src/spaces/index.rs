@@ -72,6 +72,12 @@ impl FiniteSpace for IndexSpace {
     }
 }
 
+impl<T: FiniteSpace + ?Sized> From<&T> for IndexSpace {
+    fn from(space: &T) -> Self {
+        Self { size: space.size() }
+    }
+}
+
 impl CategoricalSpace for IndexSpace {}
 
 #[cfg(test)]

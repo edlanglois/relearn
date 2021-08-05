@@ -3,6 +3,7 @@
 //! More agents can be found in [`crate::torch::agents`].
 
 mod bandits;
+mod finite;
 mod meta;
 mod random;
 mod tabular;
@@ -12,12 +13,12 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
+use finite::FiniteSpaceAgent;
 pub use meta::ResettingMetaAgent;
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
 use crate::logging::TimeSeriesLogger;
-use crate::spaces::FiniteSpace;
 use tch::TchError;
 use thiserror::Error;
 
@@ -37,28 +38,6 @@ pub struct Step<O, A> {
     /// An episode is always done if it reaches a terminal state.
     /// An episode may be done for other reasons, like a step limit.
     pub episode_done: bool,
-}
-
-/// Convert a finite-space step into an index step.
-fn indexed_step<OS, AS>(
-    step: &Step<OS::Element, AS::Element>,
-    observation_space: &OS,
-    action_space: &AS,
-) -> Step<usize, usize>
-where
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
-    Step {
-        observation: observation_space.to_index(&step.observation),
-        action: action_space.to_index(&step.action),
-        reward: step.reward,
-        next_observation: step
-            .next_observation
-            .as_ref()
-            .map(|s| observation_space.to_index(s)),
-        episode_done: step.episode_done,
-    }
 }
 
 /// An actor that produces actions in response to a sequence of observations.
