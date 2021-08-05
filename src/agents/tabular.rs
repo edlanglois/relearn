@@ -128,33 +128,42 @@ where
     }
 }
 
-impl<OS, AS> Agent<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
+impl<OS, AS> TabularQLearningAgent<OS, AS>
 where
     OS: FiniteSpace,
-    AS: FiniteSpace + SampleSpace,
+    AS: FiniteSpace,
 {
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {
-        let obs_idx = self.observation_space.to_index(&step.observation);
-        let act_idx = self.action_space.to_index(&step.action);
-
+    fn indexed_update(&mut self, step: &Step<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
         let discounted_next_value = match step.next_observation {
             None => 0.0,
             Some(next_observation) => {
-                let next_obs_idx = self.observation_space.to_index(&next_observation);
                 self.state_action_values
-                    .index_axis(Axis(0), next_obs_idx)
+                    .index_axis(Axis(0), next_observation)
                     .max()
                     .unwrap()
                     * self.discount_factor
             }
         };
-        let idx = (obs_idx, act_idx);
+        let idx = (step.observation, step.action);
         self.state_action_counts[idx] += 1;
 
         let value = step.reward + discounted_next_value;
         let weight = f64::from(self.state_action_counts[idx]).recip();
         self.state_action_values[idx] *= 1.0 - weight;
         self.state_action_values[idx] += weight * value;
+    }
+}
+
+impl<OS, AS> Agent<OS::Element, AS::Element> for TabularQLearningAgent<OS, AS>
+where
+    OS: FiniteSpace,
+    AS: FiniteSpace + SampleSpace,
+{
+    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn TimeSeriesLogger) {
+        self.indexed_update(
+            &super::indexed_step(&step, &self.observation_space, &self.action_space),
+            logger,
+        )
     }
 }
 
