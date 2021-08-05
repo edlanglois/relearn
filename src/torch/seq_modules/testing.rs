@@ -54,6 +54,10 @@ pub fn check_seq_serial<M: SequenceModule>(module: &M, in_dim: usize, out_dim: u
     assert_eq!(output.i((.., 1..3, ..)), output.i((.., 4..6, ..)));
 }
 
+fn assert_allclose(input: &Tensor, other: &Tensor) {
+    assert!(input.allclose(other, 1e-5, 1e-8, false))
+}
+
 /// Basic check of [`SequenceModule::seq_packed`]
 ///
 /// * Checks that the output size is correct.
@@ -78,13 +82,13 @@ pub fn check_seq_packed<M: SequenceModule>(module: &M, in_dim: usize, out_dim: u
     let seq_2_indices: &[i64] = &[1, 4, 6];
     let seq_3_indices: &[i64] = &[2];
 
-    assert_eq!(
-        output.i((&seq_1_indices[..3], ..)),
-        output.i((seq_2_indices, ..))
+    assert_allclose(
+        &output.i((&seq_1_indices[..3], ..)),
+        &output.i((seq_2_indices, ..)),
     );
-    assert_eq!(
-        output.i((&seq_1_indices[..1], ..)),
-        output.i((seq_3_indices, ..))
+    assert_allclose(
+        &output.i((&seq_1_indices[..1], ..)),
+        &output.i((seq_3_indices, ..)),
     );
 }
 
