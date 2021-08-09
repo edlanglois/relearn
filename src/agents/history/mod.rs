@@ -2,6 +2,7 @@
 mod basic;
 
 use super::super::Step;
+pub use basic::{EpisodeBuffer, EpisodeBufferConfig};
 
 /// A step history buffer.
 pub trait HistoryBuffer<O, A>: for<'a> HistoryBufferSteps<'a, O, A> {

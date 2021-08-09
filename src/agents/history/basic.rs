@@ -36,8 +36,8 @@ pub struct EpisodeBuffer<O, A> {
     buffer: Vec<Step<O, A>>,
 }
 
-impl<O, A> From<EpisodeBufferConfig> for EpisodeBuffer<O, A> {
-    fn from(config: EpisodeBufferConfig) -> Self {
+impl<'a, O, A> From<&'a EpisodeBufferConfig> for EpisodeBuffer<O, A> {
+    fn from(config: &'a EpisodeBufferConfig) -> Self {
         Self {
             ep_done_step_threshold: config.ep_done_step_threshold,
             step_threshold: config.step_threshold,
