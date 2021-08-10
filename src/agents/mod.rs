@@ -126,6 +126,27 @@ pub trait SetActorMode {
     }
 }
 
+/// A manager agent for a set of multi-threaded workers.
+///
+/// Each worker will be sent to its own thread while the manager is run on the original thread.
+/// The workers will be run on a sequence of environment steps.
+/// The managers and workers are responsible for internally coordinating updates and
+/// synchronization.
+pub trait ManagerAgent {
+    type Worker: Send + 'static;
+
+    /// Create a new worker instance.
+    fn make_worker(&mut self, seed: u64) -> Self::Worker;
+
+    /// Run the manager.
+    ///
+    /// This function will be run on a separate thread from the workers.
+    ///
+    /// For example, it might collect data from the workers, perform policy updates,
+    /// and distribute the updated policy back to the workers.
+    fn run(&mut self, logger: &mut dyn TimeSeriesLogger);
+}
+
 /// Build an agent instance.
 pub trait AgentBuilder<T, E: ?Sized> {
     /// Build an agent for the given environment structure.
