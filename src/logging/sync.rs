@@ -11,6 +11,17 @@ pub enum Message {
     EndEvent(Event),
 }
 
+impl Message {
+    /// Log this message to the given logger.
+    pub fn log<L: TimeSeriesLogger + ?Sized>(self, logger: &mut L) -> Result<(), LogError> {
+        match self {
+            Message::Log { event, id, value } => logger.id_log(event, id, value)?,
+            Message::EndEvent(event) => logger.end_event(event),
+        }
+        Ok(())
+    }
+}
+
 /// Logger that forwards messages through a channel.
 #[derive(Debug, Clone)]
 pub struct ForwardingLogger {
@@ -58,12 +69,8 @@ pub fn log_receive_loop<L: TimeSeriesLogger + ?Sized>(
     receiver: &mut Receiver<Message>,
     logger: &mut L,
 ) -> Result<(), LogError> {
-    use Message::*;
     while let Ok(message) = receiver.recv() {
-        match message {
-            Log { event, id, value } => logger.id_log(event, id, value)?,
-            EndEvent(event) => logger.end_event(event),
-        }
+        message.log(logger)?;
     }
     Ok(())
 }
