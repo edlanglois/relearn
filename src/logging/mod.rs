@@ -1,6 +1,6 @@
 //! Logging statistics from simulation runs
 #![allow(clippy::use_self)] // false positive in Enum derive for Event
-pub mod cli;
+mod cli;
 
 pub use cli::CLILogger;
 use enum_map::Enum;
