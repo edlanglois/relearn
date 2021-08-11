@@ -7,6 +7,7 @@ mod batch_update;
 mod finite;
 pub mod history;
 mod meta;
+mod multithread;
 mod random;
 mod tabular;
 #[cfg(test)]
@@ -18,6 +19,7 @@ pub use bandits::{
 pub use batch_update::{BatchUpdate, BatchUpdateAgent, OffPolicyAgent};
 use finite::FiniteSpaceAgent;
 pub use meta::ResettingMetaAgent;
+pub use multithread::{MutexAgentManager, MutexAgentWorker};
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 

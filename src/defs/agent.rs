@@ -1,7 +1,7 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyUpdaterDef, SeqModDef};
 use crate::agents::{
     Agent, AgentBuilder, BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig,
-    BuildAgentError, RandomAgentConfig, ResettingMetaAgent, TabularQLearningAgent,
+    BuildAgentError, RandomAgent, RandomAgentConfig, ResettingMetaAgent, TabularQLearningAgent,
     TabularQLearningAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
@@ -77,7 +77,7 @@ where
         match self.0.borrow() {
             Random => RandomAgentConfig::new()
                 .build_agent(env, seed)
-                .map(|a| Box::new(a) as _),
+                .map(|a: RandomAgent<_>| Box::new(a) as _),
             ActorCritic(config) => config
                 .as_ref()
                 .build_agent(env, seed)
