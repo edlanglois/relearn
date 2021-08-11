@@ -24,7 +24,7 @@ pub struct CLILogger {
 
 impl CLILogger {
     pub fn new(display_period: Duration, average_between_displays: bool) -> Self {
-        CLILogger {
+        Self {
             events: enum_map! { _ => EventLog::new() },
             display_period,
             last_display_time: Instant::now(),
