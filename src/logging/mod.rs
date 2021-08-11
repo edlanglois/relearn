@@ -1,6 +1,6 @@
 //! Logging statistics from simulation runs
-mod caching;
 mod cli;
+pub mod sync;
 
 pub use cli::CLILogger;
 use enum_map::Enum;
