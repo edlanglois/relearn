@@ -24,6 +24,7 @@ pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
 use crate::logging::TimeSeriesLogger;
+use std::marker::PhantomData;
 use tch::TchError;
 use thiserror::Error;
 
@@ -147,6 +148,57 @@ pub trait ManagerAgent {
     /// For example, it might collect data from the workers, perform policy updates,
     /// and distribute the updated policy back to the workers.
     fn run(&mut self, logger: &mut dyn TimeSeriesLogger);
+}
+
+impl<T> ManagerAgent for Box<T>
+where
+    T: ManagerAgent + ?Sized,
+{
+    type Worker = T::Worker;
+
+    fn make_worker(&mut self, seed: u64) -> Self::Worker {
+        T::make_worker(self, seed)
+    }
+
+    fn run(&mut self, logger: &mut dyn TimeSeriesLogger) {
+        T::run(self, logger)
+    }
+}
+
+/// Wraps a [`ManagerAgent`] to return boxed workers.
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct BoxingManager<T, O, A> {
+    inner: T,
+    observation_type: PhantomData<*const O>,
+    action_type: PhantomData<*const A>,
+}
+
+impl<T, O, A> BoxingManager<T, O, A> {
+    pub const fn new(inner: T) -> Self {
+        Self {
+            inner,
+            observation_type: PhantomData,
+            action_type: PhantomData,
+        }
+    }
+}
+
+impl<T, O, A> ManagerAgent for BoxingManager<T, O, A>
+where
+    T: ManagerAgent,
+    <T as ManagerAgent>::Worker: Agent<O, A>,
+    O: 'static,
+    A: 'static,
+{
+    type Worker = Box<dyn Agent<O, A> + Send + 'static>;
+
+    fn make_worker(&mut self, seed: u64) -> Self::Worker {
+        Box::new(self.inner.make_worker(seed))
+    }
+
+    fn run(&mut self, logger: &mut dyn TimeSeriesLogger) {
+        self.inner.run(logger)
+    }
 }
 
 /// Build an agent instance.
