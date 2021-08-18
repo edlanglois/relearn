@@ -76,22 +76,22 @@ impl FromStr for AgentType {
     }
 }
 
-impl From<&Options> for AgentDef {
-    fn from(opts: &Options) -> Self {
+impl AgentType {
+    pub fn agent_def(&self, opts: &Options) -> AgentDef {
         use AgentWrapperType::*;
         use ConcreteAgentType::*;
-        let mut agent_def = match opts.agent.base {
-            Random => Self::Random,
-            TabularQLearning => Self::TabularQLearning(opts.into()),
-            BetaThompsonSampling => Self::BetaThompsonSampling(opts.into()),
-            UCB1 => Self::UCB1(From::from(opts)),
+        let mut agent_def = match self.base {
+            Random => AgentDef::Random,
+            TabularQLearning => AgentDef::TabularQLearning(opts.into()),
+            BetaThompsonSampling => AgentDef::BetaThompsonSampling(opts.into()),
+            UCB1 => AgentDef::UCB1(From::from(opts)),
             PolicyGradient => {
                 let config = ActorCriticConfig {
                     policy_updater_config: PolicyUpdaterDef::default_policy_gradient(),
                     ..ActorCriticConfig::default()
                 }
                 .with_update(opts);
-                Self::ActorCritic(Box::new(config))
+                AgentDef::ActorCritic(Box::new(config))
             }
             Trpo => {
                 let config = ActorCriticConfig {
@@ -99,7 +99,7 @@ impl From<&Options> for AgentDef {
                     ..ActorCriticConfig::default()
                 }
                 .with_update(opts);
-                Self::ActorCritic(Box::new(config))
+                AgentDef::ActorCritic(Box::new(config))
             }
             Ppo => {
                 let config = ActorCriticConfig {
@@ -107,15 +107,21 @@ impl From<&Options> for AgentDef {
                     ..ActorCriticConfig::default()
                 }
                 .with_update(opts);
-                Self::ActorCritic(Box::new(config))
+                AgentDef::ActorCritic(Box::new(config))
             }
         };
-        for wrapper in opts.agent.wrappers.iter().rev() {
+        for wrapper in self.wrappers.iter().rev() {
             agent_def = match wrapper {
-                ResettingMeta => Self::ResettingMeta(Box::new(agent_def)),
+                ResettingMeta => AgentDef::ResettingMeta(Box::new(agent_def)),
             };
         }
         agent_def
+    }
+}
+
+impl From<&Options> for AgentDef {
+    fn from(opts: &Options) -> Self {
+        opts.agent.agent_def(opts)
     }
 }
 
