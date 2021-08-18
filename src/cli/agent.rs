@@ -26,6 +26,42 @@ impl fmt::Display for ConcreteAgentType {
     }
 }
 
+impl ConcreteAgentType {
+    pub fn agent_def(&self, opts: &Options) -> AgentDef {
+        use ConcreteAgentType::*;
+        match self {
+            Random => AgentDef::Random,
+            TabularQLearning => AgentDef::TabularQLearning(opts.into()),
+            BetaThompsonSampling => AgentDef::BetaThompsonSampling(opts.into()),
+            UCB1 => AgentDef::UCB1(From::from(opts)),
+            PolicyGradient => {
+                let config = ActorCriticConfig {
+                    policy_updater_config: PolicyUpdaterDef::default_policy_gradient(),
+                    ..ActorCriticConfig::default()
+                }
+                .with_update(opts);
+                AgentDef::ActorCritic(Box::new(config))
+            }
+            Trpo => {
+                let config = ActorCriticConfig {
+                    policy_updater_config: PolicyUpdaterDef::default_trpo(),
+                    ..ActorCriticConfig::default()
+                }
+                .with_update(opts);
+                AgentDef::ActorCritic(Box::new(config))
+            }
+            Ppo => {
+                let config = ActorCriticConfig {
+                    policy_updater_config: PolicyUpdaterDef::default_ppo(),
+                    ..ActorCriticConfig::default()
+                }
+                .with_update(opts);
+                AgentDef::ActorCritic(Box::new(config))
+            }
+        }
+    }
+}
+
 /// Wrapper agent type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
 pub enum AgentWrapperType {
@@ -35,6 +71,15 @@ pub enum AgentWrapperType {
 impl fmt::Display for AgentWrapperType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", Self::VARIANTS[*self as usize])
+    }
+}
+
+impl AgentWrapperType {
+    pub fn agent_def(&self, inner: AgentDef, _opts: &Options) -> AgentDef {
+        use AgentWrapperType::*;
+        match self {
+            ResettingMeta => AgentDef::ResettingMeta(Box::new(inner)),
+        }
     }
 }
 
@@ -78,42 +123,9 @@ impl FromStr for AgentType {
 
 impl AgentType {
     pub fn agent_def(&self, opts: &Options) -> AgentDef {
-        use AgentWrapperType::*;
-        use ConcreteAgentType::*;
-        let mut agent_def = match self.base {
-            Random => AgentDef::Random,
-            TabularQLearning => AgentDef::TabularQLearning(opts.into()),
-            BetaThompsonSampling => AgentDef::BetaThompsonSampling(opts.into()),
-            UCB1 => AgentDef::UCB1(From::from(opts)),
-            PolicyGradient => {
-                let config = ActorCriticConfig {
-                    policy_updater_config: PolicyUpdaterDef::default_policy_gradient(),
-                    ..ActorCriticConfig::default()
-                }
-                .with_update(opts);
-                AgentDef::ActorCritic(Box::new(config))
-            }
-            Trpo => {
-                let config = ActorCriticConfig {
-                    policy_updater_config: PolicyUpdaterDef::default_trpo(),
-                    ..ActorCriticConfig::default()
-                }
-                .with_update(opts);
-                AgentDef::ActorCritic(Box::new(config))
-            }
-            Ppo => {
-                let config = ActorCriticConfig {
-                    policy_updater_config: PolicyUpdaterDef::default_ppo(),
-                    ..ActorCriticConfig::default()
-                }
-                .with_update(opts);
-                AgentDef::ActorCritic(Box::new(config))
-            }
-        };
+        let mut agent_def = self.base.agent_def(opts);
         for wrapper in self.wrappers.iter().rev() {
-            agent_def = match wrapper {
-                ResettingMeta => AgentDef::ResettingMeta(Box::new(agent_def)),
-            };
+            agent_def = wrapper.agent_def(agent_def, opts);
         }
         agent_def
     }
