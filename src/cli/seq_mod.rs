@@ -2,10 +2,10 @@ use super::{Options, Update, WithUpdate};
 use crate::defs::SeqModDef;
 use crate::torch::modules::MlpConfig;
 use crate::torch::seq_modules::{RnnConfig, StackedConfig};
-use clap::Clap;
+use clap::ArgEnum;
 
 /// Sequence module type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
 pub enum SeqModType {
     Mlp,
     GruMlp,

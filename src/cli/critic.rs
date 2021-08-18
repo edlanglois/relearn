@@ -1,10 +1,10 @@
 use super::{Options, Update, WithUpdate};
 use crate::defs::CriticDef;
 use crate::torch::critic::GaeConfig;
-use clap::Clap;
+use clap::ArgEnum;
 
 /// Agent step value type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
 pub enum CriticType {
     Return,
     Gae,

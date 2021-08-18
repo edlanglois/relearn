@@ -4,12 +4,12 @@ use crate::agents::{
 };
 use crate::defs::{AgentDef, CriticDef, CriticUpdaterDef, PolicyUpdaterDef, SeqModDef};
 use crate::torch::agents::ActorCriticConfig;
-use clap::{ArgEnum, Clap};
+use clap::ArgEnum;
 use std::fmt;
 use std::str::FromStr;
 
 /// Concrete agent type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
 pub enum ConcreteAgentType {
     Random,
     TabularQLearning,
@@ -27,7 +27,7 @@ impl fmt::Display for ConcreteAgentType {
 }
 
 /// Wrapper agent type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
 pub enum AgentWrapperType {
     ResettingMeta,
 }

@@ -3,10 +3,10 @@ use crate::defs::OptimizerDef;
 use crate::torch::optimizers::{
     AdamConfig, AdamWConfig, ConjugateGradientOptimizerConfig, RmsPropConfig, SgdConfig,
 };
-use clap::Clap;
+use clap::ArgEnum;
 
 /// Optimizer name
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
 pub enum OptimizerType {
     Sgd,
     RmsProp,

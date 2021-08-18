@@ -5,12 +5,12 @@ use crate::envs::{
     Chain, DirichletRandomMdps, FixedMeansBanditConfig, MemoryGame, MetaEnvConfig, OneHotBandits,
     PriorMeansBanditConfig, StepLimit, UniformBernoulliBandits, Wrapped,
 };
-use clap::Clap;
+use clap::ArgEnum;
 use rand::distributions::Standard;
 use std::convert::TryInto;
 
 /// Environment name
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
 pub enum EnvType {
     DeterministicBandit,
     BernoulliBandit,
@@ -21,7 +21,7 @@ pub enum EnvType {
     MetaDirichletMdps,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Clap)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
 pub enum BanditArmPrior {
     Fixed,
     Uniform,
