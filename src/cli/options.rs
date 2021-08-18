@@ -20,7 +20,7 @@ use tch::Device;
 )]
 pub struct Options {
     // Environment options
-    #[clap(arg_enum)]
+    #[clap(short, long, arg_enum, help_heading = Some("ENVIRONMENT OPTIONS"))]
     /// Environment type
     pub environment: EnvType,
 
@@ -58,7 +58,7 @@ pub struct Options {
 
     // Agent args
     /// Agent type
-    #[clap(long_about = agent_long_about())]
+    #[clap(short, long, long_about = agent_long_about(), help_heading = Some("AGENT OPTIONS"))]
     pub agent: AgentType,
 
     #[clap(long, help_heading = Some("AGENT OPTIONS"))]
