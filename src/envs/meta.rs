@@ -144,7 +144,7 @@ fn meta_observation_space<E: EnvStructure + ?Sized>(
 
 /// Wrapper that provides the inner environment structure of a meta environment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InnerEnvStructure<T: ?Sized, U>(U, PhantomData<T>);
+pub struct InnerEnvStructure<T: ?Sized, U>(U, PhantomData<*const T>);
 
 impl<T: ?Sized, U> InnerEnvStructure<T, U> {
     pub const fn new(inner_env: U) -> Self {
