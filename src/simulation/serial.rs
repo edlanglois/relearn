@@ -2,9 +2,8 @@
 use super::hooks::SimulationHook;
 use super::{BuildSimError, RunSimulation, SimulatorBuilder};
 use crate::agents::{Actor, Agent, Step};
-use crate::envs::{EnvBuilder, EnvStructure, StatefulEnvironment};
+use crate::envs::{EnvBuilder, StatefulEnvironment};
 use crate::logging::TimeSeriesLogger;
-use crate::spaces::Space;
 
 /// Configuration for [`Simulator`].
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -57,15 +56,9 @@ impl<E, A, H> Simulator<E, A, H> {
 impl<E, A, H> RunSimulation for Simulator<E, A, H>
 where
     E: StatefulEnvironment,
-    <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
-    A: Agent<
-        <<E as EnvStructure>::ObservationSpace as Space>::Element,
-        <<E as EnvStructure>::ActionSpace as Space>::Element,
-    >,
-    H: SimulationHook<
-        <<E as EnvStructure>::ObservationSpace as Space>::Element,
-        <<E as EnvStructure>::ActionSpace as Space>::Element,
-    >,
+    <E as StatefulEnvironment>::Observation: Clone,
+    A: Agent<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>,
+    H: SimulationHook<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>,
 {
     fn run_simulation(&mut self, logger: &mut dyn TimeSeriesLogger) {
         run_agent(
@@ -96,15 +89,10 @@ pub fn run_agent<E, A, H>(
     //
     // Alternatively, it can use the concrete struct types, which allows inlining.
     E: StatefulEnvironment + ?Sized,
-    <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
-    A: Agent<
-            <<E as EnvStructure>::ObservationSpace as Space>::Element,
-            <<E as EnvStructure>::ActionSpace as Space>::Element,
-        > + ?Sized,
-    H: SimulationHook<
-            <<E as EnvStructure>::ObservationSpace as Space>::Element,
-            <<E as EnvStructure>::ActionSpace as Space>::Element,
-        > + ?Sized,
+    <E as StatefulEnvironment>::Observation: Clone,
+    A: Agent<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action> + ?Sized,
+    H: SimulationHook<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>
+        + ?Sized,
 {
     let mut observation = environment.reset();
     let mut new_episode = true;
@@ -150,15 +138,10 @@ pub fn run_agent<E, A, H>(
 pub fn run_actor<E, A, H, L>(environment: &mut E, actor: &mut A, hook: &mut H, logger: &mut L)
 where
     E: StatefulEnvironment + ?Sized,
-    <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
-    A: Actor<
-            <<E as EnvStructure>::ObservationSpace as Space>::Element,
-            <<E as EnvStructure>::ActionSpace as Space>::Element,
-        > + ?Sized,
-    H: SimulationHook<
-            <<E as EnvStructure>::ObservationSpace as Space>::Element,
-            <<E as EnvStructure>::ActionSpace as Space>::Element,
-        > + ?Sized,
+    <E as StatefulEnvironment>::Observation: Clone,
+    A: Actor<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action> + ?Sized,
+    H: SimulationHook<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>
+        + ?Sized,
     L: TimeSeriesLogger + ?Sized,
 {
     let mut observation = environment.reset();

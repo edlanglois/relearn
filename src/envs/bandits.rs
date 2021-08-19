@@ -2,7 +2,7 @@
 use super::{
     BuildEnvError, EnvBuilder, EnvDistBuilder, EnvDistribution, EnvStructure, Environment,
 };
-use crate::spaces::{IndexSpace, SingletonSpace, Space};
+use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use rand::distributions::{Distribution, Standard, Uniform};
 use rand::prelude::*;
@@ -109,20 +109,17 @@ impl<D: Bounded<f64>> EnvStructure for Bandit<D> {
 
 impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
     type State = ();
+    type Observation = ();
+    type Action = usize;
 
     fn initial_state(&self, _rng: &mut StdRng) -> Self::State {}
 
-    fn observe(
-        &self,
-        _state: &Self::State,
-        _rng: &mut StdRng,
-    ) -> <Self::ObservationSpace as Space>::Element {
-    }
+    fn observe(&self, _state: &Self::State, _rng: &mut StdRng) -> Self::Observation {}
 
     fn step(
         &self,
         _state: Self::State,
-        action: &<Self::ActionSpace as Space>::Element,
+        action: &Self::Action,
         rng: &mut StdRng,
     ) -> (Option<Self::State>, f64, bool) {
         let reward = self.distributions[*action].sample(rng);

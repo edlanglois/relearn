@@ -124,18 +124,16 @@ where
 ///
 /// This defines the environment dynamics and strucutre.
 /// It does not internally manage state.
-pub trait Environment: EnvStructure {
+pub trait Environment {
     type State;
+    type Observation;
+    type Action;
 
     /// Sample a new initial state.
     fn initial_state(&self, rng: &mut StdRng) -> Self::State;
 
     /// Sample an observation for a state.
-    fn observe(
-        &self,
-        state: &Self::State,
-        rng: &mut StdRng,
-    ) -> <Self::ObservationSpace as Space>::Element;
+    fn observe(&self, state: &Self::State, rng: &mut StdRng) -> Self::Observation;
 
     /// Sample a state transition.
     ///
@@ -150,30 +148,28 @@ pub trait Environment: EnvStructure {
     fn step(
         &self,
         state: Self::State,
-        action: &<Self::ActionSpace as Space>::Element,
+        action: &Self::Action,
         rng: &mut StdRng,
     ) -> (Option<Self::State>, f64, bool);
 }
 
 impl<E: Environment + ?Sized> Environment for Box<E> {
     type State = E::State;
+    type Observation = E::Observation;
+    type Action = E::Action;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
         E::initial_state(self, rng)
     }
 
-    fn observe(
-        &self,
-        state: &Self::State,
-        rng: &mut StdRng,
-    ) -> <Self::ObservationSpace as Space>::Element {
+    fn observe(&self, state: &Self::State, rng: &mut StdRng) -> Self::Observation {
         E::observe(self, state, rng)
     }
 
     fn step(
         &self,
         state: Self::State,
-        action: &<Self::ActionSpace as Space>::Element,
+        action: &Self::Action,
         rng: &mut StdRng,
     ) -> (Option<Self::State>, f64, bool) {
         E::step(self, state, action, rng)
@@ -184,7 +180,10 @@ impl<E: Environment + ?Sized> Environment for Box<E> {
 ///
 /// Prefer implementing [`Environment`] since [`EnvWithState`] can be used
 /// to create a `StatefulEnvironment` out of an `Environment`.
-pub trait StatefulEnvironment: EnvStructure {
+pub trait StatefulEnvironment {
+    type Observation;
+    type Action;
+
     /// Take a step in the environment.
     ///
     /// This may panic if the state has not be initialized with reset()
@@ -199,14 +198,7 @@ pub trait StatefulEnvironment: EnvStructure {
     ///     - If `observation` is `None` then `episode_done` must be true.
     ///     - An episode may be done for other reasons, like a step limit.
     // TODO: Why not make reset() optional and have new() / step() self-reset?
-    fn step(
-        &mut self,
-        action: &<Self::ActionSpace as Space>::Element,
-    ) -> (
-        Option<<Self::ObservationSpace as Space>::Element>,
-        f64,
-        bool,
-    );
+    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f64, bool);
 
     /// Reset the environment to an initial state.
     ///
@@ -214,22 +206,18 @@ pub trait StatefulEnvironment: EnvStructure {
     ///
     /// # Returns
     /// * `observation`: An observation of the resulting state.
-    fn reset(&mut self) -> <Self::ObservationSpace as Space>::Element;
+    fn reset(&mut self) -> Self::Observation;
 }
 
 impl<E: StatefulEnvironment + ?Sized> StatefulEnvironment for Box<E> {
-    fn step(
-        &mut self,
-        action: &<Self::ActionSpace as Space>::Element,
-    ) -> (
-        Option<<Self::ObservationSpace as Space>::Element>,
-        f64,
-        bool,
-    ) {
+    type Observation = E::Observation;
+    type Action = E::Action;
+
+    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f64, bool) {
         E::step(self, action)
     }
 
-    fn reset(&mut self) -> <Self::ObservationSpace as Space>::Element {
+    fn reset(&mut self) -> Self::Observation {
         E::reset(self)
     }
 }
@@ -263,11 +251,8 @@ impl From<Infallible> for BuildEnvError {
 /// The spaces / intervals of each sampled environment must be equal to
 /// or a subset of the spaces for `EnvDistribution`.
 /// The discount factor of the sampled environments must be the same.
-pub trait EnvDistribution: EnvStructure {
-    type Environment: EnvStructure<
-        ObservationSpace = Self::ObservationSpace,
-        ActionSpace = Self::ActionSpace,
-    >;
+pub trait EnvDistribution {
+    type Environment;
 
     /// Sample an environment from the distribution.
     ///

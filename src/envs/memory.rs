@@ -1,5 +1,5 @@
 use super::{BuildEnvError, EnvBuilder, EnvStructure, Environment};
-use crate::spaces::{IndexSpace, Space};
+use crate::spaces::IndexSpace;
 use rand::prelude::*;
 
 /// Memory Game Environment
@@ -78,24 +78,22 @@ impl EnvStructure for MemoryGame {
 impl Environment for MemoryGame {
     /// `(current_state, initial_state)`
     type State = (usize, usize);
+    type Observation = usize;
+    type Action = usize;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
         let state = rng.gen_range(0..self.num_actions);
         (state, state)
     }
 
-    fn observe(
-        &self,
-        state: &Self::State,
-        _rng: &mut StdRng,
-    ) -> <Self::ObservationSpace as Space>::Element {
+    fn observe(&self, state: &Self::State, _rng: &mut StdRng) -> Self::Observation {
         state.0
     }
 
     fn step(
         &self,
         state: Self::State,
-        action: &<Self::ActionSpace as Space>::Element,
+        action: &Self::Action,
         _rng: &mut StdRng,
     ) -> (Option<Self::State>, f64, bool) {
         let (current_state, initial_state) = state;

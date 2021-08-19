@@ -4,7 +4,6 @@ use super::{
     StatefulEnvironment, Wrapped,
 };
 use crate::envs::EnvStructure;
-use crate::spaces::Space;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 /// A wrapper that adds internal state to an environment.
@@ -39,7 +38,7 @@ impl<E: Environment> EnvWithState<E> {
     }
 }
 
-impl<E: Environment> EnvStructure for EnvWithState<E> {
+impl<E: Environment + EnvStructure> EnvStructure for EnvWithState<E> {
     type ObservationSpace = E::ObservationSpace;
     type ActionSpace = E::ActionSpace;
 
@@ -61,14 +60,10 @@ impl<E: Environment> EnvStructure for EnvWithState<E> {
 }
 
 impl<E: Environment> StatefulEnvironment for EnvWithState<E> {
-    fn step(
-        &mut self,
-        action: &<Self::ActionSpace as Space>::Element,
-    ) -> (
-        Option<<Self::ObservationSpace as Space>::Element>,
-        f64,
-        bool,
-    ) {
+    type Observation = E::Observation;
+    type Action = E::Action;
+
+    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f64, bool) {
         let state = self
             .state
             .take()
@@ -82,7 +77,7 @@ impl<E: Environment> StatefulEnvironment for EnvWithState<E> {
         (observation, reward, episode_done)
     }
 
-    fn reset(&mut self) -> <Self::ObservationSpace as Space>::Element {
+    fn reset(&mut self) -> Self::Observation {
         let state = self.env.initial_state(&mut self.rng);
         let observation = self.env.observe(&state, &mut self.rng);
         self.state = Some(state);

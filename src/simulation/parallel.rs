@@ -1,9 +1,8 @@
 use super::hooks::SimulationHook;
 use super::{run_agent, BuildSimError, RunSimulation, SimulatorBuilder};
 use crate::agents::{Agent, ManagerAgent};
-use crate::envs::{EnvBuilder, EnvStructure, StatefulEnvironment};
+use crate::envs::{EnvBuilder, StatefulEnvironment};
 use crate::logging::TimeSeriesLogger;
-use crate::spaces::Space;
 use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::thread;
@@ -66,15 +65,11 @@ where
     EB: EnvBuilder<E>,
     E: StatefulEnvironment + Send + 'static,
     MA: ManagerAgent,
-    <MA as ManagerAgent>::Worker: Agent<
-            <<E as EnvStructure>::ObservationSpace as Space>::Element,
-            <<E as EnvStructure>::ActionSpace as Space>::Element,
-        > + 'static,
-    <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
-    H: SimulationHook<
-            <<E as EnvStructure>::ObservationSpace as Space>::Element,
-            <<E as EnvStructure>::ActionSpace as Space>::Element,
-        > + Clone
+    <MA as ManagerAgent>::Worker: Agent<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>
+        + 'static,
+    <E as StatefulEnvironment>::Observation: Clone,
+    H: SimulationHook<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>
+        + Clone
         + Send
         + 'static,
 {
@@ -99,15 +94,11 @@ pub fn run_agent_multithread<EB, E, MA, H>(
     EB: EnvBuilder<E>,
     E: StatefulEnvironment + Send + 'static,
     MA: ManagerAgent,
-    <MA as ManagerAgent>::Worker: Agent<
-            <<E as EnvStructure>::ObservationSpace as Space>::Element,
-            <<E as EnvStructure>::ActionSpace as Space>::Element,
-        > + 'static,
-    <<E as EnvStructure>::ObservationSpace as Space>::Element: Clone,
-    H: SimulationHook<
-            <<E as EnvStructure>::ObservationSpace as Space>::Element,
-            <<E as EnvStructure>::ActionSpace as Space>::Element,
-        > + Clone
+    <MA as ManagerAgent>::Worker: Agent<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>
+        + 'static,
+    <E as StatefulEnvironment>::Observation: Clone,
+    H: SimulationHook<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>
+        + Clone
         + Send
         + 'static,
 {

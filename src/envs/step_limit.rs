@@ -2,7 +2,6 @@ use super::{
     BuildEnvError, EnvBuilder, EnvDistBuilder, EnvStructure, EnvWrapper, Environment,
     InnerStructureWrapper, Wrapped,
 };
-use crate::spaces::Space;
 use rand::{rngs::StdRng, Rng};
 
 /// Environment wrapper that cuts off episodes after a set number of steps.
@@ -41,23 +40,21 @@ impl<E: EnvStructure> InnerStructureWrapper<E> for StepLimit {}
 impl<E: Environment> Environment for Wrapped<E, StepLimit> {
     /// `(inner_state, current_steps)`
     type State = (E::State, u64);
+    type Observation = E::Observation;
+    type Action = E::Action;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
         (self.inner.initial_state(rng), 0)
     }
 
-    fn observe(
-        &self,
-        state: &Self::State,
-        rng: &mut StdRng,
-    ) -> <Self::ObservationSpace as Space>::Element {
+    fn observe(&self, state: &Self::State, rng: &mut StdRng) -> Self::Observation {
         self.inner.observe(&state.0, rng)
     }
 
     fn step(
         &self,
         state: Self::State,
-        action: &<Self::ActionSpace as Space>::Element,
+        action: &Self::Action,
         rng: &mut StdRng,
     ) -> (Option<Self::State>, f64, bool) {
         let (inner_state, mut current_steps) = state;

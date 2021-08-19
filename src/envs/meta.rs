@@ -7,7 +7,6 @@ use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Spac
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::borrow::Borrow;
-use std::fmt;
 use std::marker::PhantomData;
 
 /// Configuration for a meta environment
@@ -120,6 +119,26 @@ impl<E> MetaEnv<E> {
     }
 }
 
+/// The state of a [`MetaEnv`].
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct MetaEnvState<E: Environment> {
+    /// An instance of the inner environment (sampled for this trial).
+    inner_env: E,
+    /// The current inner environment state. `None` represents a terminal state.
+    inner_state: Option<E::State>,
+    /// The inner episode index within the current trial.
+    episode_index: usize,
+    /// Details of the previous step of this inner episode. A copy of the action and the reward.
+    prev_step_info: Option<(E::Action, f64)>,
+    /// Whether the previous step ended the inner episode.
+    inner_episode_done: bool,
+}
+
+/// Observation type for [`MetaEnv`].
+///
+/// See [`MetaEnv`] and [`MetaObservationSpace`] for details.
+pub type MetaObservation<O, A> = (Option<O>, Option<(A, f64)>, bool);
+
 /// Meta-environment observation space. See [`MetaEnv`] for details.
 pub type MetaObservationSpace<OS, AS> = ProductSpace<(
     OptionSpace<OS>,
@@ -197,94 +216,18 @@ where
     }
 }
 
-/// The state of a [`MetaEnv`].
-pub struct MetaEnvState<E: Environment> {
-    /// An instance of the inner environment (sampled for this trial).
-    inner_env: E,
-    /// The current inner environment state. `None` represents a terminal state.
-    inner_state: Option<E::State>,
-    /// The inner episode index within the current trial.
-    episode_index: usize,
-    /// Details of the previous step of this inner episode. A copy of the action and the reward.
-    prev_step_info: Option<(<E::ActionSpace as Space>::Element, f64)>,
-    /// Whether the previous step ended the inner episode.
-    inner_episode_done: bool,
-}
-
-// #[derive(...)] does not work because of the associated types
-
-impl<E> fmt::Debug for MetaEnvState<E>
-where
-    E: Environment + fmt::Debug,
-    <E as Environment>::State: fmt::Debug,
-    <<E as EnvStructure>::ActionSpace as Space>::Element: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MetaEnvState")
-            .field("inner_env", &self.inner_env)
-            .field("inner_state", &self.inner_state)
-            .field("episode_index", &self.episode_index)
-            .field("prev_step_info", &self.prev_step_info)
-            .field("inner_episode_done", &self.inner_episode_done)
-            .finish()
-    }
-}
-
-impl<E> Clone for MetaEnvState<E>
-where
-    E: Environment + Clone,
-    <E as Environment>::State: Clone,
-    <<E as EnvStructure>::ActionSpace as Space>::Element: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            inner_env: self.inner_env.clone(),
-            inner_state: self.inner_state.clone(),
-            episode_index: self.episode_index,
-            prev_step_info: self.prev_step_info.clone(),
-            inner_episode_done: self.inner_episode_done,
-        }
-    }
-}
-
-impl<E> Copy for MetaEnvState<E>
-where
-    E: Environment + Copy,
-    <E as Environment>::State: Copy,
-    <<E as EnvStructure>::ActionSpace as Space>::Element: Copy,
-{
-}
-
-impl<E> PartialEq for MetaEnvState<E>
-where
-    E: Environment + PartialEq,
-    <E as Environment>::State: PartialEq,
-    <<E as EnvStructure>::ActionSpace as Space>::Element: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.inner_env == other.inner_env
-            && self.inner_state == other.inner_state
-            && self.episode_index == other.episode_index
-            && self.prev_step_info == other.prev_step_info
-            && self.inner_episode_done == other.inner_episode_done
-    }
-}
-
-impl<E> Eq for MetaEnvState<E>
-where
-    E: Environment + Eq,
-    <E as Environment>::State: Eq,
-    <<E as EnvStructure>::ActionSpace as Space>::Element: Eq,
-{
-}
-
 impl<E> Environment for MetaEnv<E>
 where
     E: EnvDistribution,
     <E as EnvDistribution>::Environment: Environment,
-    <<E as EnvStructure>::ActionSpace as Space>::Element: Copy,
+    <<E as EnvDistribution>::Environment as Environment>::Action: Copy,
 {
     type State = MetaEnvState<E::Environment>;
+    type Observation = MetaObservation<
+        <E::Environment as Environment>::Observation,
+        <E::Environment as Environment>::Action,
+    >;
+    type Action = <E::Environment as Environment>::Action;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
         // Sample a new inner environment.
@@ -299,11 +242,7 @@ where
         }
     }
 
-    fn observe(
-        &self,
-        state: &Self::State,
-        rng: &mut StdRng,
-    ) -> <Self::ObservationSpace as Space>::Element {
+    fn observe(&self, state: &Self::State, rng: &mut StdRng) -> Self::Observation {
         let inner_observation = state
             .inner_state
             .as_ref()
@@ -316,7 +255,7 @@ where
     fn step(
         &self,
         state: Self::State,
-        action: &<Self::ActionSpace as Space>::Element,
+        action: &Self::Action,
         rng: &mut StdRng,
     ) -> (Option<Self::State>, f64, bool) {
         if state.inner_episode_done {
@@ -398,7 +337,7 @@ impl<E: EnvDistribution> StatefulMetaEnv<E> {
     }
 }
 
-impl<E: EnvDistribution> EnvStructure for StatefulMetaEnv<E> {
+impl<E: EnvDistribution + EnvStructure> EnvStructure for StatefulMetaEnv<E> {
     type ObservationSpace = MetaObservationSpace<E::ObservationSpace, E::ActionSpace>;
     type ActionSpace = E::ActionSpace;
 
@@ -420,16 +359,15 @@ impl<E> StatefulEnvironment for StatefulMetaEnv<E>
 where
     E: EnvDistribution,
     <E as EnvDistribution>::Environment: StatefulEnvironment,
-    <<E as EnvStructure>::ActionSpace as Space>::Element: Copy,
+    <<E as EnvDistribution>::Environment as StatefulEnvironment>::Action: Copy,
 {
-    fn step(
-        &mut self,
-        action: &<Self::ActionSpace as Space>::Element,
-    ) -> (
-        Option<<Self::ObservationSpace as Space>::Element>,
-        f64,
-        bool,
-    ) {
+    type Observation = MetaObservation<
+        <E::Environment as StatefulEnvironment>::Observation,
+        <E::Environment as StatefulEnvironment>::Action,
+    >;
+    type Action = <E::Environment as StatefulEnvironment>::Action;
+
+    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f64, bool) {
         let env = self.env.as_mut().expect("Must call reset() first");
         if self.inner_episode_done {
             // Ignore the action and start a new inner episode
@@ -463,7 +401,7 @@ where
         }
     }
 
-    fn reset(&mut self) -> <Self::ObservationSpace as Space>::Element {
+    fn reset(&mut self) -> Self::Observation {
         // Start a new trial
         let mut env = self.env_distribution.sample_environment(&mut self.rng);
         let inner_observation = env.reset();

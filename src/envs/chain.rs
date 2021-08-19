@@ -1,6 +1,6 @@
 //! Chain environment
 use super::{BuildEnvError, EnvBuilder, EnvStructure, Environment};
-use crate::spaces::{IndexSpace, IndexedTypeSpace, Space};
+use crate::spaces::{IndexSpace, IndexedTypeSpace};
 use rand::prelude::*;
 use rust_rl_derive::Indexed;
 use std::convert::TryInto;
@@ -68,23 +68,21 @@ impl EnvStructure for Chain {
 
 impl Environment for Chain {
     type State = u64;
+    type Observation = usize;
+    type Action = Move;
 
     fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
         0
     }
 
-    fn observe(
-        &self,
-        state: &Self::State,
-        _rng: &mut StdRng,
-    ) -> <Self::ObservationSpace as Space>::Element {
+    fn observe(&self, state: &Self::State, _rng: &mut StdRng) -> Self::Observation {
         (*state).try_into().unwrap()
     }
 
     fn step(
         &self,
         state: Self::State,
-        action: &<Self::ActionSpace as Space>::Element,
+        action: &Self::Action,
         rng: &mut StdRng,
     ) -> (Option<Self::State>, f64, bool) {
         let mut action = *action;

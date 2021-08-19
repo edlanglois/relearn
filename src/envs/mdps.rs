@@ -1,7 +1,6 @@
 //! Generic Markov Decision Processes
 use super::{EnvDistBuilder, EnvDistribution, EnvStructure, Environment};
 use crate::spaces::IndexSpace;
-use crate::spaces::Space;
 use ndarray::{Array2, Axis};
 use rand::{distributions::Distribution, rngs::StdRng};
 use rand_distr::{Dirichlet, Normal, WeightedAliasIndex};
@@ -52,23 +51,21 @@ where
     R: Distribution<f64>,
 {
     type State = usize;
+    type Observation = usize;
+    type Action = usize;
 
     fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
         0
     }
 
-    fn observe(
-        &self,
-        state: &Self::State,
-        _rng: &mut StdRng,
-    ) -> <Self::ObservationSpace as Space>::Element {
+    fn observe(&self, state: &Self::State, _rng: &mut StdRng) -> Self::Observation {
         *state
     }
 
     fn step(
         &self,
         state: Self::State,
-        action: &<Self::ActionSpace as Space>::Element,
+        action: &Self::Action,
         rng: &mut StdRng,
     ) -> (Option<Self::State>, f64, bool) {
         let (successor_distribution, reward_distribution) = &self.transitions[(state, *action)];

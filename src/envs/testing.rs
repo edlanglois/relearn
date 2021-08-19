@@ -14,11 +14,15 @@ use std::fmt::Debug;
 /// Run a stateless environment and check that invariants are satisfied.
 pub fn run_stateless<E>(env: E, num_steps: u64, seed: u64)
 where
-    E: Environment,
+    E: EnvStructure,
+    E: Environment<
+        Observation = <<E as EnvStructure>::ObservationSpace as Space>::Element,
+        Action = <<E as EnvStructure>::ActionSpace as Space>::Element,
+    >,
     <E as EnvStructure>::ObservationSpace: Debug,
-    <<E as EnvStructure>::ObservationSpace as Space>::Element: Debug + Clone,
+    <E as Environment>::Observation: Debug + Clone,
     <E as EnvStructure>::ActionSpace: Debug + SampleSpace,
-    <<E as EnvStructure>::ActionSpace as Space>::Element: Debug,
+    <E as Environment>::Action: Debug,
 {
     run_stateful(&mut env.into_stateful(seed), num_steps, seed + 1)
 }
@@ -26,11 +30,15 @@ where
 /// Run a stateful environment and check that invariants are satisfied.
 pub fn run_stateful<E>(env: &mut E, num_steps: u64, seed: u64)
 where
-    E: StatefulEnvironment,
+    E: EnvStructure,
+    E: StatefulEnvironment<
+        Observation = <<E as EnvStructure>::ObservationSpace as Space>::Element,
+        Action = <<E as EnvStructure>::ActionSpace as Space>::Element,
+    >,
     <E as EnvStructure>::ObservationSpace: Debug,
-    <<E as EnvStructure>::ObservationSpace as Space>::Element: Debug + Clone,
+    <E as StatefulEnvironment>::Observation: Debug + Clone,
     <E as EnvStructure>::ActionSpace: Debug + SampleSpace,
-    <<E as EnvStructure>::ActionSpace as Space>::Element: Debug,
+    <E as StatefulEnvironment>::Action: Debug,
 {
     let observation_space = env.observation_space();
     let action_space = env.action_space();
@@ -70,7 +78,11 @@ where
 #[allow(clippy::float_cmp)] // discount factor should be exactly equal
 pub fn check_env_distribution_structure<D>(env_dist: &D, num_samples: usize)
 where
-    D: EnvDistribution + ?Sized,
+    D: EnvDistribution + EnvStructure + ?Sized,
+    <D as EnvDistribution>::Environment: EnvStructure<
+        ObservationSpace = <D as EnvStructure>::ObservationSpace,
+        ActionSpace = <D as EnvStructure>::ActionSpace,
+    >,
     <D as EnvStructure>::ObservationSpace: PartialOrd + Debug,
     <D as EnvStructure>::ActionSpace: PartialOrd + Debug,
 {
