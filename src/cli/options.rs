@@ -187,8 +187,15 @@ pub struct Options {
     pub seed: u64,
 
     #[clap(long, help_heading = Some("SIMULATION OPTIONS"))]
-    /// Maximum number of experiment steps
+    /// Maximum number of experiment steps (total steps when running parallel simulations)"
     pub max_steps: Option<u64>,
+
+    #[clap(short, long, visible_alias="parallel", default_missing_value="0",
+           help_heading = Some("SIMULATION OPTIONS"))]
+    /// Number of parallel simulation threads. An additional thread runs the agent manager.
+    ///
+    /// Passing this option without an argument (or 0) defaults to the number of CPU cores.
+    pub parallel_threads: Option<usize>,
 }
 
 /// Stores the agent argument help message.

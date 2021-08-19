@@ -829,6 +829,7 @@ dependencies = [
  "ndarray",
  "ndarray-stats",
  "num-traits",
+ "num_cpus",
  "once_cell",
  "rand",
  "rand_distr",

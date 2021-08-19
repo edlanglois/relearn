@@ -9,7 +9,7 @@ mod optimizer;
 mod seq_mod;
 mod updater;
 
-pub use agent::AgentDef;
+pub use agent::{AgentDef, MultiThreadAgentDef};
 pub use critic::CriticDef;
 pub use env::EnvDef;
 pub use optimizer::OptimizerDef;

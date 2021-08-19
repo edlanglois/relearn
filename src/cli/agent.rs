@@ -2,7 +2,9 @@ use super::{Options, Update, WithUpdate};
 use crate::agents::{
     BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
-use crate::defs::{AgentDef, CriticDef, CriticUpdaterDef, PolicyUpdaterDef, SeqModDef};
+use crate::defs::{
+    AgentDef, CriticDef, CriticUpdaterDef, MultiThreadAgentDef, PolicyUpdaterDef, SeqModDef,
+};
 use crate::torch::agents::ActorCriticConfig;
 use clap::ArgEnum;
 use std::fmt;
@@ -66,6 +68,7 @@ impl ConcreteAgentType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
 pub enum AgentWrapperType {
     ResettingMeta,
+    Mutex,
 }
 
 impl fmt::Display for AgentWrapperType {
@@ -75,10 +78,23 @@ impl fmt::Display for AgentWrapperType {
 }
 
 impl AgentWrapperType {
-    pub fn agent_def(&self, inner: AgentDef, _opts: &Options) -> AgentDef {
+    pub fn agent_def(&self, inner: AgentDef, _opts: &Options) -> Option<AgentDef> {
         use AgentWrapperType::*;
         match self {
-            ResettingMeta => AgentDef::ResettingMeta(Box::new(inner)),
+            ResettingMeta => Some(AgentDef::ResettingMeta(Box::new(inner))),
+            _ => None,
+        }
+    }
+
+    pub fn multi_thread_agent_def(
+        &self,
+        inner: AgentDef,
+        _opts: &Options,
+    ) -> Option<MultiThreadAgentDef> {
+        use AgentWrapperType::*;
+        match self {
+            Mutex => Some(MultiThreadAgentDef::Mutex(Box::new(inner))),
+            _ => None,
         }
     }
 }
@@ -122,18 +138,35 @@ impl FromStr for AgentType {
 }
 
 impl AgentType {
-    pub fn agent_def(&self, opts: &Options) -> AgentDef {
+    pub fn agent_def(&self, opts: &Options) -> Option<AgentDef> {
         let mut agent_def = self.base.agent_def(opts);
         for wrapper in self.wrappers.iter().rev() {
-            agent_def = wrapper.agent_def(agent_def, opts);
+            agent_def = wrapper.agent_def(agent_def, opts)?;
         }
-        agent_def
+        Some(agent_def)
+    }
+
+    pub fn multi_thread_agent_def(&self, opts: &Options) -> Option<MultiThreadAgentDef> {
+        if let Some(AgentWrapperType::Mutex) = self.wrappers.first() {
+            let inner = Self {
+                base: self.base,
+                wrappers: self.wrappers[1..].into(),
+            };
+            return Some(MultiThreadAgentDef::Mutex(Box::new(inner.agent_def(opts)?)));
+        }
+        None
     }
 }
 
-impl From<&Options> for AgentDef {
+impl From<&Options> for Option<AgentDef> {
     fn from(opts: &Options) -> Self {
         opts.agent.agent_def(opts)
+    }
+}
+
+impl From<&Options> for Option<MultiThreadAgentDef> {
+    fn from(opts: &Options) -> Self {
+        opts.agent.multi_thread_agent_def(opts)
     }
 }
 
