@@ -2,17 +2,13 @@ use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
 use super::AgentDef;
 use crate::agents::{Agent, AgentBuilder};
 use crate::envs::{
-    Bandit, Chain as ChainEnv, DirichletRandomMdps, EnvBuilder, EnvWithState,
+    Bandit, Chain as ChainEnv, DirichletRandomMdps, EnvBuilder, EnvStructure, EnvWithState,
     FixedMeansBanditConfig, MemoryGame as MemoryGameEnv, MetaEnvConfig, OneHotBandits,
-    PriorMeansBanditConfig, StatefulEnvironment, StatefulMetaEnv, StepLimit,
-    UniformBernoulliBandits, WithState, Wrapped,
+    PriorMeansBanditConfig, StatefulMetaEnv, StepLimit, UniformBernoulliBandits, WithState,
+    Wrapped,
 };
 use crate::error::RLError;
-use crate::logging::Loggable;
-use crate::simulation::{
-    hooks::StepLogger, GenericSimulationHook, RunSimulation, SimulationHook, Simulator,
-};
-use crate::spaces::{ElementRefInto, Space};
+use crate::simulation::{hooks::StepLogger, GenericSimulationHook, RunSimulation, Simulator};
 use crate::utils::distributions::{Bernoulli, Deterministic};
 use rand::distributions::Standard;
 
@@ -63,9 +59,10 @@ impl EnvDef {
         macro_rules! boxed_simulation {
             ($env_type:ty, $env_config:expr, $agent_builder:ty) => {{
                 let env: Box<$env_type> = Box::new($env_config.build_env(env_seed)?);
-                // TODO: Box the agent too?
-                let agent = <$agent_builder>::new(agent_def).build_agent(&env, agent_seed)?;
-                logging_boxed_simulator(env, agent, hook)
+                let agent: Box<dyn Agent<_, _>> =
+                    <$agent_builder>::new(agent_def).build_agent(&env, agent_seed)?;
+                let log_hook = StepLogger::new(env.observation_space(), env.action_space());
+                Box::new(Simulator::new(env, agent, (log_hook, hook)))
             }};
         }
 
@@ -124,20 +121,4 @@ impl EnvDef {
             }
         })
     }
-}
-
-/// Make a boxed simulator with an extra logging hook.
-fn logging_boxed_simulator<OS, AS, H>(
-    environment: Box<dyn StatefulEnvironment<ObservationSpace = OS, ActionSpace = AS>>,
-    agent: Box<dyn Agent<OS::Element, AS::Element>>,
-    hook: H,
-) -> Box<dyn RunSimulation>
-where
-    OS: Space + ElementRefInto<Loggable> + 'static,
-    <OS as Space>::Element: Clone,
-    AS: Space + ElementRefInto<Loggable> + 'static,
-    H: SimulationHook<OS::Element, AS::Element> + 'static,
-{
-    let log_hook = StepLogger::new(environment.observation_space(), environment.action_space());
-    Box::new(Simulator::new(environment, agent, (log_hook, hook)))
 }
