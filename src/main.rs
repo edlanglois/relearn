@@ -1,5 +1,4 @@
 use clap::Clap;
-use num_cpus;
 use rust_rl::logging::CLILogger;
 use rust_rl::{cli::Options, AgentDef, EnvDef, MultiThreadAgentDef};
 use std::convert::From;
