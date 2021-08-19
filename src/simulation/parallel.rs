@@ -9,10 +9,18 @@ use std::marker::PhantomData;
 use std::thread;
 
 /// Configuration for [`MultiThreadSimulator`].
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MultiThreadSimulatorConfig {
     pub num_workers: usize,
     // TODO: Add seed
+}
+
+impl Default for MultiThreadSimulatorConfig {
+    fn default() -> Self {
+        Self {
+            num_workers: num_cpus::get(),
+        }
+    }
 }
 
 impl MultiThreadSimulatorConfig {
