@@ -1,10 +1,40 @@
 //! Serial (single-thread) simulation.
 use super::hooks::SimulationHook;
-use super::RunSimulation;
+use super::{BuildSimError, RunSimulation, SimulatorBuilder};
 use crate::agents::{Actor, Agent, Step};
-use crate::envs::{EnvStructure, StatefulEnvironment};
+use crate::envs::{EnvBuilder, EnvStructure, StatefulEnvironment};
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::Space;
+
+/// Configuration for [`Simulator`].
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SimulatorConfig {
+    pub seed: u64,
+}
+
+impl SimulatorConfig {
+    pub const fn new(seed: u64) -> Self {
+        Self { seed }
+    }
+}
+
+impl<EB, E, A, H> SimulatorBuilder<Simulator<E, A, H>, EB, E, A, H> for SimulatorConfig
+where
+    EB: EnvBuilder<E>,
+{
+    fn build_simulator(
+        &self,
+        env_config: EB,
+        agent: A,
+        hook: H,
+    ) -> Result<Simulator<E, A, H>, BuildSimError> {
+        Ok(Simulator {
+            environment: env_config.build_env(self.seed)?,
+            agent,
+            hook,
+        })
+    }
+}
 
 /// An agent-environment simulator with logging.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]

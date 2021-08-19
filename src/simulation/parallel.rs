@@ -1,5 +1,5 @@
 use super::hooks::SimulationHook;
-use super::{run_agent, RunSimulation};
+use super::{run_agent, BuildSimError, RunSimulation, SimulatorBuilder};
 use crate::agents::{Agent, ManagerAgent};
 use crate::envs::{EnvBuilder, EnvStructure, StatefulEnvironment};
 use crate::logging::TimeSeriesLogger;
@@ -7,6 +7,40 @@ use crate::spaces::Space;
 use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::thread;
+
+/// Configuration for [`MultiThreadSimulator`].
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MultiThreadSimulatorConfig {
+    pub num_workers: usize,
+    // TODO: Add seed
+}
+
+impl MultiThreadSimulatorConfig {
+    pub const fn new(num_workers: usize) -> Self {
+        Self { num_workers }
+    }
+}
+
+impl<EB, E, A, H> SimulatorBuilder<MultiThreadSimulator<EB, E, A, H>, EB, E, A, H>
+    for MultiThreadSimulatorConfig
+where
+    EB: EnvBuilder<E>,
+{
+    fn build_simulator(
+        &self,
+        env_config: EB,
+        agent: A,
+        hook: H,
+    ) -> Result<MultiThreadSimulator<EB, E, A, H>, BuildSimError> {
+        Ok(MultiThreadSimulator {
+            env_builder: env_config,
+            env_type: PhantomData,
+            manager_agent: agent,
+            num_workers: self.num_workers,
+            worker_hook: hook,
+        })
+    }
+}
 
 /// Multi-thread simulator
 pub struct MultiThreadSimulator<EB, E, MA, H> {
@@ -71,6 +105,7 @@ pub fn run_agent_multithread<EB, E, MA, H>(
 {
     let mut worker_threads = vec![];
     for i in 0..num_workers {
+        // TODO: Allow setting a seed
         let env_seed = 2 * u64::try_from(i).unwrap();
         let mut env: E = env_builder.build_env(env_seed).unwrap();
         let mut worker = manager.make_worker(env_seed + 1);
