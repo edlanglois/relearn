@@ -5,6 +5,7 @@ use crate::envs::{EnvBuilder, StatefulEnvironment};
 use crate::logging::TimeSeriesLogger;
 use std::convert::TryFrom;
 use std::marker::PhantomData;
+use std::sync::{Arc, RwLock};
 use std::thread;
 
 /// Configuration for [`MultiThreadSimulator`].
@@ -40,7 +41,7 @@ where
         hook: H,
     ) -> Result<MultiThreadSimulator<EB, E, A, H>, BuildSimError> {
         Ok(MultiThreadSimulator {
-            env_builder: env_config,
+            env_builder: Arc::new(RwLock::new(env_config)),
             env_type: PhantomData,
             manager_agent: agent,
             num_workers: self.num_workers,
@@ -51,7 +52,7 @@ where
 
 /// Multi-thread simulator
 pub struct MultiThreadSimulator<EB, E, MA, H> {
-    env_builder: EB,
+    env_builder: Arc<RwLock<EB>>,
     // *const E to avoid indicating ownership. See:
     // https://doc.rust-lang.org/std/marker/struct.PhantomData.html#ownership-and-the-drop-check
     env_type: PhantomData<*const E>,
@@ -62,8 +63,8 @@ pub struct MultiThreadSimulator<EB, E, MA, H> {
 
 impl<EB, E, MA, H> RunSimulation for MultiThreadSimulator<EB, E, MA, H>
 where
-    EB: EnvBuilder<E>,
-    E: StatefulEnvironment + Send + 'static,
+    EB: EnvBuilder<E> + Send + Sync + 'static,
+    E: StatefulEnvironment,
     MA: ManagerAgent,
     <MA as ManagerAgent>::Worker: Agent<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>
         + 'static,
@@ -85,14 +86,14 @@ where
 }
 
 pub fn run_agent_multithread<EB, E, MA, H>(
-    env_builder: &EB,
-    manager: &mut MA,
+    env_config: &Arc<RwLock<EB>>,
+    agent_manager: &mut MA,
     num_workers: usize,
     worker_hook: &H,
     logger: &mut dyn TimeSeriesLogger,
 ) where
-    EB: EnvBuilder<E>,
-    E: StatefulEnvironment + Send + 'static,
+    EB: EnvBuilder<E> + Send + Sync + 'static,
+    E: StatefulEnvironment,
     MA: ManagerAgent,
     <MA as ManagerAgent>::Worker: Agent<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>
         + 'static,
@@ -106,15 +107,17 @@ pub fn run_agent_multithread<EB, E, MA, H>(
     for i in 0..num_workers {
         // TODO: Allow setting a seed
         let env_seed = 2 * u64::try_from(i).unwrap();
-        let mut env: E = env_builder.build_env(env_seed).unwrap();
-        let mut worker = manager.make_worker(env_seed + 1);
+        let env_config_ = Arc::clone(env_config);
+        let mut worker = agent_manager.make_worker(env_seed + 1);
         let mut hook = worker_hook.clone();
         worker_threads.push(thread::spawn(move || {
+            let mut env: E = (*env_config_.read().unwrap()).build_env(env_seed).unwrap();
+            drop(env_config_);
             run_agent(&mut env, &mut worker, &mut hook, &mut ());
         }));
     }
 
-    manager.run(logger);
+    agent_manager.run(logger);
     for thread in worker_threads.into_iter() {
         thread.join().unwrap();
     }

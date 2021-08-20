@@ -132,6 +132,7 @@ mod tests {
     };
     use crate::simulation;
     use crate::simulation::hooks::StepLimit;
+    use std::sync::{Arc, RwLock};
 
     #[test]
     fn mutex_multithread_learns() {
@@ -147,7 +148,7 @@ mod tests {
         let num_workers = 5;
 
         simulation::run_agent_multithread::<_, EnvWithState<DeterministicBandit>, _, _>(
-            &env_config,
+            &Arc::new(RwLock::new(env_config)),
             &mut agent,
             num_workers,
             &hook,
