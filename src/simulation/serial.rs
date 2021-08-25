@@ -1,8 +1,8 @@
 //! Serial (single-thread) simulation.
 use super::hooks::SimulationHook;
-use super::{BuildSimError, RunSimulation, SimulatorBuilder};
+use super::RunSimulation;
 use crate::agents::{Actor, Agent, Step};
-use crate::envs::{EnvBuilder, StatefulEnvironment};
+use crate::envs::StatefulEnvironment;
 use crate::logging::TimeSeriesLogger;
 
 /// Configuration for [`Simulator`].
@@ -14,24 +14,6 @@ pub struct SimulatorConfig {
 impl SimulatorConfig {
     pub const fn new(seed: u64) -> Self {
         Self { seed }
-    }
-}
-
-impl<EB, E, A, H> SimulatorBuilder<Simulator<E, A, H>, EB, E, A, H> for SimulatorConfig
-where
-    EB: EnvBuilder<E>,
-{
-    fn build_simulator(
-        &self,
-        env_config: EB,
-        agent: A,
-        hook: H,
-    ) -> Result<Simulator<E, A, H>, BuildSimError> {
-        Ok(Simulator {
-            environment: env_config.build_env(self.seed)?,
-            agent,
-            hook,
-        })
     }
 }
 

@@ -1,6 +1,8 @@
 use clap::Clap;
+use rust_rl::cli::Options;
 use rust_rl::logging::CLILogger;
-use rust_rl::{cli::Options, AgentDef, EnvDef, MultiThreadAgentDef};
+use rust_rl::simulation::MultiThreadSimulatorConfig;
+use rust_rl::{AgentDef, EnvDef, MultiThreadAgentDef};
 use std::convert::From;
 use std::error::Error;
 use std::time::Duration;
@@ -18,7 +20,7 @@ fn run_serial(opts: &Options, env_def: EnvDef) -> Result<(), Box<dyn Error>> {
 
 fn run_parallel(
     opts: &Options,
-    _env_def: EnvDef,
+    env_def: EnvDef,
     mut num_threads: usize,
 ) -> Result<(), Box<dyn Error>> {
     let agent_def = Option::<MultiThreadAgentDef>::from(opts)
@@ -28,10 +30,19 @@ fn run_parallel(
     if num_threads == 0 {
         num_threads = num_cpus::get();
     }
+    let sim_config = MultiThreadSimulatorConfig {
+        num_workers: num_threads,
+    };
+    println!("Simulation:\n{:#?}", sim_config);
     println!(
         "Starting a parallel run with {} simulation threads.",
         num_threads
     );
+
+    let mut simulation =
+        env_def.build_parallel_simulation(&sim_config, &agent_def, opts.seed, opts.seed + 1, ())?;
+    let mut logger = CLILogger::new(Duration::from_millis(1000), true);
+    simulation.run_simulation(&mut logger);
     Ok(())
 }
 

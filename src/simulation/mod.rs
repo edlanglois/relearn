@@ -17,12 +17,6 @@ pub trait RunSimulation {
     fn run_simulation(&mut self, logger: &mut dyn TimeSeriesLogger);
 }
 
-/// Builds a simulator
-pub trait SimulatorBuilder<S, EB, E, A, H> {
-    /// Build a simulator
-    fn build_simulator(&self, env_config: EB, agent: A, hook: H) -> Result<S, BuildSimError>;
-}
-
 /// Error building a simulator
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum BuildSimError {

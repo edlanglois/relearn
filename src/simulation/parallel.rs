@@ -1,5 +1,5 @@
 use super::hooks::SimulationHook;
-use super::{run_agent, BuildSimError, RunSimulation, SimulatorBuilder};
+use super::{run_agent, RunSimulation};
 use crate::agents::{Agent, ManagerAgent};
 use crate::envs::{EnvBuilder, StatefulEnvironment};
 use crate::logging::TimeSeriesLogger;
@@ -27,25 +27,33 @@ impl MultiThreadSimulatorConfig {
     pub const fn new(num_workers: usize) -> Self {
         Self { num_workers }
     }
-}
 
-impl<EB, E, A, H> SimulatorBuilder<MultiThreadSimulator<EB, E, A, H>, EB, E, A, H>
-    for MultiThreadSimulatorConfig
-where
-    EB: EnvBuilder<E>,
-{
-    fn build_simulator(
+    pub fn build_simulator<EB, E, MA, H>(
         &self,
         env_config: EB,
-        agent: A,
-        hook: H,
-    ) -> Result<MultiThreadSimulator<EB, E, A, H>, BuildSimError> {
-        Ok(MultiThreadSimulator {
+        manager_agent: MA,
+        worker_hook: H,
+    ) -> Box<dyn RunSimulation>
+    where
+        EB: EnvBuilder<E> + Send + Sync + 'static,
+        E: StatefulEnvironment + 'static,
+        MA: ManagerAgent + 'static,
+        <MA as ManagerAgent>::Worker: Agent<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>
+            + 'static,
+        <E as StatefulEnvironment>::Observation: Clone,
+        H: SimulationHook<
+                <E as StatefulEnvironment>::Observation,
+                <E as StatefulEnvironment>::Action,
+            > + Clone
+            + Send
+            + 'static,
+    {
+        Box::new(MultiThreadSimulator {
             env_builder: Arc::new(RwLock::new(env_config)),
-            env_type: PhantomData,
-            manager_agent: agent,
+            env_type: PhantomData::<*const E>,
+            manager_agent,
             num_workers: self.num_workers,
-            worker_hook: hook,
+            worker_hook,
         })
     }
 }
