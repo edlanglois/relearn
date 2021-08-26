@@ -1,7 +1,7 @@
 use super::super::{
     Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, ManagerAgent, SetActorMode, Step,
 };
-use crate::logging::{self, sync::ForwardingLogger, TimeSeriesLogger};
+use crate::logging::{self, ForwardingLogger, TimeSeriesLogger};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -31,7 +31,7 @@ pub struct MutexAgentManager<T> {
     /// Forwarding logger to use in the workers.
     logger: ForwardingLogger,
     /// Receives log messages from the workers.
-    receiver: Receiver<logging::sync::Message>,
+    receiver: Receiver<logging::forwarding::Message>,
 }
 
 /// A mutex-based "multithread" agent worker.

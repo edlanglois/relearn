@@ -1,8 +1,10 @@
 //! Logging statistics from simulation runs
 mod cli;
-pub mod sync;
+pub mod forwarding;
 
 pub use cli::CLILogger;
+pub use forwarding::ForwardingLogger;
+
 use enum_map::Enum;
 use smallvec::SmallVec;
 use std::borrow::Cow;
