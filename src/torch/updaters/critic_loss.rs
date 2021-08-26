@@ -40,6 +40,7 @@ where
             let loss = optimizer
                 .backward_step(&loss_fn, &mut logger.event_logger(Event::AgentValueOptStep))
                 .unwrap();
+            logger.unwrap_log_scalar(Event::AgentValueOptStep, "loss", f64::from(&loss));
             logger.end_event(Event::AgentValueOptStep);
 
             if i == 0 {
