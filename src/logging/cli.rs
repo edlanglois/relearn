@@ -17,6 +17,9 @@ pub struct CLILogger {
     events: EnumMap<Event, EventLog>,
 
     display_period: Duration,
+    // Tries to avoid logging at the end of high-frequency events,
+    // but will log anyways if urgent_display_period is reached.
+    urgent_display_period: Duration,
     last_display_time: Instant,
 
     average_between_displays: bool,
@@ -24,9 +27,11 @@ pub struct CLILogger {
 
 impl CLILogger {
     pub fn new(display_period: Duration, average_between_displays: bool) -> Self {
+        let urgent_display_period = display_period.mul_f32(1.1);
         Self {
             events: enum_map! { _ => EventLog::new() },
             display_period,
+            urgent_display_period: urgent_display_period,
             last_display_time: Instant::now(),
             average_between_displays,
         }
@@ -105,10 +110,11 @@ impl TimeSeriesLogger for CLILogger {
             return;
         }
 
-        // Don't display at the end of a step
-        if event == Event::EnvStep
+        // Don't display at the end of a step unless the urgent_display_period is reached
+        if (event == Event::EnvStep
             || event == Event::AgentPolicyOptStep
-            || event == Event::AgentValueOptStep
+            || event == Event::AgentValueOptStep)
+            && time_since_display < self.urgent_display_period
         {
             return;
         }
