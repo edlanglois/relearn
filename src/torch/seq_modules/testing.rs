@@ -50,8 +50,8 @@ pub fn check_seq_serial<M: SequenceModule>(module: &M, in_dim: usize, out_dim: u
     );
 
     // Compare the inner sequences. The output should be the same for each.
-    assert_eq!(output.i((.., 0, ..)), output.i((.., 1, ..)));
-    assert_eq!(output.i((.., 1..3, ..)), output.i((.., 4..6, ..)));
+    assert_allclose(&output.i((.., 0, ..)), &output.i((.., 1, ..)));
+    assert_allclose(&output.i((.., 1..3, ..)), &output.i((.., 4..6, ..)));
 }
 
 fn assert_allclose(input: &Tensor, other: &Tensor) {
