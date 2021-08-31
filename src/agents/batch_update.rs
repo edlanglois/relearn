@@ -23,7 +23,7 @@ impl<T: OffPolicyAgent + Agent<O, A>, O, A> BatchUpdate<O, A> for T {
         for step in steps {
             self.update(step, logger)
         }
-        logger.end_event(Event::AgentOptPeriod);
+        logger.end_event(Event::AgentOptPeriod).unwrap();
     }
 }
 

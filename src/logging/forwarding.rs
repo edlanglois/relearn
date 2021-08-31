@@ -1,5 +1,6 @@
 use super::{Event, Id, LogError, Loggable, ScopedLogger, TimeSeriesEventLogger, TimeSeriesLogger};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::time::Instant;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Message {
@@ -8,17 +9,24 @@ pub enum Message {
         id: Id,
         value: Loggable,
     },
-    EndEvent(Event),
+    StartEvent {
+        event: Event,
+        time: Instant,
+    },
+    EndEvent {
+        event: Event,
+        time: Instant,
+    },
 }
 
 impl Message {
     /// Log this message to the given logger.
     pub fn log<L: TimeSeriesLogger + ?Sized>(self, logger: &mut L) -> Result<(), LogError> {
         match self {
-            Message::Log { event, id, value } => logger.id_log(event, id, value)?,
-            Message::EndEvent(event) => logger.end_event(event),
+            Message::Log { event, id, value } => logger.log_(event, id, value),
+            Message::StartEvent { event, time } => logger.start_event_(event, time),
+            Message::EndEvent { event, time } => logger.end_event_(event, time),
         }
-        Ok(())
     }
 }
 
@@ -41,13 +49,22 @@ impl ForwardingLogger {
 }
 
 impl TimeSeriesLogger for ForwardingLogger {
-    fn id_log(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError> {
-        self.sender.send(Message::Log { event, id, value }).unwrap();
-        Ok(())
+    fn log_(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError> {
+        self.sender
+            .send(Message::Log { event, id, value })
+            .map_err(|e| LogError::InternalError(Box::new(e)))
     }
 
-    fn end_event(&mut self, event: Event) {
-        self.sender.send(Message::EndEvent(event)).unwrap();
+    fn start_event_(&mut self, event: Event, time: Instant) -> Result<(), LogError> {
+        self.sender
+            .send(Message::StartEvent { event, time })
+            .map_err(|e| LogError::InternalError(Box::new(e)))
+    }
+
+    fn end_event_(&mut self, event: Event, time: Instant) -> Result<(), LogError> {
+        self.sender
+            .send(Message::EndEvent { event, time })
+            .map_err(|e| LogError::InternalError(Box::new(e)))
     }
 
     fn event_logger(&mut self, event: Event) -> TimeSeriesEventLogger {

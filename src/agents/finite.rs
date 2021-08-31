@@ -72,7 +72,7 @@ where
                 .map(|s| indexed_step(&s, observation_space, action_space)),
             logger,
         );
-        logger.end_event(Event::AgentOptPeriod);
+        logger.end_event(Event::AgentOptPeriod).unwrap();
     }
 }
 

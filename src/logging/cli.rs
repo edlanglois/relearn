@@ -31,7 +31,7 @@ impl CLILogger {
         Self {
             events: enum_map! { _ => EventLog::new() },
             display_period,
-            urgent_display_period: urgent_display_period,
+            urgent_display_period,
             last_display_time: Instant::now(),
             average_between_displays,
         }
@@ -59,7 +59,7 @@ impl CLILogger {
             }
             print!(
                 " ({:?} / event)",
-                event_log.summary_duration / summary_size.try_into().unwrap()
+                event_log.total_duration / summary_size.try_into().unwrap()
             );
             println!(" ====");
 
@@ -74,7 +74,7 @@ impl CLILogger {
 }
 
 impl TimeSeriesLogger for CLILogger {
-    fn id_log<'a>(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError> {
+    fn log_(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError> {
         let aggregators = &mut self.events[event].aggregators;
         match aggregators.entry(id) {
             btree_map::Entry::Vacant(e) => {
@@ -96,7 +96,13 @@ impl TimeSeriesLogger for CLILogger {
         Ok(())
     }
 
-    fn end_event(&mut self, event: Event) {
+    fn start_event_(&mut self, event: Event, time: Instant) -> Result<(), LogError> {
+        let event_info = &mut self.events[event];
+        event_info.active_start_time = time;
+        Ok(())
+    }
+
+    fn end_event_(&mut self, event: Event, time: Instant) -> Result<(), LogError> {
         let event_info = &mut self.events[event];
         event_info.index += 1;
 
@@ -104,10 +110,14 @@ impl TimeSeriesLogger for CLILogger {
             aggregator.commit()
         }
 
-        let time_since_display = self.last_display_time.elapsed();
-        event_info.summary_duration = time_since_display;
+        event_info.total_duration += time
+            .checked_duration_since(event_info.active_start_time)
+            .ok_or(LogError::EndBeforeStart)?;
+        event_info.active_start_time = time; // Start the next event instance
+
+        let time_since_display = time - self.last_display_time;
         if time_since_display < self.display_period {
-            return;
+            return Ok(());
         }
 
         // Don't display at the end of a step unless the urgent_display_period is reached
@@ -116,10 +126,11 @@ impl TimeSeriesLogger for CLILogger {
             || event == Event::AgentValueOptStep)
             && time_since_display < self.urgent_display_period
         {
-            return;
+            return Ok(());
         }
 
         self.display();
+        Ok(())
     }
 
     fn event_logger(&mut self, event: Event) -> TimeSeriesEventLogger {
@@ -141,14 +152,24 @@ impl Drop for CLILogger {
     }
 }
 
+/// The summary state for an event type across multiple instances.
 #[derive(Debug, Clone, PartialEq)]
 struct EventLog {
     /// Global index for this event
     index: u64,
+
     /// Value of `index` at the start of this summary period
     summary_start_index: u64,
-    /// Duration of this summary period to the most recent update
-    summary_duration: Duration,
+
+    /// Total time spent with this event active.
+    ///
+    /// This is the sum of `(end_time[i] - start_time[i])` for each
+    /// instance `i` of this event included in the summary.
+    total_duration: Duration,
+
+    /// Start time of the current event instance.
+    active_start_time: Instant,
+
     /// An aggregator for each log entry.
     aggregators: BTreeMap<Id, Aggregator>,
 }
@@ -159,7 +180,8 @@ impl EventLog {
         Self {
             index: 0,
             summary_start_index: 0,
-            summary_duration: Duration::new(0, 0),
+            total_duration: Duration::new(0, 0),
+            active_start_time: Instant::now(),
             aggregators: BTreeMap::new(),
         }
     }

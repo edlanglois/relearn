@@ -37,11 +37,12 @@ where
         let loss_fn = || critic.loss(features).unwrap();
 
         for i in 0..self.optimizer_iters {
+            logger.start_event(Event::AgentValueOptStep).unwrap();
             let loss = optimizer
                 .backward_step(&loss_fn, &mut logger.event_logger(Event::AgentValueOptStep))
                 .unwrap();
             logger.unwrap_log_scalar(Event::AgentValueOptStep, "loss", f64::from(&loss));
-            logger.end_event(Event::AgentValueOptStep);
+            logger.end_event(Event::AgentValueOptStep).unwrap();
 
             if i == 0 {
                 logger.unwrap_log_scalar(Event::AgentOptPeriod, "initial_loss", loss);

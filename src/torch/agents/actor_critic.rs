@@ -305,7 +305,7 @@ where
         }
 
         self.history.clear();
-        logger.end_event(Event::AgentOptPeriod);
+        logger.end_event(Event::AgentOptPeriod).unwrap();
     }
 }
 

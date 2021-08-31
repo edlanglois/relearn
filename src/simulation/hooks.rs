@@ -161,7 +161,7 @@ where
             self.observation_space.elem_ref_into(&step.observation),
         );
         step_logger.unwrap_log("action", self.action_space.elem_ref_into(&step.action));
-        logger.end_event(Event::EnvStep);
+        logger.end_event(Event::EnvStep).unwrap();
 
         self.episode_length += 1;
         self.episode_reward += step.reward;
@@ -171,7 +171,7 @@ where
             self.episode_length = 0;
             episode_logger.unwrap_log("reward", self.episode_reward);
             self.episode_reward = 0.0;
-            logger.end_event(Event::EnvEpisode);
+            logger.end_event(Event::EnvEpisode).unwrap();
         }
 
         true

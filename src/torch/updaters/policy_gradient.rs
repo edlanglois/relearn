@@ -30,6 +30,7 @@ where
         action_space: &AS,
         logger: &mut dyn TimeSeriesLogger,
     ) -> PolicyStats {
+        logger.start_event(Event::AgentPolicyOptStep).unwrap();
         let step_values = tch::no_grad(|| critic.seq_packed(features));
 
         let action_dist_params = policy.seq_packed(
@@ -51,7 +52,7 @@ where
                 &mut logger.event_logger(Event::AgentPolicyOptStep),
             )
             .unwrap();
-        logger.end_event(Event::AgentPolicyOptStep);
+        logger.end_event(Event::AgentPolicyOptStep).unwrap();
 
         let entropy = entropies.into_inner().unwrap().mean(Kind::Float).into();
         PolicyStats {

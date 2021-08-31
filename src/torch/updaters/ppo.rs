@@ -47,6 +47,7 @@ where
         action_space: &AS,
         logger: &mut dyn TimeSeriesLogger,
     ) -> PolicyStats {
+        logger.start_event(Event::AgentPolicyOptStep).unwrap();
         let observation_features = features.observation_features();
         let batch_sizes = features.batch_sizes_tensor();
         let actions = features.actions();
@@ -84,7 +85,7 @@ where
                 &mut logger.event_logger(Event::AgentPolicyOptStep),
             )
             .unwrap();
-        logger.end_event(Event::AgentPolicyOptStep);
+        logger.end_event(Event::AgentPolicyOptStep).unwrap();
 
         PolicyStats {
             entropy: Some(initial_policy_entropy),

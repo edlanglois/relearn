@@ -10,6 +10,7 @@ use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::convert::{AsRef, From, Into};
 use std::fmt;
+use std::time::Instant;
 use thiserror::Error;
 
 /// Simulation run events types.
@@ -93,7 +94,7 @@ pub trait Logger {
     /// * `name` - A name identifying the value.
     /// * `value` - The value to log.
     fn log(&mut self, name: &'static str, value: Loggable) -> Result<(), LogError> {
-        self.id_log(name.into(), value)
+        self.log_(name.into(), value)
     }
 
     /// Log a value for a given hierarchical ID.
@@ -101,7 +102,7 @@ pub trait Logger {
     /// # Args
     /// * `id` - The identifier for the value.
     /// * `value` - The value to log.
-    fn id_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError>;
+    fn log_(&mut self, id: Id, value: Loggable) -> Result<(), LogError>;
 
     /// Create a view on the logger that adds a scope prefix to all logged ids.
     fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn Logger>;
@@ -121,14 +122,14 @@ pub trait LoggerHelper: Logger {
 
 impl<T: Logger + ?Sized> LoggerHelper for T {}
 
-// TODO: Make generic over Event? E: Enum
-
 /// Logs named values associated with a time series of recurring events.
 ///
 /// # Events
-/// An event represents the duration of time that starts when the last instance of that event
-/// ended (or when the logger was created) and ends `TimeSeriesLogger::end_event` is called.
-/// In this way, each event type creates a partitining of time into instances of that event.
+/// An event represents the period fo time ending with a call to [`TimeSeriesLogger::end_event`]
+/// and starting with either
+/// * the most recent call to [`TimeSeriesLogger::start_event`],
+/// * the last call to [`TimeSeriesEventLogger::start_event`],
+/// * or the creation time of the logger.
 ///
 /// Examples of events include an environment step, an environment episode, or a training epoch.
 ///
@@ -136,7 +137,7 @@ impl<T: Logger + ?Sized> LoggerHelper for T {}
 /// instance of that event. Logging the same name multiple times during an event is allowed but
 /// discouraged; prefer using a finer grained event instead. If the same value _is_ logged
 /// multiple times in an event then the logger may behave in an implementation-dependent way
-/// like logging both values or using only the last.
+/// such as logging both values or using only the last.
 ///
 /// # Values
 /// Logged values must be of type [`Loggable`].
@@ -149,27 +150,68 @@ pub trait TimeSeriesLogger {
     /// * `name` - The name that identifies this value.
     /// * `value` - The value to log.
     ///
-    /// An "event" refers to the period between calls to [`TimeSeriesLogger::end_event`]
-    /// for that event type.
-    ///
-    /// # Returns
-    /// May return an error if the logged value is structurally incompatible
-    /// with previous values logged under the same name.
+    /// # Errors
+    /// * May return [`LogError::InactiveEvent`] if there is not a currently active event instance.
+    ///     Call [`TimeSeriesLogger::start_event`] first.
+    /// * May return [`LogError::IncompatibleValue`] if the logged value is structurally
+    ///     incompatible with previous values logged under the same name.
     fn log(&mut self, event: Event, name: &'static str, value: Loggable) -> Result<(), LogError> {
-        self.id_log(event, name.into(), value)
+        self.log_(event, name.into(), value)
     }
 
-    /// Log a value for a given hierarchical id.
+    /// Log a value associated with the active instance of an event.
     ///
-    /// See [`TimeSeriesLogger::log`] for details.
-    fn id_log(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError>;
+    /// See [`TimeSeriesLogger::log`] for more information.
+    ///
+    /// This is the fully general implementation that identifies the value with an [`Id`]
+    /// instad of a `&'static str`.
+    fn log_(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError>;
+
+    /// Set the start time of an event instance to the current time.
+    ///
+    /// This is optional. If not called, the event is assumed to start at the previous call to
+    /// [`TimeSeriesLogger::end_event`] or when the logger was created if the event has not
+    /// previously ended.
+    ///
+    /// # Args
+    /// * `event` - The event type to start.
+    fn start_event(&mut self, event: Event) -> Result<(), LogError> {
+        self.start_event_(event, Instant::now())
+    }
+
+    /// Start an event instance at the given time.
+    ///
+    /// See [`TimeSeriesLogger::start_event`] for more information.
+    ///
+    /// This is the fully general implementation that accepts an instant for the event start time.
+    fn start_event_(&mut self, event: Event, time: Instant) -> Result<(), LogError>;
 
     /// End an event instance.
-    fn end_event(&mut self, event: Event);
+    ///
+    /// # Args
+    /// * `event` - The event type to end.
+    ///
+    /// # Errors
+    /// It is an error ([`LogError::EndBeforeStart`]) to end an event before it starts.
+    /// This is only possible if either the start time or the end time are set explicity with
+    /// [`TimeSeriesLogger::start_event_`] or [`TimeSeriesLogger::end_event_`].
+    fn end_event(&mut self, event: Event) -> Result<(), LogError> {
+        self.end_event_(event, Instant::now())
+    }
+
+    /// End an event instance at the given time.
+    ///
+    /// See [`TimeSeriesLogger::end_event`] for more information.
+    ///
+    /// This is the fully general implementation that accepts an instant for the event end time.
+    ///
+    /// # Errors
+    /// It is an error to end an event before it starts.
+    fn end_event_(&mut self, event: Event, time: Instant) -> Result<(), LogError>;
 
     /// Creates a wrapper [`Logger`] that logs all values to a specific event type.
     ///
-    /// This does not create or end event instances,
+    /// This does not start or end event instances,
     /// it just creates a wrapper around [`TimeSeriesLogger::log`] with a fixed event.
     fn event_logger(&mut self, event: Event) -> TimeSeriesEventLogger;
 
@@ -196,8 +238,8 @@ pub struct TimeSeriesEventLogger<'a> {
 }
 
 impl<'a> Logger for TimeSeriesEventLogger<'a> {
-    fn id_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
-        self.logger.id_log(self.event, id, value)
+    fn log_(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+        self.logger.log_(self.event, id, value)
     }
 
     fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn Logger> {
@@ -224,13 +266,13 @@ impl<'a> Logger for ScopedLogger<'a, dyn Logger> {
     fn log(&mut self, name: &'static str, value: Loggable) -> Result<(), LogError> {
         let mut full_id = self.prefix.clone();
         full_id.push(name.into());
-        self.logger.id_log(full_id, value)
+        self.logger.log_(full_id, value)
     }
 
-    fn id_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+    fn log_(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
         let mut full_id = self.prefix.clone();
         full_id.append(id);
-        self.logger.id_log(full_id, value)
+        self.logger.log_(full_id, value)
     }
 
     fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn Logger> {
@@ -250,17 +292,21 @@ impl<'a> TimeSeriesLogger for ScopedLogger<'a, dyn TimeSeriesLogger> {
     fn log(&mut self, event: Event, name: &'static str, value: Loggable) -> Result<(), LogError> {
         let mut full_id = self.prefix.clone();
         full_id.push(name.into());
-        self.id_log(event, full_id, value)
+        self.log_(event, full_id, value)
     }
 
-    fn id_log(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError> {
+    fn log_(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError> {
         let mut full_id = self.prefix.clone();
         full_id.append(id);
-        self.logger.id_log(event, full_id, value)
+        self.logger.log_(event, full_id, value)
     }
 
-    fn end_event(&mut self, event: Event) {
-        self.logger.end_event(event);
+    fn start_event_(&mut self, event: Event, time: Instant) -> Result<(), LogError> {
+        self.logger.start_event_(event, time)
+    }
+
+    fn end_event_(&mut self, event: Event, time: Instant) -> Result<(), LogError> {
+        self.logger.end_event_(event, time)
     }
 
     fn event_logger(&mut self, event: Event) -> TimeSeriesEventLogger {
@@ -285,7 +331,7 @@ impl<'a> TimeSeriesLogger for ScopedLogger<'a, dyn TimeSeriesLogger> {
 
 /// Logger that does nothing
 impl Logger for () {
-    fn id_log(&mut self, _id: Id, _value: Loggable) -> Result<(), LogError> {
+    fn log_(&mut self, _id: Id, _value: Loggable) -> Result<(), LogError> {
         Ok(())
     }
     fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn Logger> {
@@ -295,11 +341,17 @@ impl Logger for () {
 
 /// Time series logger that does nothing
 impl TimeSeriesLogger for () {
-    fn id_log(&mut self, _event: Event, _id: Id, _value: Loggable) -> Result<(), LogError> {
+    fn log_(&mut self, _event: Event, _id: Id, _value: Loggable) -> Result<(), LogError> {
         Ok(())
     }
 
-    fn end_event(&mut self, _: Event) {}
+    fn start_event_(&mut self, _: Event, _: Instant) -> Result<(), LogError> {
+        Ok(())
+    }
+
+    fn end_event_(&mut self, _: Event, _: Instant) -> Result<(), LogError> {
+        Ok(())
+    }
 
     fn event_logger(&mut self, event: Event) -> TimeSeriesEventLogger {
         TimeSeriesEventLogger {
@@ -366,12 +418,16 @@ impl fmt::Display for Id {
     }
 }
 
-#[derive(Error, Debug, Clone, PartialEq)]
+#[derive(Error, Debug)]
 pub enum LogError {
     #[error("ID name list must not be empty")]
     InvalidEmptyId,
     #[error(transparent)]
     IncompatibleValue(#[from] Box<IncompatibleValueError>),
+    #[error("Event instance end time preceeds the start time")]
+    EndBeforeStart,
+    #[error(transparent)]
+    InternalError(#[from] Box<dyn std::error::Error>),
 }
 
 #[derive(Error, Debug, Clone, PartialEq)]

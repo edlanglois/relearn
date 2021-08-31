@@ -47,6 +47,7 @@ where
         action_space: &AS,
         logger: &mut dyn TimeSeriesLogger,
     ) -> PolicyStats {
+        logger.start_event(Event::AgentPolicyOptStep).unwrap();
         let _cudnn_disable_guard = if policy.has_cudnn_second_derivatives() {
             None
         } else {
@@ -98,7 +99,7 @@ where
             self.max_policy_step_kl,
             &mut logger.event_logger(Event::AgentPolicyOptStep),
         );
-        logger.end_event(Event::AgentPolicyOptStep);
+        logger.end_event(Event::AgentPolicyOptStep).unwrap();
 
         if let Err(error) = result {
             match error {
