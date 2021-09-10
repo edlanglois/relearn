@@ -1,6 +1,6 @@
 //! Agent testing utilities
 use crate::agents::{ActorMode, SetActorMode};
-use crate::envs::{DeterministicBandit, EnvWithState, IntoStateful};
+use crate::envs::{DeterministicBandit, IntoStateful, PomdpEnv};
 use crate::simulation;
 use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 use crate::{Agent, EnvStructure};
@@ -12,7 +12,7 @@ use crate::{Agent, EnvStructure};
 pub fn train_deterministic_bandit<A, F>(make_agent: F, num_train_steps: u64, threshold: f64)
 where
     A: Agent<(), usize> + SetActorMode,
-    F: FnOnce(&EnvWithState<DeterministicBandit>) -> A,
+    F: FnOnce(&PomdpEnv<DeterministicBandit>) -> A,
 {
     let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).into_stateful(0);
     let mut agent = make_agent(&env);
@@ -34,7 +34,7 @@ where
 #[allow(clippy::cast_possible_truncation)]
 pub fn eval_deterministic_bandit<A>(
     mut agent: A,
-    env: &mut EnvWithState<DeterministicBandit>,
+    env: &mut PomdpEnv<DeterministicBandit>,
     threshold: f64,
 ) where
     A: Agent<(), usize> + SetActorMode,

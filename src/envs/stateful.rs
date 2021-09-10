@@ -11,10 +11,10 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 pub struct WithState;
 
 impl<E: Pomdp> EnvWrapper<E> for WithState {
-    type Wrapped = EnvWithState<E>;
+    type Wrapped = PomdpEnv<E>;
 
     fn wrap<R: Rng + ?Sized>(&self, env: E, rng: &mut R) -> Self::Wrapped {
-        EnvWithState::new(env, rng.gen())
+        PomdpEnv::new(env, rng.gen())
     }
 }
 
@@ -22,13 +22,13 @@ impl<E: EnvStructure> InnerStructureWrapper<E> for WithState {}
 
 /// Wraps a [`Pomdp`] as a [`Environment`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EnvWithState<E: Pomdp> {
+pub struct PomdpEnv<E: Pomdp> {
     pub env: E,
     state: Option<E::State>,
     rng: StdRng,
 }
 
-impl<E: Pomdp> EnvWithState<E> {
+impl<E: Pomdp> PomdpEnv<E> {
     pub fn new(env: E, seed: u64) -> Self {
         Self {
             env,
@@ -38,7 +38,7 @@ impl<E: Pomdp> EnvWithState<E> {
     }
 }
 
-impl<E: Pomdp + EnvStructure> EnvStructure for EnvWithState<E> {
+impl<E: Pomdp + EnvStructure> EnvStructure for PomdpEnv<E> {
     type ObservationSpace = E::ObservationSpace;
     type ActionSpace = E::ActionSpace;
 
@@ -59,7 +59,7 @@ impl<E: Pomdp + EnvStructure> EnvStructure for EnvWithState<E> {
     }
 }
 
-impl<E: Pomdp> Environment for EnvWithState<E> {
+impl<E: Pomdp> Environment for PomdpEnv<E> {
     type Observation = E::Observation;
     type Action = E::Action;
 
@@ -95,16 +95,16 @@ pub trait IntoStateful {
 }
 
 impl<E: Pomdp> IntoStateful for E {
-    type Output = EnvWithState<Self>;
+    type Output = PomdpEnv<Self>;
 
     fn into_stateful(self, seed: u64) -> Self::Output {
         Self::Output::new(self, seed)
     }
 }
 
-impl<E: Pomdp, B: BuildEnv<E>> BuildEnv<EnvWithState<E>> for B {
-    fn build_env(&self, seed: u64) -> Result<EnvWithState<E>, BuildEnvError> {
-        // Re-use seed so that BuildEnv<E> and BuildEnv<EnvWithState<E>>
+impl<E: Pomdp, B: BuildEnv<E>> BuildEnv<PomdpEnv<E>> for B {
+    fn build_env(&self, seed: u64) -> Result<PomdpEnv<E>, BuildEnvError> {
+        // Re-use seed so that BuildEnv<E> and BuildEnv<PomdpEnv<E>>
         // have the same environment structure given the same seed.
         let structure_seed = seed;
         // Add an arbitrary offset for the dynamics seed.

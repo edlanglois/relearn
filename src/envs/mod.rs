@@ -19,7 +19,7 @@ pub use memory::MemoryGame;
 pub use meta::{
     InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaEnvState, MetaObservationSpace, StatefulMetaEnv,
 };
-pub use stateful::{EnvWithState, IntoStateful, WithState};
+pub use stateful::{IntoStateful, PomdpEnv, WithState};
 pub use step_limit::StepLimit;
 
 use crate::spaces::Space;
@@ -178,7 +178,7 @@ impl<E: Pomdp + ?Sized> Pomdp for Box<E> {
 
 /// A reinforcement learning environment with internal state.
 ///
-/// Prefer implementing [`Pomdp`] since [`EnvWithState`] can be used
+/// Prefer implementing [`Pomdp`] since [`PomdpEnv`] can be used
 /// to create an `Environment` out of a `Pomdp`.
 pub trait Environment {
     type Observation;

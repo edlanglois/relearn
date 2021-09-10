@@ -128,7 +128,7 @@ mod tests {
     use super::*;
     use crate::agents::{BuildAgent, TabularQLearningAgent, TabularQLearningAgentConfig};
     use crate::envs::{
-        DeterministicBandit, BuildEnv, EnvWithState, FixedMeansBanditConfig, IntoStateful,
+        BuildEnv, DeterministicBandit, FixedMeansBanditConfig, IntoStateful, PomdpEnv,
     };
     use crate::simulation;
     use crate::simulation::hooks::StepLimit;
@@ -147,7 +147,7 @@ mod tests {
         let hook = StepLimit::new(1000);
         let num_workers = 5;
 
-        simulation::run_agent_multithread::<_, EnvWithState<DeterministicBandit>, _, _>(
+        simulation::run_agent_multithread::<_, PomdpEnv<DeterministicBandit>, _, _>(
             &Arc::new(RwLock::new(env_config)),
             &mut agent,
             num_workers,
