@@ -86,7 +86,7 @@ impl From<&Options> for Chain {
 impl Update<&Options> for Chain {
     fn update(&mut self, opts: &Options) {
         if let Some(num_states) = opts.num_states {
-            self.size = num_states;
+            self.size = num_states.try_into().unwrap();
         }
         if let Some(discount_factor) = opts.discount_factor {
             self.discount_factor = discount_factor;

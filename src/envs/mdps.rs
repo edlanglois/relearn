@@ -1,5 +1,5 @@
 //! Generic Markov Decision Processes
-use super::{BuildEnvDist, EnvDistribution, EnvStructure, Pomdp};
+use super::{BuildEnvDist, EnvDistribution, EnvStructure, Mdp};
 use crate::spaces::IndexSpace;
 use ndarray::{Array2, Axis};
 use rand::{distributions::Distribution, rngs::StdRng};
@@ -45,21 +45,16 @@ impl<T, R> EnvStructure for TabularMdp<T, R> {
     }
 }
 
-impl<T, R> Pomdp for TabularMdp<T, R>
+impl<T, R> Mdp for TabularMdp<T, R>
 where
     T: Distribution<usize>,
     R: Distribution<f64>,
 {
     type State = usize;
-    type Observation = usize;
     type Action = usize;
 
     fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
         0
-    }
-
-    fn observe(&self, state: &Self::State, _rng: &mut StdRng) -> Self::Observation {
-        *state
     }
 
     fn step(

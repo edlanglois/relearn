@@ -87,7 +87,8 @@ impl Pomdp for MemoryGame {
     }
 
     fn observe(&self, state: &Self::State, _rng: &mut StdRng) -> Self::Observation {
-        state.0
+        let (current_state, _initial_state) = *state;
+        current_state
     }
 
     fn step(

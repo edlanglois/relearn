@@ -1,5 +1,5 @@
 //! Multi-armed bandit environments
-use super::{BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Pomdp};
+use super::{BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Mdp};
 use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use rand::distributions::{Distribution, Standard, Uniform};
@@ -105,14 +105,11 @@ impl<D: Bounded<f64>> EnvStructure for Bandit<D> {
     }
 }
 
-impl<D: Distribution<f64> + Bounded<f64>> Pomdp for Bandit<D> {
+impl<D: Distribution<f64> + Bounded<f64>> Mdp for Bandit<D> {
     type State = ();
-    type Observation = ();
     type Action = usize;
 
     fn initial_state(&self, _rng: &mut StdRng) -> Self::State {}
-
-    fn observe(&self, _state: &Self::State, _rng: &mut StdRng) -> Self::Observation {}
 
     fn step(
         &self,

@@ -1,5 +1,5 @@
 //! Chain environment
-use super::{BuildEnv, BuildEnvError, EnvStructure, Pomdp};
+use super::{BuildEnv, BuildEnvError, EnvStructure, Mdp};
 use crate::spaces::{IndexSpace, IndexedTypeSpace};
 use rand::prelude::*;
 use rust_rl_derive::Indexed;
@@ -16,14 +16,14 @@ use std::convert::TryInto;
 /// Described in "Bayesian Q-learning" by Dearden, Friedman and Russel (1998)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Chain {
-    pub size: u64,
+    pub size: usize,
     pub discount_factor: f64,
 }
 
 impl Chain {
-    pub const fn new(size: u64, discount_factor: f64) -> Self {
+    pub const fn new(size: usize, discount_factor: f64) -> Self {
         Self {
-            size,
+            size: size,
             discount_factor,
         }
     }
@@ -66,17 +66,12 @@ impl EnvStructure for Chain {
     }
 }
 
-impl Pomdp for Chain {
-    type State = u64;
-    type Observation = usize;
+impl Mdp for Chain {
+    type State = usize;
     type Action = Move;
 
     fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
         0
-    }
-
-    fn observe(&self, state: &Self::State, _rng: &mut StdRng) -> Self::Observation {
-        (*state).try_into().unwrap()
     }
 
     fn step(

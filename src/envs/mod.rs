@@ -120,6 +120,35 @@ where
     }
 }
 
+/// A Markov decision process (MDP).
+///
+/// The concept of an episode is an abstraction on the MDP formalism.
+/// An episode ending means that all possible future trajectories have 0 reward on each step.
+pub trait Mdp {
+    type State;
+    type Action;
+
+    /// Sample a new initial state.
+    fn initial_state(&self, rng: &mut StdRng) -> Self::State;
+
+    /// Sample a state transition.
+    ///
+    /// # Returns
+    /// * `state`: The resulting state.
+    ///     Is `None` if the resulting state is terminal.
+    ///     All trajectories from terminal states yield 0 reward on each step.
+    /// * `reward`: The reward value for this transition.
+    /// * `episode_done`: Whether this step ends the current episode.
+    ///     - If `observation` is `None` then `episode_done` must be true.
+    ///     - An episode may be done for other reasons, like a step limit.
+    fn step(
+        &self,
+        state: Self::State,
+        action: &Self::Action,
+        rng: &mut StdRng,
+    ) -> (Option<Self::State>, f64, bool);
+}
+
 /// A partially observable Markov decision process (POMDP).
 ///
 /// The concept of an episode is an abstraction on the MDP formalism.
@@ -153,17 +182,20 @@ pub trait Pomdp {
     ) -> (Option<Self::State>, f64, bool);
 }
 
-impl<E: Pomdp + ?Sized> Pomdp for Box<E> {
-    type State = E::State;
-    type Observation = E::Observation;
-    type Action = E::Action;
+impl<E: Mdp> Pomdp for E
+where
+    <Self as Mdp>::State: Copy,
+{
+    type State = <Self as Mdp>::State;
+    type Observation = <Self as Mdp>::State;
+    type Action = <Self as Mdp>::Action;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
-        E::initial_state(self, rng)
+        Mdp::initial_state(self, rng)
     }
 
-    fn observe(&self, state: &Self::State, rng: &mut StdRng) -> Self::Observation {
-        E::observe(self, state, rng)
+    fn observe(&self, state: &Self::State, _: &mut StdRng) -> Self::Observation {
+        *state
     }
 
     fn step(
@@ -172,7 +204,7 @@ impl<E: Pomdp + ?Sized> Pomdp for Box<E> {
         action: &Self::Action,
         rng: &mut StdRng,
     ) -> (Option<Self::State>, f64, bool) {
-        E::step(self, state, action, rng)
+        Mdp::step(self, state, action, rng)
     }
 }
 
