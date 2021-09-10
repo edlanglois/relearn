@@ -1,9 +1,9 @@
 //! TRPO actor-critic tests
-use crate::agents::{testing, AgentBuilder};
+use crate::agents::{testing, BuildAgent};
 use crate::torch::agents::{ActorCriticAgent, ActorCriticConfig};
 use crate::torch::backends::CudnnSupport;
-use crate::torch::critic::{Critic, CriticBuilder, Gae, GaeConfig, Return};
-use crate::torch::modules::{MlpConfig, ModuleBuilder};
+use crate::torch::critic::{Critic, BuildCritic, Gae, GaeConfig, Return};
+use crate::torch::modules::{MlpConfig, BuildModule};
 use crate::torch::optimizers::{AdamConfig, ConjugateGradientOptimizerConfig};
 use crate::torch::seq_modules::{
     GruMlp, RnnMlpConfig, SequenceModule, StatefulIterativeModule, WithState,
@@ -20,9 +20,9 @@ fn test_train_default_trpo<P, PB, V, VB>(
     >,
 ) where
     P: SequenceModule + StatefulIterativeModule + CudnnSupport,
-    PB: ModuleBuilder<P> + Default,
+    PB: BuildModule<P> + Default,
     V: Critic,
-    VB: CriticBuilder<V> + Default,
+    VB: BuildCritic<V> + Default,
 {
     // Speed up learning for this simple environment
     config.steps_per_epoch = 25;

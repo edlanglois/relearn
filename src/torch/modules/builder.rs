@@ -2,7 +2,7 @@
 use tch::nn::Path;
 
 /// Build an instance of a torch module (or module-like).
-pub trait ModuleBuilder<T> {
+pub trait BuildModule<T> {
     /// Build a new module instance.
     ///
     /// # Args

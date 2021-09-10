@@ -1,4 +1,4 @@
-use super::super::ModuleBuilder;
+use super::super::BuildModule;
 use super::{IterativeModule, SequenceModule, StatefulIterativeModule};
 use crate::torch::backends::CudnnSupport;
 use std::borrow::Borrow;
@@ -75,9 +75,9 @@ where
     }
 }
 
-impl<T, MB> ModuleBuilder<WithState<T>> for MB
+impl<T, MB> BuildModule<WithState<T>> for MB
 where
-    MB: ModuleBuilder<T>,
+    MB: BuildModule<T>,
     T: IterativeModule,
 {
     fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> WithState<T> {

@@ -27,7 +27,7 @@ use tch::nn::VarStore;
 // TODO: Remove ActionSpace
 
 /// Build an updater
-pub trait UpdaterBuilder<U> {
+pub trait BuildUpdater<U> {
     /// Build an updater for the trainable variables in a variable store.
     fn build_updater(&self, vs: &VarStore) -> U;
 }

@@ -29,7 +29,7 @@
 // SOFTWARE.
 
 use super::super::utils;
-use super::{BaseOptimizer, OptimizerBuilder, OptimizerStepError, TrustRegionOptimizer};
+use super::{BaseOptimizer, BuildOptimizer, OptimizerStepError, TrustRegionOptimizer};
 use crate::logging::{Logger, LoggerHelper};
 use std::borrow::Borrow;
 use std::convert::{Infallible, TryInto};
@@ -63,7 +63,7 @@ impl Default for ConjugateGradientOptimizerConfig {
     }
 }
 
-impl OptimizerBuilder<ConjugateGradientOptimizer> for ConjugateGradientOptimizerConfig {
+impl BuildOptimizer<ConjugateGradientOptimizer> for ConjugateGradientOptimizerConfig {
     type Error = Infallible;
 
     fn build_optimizer(&self, vs: &VarStore) -> Result<ConjugateGradientOptimizer, Infallible> {

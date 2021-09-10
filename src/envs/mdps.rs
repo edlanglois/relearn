@@ -1,5 +1,5 @@
 //! Generic Markov Decision Processes
-use super::{EnvDistBuilder, EnvDistribution, EnvStructure, Environment};
+use super::{BuildEnvDist, EnvDistribution, EnvStructure, Environment};
 use crate::spaces::IndexSpace;
 use ndarray::{Array2, Axis};
 use rand::{distributions::Distribution, rngs::StdRng};
@@ -110,7 +110,7 @@ impl Default for DirichletRandomMdps {
     }
 }
 
-impl EnvDistBuilder<Self> for DirichletRandomMdps {
+impl BuildEnvDist<Self> for DirichletRandomMdps {
     fn build_env_dist(&self) -> Self {
         *self
     }

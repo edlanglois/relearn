@@ -223,7 +223,7 @@ impl<E: StatefulEnvironment + ?Sized> StatefulEnvironment for Box<E> {
 }
 
 /// Builds an environment
-pub trait EnvBuilder<E> {
+pub trait BuildEnv<E> {
     /// Build an environment instance.
     ///
     /// # Args
@@ -274,7 +274,7 @@ pub trait EnvDistribution {
 }
 
 /// Builds an environment distribution.
-pub trait EnvDistBuilder<E> {
+pub trait BuildEnvDist<E> {
     fn build_env_dist(&self) -> E;
 }
 
@@ -376,10 +376,10 @@ impl<T, W> Wrapped<T, W> {
 
 // TODO: Maybe provide a macro for these since they conflict with implementing builders for B
 /*
-/// A wrapped EnvBuilder builds wrapped environments.
-impl<B, E, W> EnvBuilder<Wrapped<E, W>> for Wrapped<B, W>
+/// A wrapped BuildEnv builds wrapped environments.
+impl<B, E, W> BuildEnv<Wrapped<E, W>> for Wrapped<B, W>
 where
-    B: EnvBuilder<E>,
+    B: BuildEnv<E>,
     W: Clone,
 {
     fn build_env(&self, seed: u64) -> Result<Wrapped<E, W>, BuildEnvError> {
@@ -390,10 +390,10 @@ where
     }
 }
 
-/// A wrapped EnvDistBuilder builds wrapped distributions.
-impl<B, T, W> EnvDistBuilder<Wrapped<T, W>> for Wrapped<B, W>
+/// A wrapped BuildEnvDist builds wrapped distributions.
+impl<B, T, W> BuildEnvDist<Wrapped<T, W>> for Wrapped<B, W>
 where
-    B: EnvDistBuilder<T>,
+    B: BuildEnvDist<T>,
     W: Clone,
 {
     fn build_env_dist(&self) -> Wrapped<T, W> {

@@ -1,14 +1,14 @@
 //! Meta agents
-use super::{Actor, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
+use super::{Actor, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace, StoredEnvStructure};
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::{SampleSpace, Space};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-/// A cloneable [`AgentBuilder`] for `A` can also build `ResettingMetaAgent<_, A>`
-impl<B, A, E, OS, AS> AgentBuilder<ResettingMetaAgent<Self, A, OS, AS>, E> for B
+/// A cloneable [`BuildAgent`] for `A` can also build `ResettingMetaAgent<_, A>`
+impl<B, A, E, OS, AS> BuildAgent<ResettingMetaAgent<Self, A, OS, AS>, E> for B
 where
-    B: AgentBuilder<A, StoredEnvStructure<OS, AS>> + Clone,
+    B: BuildAgent<A, StoredEnvStructure<OS, AS>> + Clone,
     E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
     OS: Space,
     AS: Space,
@@ -39,7 +39,7 @@ pub struct ResettingMetaAgent<B, A, OS: Space, AS> {
 
 impl<B, A, OS, AS> ResettingMetaAgent<B, A, OS, AS>
 where
-    B: AgentBuilder<A, StoredEnvStructure<OS, AS>>,
+    B: BuildAgent<A, StoredEnvStructure<OS, AS>>,
     OS: Space,
     AS: Space,
 {
@@ -72,7 +72,7 @@ where
 impl<B, A, OS, AS> Actor<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>
     for ResettingMetaAgent<B, A, OS, AS>
 where
-    B: AgentBuilder<A, StoredEnvStructure<OS, AS>>,
+    B: BuildAgent<A, StoredEnvStructure<OS, AS>>,
     A: Agent<OS::Element, AS::Element>,
     OS: Space,
     <OS as Space>::Element: Clone,
@@ -133,7 +133,7 @@ where
 impl<B, A, OS, AS> Agent<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>
     for ResettingMetaAgent<B, A, OS, AS>
 where
-    B: AgentBuilder<A, StoredEnvStructure<OS, AS>>,
+    B: BuildAgent<A, StoredEnvStructure<OS, AS>>,
     A: Agent<OS::Element, AS::Element>,
     OS: Space,
     <OS as Space>::Element: Clone,

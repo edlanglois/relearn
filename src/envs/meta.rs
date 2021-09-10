@@ -1,6 +1,6 @@
 //! Meta reinforcement learning environment.
 use super::{
-    BuildEnvError, EnvBuilder, EnvDistBuilder, EnvDistribution, EnvStructure, Environment,
+    BuildEnvError, BuildEnv, BuildEnvDist, EnvDistribution, EnvStructure, Environment,
     StatefulEnvironment,
 };
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
@@ -36,9 +36,9 @@ impl<EB: Default> Default for MetaEnvConfig<EB> {
     }
 }
 
-impl<E, EB> EnvBuilder<MetaEnv<E>> for MetaEnvConfig<EB>
+impl<E, EB> BuildEnv<MetaEnv<E>> for MetaEnvConfig<EB>
 where
-    EB: EnvDistBuilder<E>,
+    EB: BuildEnvDist<E>,
 {
     fn build_env(&self, _seed: u64) -> Result<MetaEnv<E>, BuildEnvError> {
         Ok(MetaEnv::new(
@@ -48,9 +48,9 @@ where
     }
 }
 
-impl<E, EB> EnvBuilder<StatefulMetaEnv<E>> for MetaEnvConfig<EB>
+impl<E, EB> BuildEnv<StatefulMetaEnv<E>> for MetaEnvConfig<EB>
 where
-    EB: EnvDistBuilder<E>,
+    EB: BuildEnvDist<E>,
     E: EnvDistribution,
 {
     fn build_env(&self, seed: u64) -> Result<StatefulMetaEnv<E>, BuildEnvError> {

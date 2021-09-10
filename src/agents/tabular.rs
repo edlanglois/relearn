@@ -1,6 +1,6 @@
 //! Tabular agents
 use super::{
-    Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, FiniteSpaceAgent, OffPolicyAgent,
+    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, FiniteSpaceAgent, OffPolicyAgent,
     SetActorMode, Step,
 };
 use crate::envs::EnvStructure;
@@ -31,7 +31,7 @@ impl Default for TabularQLearningAgentConfig {
     }
 }
 
-impl<E> AgentBuilder<BaseTabularQLearningAgent, E> for TabularQLearningAgentConfig
+impl<E> BuildAgent<BaseTabularQLearningAgent, E> for TabularQLearningAgentConfig
 where
     E: EnvStructure<ObservationSpace = IndexSpace, ActionSpace = IndexSpace> + ?Sized,
 {

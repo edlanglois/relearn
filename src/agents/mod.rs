@@ -202,7 +202,7 @@ where
 }
 
 /// Build an agent instance.
-pub trait AgentBuilder<T, E: ?Sized> {
+pub trait BuildAgent<T, E: ?Sized> {
     /// Build an agent for the given environment structure.
     ///
     /// If the agent supports [`ActorMode`]

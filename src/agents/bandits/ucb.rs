@@ -1,6 +1,6 @@
 //! Upper confidence bound bandit agent.
 use super::super::{
-    Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, FiniteSpaceAgent, OffPolicyAgent,
+    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, FiniteSpaceAgent, OffPolicyAgent,
     SetActorMode, Step,
 };
 use crate::envs::EnvStructure;
@@ -33,7 +33,7 @@ impl Default for UCB1AgentConfig {
     }
 }
 
-impl<E> AgentBuilder<BaseUCB1Agent, E> for UCB1AgentConfig
+impl<E> BuildAgent<BaseUCB1Agent, E> for UCB1AgentConfig
 where
     E: EnvStructure<ObservationSpace = IndexSpace, ActionSpace = IndexSpace> + ?Sized,
 {

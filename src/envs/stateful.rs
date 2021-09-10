@@ -1,6 +1,6 @@
 //! Converting an `Environment` into a `StatefulEnvironment`
 use super::{
-    BuildEnvError, EnvBuilder, EnvDistBuilder, EnvWrapper, Environment, InnerStructureWrapper,
+    BuildEnvError, BuildEnv, BuildEnvDist, EnvWrapper, Environment, InnerStructureWrapper,
     StatefulEnvironment, Wrapped,
 };
 use crate::envs::EnvStructure;
@@ -102,9 +102,9 @@ impl<E: Environment> IntoStateful for E {
     }
 }
 
-impl<E: Environment, B: EnvBuilder<E>> EnvBuilder<EnvWithState<E>> for B {
+impl<E: Environment, B: BuildEnv<E>> BuildEnv<EnvWithState<E>> for B {
     fn build_env(&self, seed: u64) -> Result<EnvWithState<E>, BuildEnvError> {
-        // Re-use seed so that EnvBuilder<E> and EnvBuilder<EnvWithState<E>>
+        // Re-use seed so that BuildEnv<E> and BuildEnv<EnvWithState<E>>
         // have the same environment structure given the same seed.
         let structure_seed = seed;
         // Add an arbitrary offset for the dynamics seed.
@@ -114,7 +114,7 @@ impl<E: Environment, B: EnvBuilder<E>> EnvBuilder<EnvWithState<E>> for B {
     }
 }
 
-impl<E, B: EnvBuilder<E>> EnvBuilder<Wrapped<E, WithState>> for B {
+impl<E, B: BuildEnv<E>> BuildEnv<Wrapped<E, WithState>> for B {
     fn build_env(&self, seed: u64) -> Result<Wrapped<E, WithState>, BuildEnvError> {
         Ok(Wrapped {
             inner: self.build_env(seed)?,
@@ -123,7 +123,7 @@ impl<E, B: EnvBuilder<E>> EnvBuilder<Wrapped<E, WithState>> for B {
     }
 }
 
-impl<T, B: EnvDistBuilder<T>> EnvDistBuilder<Wrapped<T, WithState>> for B {
+impl<T, B: BuildEnvDist<T>> BuildEnvDist<Wrapped<T, WithState>> for B {
     fn build_env_dist(&self) -> Wrapped<T, WithState> {
         Wrapped {
             inner: self.build_env_dist(),

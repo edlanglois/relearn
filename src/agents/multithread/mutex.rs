@@ -1,14 +1,14 @@
 use super::super::{
-    Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, ManagerAgent, SetActorMode, Step,
+    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, ManagerAgent, SetActorMode, Step,
 };
 use crate::logging::{self, ForwardingLogger, TimeSeriesLogger};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-impl<B, T, E> AgentBuilder<MutexAgentManager<T>, E> for B
+impl<B, T, E> BuildAgent<MutexAgentManager<T>, E> for B
 where
-    B: AgentBuilder<T, E>,
+    B: BuildAgent<T, E>,
     E: ?Sized,
 {
     fn build_agent(&self, env: &E, seed: u64) -> Result<MutexAgentManager<T>, BuildAgentError> {
@@ -126,9 +126,9 @@ impl<T: Send + 'static> ManagerAgent for MutexAgentManager<T> {
 mod tests {
     use super::super::super::testing;
     use super::*;
-    use crate::agents::{AgentBuilder, TabularQLearningAgent, TabularQLearningAgentConfig};
+    use crate::agents::{BuildAgent, TabularQLearningAgent, TabularQLearningAgentConfig};
     use crate::envs::{
-        DeterministicBandit, EnvBuilder, EnvWithState, FixedMeansBanditConfig, IntoStateful,
+        DeterministicBandit, BuildEnv, EnvWithState, FixedMeansBanditConfig, IntoStateful,
     };
     use crate::simulation;
     use crate::simulation::hooks::StepLimit;

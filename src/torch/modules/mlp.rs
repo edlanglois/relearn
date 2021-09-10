@@ -1,5 +1,5 @@
 //! Multi-layer perceptron
-use super::{Activation, ModuleBuilder};
+use super::{Activation, BuildModule};
 use std::iter;
 use tch::nn;
 
@@ -24,7 +24,7 @@ impl Default for MlpConfig {
     }
 }
 
-impl ModuleBuilder<nn::Sequential> for MlpConfig {
+impl BuildModule<nn::Sequential> for MlpConfig {
     fn build_module(&self, vs: &nn::Path, input_dim: usize, output_dim: usize) -> nn::Sequential {
         let iter_in_dim = iter::once(&input_dim).chain(self.hidden_sizes.iter());
         let iter_out_dim = self.hidden_sizes.iter().chain(iter::once(&output_dim));

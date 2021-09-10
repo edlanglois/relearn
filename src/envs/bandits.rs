@@ -1,6 +1,6 @@
 //! Multi-armed bandit environments
 use super::{
-    BuildEnvError, EnvBuilder, EnvDistBuilder, EnvDistribution, EnvStructure, Environment,
+    BuildEnvError, BuildEnv, BuildEnvDist, EnvDistribution, EnvStructure, Environment,
 };
 use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
@@ -23,7 +23,7 @@ impl Default for FixedMeansBanditConfig {
     }
 }
 
-impl<D> EnvBuilder<Bandit<D>> for FixedMeansBanditConfig
+impl<D> BuildEnv<Bandit<D>> for FixedMeansBanditConfig
 where
     D: Distribution<f64> + FromMean<f64>,
     <D as FromMean<f64>>::Error: Into<BuildEnvError>,
@@ -50,7 +50,7 @@ impl Default for PriorMeansBanditConfig<Standard> {
     }
 }
 
-impl<DR, DM> EnvBuilder<Bandit<DR>> for PriorMeansBanditConfig<DM>
+impl<DR, DM> BuildEnv<Bandit<DR>> for PriorMeansBanditConfig<DM>
 where
     DR: Distribution<f64> + FromMean<f64>,
     <DR as FromMean<f64>>::Error: Into<BuildEnvError>,
@@ -222,7 +222,7 @@ impl EnvDistribution for UniformBernoulliBandits {
 }
 
 /// [`UniformBernoulliBandits`] can build itself by cloning
-impl EnvDistBuilder<Self> for UniformBernoulliBandits {
+impl BuildEnvDist<Self> for UniformBernoulliBandits {
     fn build_env_dist(&self) -> Self {
         *self
     }
@@ -282,7 +282,7 @@ impl EnvDistribution for OneHotBandits {
 }
 
 /// [`OneHotBandits`] can build itself by cloning
-impl EnvDistBuilder<Self> for OneHotBandits {
+impl BuildEnvDist<Self> for OneHotBandits {
     fn build_env_dist(&self) -> Self {
         *self
     }

@@ -12,6 +12,6 @@ pub mod seq_modules;
 pub mod updaters;
 pub mod utils;
 
-pub use modules::{Activation, ModuleBuilder};
-pub use optimizers::{Optimizer, OptimizerBuilder};
+pub use modules::{Activation, BuildModule};
+pub use optimizers::{Optimizer, BuildOptimizer};
 pub use seq_modules::{Gru, Lstm};

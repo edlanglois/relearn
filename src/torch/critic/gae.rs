@@ -1,7 +1,7 @@
 //! Generalized Advantage Estimation
 use super::super::history::PackedHistoryFeaturesView;
-use super::{Critic, CriticBuilder};
-use crate::torch::{seq_modules::SequenceModule, ModuleBuilder};
+use super::{Critic, BuildCritic};
+use crate::torch::{seq_modules::SequenceModule, BuildModule};
 use crate::utils::packed;
 use tch::{nn::Path, Reduction, Tensor};
 
@@ -23,9 +23,9 @@ impl<VB: Default> Default for GaeConfig<VB> {
     }
 }
 
-impl<VB, V> CriticBuilder<Gae<V>> for GaeConfig<VB>
+impl<VB, V> BuildCritic<Gae<V>> for GaeConfig<VB>
 where
-    VB: ModuleBuilder<V>,
+    VB: BuildModule<V>,
     V: SequenceModule,
 {
     fn build_critic(&self, vs: &Path, in_dim: usize) -> Gae<V> {

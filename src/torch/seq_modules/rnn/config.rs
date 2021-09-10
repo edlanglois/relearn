@@ -1,5 +1,5 @@
 //! Recurrent neural network configuration
-use super::super::super::ModuleBuilder;
+use super::super::super::BuildModule;
 use super::{Gru, Lstm};
 use tch::nn::Path;
 
@@ -15,7 +15,7 @@ impl Default for RnnConfig {
     }
 }
 
-impl ModuleBuilder<Gru> for RnnConfig {
+impl BuildModule<Gru> for RnnConfig {
     fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Gru {
         Gru::new(
             vs,
@@ -27,7 +27,7 @@ impl ModuleBuilder<Gru> for RnnConfig {
     }
 }
 
-impl ModuleBuilder<Lstm> for RnnConfig {
+impl BuildModule<Lstm> for RnnConfig {
     fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Lstm {
         Lstm::new(
             vs,

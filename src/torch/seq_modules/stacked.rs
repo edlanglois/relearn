@@ -1,4 +1,4 @@
-use super::super::{Activation, ModuleBuilder};
+use super::super::{Activation, BuildModule};
 use super::{IterativeModule, SequenceModule};
 use crate::torch::backends::CudnnSupport;
 use tch::{nn::Func, nn::Module, nn::Path, Tensor};
@@ -105,10 +105,10 @@ where
     }
 }
 
-impl<T, TC, U, UC> ModuleBuilder<Stacked<'static, T, U>> for StackedConfig<TC, UC>
+impl<T, TC, U, UC> BuildModule<Stacked<'static, T, U>> for StackedConfig<TC, UC>
 where
-    TC: ModuleBuilder<T>,
-    UC: ModuleBuilder<U>,
+    TC: BuildModule<T>,
+    UC: BuildModule<U>,
 {
     fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Stacked<'static, T, U> {
         Stacked::new(

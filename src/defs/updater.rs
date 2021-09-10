@@ -2,11 +2,11 @@ use super::OptimizerDef;
 use crate::spaces::ParameterizedDistributionSpace;
 use crate::torch::backends::CudnnSupport;
 use crate::torch::critic::Critic;
-use crate::torch::optimizers::{ConjugateGradientOptimizerConfig, OptimizerBuilder};
+use crate::torch::optimizers::{ConjugateGradientOptimizerConfig, BuildOptimizer};
 use crate::torch::seq_modules::SequenceModule;
 use crate::torch::updaters::{
     CriticLossUpdateRule, PolicyGradientUpdateRule, PpoPolicyUpdateRule, TrpoPolicyUpdateRule,
-    UpdateCritic, UpdatePolicy, UpdaterBuilder, WithOptimizer,
+    UpdateCritic, UpdatePolicy, BuildUpdater, WithOptimizer,
 };
 use tch::{nn::VarStore, Tensor};
 
@@ -39,7 +39,7 @@ impl PolicyUpdaterDef {
     }
 }
 
-impl<P, C, AS> UpdaterBuilder<Box<dyn UpdatePolicy<P, C, AS>>> for PolicyUpdaterDef
+impl<P, C, AS> BuildUpdater<Box<dyn UpdatePolicy<P, C, AS>>> for PolicyUpdaterDef
 where
     P: SequenceModule + CudnnSupport + ?Sized,
     C: Critic + ?Sized,
@@ -76,7 +76,7 @@ impl Default for CriticUpdaterDef {
     }
 }
 
-impl<C> UpdaterBuilder<Box<dyn UpdateCritic<C>>> for CriticUpdaterDef
+impl<C> BuildUpdater<Box<dyn UpdateCritic<C>>> for CriticUpdaterDef
 where
     C: Critic + ?Sized,
 {

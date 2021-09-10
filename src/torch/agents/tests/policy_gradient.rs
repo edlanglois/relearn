@@ -1,8 +1,8 @@
 //! Policy-gradient actor critic agent tests.
-use crate::agents::{testing, AgentBuilder};
+use crate::agents::{testing, BuildAgent};
 use crate::torch::agents::{ActorCriticAgent, ActorCriticConfig};
-use crate::torch::critic::{Critic, CriticBuilder, Gae, GaeConfig, Return};
-use crate::torch::modules::{MlpConfig, ModuleBuilder};
+use crate::torch::critic::{Critic, BuildCritic, Gae, GaeConfig, Return};
+use crate::torch::modules::{MlpConfig, BuildModule};
 use crate::torch::optimizers::AdamConfig;
 use crate::torch::seq_modules::{
     GruMlp, RnnMlpConfig, SequenceModule, StatefulIterativeModule, WithState,
@@ -19,9 +19,9 @@ fn test_train_policy_gradient<P, PB, V, VB>(
     >,
 ) where
     P: SequenceModule + StatefulIterativeModule,
-    PB: ModuleBuilder<P>,
+    PB: BuildModule<P>,
     V: Critic,
-    VB: CriticBuilder<V>,
+    VB: BuildCritic<V>,
 {
     // Speed up learning for this simple environment
     config.steps_per_epoch = 25;

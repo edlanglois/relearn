@@ -56,7 +56,7 @@ impl OptimizerDef {
 #[cfg(test)]
 mod optimizer_def {
     use super::*;
-    use crate::torch::OptimizerBuilder;
+    use crate::torch::BuildOptimizer;
     use tch::{nn::VarStore, Device};
 
     #[test]

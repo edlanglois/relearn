@@ -1,9 +1,9 @@
-use super::super::critic::{Critic, CriticBuilder};
+use super::super::critic::{Critic, BuildCritic};
 use super::super::history::{HistoryBuffer, LazyPackedHistoryFeatures};
 use super::super::seq_modules::StatefulIterativeModule;
-use super::super::updaters::{UpdateCritic, UpdatePolicy, UpdaterBuilder};
-use super::super::ModuleBuilder;
-use crate::agents::{Actor, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
+use super::super::updaters::{UpdateCritic, UpdatePolicy, BuildUpdater};
+use super::super::BuildModule;
+use crate::agents::{Actor, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::{Event, Logger, LoggerHelper, TimeSeriesLogger, TimeSeriesLoggerHelper};
 use crate::spaces::{
@@ -46,15 +46,15 @@ where
 }
 
 impl<OS, AS, P, PB, PU, PUB, C, CB, CU, CUB, E>
-    AgentBuilder<ActorCriticAgent<OS, AS, P, PU, C, CU>, E> for ActorCriticConfig<PB, PUB, CB, CUB>
+    BuildAgent<ActorCriticAgent<OS, AS, P, PU, C, CU>, E> for ActorCriticConfig<PB, PUB, CB, CUB>
 where
     OS: Space + BaseFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
-    PB: ModuleBuilder<P>,
-    PUB: UpdaterBuilder<PU>,
+    PB: BuildModule<P>,
+    PUB: BuildUpdater<PU>,
     C: Critic,
-    CB: CriticBuilder<C>,
-    CUB: UpdaterBuilder<CU>,
+    CB: BuildCritic<C>,
+    CUB: BuildUpdater<CU>,
     E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
 {
     fn build_agent(
@@ -141,11 +141,11 @@ where
     pub fn new<E, PB, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
-        PB: ModuleBuilder<P>,
-        PUB: UpdaterBuilder<PU>,
+        PB: BuildModule<P>,
+        PUB: BuildUpdater<PU>,
         C: Critic,
-        CB: CriticBuilder<C>,
-        CUB: UpdaterBuilder<CU>,
+        CB: BuildCritic<C>,
+        CUB: BuildUpdater<CU>,
     {
         let observation_space = NonEmptyFeatures::new(env.observation_space());
         let action_space = env.action_space();

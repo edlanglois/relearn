@@ -4,7 +4,7 @@ mod builder;
 mod mlp;
 
 pub use activations::Activation;
-pub use builder::ModuleBuilder;
+pub use builder::BuildModule;
 pub use mlp::MlpConfig;
 
 use crate::torch::backends::CudnnSupport;

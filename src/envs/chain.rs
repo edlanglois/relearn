@@ -1,5 +1,5 @@
 //! Chain environment
-use super::{BuildEnvError, EnvBuilder, EnvStructure, Environment};
+use super::{BuildEnvError, BuildEnv, EnvStructure, Environment};
 use crate::spaces::{IndexSpace, IndexedTypeSpace};
 use rand::prelude::*;
 use rust_rl_derive::Indexed;
@@ -39,7 +39,7 @@ impl Default for Chain {
 }
 
 /// Chain is its own configuration
-impl EnvBuilder<Self> for Chain {
+impl BuildEnv<Self> for Chain {
     fn build_env(&self, _seed: u64) -> Result<Self, BuildEnvError> {
         Ok(*self)
     }

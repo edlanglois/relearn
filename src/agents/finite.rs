@@ -1,5 +1,5 @@
 use super::{
-    Actor, ActorMode, Agent, AgentBuilder, BatchUpdate, BuildAgentError, SetActorMode, Step,
+    Actor, ActorMode, Agent, BuildAgent, BatchUpdate, BuildAgentError, SetActorMode, Step,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure};
 use crate::logging::{Event, TimeSeriesLogger};
@@ -107,9 +107,9 @@ where
     }
 }
 
-impl<B, T, E> AgentBuilder<FiniteSpaceAgent<T, E::ObservationSpace, E::ActionSpace>, E> for B
+impl<B, T, E> BuildAgent<FiniteSpaceAgent<T, E::ObservationSpace, E::ActionSpace>, E> for B
 where
-    B: AgentBuilder<T, StoredEnvStructure<IndexSpace, IndexSpace>>,
+    B: BuildAgent<T, StoredEnvStructure<IndexSpace, IndexSpace>>,
     E: EnvStructure + ?Sized,
     <E as EnvStructure>::ObservationSpace: FiniteSpace,
     <E as EnvStructure>::ActionSpace: FiniteSpace,

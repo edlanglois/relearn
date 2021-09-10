@@ -1,4 +1,4 @@
-use super::{Actor, Agent, AgentBuilder, BuildAgentError, OffPolicyAgent, SetActorMode, Step};
+use super::{Actor, Agent, BuildAgent, BuildAgentError, OffPolicyAgent, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::SampleSpace;
@@ -16,7 +16,7 @@ impl RandomAgentConfig {
     }
 }
 
-impl<E> AgentBuilder<RandomAgent<E::ActionSpace>, E> for RandomAgentConfig
+impl<E> BuildAgent<RandomAgent<E::ActionSpace>, E> for RandomAgentConfig
 where
     E: EnvStructure + ?Sized,
 {

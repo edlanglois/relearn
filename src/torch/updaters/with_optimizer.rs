@@ -1,8 +1,8 @@
 use super::super::history::PackedHistoryFeaturesView;
-use super::super::optimizers::OptimizerBuilder;
+use super::super::optimizers::BuildOptimizer;
 use super::{
     PolicyStats, UpdateCritic, UpdateCriticWithOptimizer, UpdatePolicy, UpdatePolicyWithOptimizer,
-    UpdaterBuilder,
+    BuildUpdater,
 };
 use crate::logging::TimeSeriesLogger;
 use tch::nn::VarStore;
@@ -56,10 +56,10 @@ where
     }
 }
 
-impl<U, O, OB> UpdaterBuilder<WithOptimizer<U, O>> for WithOptimizer<U, OB>
+impl<U, O, OB> BuildUpdater<WithOptimizer<U, O>> for WithOptimizer<U, OB>
 where
     U: Clone,
-    OB: OptimizerBuilder<O>,
+    OB: BuildOptimizer<O>,
 {
     fn build_updater(&self, vs: &VarStore) -> WithOptimizer<U, O> {
         WithOptimizer {

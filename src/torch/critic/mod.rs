@@ -50,7 +50,7 @@ pub trait Critic {
 }
 
 /// Build a [`Critic`] instance.
-pub trait CriticBuilder<T> {
+pub trait BuildCritic<T> {
     /// Build a new [`Critic`] instance.
     ///
     /// # Args
@@ -83,7 +83,7 @@ impl Critic for Return {
     }
 }
 
-impl CriticBuilder<Self> for Return {
+impl BuildCritic<Self> for Return {
     fn build_critic(&self, _: &Path, _: usize) -> Self {
         Return
     }

@@ -1,5 +1,5 @@
 use super::{
-    BuildEnvError, EnvBuilder, EnvDistBuilder, EnvStructure, EnvWrapper, Environment,
+    BuildEnvError, BuildEnv, BuildEnvDist, EnvStructure, EnvWrapper, Environment,
     InnerStructureWrapper, Wrapped,
 };
 use rand::{rngs::StdRng, Rng};
@@ -74,9 +74,9 @@ impl<E: Environment> Environment for Wrapped<E, StepLimit> {
     }
 }
 
-impl<B, E> EnvBuilder<Wrapped<E, StepLimit>> for Wrapped<B, StepLimit>
+impl<B, E> BuildEnv<Wrapped<E, StepLimit>> for Wrapped<B, StepLimit>
 where
-    B: EnvBuilder<E>,
+    B: BuildEnv<E>,
 {
     fn build_env(&self, seed: u64) -> Result<Wrapped<E, StepLimit>, BuildEnvError> {
         Ok(Wrapped {
@@ -86,9 +86,9 @@ where
     }
 }
 
-impl<B, D> EnvDistBuilder<Wrapped<D, StepLimit>> for Wrapped<B, StepLimit>
+impl<B, D> BuildEnvDist<Wrapped<D, StepLimit>> for Wrapped<B, StepLimit>
 where
-    B: EnvDistBuilder<D>,
+    B: BuildEnvDist<D>,
 {
     fn build_env_dist(&self) -> Wrapped<D, StepLimit> {
         Wrapped {
@@ -100,7 +100,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{chain::Move, testing, Chain, EnvBuilder};
+    use super::super::{chain::Move, testing, Chain, BuildEnv};
     use super::*;
     use rand::SeedableRng;
 

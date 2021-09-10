@@ -1,6 +1,6 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyUpdaterDef, SeqModDef};
 use crate::agents::{
-    Agent, AgentBuilder, BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, BoxingManager,
+    Agent, BuildAgent, BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, BoxingManager,
     BuildAgentError, ManagerAgent, MutexAgentManager, RandomAgent, RandomAgentConfig,
     ResettingMetaAgent, TabularQLearningAgent, TabularQLearningAgentConfig, UCB1Agent,
     UCB1AgentConfig,
@@ -57,7 +57,7 @@ impl<T: RLSpace + FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>> RLObservatio
 pub trait RLActionSpace: RLSpace + ParameterizedDistributionSpace<Tensor> {}
 impl<T: RLSpace + ParameterizedDistributionSpace<Tensor>> RLActionSpace for T {}
 
-/// Wrapper implementing [`AgentBuilder`] for [`AgentDef`] for any observation and action space.
+/// Wrapper implementing [`BuildAgent`] for [`AgentDef`] for any observation and action space.
 ///
 /// More specifically, any observation and action space satisfying the relatively generic
 /// [`RLObservationSpace`] and [`RLActionSpace`] traits.
@@ -75,7 +75,7 @@ impl<T> ForAnyAny<T> {
 
 macro_rules! agent_builder_boxed_for_any_any {
     ($type:ty$(, $bound:tt )*) => {
-        impl<T, E> AgentBuilder<Box<$type>, E> for ForAnyAny<T>
+        impl<T, E> BuildAgent<Box<$type>, E> for ForAnyAny<T>
         where
             T: Borrow<AgentDef>,
             E: EnvStructure + ?Sized,
@@ -101,7 +101,7 @@ macro_rules! agent_builder_boxed_for_any_any {
 agent_builder_boxed_for_any_any!(DynEnvAgent<E>);
 // agent_builder_boxed_for_any_any!(DynSendEnvAgent<E>, Send);
 
-impl<T, E> AgentBuilder<Box<DynSendEnvAgent<E>>, E> for ForAnyAny<T>
+impl<T, E> BuildAgent<Box<DynSendEnvAgent<E>>, E> for ForAnyAny<T>
 where
     T: Borrow<AgentDef>,
     E: EnvStructure + ?Sized,
@@ -121,7 +121,7 @@ where
     }
 }
 
-impl<T, E> AgentBuilder<Box<DynEnvManagerAgent<E>>, E> for ForAnyAny<T>
+impl<T, E> BuildAgent<Box<DynEnvManagerAgent<E>>, E> for ForAnyAny<T>
 where
     T: Borrow<MultiThreadAgentDef>,
     E: EnvStructure + ?Sized,
@@ -144,7 +144,7 @@ where
     }
 }
 
-/// Wrapper implementing [`AgentBuilder`] for [`AgentDef`] for finite observation and action spaces.
+/// Wrapper implementing [`BuildAgent`] for [`AgentDef`] for finite observation and action spaces.
 ///
 /// There is no trait specialization so this will fail for those agents that require a tighter
 /// bounds on the observation and actions paces.
@@ -159,7 +159,7 @@ impl<T> ForFiniteFinite<T> {
 
 macro_rules! agent_builder_boxed_for_finite_finite {
     ($type:ty$(, $bound:tt )*) => {
-        impl<T, E> AgentBuilder<Box<$type>, E> for ForFiniteFinite<T>
+        impl<T, E> BuildAgent<Box<$type>, E> for ForFiniteFinite<T>
         where
             T: Borrow<AgentDef>,
             E: EnvStructure + ?Sized,
@@ -188,7 +188,7 @@ macro_rules! agent_builder_boxed_for_finite_finite {
 agent_builder_boxed_for_finite_finite!(DynEnvAgent<E>);
 agent_builder_boxed_for_finite_finite!(DynSendEnvAgent<E>, Send);
 
-impl<T, E> AgentBuilder<Box<DynEnvManagerAgent<E>>, E> for ForFiniteFinite<T>
+impl<T, E> BuildAgent<Box<DynEnvManagerAgent<E>>, E> for ForFiniteFinite<T>
 where
     T: Borrow<MultiThreadAgentDef>,
     E: EnvStructure + ?Sized,
@@ -211,7 +211,7 @@ where
     }
 }
 
-/// Wrapper implementing [`AgentBuilder`] for [`AgentDef`] for meta finite obs/action spaces.
+/// Wrapper implementing [`BuildAgent`] for [`AgentDef`] for meta finite obs/action spaces.
 ///
 /// Specifically, it is the inner observation space that must be finite.
 /// The outer observation space is not finite.
@@ -229,7 +229,7 @@ impl<T> ForMetaFiniteFinite<T> {
 
 macro_rules! agent_builder_boxed_for_meta_finite_finite {
     ($type:ty$(, $bound:tt )*) => {
-        impl<T, E, OS, AS> AgentBuilder<Box<$type>, E> for ForMetaFiniteFinite<T>
+        impl<T, E, OS, AS> BuildAgent<Box<$type>, E> for ForMetaFiniteFinite<T>
         where
             T: Borrow<AgentDef>,
             E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
@@ -264,7 +264,7 @@ macro_rules! agent_builder_boxed_for_meta_finite_finite {
 agent_builder_boxed_for_meta_finite_finite!(DynEnvAgent<E>);
 agent_builder_boxed_for_meta_finite_finite!(DynSendEnvAgent<E>, Send);
 
-impl<T, E, OS, AS> AgentBuilder<Box<DynEnvManagerAgent<E>>, E> for ForMetaFiniteFinite<T>
+impl<T, E, OS, AS> BuildAgent<Box<DynEnvManagerAgent<E>>, E> for ForMetaFiniteFinite<T>
 where
     T: Borrow<MultiThreadAgentDef>,
     E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,

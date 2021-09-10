@@ -2,7 +2,7 @@ use crate::torch::{
     agents::ACPolicyModule,
     modules::MlpConfig,
     seq_modules::{GruMlp, LstmMlp, RnnMlpConfig, StatefulIterSeqModule, WithState},
-    ModuleBuilder,
+    BuildModule,
 };
 use tch::nn::{Path, Sequential};
 
@@ -27,7 +27,7 @@ impl From<MlpConfig> for SeqModDef {
 }
 
 // TODO: Make generic once std::marker::Unsize is stabilized:
-// impl<T> ModuleBuilder<Box<T>> for SeqModDef
+// impl<T> BuildModule<Box<T>> for SeqModDef
 // where
 //      Sequential: Unsize<T>,
 //      WithState<GruMlp>: Unsize<T>,
@@ -40,7 +40,7 @@ impl From<MlpConfig> for SeqModDef {
 
 macro_rules! boxed_module_builder_for_seq_mod {
     ($type:ty) => {
-        impl ModuleBuilder<Box<$type>> for SeqModDef {
+        impl BuildModule<Box<$type>> for SeqModDef {
             fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Box<$type> {
                 match self {
                     SeqModDef::Mlp(config) => {

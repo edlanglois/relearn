@@ -1,8 +1,8 @@
 use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
 use super::{AgentDef, MultiThreadAgentDef};
-use crate::agents::{Agent, AgentBuilder, ManagerAgent};
+use crate::agents::{Agent, BuildAgent, ManagerAgent};
 use crate::envs::{
-    Bandit, Chain as ChainEnv, DirichletRandomMdps, EnvBuilder, EnvStructure, EnvWithState,
+    Bandit, Chain as ChainEnv, DirichletRandomMdps, BuildEnv, EnvStructure, EnvWithState,
     FixedMeansBanditConfig, MemoryGame as MemoryGameEnv, MetaEnvConfig, OneHotBandits,
     PriorMeansBanditConfig, StatefulMetaEnv, StepLimit, UniformBernoulliBandits, WithState,
     Wrapped,

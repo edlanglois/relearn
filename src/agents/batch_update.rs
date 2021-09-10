@@ -1,5 +1,5 @@
 use super::history::HistoryBuffer;
-use super::{Actor, ActorMode, Agent, AgentBuilder, BuildAgentError, SetActorMode, Step};
+use super::{Actor, ActorMode, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
 use crate::logging::{Event, TimeSeriesLogger};
 
 /// An agent that can update from a batch of on-policy history steps.
@@ -33,9 +33,9 @@ pub struct BatchUpdateAgentConfig<B, HBB> {
     pub history_buffer_config: HBB,
 }
 
-impl<T, B, HB, HBB, E> AgentBuilder<BatchUpdateAgent<T, HB>, E> for BatchUpdateAgentConfig<B, HBB>
+impl<T, B, HB, HBB, E> BuildAgent<BatchUpdateAgent<T, HB>, E> for BatchUpdateAgentConfig<B, HBB>
 where
-    B: AgentBuilder<T, E>,
+    B: BuildAgent<T, E>,
     HB: for<'a> From<&'a HBB>,
     E: ?Sized,
 {

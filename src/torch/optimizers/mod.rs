@@ -148,7 +148,7 @@ pub enum OptimizerStepError {
 }
 
 /// Build an optimizer
-pub trait OptimizerBuilder<T> {
+pub trait BuildOptimizer<T> {
     type Error: Error;
 
     /// Build an optimizer for the trainable variables in a variable store.
@@ -163,7 +163,7 @@ mod testing {
     pub fn check_optimizes_quadratic<O, OB>(builder: &OB, num_steps: u64)
     where
         O: Optimizer,
-        OB: OptimizerBuilder<O>,
+        OB: BuildOptimizer<O>,
     {
         // Minimize f(x) = 1/2*x'Mx + b'x
         // with M = [1  -1]  b = [ 2]
@@ -195,7 +195,7 @@ mod testing {
     pub fn check_trust_region_optimizes_quadratic<O, OB>(builder: &OB, num_steps: u64)
     where
         O: TrustRegionOptimizer,
-        OB: OptimizerBuilder<O>,
+        OB: BuildOptimizer<O>,
     {
         // Minimize f(x) = 1/2*x'Mx + b'x
         // with M = [1  -1]  b = [ 2]
