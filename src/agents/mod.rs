@@ -208,10 +208,10 @@ pub trait BuildAgent<T, E: ?Sized> {
     /// If the agent supports [`ActorMode`]
     /// then the agent must be initialized in [`Training`][`ActorMode::Training`] mode.
     ///
-    /// # Args:
-    /// `env` - The structure of the environment in which the agent is to operate.
-    /// `seed` - A number used to seed the agent's random state,
-    ///          for those agents that use deterministic pseudo-random number generation.
+    /// # Args
+    /// * `env`  - The structure of the environment in which the agent is to operate.
+    /// * `seed` - A number used to seed the agent's random state,
+    ///            for those agents that use deterministic pseudo-random number generation.
     fn build_agent(&self, env: &E, seed: u64) -> Result<T, BuildAgentError>;
 }
 
