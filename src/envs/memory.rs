@@ -1,4 +1,4 @@
-use super::{BuildEnvError, BuildEnv, EnvStructure, Environment};
+use super::{BuildEnv, BuildEnvError, EnvStructure, Pomdp};
 use crate::spaces::IndexSpace;
 use rand::prelude::*;
 
@@ -75,7 +75,7 @@ impl EnvStructure for MemoryGame {
     }
 }
 
-impl Environment for MemoryGame {
+impl Pomdp for MemoryGame {
     /// `(current_state, initial_state)`
     type State = (usize, usize);
     type Observation = usize;
@@ -118,6 +118,6 @@ mod tests {
 
     #[test]
     fn run_default() {
-        testing::run_stateless(MemoryGame::default(), 1000, 0);
+        testing::run_pomdp(MemoryGame::default(), 1000, 0);
     }
 }

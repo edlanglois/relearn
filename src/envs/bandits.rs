@@ -1,7 +1,5 @@
 //! Multi-armed bandit environments
-use super::{
-    BuildEnvError, BuildEnv, BuildEnvDist, EnvDistribution, EnvStructure, Environment,
-};
+use super::{BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Pomdp};
 use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use rand::distributions::{Distribution, Standard, Uniform};
@@ -107,7 +105,7 @@ impl<D: Bounded<f64>> EnvStructure for Bandit<D> {
     }
 }
 
-impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
+impl<D: Distribution<f64> + Bounded<f64>> Pomdp for Bandit<D> {
     type State = ();
     type Observation = ();
     type Action = usize;
@@ -296,7 +294,7 @@ mod bernoulli_bandit {
     #[test]
     fn run() {
         let env = BernoulliBandit::from_means(vec![0.2, 0.8]).unwrap();
-        testing::run_stateless(env, 1000, 0);
+        testing::run_pomdp(env, 1000, 0);
     }
 
     #[test]
@@ -336,7 +334,7 @@ mod deterministic_bandit {
     #[test]
     fn run() {
         let env = DeterministicBandit::from_values(vec![0.2, 0.8]);
-        testing::run_stateless(env, 1000, 0);
+        testing::run_pomdp(env, 1000, 0);
     }
 
     #[test]
@@ -362,7 +360,7 @@ mod uniform_determistic_bandits {
         let env_dist = UniformBernoulliBandits::new(3);
         let mut rng = StdRng::seed_from_u64(284);
         let env = env_dist.sample_environment(&mut rng);
-        testing::run_stateless(env, 1000, 286);
+        testing::run_pomdp(env, 1000, 286);
     }
 
     #[test]
@@ -383,7 +381,7 @@ mod needle_haystack_bandits {
         let env_dist = OneHotBandits::new(3);
         let mut rng = StdRng::seed_from_u64(284);
         let env = env_dist.sample_environment(&mut rng);
-        testing::run_stateless(env, 1000, 286);
+        testing::run_pomdp(env, 1000, 286);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 //! Meta reinforcement learning environment.
 use super::{
-    BuildEnvError, BuildEnv, BuildEnvDist, EnvDistribution, EnvStructure, Environment,
+    BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Pomdp,
     StatefulEnvironment,
 };
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
@@ -121,7 +121,7 @@ impl<E> MetaEnv<E> {
 
 /// The state of a [`MetaEnv`].
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct MetaEnvState<E: Environment> {
+pub struct MetaEnvState<E: Pomdp> {
     /// An instance of the inner environment (sampled for this trial).
     inner_env: E,
     /// The current inner environment state. `None` represents a terminal state.
@@ -216,18 +216,16 @@ where
     }
 }
 
-impl<E> Environment for MetaEnv<E>
+impl<E> Pomdp for MetaEnv<E>
 where
     E: EnvDistribution,
-    <E as EnvDistribution>::Environment: Environment,
-    <<E as EnvDistribution>::Environment as Environment>::Action: Copy,
+    <E as EnvDistribution>::Environment: Pomdp,
+    <<E as EnvDistribution>::Environment as Pomdp>::Action: Copy,
 {
     type State = MetaEnvState<E::Environment>;
-    type Observation = MetaObservation<
-        <E::Environment as Environment>::Observation,
-        <E::Environment as Environment>::Action,
-    >;
-    type Action = <E::Environment as Environment>::Action;
+    type Observation =
+        MetaObservation<<E::Environment as Pomdp>::Observation, <E::Environment as Pomdp>::Action>;
+    type Action = <E::Environment as Pomdp>::Action;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
         // Sample a new inner environment.
@@ -421,7 +419,7 @@ mod meta_env_bandits {
     #[test]
     fn stateless_run() {
         let env = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3);
-        testing::run_stateless(env, 1000, 0);
+        testing::run_pomdp(env, 1000, 0);
     }
 
     #[test]

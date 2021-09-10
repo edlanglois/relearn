@@ -1,6 +1,6 @@
 use super::{
-    BuildEnvError, BuildEnv, BuildEnvDist, EnvStructure, EnvWrapper, Environment,
-    InnerStructureWrapper, Wrapped,
+    BuildEnv, BuildEnvDist, BuildEnvError, EnvStructure, EnvWrapper, InnerStructureWrapper, Pomdp,
+    Wrapped,
 };
 use rand::{rngs::StdRng, Rng};
 
@@ -37,7 +37,7 @@ impl<E> EnvWrapper<E> for StepLimit {
 
 impl<E: EnvStructure> InnerStructureWrapper<E> for StepLimit {}
 
-impl<E: Environment> Environment for Wrapped<E, StepLimit> {
+impl<E: Pomdp> Pomdp for Wrapped<E, StepLimit> {
     /// `(inner_state, current_steps)`
     type State = (E::State, u64);
     type Observation = E::Observation;
@@ -100,13 +100,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{chain::Move, testing, Chain, BuildEnv};
+    use super::super::{chain::Move, testing, BuildEnv, Chain};
     use super::*;
     use rand::SeedableRng;
 
     #[test]
     fn run_default() {
-        testing::run_stateless(Wrapped::<Chain, StepLimit>::default(), 1000, 104);
+        testing::run_pomdp(Wrapped::<Chain, StepLimit>::default(), 1000, 104);
     }
 
     #[test]

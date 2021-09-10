@@ -1,5 +1,5 @@
 //! Chain environment
-use super::{BuildEnvError, BuildEnv, EnvStructure, Environment};
+use super::{BuildEnv, BuildEnvError, EnvStructure, Pomdp};
 use crate::spaces::{IndexSpace, IndexedTypeSpace};
 use rand::prelude::*;
 use rust_rl_derive::Indexed;
@@ -66,7 +66,7 @@ impl EnvStructure for Chain {
     }
 }
 
-impl Environment for Chain {
+impl Pomdp for Chain {
     type State = u64;
     type Observation = usize;
     type Action = Move;
@@ -125,6 +125,6 @@ mod tests {
 
     #[test]
     fn run_default() {
-        testing::run_stateless(Chain::default(), 1000, 0);
+        testing::run_pomdp(Chain::default(), 1000, 0);
     }
 }

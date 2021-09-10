@@ -1,7 +1,7 @@
 //! Environment testing utilities
 use super::{
-    DeterministicBandit, EnvDistribution, EnvStructure, Environment, IntoStateful,
-    StatefulEnvironment, StoredEnvStructure,
+    DeterministicBandit, EnvDistribution, EnvStructure, IntoStateful, Pomdp, StatefulEnvironment,
+    StoredEnvStructure,
 };
 use crate::agents::{RandomAgent, Step};
 use crate::simulation;
@@ -11,18 +11,18 @@ use rand::{rngs::StdRng, SeedableRng};
 use std::cell::Cell;
 use std::fmt::Debug;
 
-/// Run a stateless environment and check that invariants are satisfied.
-pub fn run_stateless<E>(env: E, num_steps: u64, seed: u64)
+/// Run a [POMDP](Pomdp) and check that invariants are satisfied.
+pub fn run_pomdp<E>(env: E, num_steps: u64, seed: u64)
 where
     E: EnvStructure,
-    E: Environment<
+    E: Pomdp<
         Observation = <<E as EnvStructure>::ObservationSpace as Space>::Element,
         Action = <<E as EnvStructure>::ActionSpace as Space>::Element,
     >,
     <E as EnvStructure>::ObservationSpace: Debug,
-    <E as Environment>::Observation: Debug + Clone,
+    <E as Pomdp>::Observation: Debug + Clone,
     <E as EnvStructure>::ActionSpace: Debug + SampleSpace,
-    <E as Environment>::Action: Debug,
+    <E as Pomdp>::Action: Debug,
 {
     run_stateful(&mut env.into_stateful(seed), num_steps, seed + 1)
 }

@@ -120,11 +120,11 @@ where
     }
 }
 
-/// A reinforcement learning environment.
+/// A partially observable Markov decision process (POMDP).
 ///
-/// This defines the environment dynamics and strucutre.
-/// It does not internally manage state.
-pub trait Environment {
+/// The concept of an episode is an abstraction on the MDP formalism.
+/// An episode ending means that all possible future trajectories have 0 reward on each step.
+pub trait Pomdp {
     type State;
     type Observation;
     type Action;
@@ -141,7 +141,7 @@ pub trait Environment {
     /// * `state`: The resulting state.
     ///     Is `None` if the resulting state is terminal.
     ///     All trajectories from terminal states yield 0 reward on each step.
-    /// * `reward`: The reward value for this transition
+    /// * `reward`: The reward value for this transition.
     /// * `episode_done`: Whether this step ends the episode.
     ///     - If `observation` is `None` then `episode_done` must be true.
     ///     - An episode may be done for other reasons, like a step limit.
@@ -153,7 +153,7 @@ pub trait Environment {
     ) -> (Option<Self::State>, f64, bool);
 }
 
-impl<E: Environment + ?Sized> Environment for Box<E> {
+impl<E: Pomdp + ?Sized> Pomdp for Box<E> {
     type State = E::State;
     type Observation = E::Observation;
     type Action = E::Action;
@@ -178,8 +178,8 @@ impl<E: Environment + ?Sized> Environment for Box<E> {
 
 /// A reinforcement learning environment with internal state.
 ///
-/// Prefer implementing [`Environment`] since [`EnvWithState`] can be used
-/// to create a `StatefulEnvironment` out of an `Environment`.
+/// Prefer implementing [`Pomdp`] since [`EnvWithState`] can be used
+/// to create a `StatefulEnvironment` out of a `Pomdp`.
 pub trait StatefulEnvironment {
     type Observation;
     type Action;

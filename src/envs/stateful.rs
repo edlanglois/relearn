@@ -1,6 +1,6 @@
-//! Converting an `Environment` into a `StatefulEnvironment`
+//! Converting a `Pomdp` into a `StatefulEnvironment`
 use super::{
-    BuildEnvError, BuildEnv, BuildEnvDist, EnvWrapper, Environment, InnerStructureWrapper,
+    BuildEnv, BuildEnvDist, BuildEnvError, EnvWrapper, InnerStructureWrapper, Pomdp,
     StatefulEnvironment, Wrapped,
 };
 use crate::envs::EnvStructure;
@@ -10,7 +10,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WithState;
 
-impl<E: Environment> EnvWrapper<E> for WithState {
+impl<E: Pomdp> EnvWrapper<E> for WithState {
     type Wrapped = EnvWithState<E>;
 
     fn wrap<R: Rng + ?Sized>(&self, env: E, rng: &mut R) -> Self::Wrapped {
@@ -20,15 +20,15 @@ impl<E: Environment> EnvWrapper<E> for WithState {
 
 impl<E: EnvStructure> InnerStructureWrapper<E> for WithState {}
 
-/// Wraps an [`Environment`] as a [`StatefulEnvironment`].
+/// Wraps a [`Pomdp`] as a [`StatefulEnvironment`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EnvWithState<E: Environment> {
+pub struct EnvWithState<E: Pomdp> {
     pub env: E,
     state: Option<E::State>,
     rng: StdRng,
 }
 
-impl<E: Environment> EnvWithState<E> {
+impl<E: Pomdp> EnvWithState<E> {
     pub fn new(env: E, seed: u64) -> Self {
         Self {
             env,
@@ -38,7 +38,7 @@ impl<E: Environment> EnvWithState<E> {
     }
 }
 
-impl<E: Environment + EnvStructure> EnvStructure for EnvWithState<E> {
+impl<E: Pomdp + EnvStructure> EnvStructure for EnvWithState<E> {
     type ObservationSpace = E::ObservationSpace;
     type ActionSpace = E::ActionSpace;
 
@@ -59,7 +59,7 @@ impl<E: Environment + EnvStructure> EnvStructure for EnvWithState<E> {
     }
 }
 
-impl<E: Environment> StatefulEnvironment for EnvWithState<E> {
+impl<E: Pomdp> StatefulEnvironment for EnvWithState<E> {
     type Observation = E::Observation;
     type Action = E::Action;
 
@@ -94,7 +94,7 @@ pub trait IntoStateful {
     fn into_stateful(self, seed: u64) -> Self::Output;
 }
 
-impl<E: Environment> IntoStateful for E {
+impl<E: Pomdp> IntoStateful for E {
     type Output = EnvWithState<Self>;
 
     fn into_stateful(self, seed: u64) -> Self::Output {
@@ -102,7 +102,7 @@ impl<E: Environment> IntoStateful for E {
     }
 }
 
-impl<E: Environment, B: BuildEnv<E>> BuildEnv<EnvWithState<E>> for B {
+impl<E: Pomdp, B: BuildEnv<E>> BuildEnv<EnvWithState<E>> for B {
     fn build_env(&self, seed: u64) -> Result<EnvWithState<E>, BuildEnvError> {
         // Re-use seed so that BuildEnv<E> and BuildEnv<EnvWithState<E>>
         // have the same environment structure given the same seed.

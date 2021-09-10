@@ -7,17 +7,18 @@
 //! It uses [PyTorch](https://pytorch.org/) via [tch].
 //!
 //! ## Environments
-//! A reinforcement learning [`Environment`] is a partially observable Markov decision process
-//! with possibly infinite state, _observation_, and _action spaces_.
-//! The fundamental operation is to take a [step](Environment::step) from a state given some
-//! action, resulting in a successor state, a reward value, and a flag indicating whether the
+//! A reinforcement learning [`StatefulEnvironment`] is an environment structure with internal
+//! state.
+//! The fundamental operation is to take a [step](StatefulEnvironment::step) from a state given
+//! some action, resulting in a successor state, a reward value, and a flag indicating whether the
 //! current _episode_ is done. The [`Step`](crate::agents::Step) structure stores a
 //! description of the observable parts of an environment step.
 //!
 //! ### Episode
 //! A sequence of environment steps each starting from the successor state of the previous.
-//! The initial state is sampled using [`Environment::initial_state`].
-//! An episode ends when [`Environment::step`] sets the `episode_done` flag in its return value.
+//! The initial state is set by calling [`StatefulEnvironment::reset`].
+//! An episode ends when [`StatefulEnvironment::step`] sets the `episode_done` flag in its return
+//! value.
 //! An episode may end on a _terminal state_ in which case all future rewards are assumed to be
 //! zero. If instead the final state is non-terminal then there may have been non-zero future
 //! rewards if the episode had continued.
@@ -112,6 +113,6 @@ pub mod utils;
 
 pub use agents::{Actor, Agent, Step};
 pub use defs::{AgentDef, EnvDef, MultiThreadAgentDef, OptimizerDef, SeqModDef};
-pub use envs::{EnvStructure, Environment, StatefulEnvironment};
+pub use envs::{EnvStructure, Pomdp, StatefulEnvironment};
 pub use error::RLError;
 pub use simulation::{run_actor, run_agent, RunSimulation};

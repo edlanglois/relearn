@@ -1,5 +1,5 @@
 //! Generic Markov Decision Processes
-use super::{BuildEnvDist, EnvDistribution, EnvStructure, Environment};
+use super::{BuildEnvDist, EnvDistribution, EnvStructure, Pomdp};
 use crate::spaces::IndexSpace;
 use ndarray::{Array2, Axis};
 use rand::{distributions::Distribution, rngs::StdRng};
@@ -45,7 +45,7 @@ impl<T, R> EnvStructure for TabularMdp<T, R> {
     }
 }
 
-impl<T, R> Environment for TabularMdp<T, R>
+impl<T, R> Pomdp for TabularMdp<T, R>
 where
     T: Distribution<usize>,
     R: Distribution<f64>,
@@ -171,7 +171,7 @@ mod dirichlet_random_mdps {
         let env_dist = DirichletRandomMdps::default();
         let mut rng = StdRng::seed_from_u64(168);
         let env = env_dist.sample_environment(&mut rng);
-        testing::run_stateless(env, 1000, 170);
+        testing::run_pomdp(env, 1000, 170);
     }
 
     #[test]
