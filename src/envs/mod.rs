@@ -197,7 +197,6 @@ pub trait Environment {
     /// * `episode_done`: Whether this step ends the episode.
     ///     - If `observation` is `None` then `episode_done` must be true.
     ///     - An episode may be done for other reasons, like a step limit.
-    // TODO: Why not make reset() optional and have new() / step() self-reset?
     fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f64, bool);
 
     /// Reset the environment to an initial state.
