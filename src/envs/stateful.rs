@@ -1,7 +1,7 @@
-//! Converting a `Pomdp` into a `StatefulEnvironment`
+//! Converting a `Pomdp` into an `Environment`
 use super::{
-    BuildEnv, BuildEnvDist, BuildEnvError, EnvWrapper, InnerStructureWrapper, Pomdp,
-    StatefulEnvironment, Wrapped,
+    BuildEnv, BuildEnvDist, BuildEnvError, EnvWrapper, Environment, InnerStructureWrapper, Pomdp,
+    Wrapped,
 };
 use crate::envs::EnvStructure;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -20,7 +20,7 @@ impl<E: Pomdp> EnvWrapper<E> for WithState {
 
 impl<E: EnvStructure> InnerStructureWrapper<E> for WithState {}
 
-/// Wraps a [`Pomdp`] as a [`StatefulEnvironment`].
+/// Wraps a [`Pomdp`] as a [`Environment`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnvWithState<E: Pomdp> {
     pub env: E,
@@ -59,7 +59,7 @@ impl<E: Pomdp + EnvStructure> EnvStructure for EnvWithState<E> {
     }
 }
 
-impl<E: Pomdp> StatefulEnvironment for EnvWithState<E> {
+impl<E: Pomdp> Environment for EnvWithState<E> {
     type Observation = E::Observation;
     type Action = E::Action;
 

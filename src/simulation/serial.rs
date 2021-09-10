@@ -2,7 +2,7 @@
 use super::hooks::SimulationHook;
 use super::RunSimulation;
 use crate::agents::{Actor, Agent, Step};
-use crate::envs::StatefulEnvironment;
+use crate::envs::Environment;
 use crate::logging::TimeSeriesLogger;
 
 /// Configuration for [`Simulator`].
@@ -37,10 +37,10 @@ impl<E, A, H> Simulator<E, A, H> {
 
 impl<E, A, H> RunSimulation for Simulator<E, A, H>
 where
-    E: StatefulEnvironment,
-    <E as StatefulEnvironment>::Observation: Clone,
-    A: Agent<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>,
-    H: SimulationHook<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>,
+    E: Environment,
+    <E as Environment>::Observation: Clone,
+    A: Agent<<E as Environment>::Observation, <E as Environment>::Action>,
+    H: SimulationHook<<E as Environment>::Observation, <E as Environment>::Action>,
 {
     fn run_simulation(&mut self, logger: &mut dyn TimeSeriesLogger) {
         run_agent(
@@ -70,11 +70,10 @@ pub fn run_agent<E, A, H>(
     // In that case it only needs to be instantiated once and can work with trait pointers.
     //
     // Alternatively, it can use the concrete struct types, which allows inlining.
-    E: StatefulEnvironment + ?Sized,
-    <E as StatefulEnvironment>::Observation: Clone,
-    A: Agent<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action> + ?Sized,
-    H: SimulationHook<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>
-        + ?Sized,
+    E: Environment + ?Sized,
+    <E as Environment>::Observation: Clone,
+    A: Agent<<E as Environment>::Observation, <E as Environment>::Action> + ?Sized,
+    H: SimulationHook<<E as Environment>::Observation, <E as Environment>::Action> + ?Sized,
 {
     let mut observation = environment.reset();
     let mut new_episode = true;
@@ -119,11 +118,10 @@ pub fn run_agent<E, A, H>(
 /// * `logger` - The logger to use. Passed to hook calls.
 pub fn run_actor<E, A, H, L>(environment: &mut E, actor: &mut A, hook: &mut H, logger: &mut L)
 where
-    E: StatefulEnvironment + ?Sized,
-    <E as StatefulEnvironment>::Observation: Clone,
-    A: Actor<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action> + ?Sized,
-    H: SimulationHook<<E as StatefulEnvironment>::Observation, <E as StatefulEnvironment>::Action>
-        + ?Sized,
+    E: Environment + ?Sized,
+    <E as Environment>::Observation: Clone,
+    A: Actor<<E as Environment>::Observation, <E as Environment>::Action> + ?Sized,
+    H: SimulationHook<<E as Environment>::Observation, <E as Environment>::Action> + ?Sized,
     L: TimeSeriesLogger + ?Sized,
 {
     let mut observation = environment.reset();

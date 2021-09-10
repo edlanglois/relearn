@@ -1,7 +1,6 @@
 //! Meta reinforcement learning environment.
 use super::{
-    BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Pomdp,
-    StatefulEnvironment,
+    BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment, Pomdp,
 };
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
 use rand::rngs::StdRng;
@@ -353,17 +352,17 @@ impl<E: EnvDistribution + EnvStructure> EnvStructure for StatefulMetaEnv<E> {
     }
 }
 
-impl<E> StatefulEnvironment for StatefulMetaEnv<E>
+impl<E> Environment for StatefulMetaEnv<E>
 where
     E: EnvDistribution,
-    <E as EnvDistribution>::Environment: StatefulEnvironment,
-    <<E as EnvDistribution>::Environment as StatefulEnvironment>::Action: Copy,
+    <E as EnvDistribution>::Environment: Environment,
+    <<E as EnvDistribution>::Environment as Environment>::Action: Copy,
 {
     type Observation = MetaObservation<
-        <E::Environment as StatefulEnvironment>::Observation,
-        <E::Environment as StatefulEnvironment>::Action,
+        <E::Environment as Environment>::Observation,
+        <E::Environment as Environment>::Action,
     >;
-    type Action = <E::Environment as StatefulEnvironment>::Action;
+    type Action = <E::Environment as Environment>::Action;
 
     fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f64, bool) {
         let env = self.env.as_mut().expect("Must call reset() first");
@@ -429,7 +428,7 @@ mod meta_env_bandits {
             3,
             0,
         );
-        testing::run_stateful(&mut env, 1000, 0);
+        testing::run_env(&mut env, 1000, 0);
     }
 
     #[test]

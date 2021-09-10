@@ -1,6 +1,6 @@
 //! Environment testing utilities
 use super::{
-    DeterministicBandit, EnvDistribution, EnvStructure, IntoStateful, Pomdp, StatefulEnvironment,
+    DeterministicBandit, EnvDistribution, EnvStructure, Environment, IntoStateful, Pomdp,
     StoredEnvStructure,
 };
 use crate::agents::{RandomAgent, Step};
@@ -12,7 +12,7 @@ use std::cell::Cell;
 use std::fmt::Debug;
 
 /// Run a [POMDP](Pomdp) and check that invariants are satisfied.
-pub fn run_pomdp<E>(env: E, num_steps: u64, seed: u64)
+pub fn run_pomdp<E>(pomdp: E, num_steps: u64, seed: u64)
 where
     E: EnvStructure,
     E: Pomdp<
@@ -24,21 +24,21 @@ where
     <E as EnvStructure>::ActionSpace: Debug + SampleSpace,
     <E as Pomdp>::Action: Debug,
 {
-    run_stateful(&mut env.into_stateful(seed), num_steps, seed + 1)
+    run_env(&mut pomdp.into_stateful(seed), num_steps, seed + 1)
 }
 
 /// Run a stateful environment and check that invariants are satisfied.
-pub fn run_stateful<E>(env: &mut E, num_steps: u64, seed: u64)
+pub fn run_env<E>(env: &mut E, num_steps: u64, seed: u64)
 where
     E: EnvStructure,
-    E: StatefulEnvironment<
+    E: Environment<
         Observation = <<E as EnvStructure>::ObservationSpace as Space>::Element,
         Action = <<E as EnvStructure>::ActionSpace as Space>::Element,
     >,
     <E as EnvStructure>::ObservationSpace: Debug,
-    <E as StatefulEnvironment>::Observation: Debug + Clone,
+    <E as Environment>::Observation: Debug + Clone,
     <E as EnvStructure>::ActionSpace: Debug + SampleSpace,
-    <E as StatefulEnvironment>::Action: Debug,
+    <E as Environment>::Action: Debug,
 {
     let observation_space = env.observation_space();
     let action_space = env.action_space();

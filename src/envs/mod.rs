@@ -179,8 +179,8 @@ impl<E: Pomdp + ?Sized> Pomdp for Box<E> {
 /// A reinforcement learning environment with internal state.
 ///
 /// Prefer implementing [`Pomdp`] since [`EnvWithState`] can be used
-/// to create a `StatefulEnvironment` out of a `Pomdp`.
-pub trait StatefulEnvironment {
+/// to create an `Environment` out of a `Pomdp`.
+pub trait Environment {
     type Observation;
     type Action;
 
@@ -209,7 +209,7 @@ pub trait StatefulEnvironment {
     fn reset(&mut self) -> Self::Observation;
 }
 
-impl<E: StatefulEnvironment + ?Sized> StatefulEnvironment for Box<E> {
+impl<E: Environment + ?Sized> Environment for Box<E> {
     type Observation = E::Observation;
     type Action = E::Action;
 
