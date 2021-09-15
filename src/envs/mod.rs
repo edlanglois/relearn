@@ -277,13 +277,16 @@ impl From<Infallible> for BuildEnvError {
     }
 }
 
-/// A distribution of environments sharing the same structure.
+/// A distribution of environments sharing the same external structure.
 ///
-/// The spaces / intervals of each sampled environment must be equal to
-/// or a subset of the spaces for `EnvDistribution`.
-/// The discount factor of the sampled environments must be the same.
-pub trait EnvDistribution {
-    type Environment;
+/// The [`EnvStructure`] of each sampled environment must be a subset of the `EnvStructure` of the
+/// distribution as a whole. The discount factors must be identical.
+/// The transition dynamics of the individual environment samples may differ.
+pub trait EnvDistribution: EnvStructure {
+    type Environment: EnvStructure<
+        ObservationSpace = <Self as EnvStructure>::ObservationSpace,
+        ActionSpace = <Self as EnvStructure>::ActionSpace,
+    >;
 
     /// Sample an environment from the distribution.
     ///

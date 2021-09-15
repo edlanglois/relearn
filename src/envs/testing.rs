@@ -79,10 +79,6 @@ where
 pub fn check_env_distribution_structure<D>(env_dist: &D, num_samples: usize)
 where
     D: EnvDistribution + EnvStructure + ?Sized,
-    <D as EnvDistribution>::Environment: EnvStructure<
-        ObservationSpace = <D as EnvStructure>::ObservationSpace,
-        ActionSpace = <D as EnvStructure>::ActionSpace,
-    >,
     <D as EnvStructure>::ObservationSpace: PartialOrd + Debug,
     <D as EnvStructure>::ActionSpace: PartialOrd + Debug,
 {
