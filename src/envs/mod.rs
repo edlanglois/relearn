@@ -294,17 +294,6 @@ pub trait EnvDistribution: EnvStructure {
     /// * `rng` - Random number generator used for sampling the environment structure and for
     ///           seeding any internal randomness of the environment dynamics.
     fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment;
-
-    /// Apply a wrapper to sampled environments.
-    fn wrap<W>(self, wrapper: W) -> Wrapped<Self, W>
-    where
-        Self: Sized,
-    {
-        Wrapped {
-            inner: self,
-            wrapper,
-        }
-    }
 }
 
 /// Builds an environment distribution.
