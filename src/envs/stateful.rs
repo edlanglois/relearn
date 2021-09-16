@@ -68,20 +68,24 @@ impl<E: Pomdp> Environment for PomdpEnv<E> {
     }
 }
 
-// TODO: Remove?
-/// Supports conversion to a stateful environment
-pub trait IntoStateful {
-    type Output;
+/// Convert into an [`Environment`].
+pub trait IntoEnv {
+    type Environment: Environment;
 
-    /// Convert into a stateful environment.
-    fn into_stateful(self, seed: u64) -> Self::Output;
+    /// Convert into an environment.
+    ///
+    /// # Args
+    /// * `seed` - Seed for pseudo-randomness in the environment state and transition dynamics.
+    ///            The environment structure itself should not be random; seed any structural
+    ///            randomness from the environment configuration.
+    fn into_env(self, seed: u64) -> Self::Environment;
 }
 
-impl<E: Pomdp> IntoStateful for E {
-    type Output = PomdpEnv<Self>;
+impl<E: Pomdp> IntoEnv for E {
+    type Environment = PomdpEnv<E>;
 
-    fn into_stateful(self, seed: u64) -> Self::Output {
-        Self::Output::new(self, seed)
+    fn into_env(self, seed: u64) -> Self::Environment {
+        PomdpEnv::new(self, seed)
     }
 }
 
@@ -93,6 +97,6 @@ impl<E: Pomdp, B: BuildEnv<E>> BuildEnv<PomdpEnv<E>> for B {
         // Add an arbitrary offset for the dynamics seed.
         // Want to avoid collissions with other seed derivations.
         let dynamics_seed = seed.wrapping_add(135);
-        Ok(self.build_env(structure_seed)?.into_stateful(dynamics_seed))
+        Ok(self.build_env(structure_seed)?.into_env(dynamics_seed))
     }
 }

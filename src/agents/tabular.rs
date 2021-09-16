@@ -147,7 +147,7 @@ impl SetActorMode for BaseTabularQLearningAgent {
 mod tabular_q_learning {
     use super::super::testing;
     use super::*;
-    use crate::envs::{DeterministicBandit, IntoStateful};
+    use crate::envs::{DeterministicBandit, IntoEnv};
     use crate::simulation;
     use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 
@@ -165,7 +165,7 @@ mod tabular_q_learning {
 
     #[test]
     fn explore_exploit() {
-        let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).into_stateful(0);
+        let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).into_env(0);
 
         // The initial mode explores
         let config = TabularQLearningAgentConfig::new(0.95);

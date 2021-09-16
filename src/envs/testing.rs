@@ -1,6 +1,6 @@
 //! Environment testing utilities
 use super::{
-    DeterministicBandit, EnvDistribution, EnvStructure, Environment, IntoStateful, Pomdp,
+    DeterministicBandit, EnvDistribution, EnvStructure, Environment, IntoEnv, Pomdp,
     PomdpDistribution, StoredEnvStructure,
 };
 use crate::agents::{RandomAgent, Step};
@@ -24,7 +24,7 @@ where
     <E as EnvStructure>::ActionSpace: Debug + SampleSpace,
     <E as Pomdp>::Action: Debug,
 {
-    run_env(&mut pomdp.into_stateful(seed), num_steps, seed + 1)
+    run_env(&mut pomdp.into_env(seed), num_steps, seed + 1)
 }
 
 /// Run a stateful environment and check that invariants are satisfied.

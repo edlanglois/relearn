@@ -19,7 +19,7 @@ pub use memory::MemoryGame;
 pub use meta::{
     InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaEnvState, MetaObservationSpace, StatefulMetaEnv,
 };
-pub use stateful::{IntoStateful, PomdpEnv};
+pub use stateful::{IntoEnv, PomdpEnv};
 pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 
 use crate::spaces::Space;

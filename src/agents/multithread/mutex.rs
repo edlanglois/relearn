@@ -127,9 +127,7 @@ mod tests {
     use super::super::super::testing;
     use super::*;
     use crate::agents::{BuildAgent, TabularQLearningAgent, TabularQLearningAgentConfig};
-    use crate::envs::{
-        BuildEnv, DeterministicBandit, FixedMeansBanditConfig, IntoStateful, PomdpEnv,
-    };
+    use crate::envs::{BuildEnv, DeterministicBandit, FixedMeansBanditConfig, IntoEnv, PomdpEnv};
     use crate::simulation;
     use crate::simulation::hooks::StepLimit;
     use std::sync::{Arc, RwLock};
@@ -156,7 +154,7 @@ mod tests {
         );
 
         let agent = agent.try_into_inner().unwrap();
-        let mut env = env.into_stateful(0);
+        let mut env = env.into_env(0);
         testing::eval_deterministic_bandit(agent, &mut env, 0.9);
     }
 }
