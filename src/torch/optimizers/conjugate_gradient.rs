@@ -249,7 +249,7 @@ impl ConjugateGradientOptimizer {
 ///
 /// # Reference
 /// Pearlmutter, Barak A. "Fast exact multiplication by the Hessian."
-/// Neural computation 6.1 (1994): 147-160.`
+/// Neural computation 6.1 (1994): 147-160.
 struct HessianVectorProduct<'a, T> {
     /// Parameter tensors
     params: &'a [T],

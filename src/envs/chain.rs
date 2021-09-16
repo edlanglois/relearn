@@ -3,7 +3,6 @@ use super::{BuildEnv, BuildEnvError, EnvStructure, Mdp};
 use crate::spaces::{IndexSpace, IndexedTypeSpace};
 use rand::prelude::*;
 use rust_rl_derive::Indexed;
-use std::convert::TryInto;
 
 /// Chain Environment
 ///
@@ -23,7 +22,7 @@ pub struct Chain {
 impl Chain {
     pub const fn new(size: usize, discount_factor: f64) -> Self {
         Self {
-            size: size,
+            size,
             discount_factor,
         }
     }
@@ -50,7 +49,7 @@ impl EnvStructure for Chain {
     type ActionSpace = IndexedTypeSpace<Move>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
-        IndexSpace::new(self.size.try_into().unwrap())
+        IndexSpace::new(self.size)
     }
 
     fn action_space(&self) -> Self::ActionSpace {
