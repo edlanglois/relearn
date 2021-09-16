@@ -4,7 +4,7 @@ use crate::agents::{Agent, BuildAgent, ManagerAgent};
 use crate::envs::{
     Bandit, BuildEnv, Chain as ChainEnv, DirichletRandomMdps, EnvStructure, FixedMeansBanditConfig,
     MemoryGame as MemoryGameEnv, MetaEnvConfig, OneHotBandits, PomdpEnv, PriorMeansBanditConfig,
-    StatefulMetaEnv, StepLimit, UniformBernoulliBandits, Wrapped,
+    StatefulMetaEnv, UniformBernoulliBandits, WithStepLimit,
 };
 use crate::error::RLError;
 use crate::simulation::{
@@ -29,7 +29,7 @@ pub enum EnvDef {
     /// Meta uniform bernoulli bandits environment
     MetaUniformBernoulliBandits(MetaEnvConfig<UniformBernoulliBandits>),
     /// Meta dirichlet MDPs environment
-    MetaDirichletMdps(MetaEnvConfig<Wrapped<DirichletRandomMdps, StepLimit>>),
+    MetaDirichletMdps(MetaEnvConfig<WithStepLimit<DirichletRandomMdps>>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -115,7 +115,7 @@ impl EnvDef {
             }
             MetaDirichletMdps(config) => {
                 boxed_simulation!(
-                    StatefulMetaEnv<Wrapped<DirichletRandomMdps, StepLimit>>,
+                    StatefulMetaEnv<WithStepLimit<DirichletRandomMdps>>,
                     config,
                     ForMetaFiniteFinite<_>
                 )
@@ -206,7 +206,7 @@ impl EnvDef {
             }
             MetaDirichletMdps(config) => {
                 boxed_simulation!(
-                    StatefulMetaEnv<Wrapped<DirichletRandomMdps, StepLimit>>,
+                    StatefulMetaEnv<WithStepLimit<DirichletRandomMdps>>,
                     config,
                     ForMetaFiniteFinite<_>
                 )

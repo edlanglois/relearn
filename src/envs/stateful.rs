@@ -1,24 +1,7 @@
 //! Converting a `Pomdp` into an `Environment`
-use super::{
-    BuildEnv, BuildEnvDist, BuildEnvError, EnvWrapper, Environment, InnerStructureWrapper, Pomdp,
-    Wrapped,
-};
+use super::{BuildEnv, BuildEnvError, Environment, Pomdp};
 use crate::envs::EnvStructure;
-use rand::{rngs::StdRng, Rng, SeedableRng};
-
-/// A wrapper that adds internal state to an environment.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct WithState;
-
-impl<E: Pomdp> EnvWrapper<E> for WithState {
-    type Wrapped = PomdpEnv<E>;
-
-    fn wrap<R: Rng + ?Sized>(&self, env: E, rng: &mut R) -> Self::Wrapped {
-        PomdpEnv::new(env, rng.gen())
-    }
-}
-
-impl<E: EnvStructure> InnerStructureWrapper<E> for WithState {}
+use rand::{rngs::StdRng, SeedableRng};
 
 /// Wraps a [`Pomdp`] as a [`Environment`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -111,23 +94,5 @@ impl<E: Pomdp, B: BuildEnv<E>> BuildEnv<PomdpEnv<E>> for B {
         // Want to avoid collissions with other seed derivations.
         let dynamics_seed = seed.wrapping_add(135);
         Ok(self.build_env(structure_seed)?.into_stateful(dynamics_seed))
-    }
-}
-
-impl<E, B: BuildEnv<E>> BuildEnv<Wrapped<E, WithState>> for B {
-    fn build_env(&self, seed: u64) -> Result<Wrapped<E, WithState>, BuildEnvError> {
-        Ok(Wrapped {
-            inner: self.build_env(seed)?,
-            wrapper: WithState,
-        })
-    }
-}
-
-impl<T, B: BuildEnvDist<T>> BuildEnvDist<Wrapped<T, WithState>> for B {
-    fn build_env_dist(&self) -> Wrapped<T, WithState> {
-        Wrapped {
-            inner: self.build_env_dist(),
-            wrapper: WithState,
-        }
     }
 }

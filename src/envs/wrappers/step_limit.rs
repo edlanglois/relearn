@@ -1,8 +1,6 @@
-use super::{
-    BuildEnv, BuildEnvDist, BuildEnvError, EnvStructure, EnvWrapper, InnerStructureWrapper, Pomdp,
-    Wrapped,
-};
-use rand::{rngs::StdRng, Rng};
+use super::super::Pomdp;
+use super::Wrapped;
+use rand::rngs::StdRng;
 
 /// Environment wrapper that cuts off episodes after a set number of steps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -27,15 +25,8 @@ impl Default for StepLimit {
     }
 }
 
-impl<E> EnvWrapper<E> for StepLimit {
-    type Wrapped = Wrapped<E, Self>;
-
-    fn wrap<R: Rng + ?Sized>(&self, env: E, _rng: &mut R) -> Self::Wrapped {
-        Wrapped::new(env, *self)
-    }
-}
-
-impl<E: EnvStructure> InnerStructureWrapper<E> for StepLimit {}
+/// Wrap an environment with a per-episode step limit.
+pub type WithStepLimit<E> = Wrapped<E, StepLimit>;
 
 impl<E: Pomdp> Pomdp for Wrapped<E, StepLimit> {
     /// `(inner_state, current_steps)`
@@ -74,54 +65,27 @@ impl<E: Pomdp> Pomdp for Wrapped<E, StepLimit> {
     }
 }
 
-impl<B, E> BuildEnv<Wrapped<E, StepLimit>> for Wrapped<B, StepLimit>
-where
-    B: BuildEnv<E>,
-{
-    fn build_env(&self, seed: u64) -> Result<Wrapped<E, StepLimit>, BuildEnvError> {
-        Ok(Wrapped {
-            inner: self.inner.build_env(seed)?,
-            wrapper: self.wrapper,
-        })
-    }
-}
-
-impl<B, D> BuildEnvDist<Wrapped<D, StepLimit>> for Wrapped<B, StepLimit>
-where
-    B: BuildEnvDist<D>,
-{
-    fn build_env_dist(&self) -> Wrapped<D, StepLimit> {
-        Wrapped {
-            inner: self.inner.build_env_dist(),
-            wrapper: self.wrapper,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::super::{chain::Move, testing, BuildEnv, Chain};
+    use super::super::super::{chain::Move, testing, BuildEnv, Chain};
     use super::*;
     use rand::SeedableRng;
 
     #[test]
     fn run_default() {
-        testing::run_pomdp(Wrapped::<Chain, StepLimit>::default(), 1000, 104);
+        testing::run_pomdp(WithStepLimit::<Chain>::default(), 1000, 119);
     }
 
     #[test]
     fn build() {
-        let config = Wrapped::<Chain, StepLimit>::default();
-        let _env: Wrapped<Chain, StepLimit> = config.build_env(0).unwrap();
+        let config = WithStepLimit::<Chain>::default();
+        let _env: WithStepLimit<Chain> = config.build_env(0).unwrap();
     }
 
     #[test]
     fn step_limit() {
         let mut rng = StdRng::seed_from_u64(110);
-        let env = Wrapped {
-            inner: Chain::default(),
-            wrapper: StepLimit::new(2),
-        };
+        let env = WithStepLimit::new(Chain::default(), StepLimit::new(2));
         let state = env.initial_state(&mut rng);
 
         // Step 1
