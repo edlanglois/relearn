@@ -277,6 +277,24 @@ impl From<Infallible> for BuildEnvError {
     }
 }
 
+/// A distribution of [`Pomdp`] sharing the same external structure.
+///
+/// The [`EnvStructure`] of each sampled environment must be a subset of the `EnvStructure` of the
+/// distribution as a whole. The discount factors must be identical.
+/// The transition dynamics of the individual environment samples may differ.
+pub trait PomdpDistribution: EnvStructure {
+    type Pomdp: EnvStructure<
+        ObservationSpace = <Self as EnvStructure>::ObservationSpace,
+        ActionSpace = <Self as EnvStructure>::ActionSpace,
+    >;
+
+    /// Sample a POMDP from the distribution.
+    ///
+    /// # Args
+    /// * `rng` - Random number generator used for sampling the environment structure.
+    fn sample_pomdp(&self, rng: &mut StdRng) -> Self::Pomdp;
+}
+
 /// A distribution of environments sharing the same external structure.
 ///
 /// The [`EnvStructure`] of each sampled environment must be a subset of the `EnvStructure` of the
@@ -294,6 +312,18 @@ pub trait EnvDistribution: EnvStructure {
     /// * `rng` - Random number generator used for sampling the environment structure and for
     ///           seeding any internal randomness of the environment dynamics.
     fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment;
+}
+
+impl<T> EnvDistribution for T
+where
+    T: PomdpDistribution,
+    <T as PomdpDistribution>::Pomdp: Pomdp,
+{
+    type Environment = PomdpEnv<T::Pomdp>;
+
+    fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment {
+        PomdpEnv::new(self.sample_pomdp(rng), rng.gen())
+    }
 }
 
 /// Builds an environment distribution.
@@ -449,6 +479,23 @@ where
     }
 }
 
+impl<T, W> PomdpDistribution for Wrapped<T, W>
+where
+    T: PomdpDistribution,
+    W: EnvStructureWrapper<T> + EnvWrapper<T::Pomdp>,
+    <W as EnvWrapper<T::Pomdp>>::Wrapped: EnvStructure<
+        ObservationSpace = <W as EnvStructureWrapper<T>>::WrappedObservationSpace,
+        ActionSpace = <W as EnvStructureWrapper<T>>::WrappedActionSpace,
+    >,
+{
+    type Pomdp = <W as EnvWrapper<T::Pomdp>>::Wrapped;
+
+    fn sample_pomdp(&self, rng: &mut StdRng) -> Self::Pomdp {
+        self.wrapper.wrap(self.inner.sample_pomdp(rng), rng)
+    }
+}
+
+/*
 impl<T, W> EnvDistribution for Wrapped<T, W>
 where
     T: EnvDistribution,
@@ -466,3 +513,4 @@ where
         self.wrapper.wrap(self.inner.sample_environment(rng), rng)
     }
 }
+*/

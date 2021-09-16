@@ -1,7 +1,7 @@
 //! Environment testing utilities
 use super::{
     DeterministicBandit, EnvDistribution, EnvStructure, Environment, IntoStateful, Pomdp,
-    StoredEnvStructure,
+    PomdpDistribution, StoredEnvStructure,
 };
 use crate::agents::{RandomAgent, Step};
 use crate::simulation;
@@ -158,10 +158,10 @@ impl EnvStructure for RoundRobinDeterministicBandits {
     }
 }
 
-impl EnvDistribution for RoundRobinDeterministicBandits {
-    type Environment = DeterministicBandit;
+impl PomdpDistribution for RoundRobinDeterministicBandits {
+    type Pomdp = DeterministicBandit;
 
-    fn sample_environment(&self, _rng: &mut StdRng) -> Self::Environment {
+    fn sample_pomdp(&self, _rng: &mut StdRng) -> Self::Pomdp {
         let mut values = vec![0.0; self.num_arms];
         let good_arm = self.good_arm.get();
         values[good_arm] = 1.0;

@@ -1,5 +1,5 @@
 //! Multi-armed bandit environments
-use super::{BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Mdp};
+use super::{BuildEnv, BuildEnvDist, BuildEnvError, EnvStructure, Mdp, PomdpDistribution};
 use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use rand::distributions::{Distribution, Standard, Uniform};
@@ -208,10 +208,10 @@ impl EnvStructure for UniformBernoulliBandits {
     }
 }
 
-impl EnvDistribution for UniformBernoulliBandits {
-    type Environment = BernoulliBandit;
+impl PomdpDistribution for UniformBernoulliBandits {
+    type Pomdp = BernoulliBandit;
 
-    fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment {
+    fn sample_pomdp(&self, rng: &mut StdRng) -> Self::Pomdp {
         BernoulliBandit::uniform(self.num_arms, rng)
     }
 }
@@ -265,10 +265,10 @@ impl EnvStructure for OneHotBandits {
     }
 }
 
-impl EnvDistribution for OneHotBandits {
-    type Environment = DeterministicBandit;
+impl PomdpDistribution for OneHotBandits {
+    type Pomdp = DeterministicBandit;
 
-    fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment {
+    fn sample_pomdp(&self, rng: &mut StdRng) -> Self::Pomdp {
         let mut means = vec![0.0; self.num_arms];
         let index = rng.gen_range(0..self.num_arms);
         means[index] = 1.0;
@@ -356,7 +356,7 @@ mod uniform_determistic_bandits {
     fn run_sample() {
         let env_dist = UniformBernoulliBandits::new(3);
         let mut rng = StdRng::seed_from_u64(284);
-        let env = env_dist.sample_environment(&mut rng);
+        let env = env_dist.sample_pomdp(&mut rng);
         testing::run_pomdp(env, 1000, 286);
     }
 
@@ -377,7 +377,7 @@ mod needle_haystack_bandits {
     fn run_sample() {
         let env_dist = OneHotBandits::new(3);
         let mut rng = StdRng::seed_from_u64(284);
-        let env = env_dist.sample_environment(&mut rng);
+        let env = env_dist.sample_pomdp(&mut rng);
         testing::run_pomdp(env, 1000, 286);
     }
 

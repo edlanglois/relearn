@@ -156,7 +156,7 @@ impl<B, A, OS: Space, AS> SetActorMode for ResettingMetaAgent<B, A, OS, AS> {}
 mod resetting_meta {
     use super::super::{ActorMode, UCB1Agent, UCB1AgentConfig};
     use super::*;
-    use crate::envs::{OneHotBandits, StatefulMetaEnv, WithState, Wrapped};
+    use crate::envs::{MetaEnv, OneHotBandits, PomdpEnv};
     use crate::simulation;
     use crate::simulation::hooks::{RewardStatistics, StepLimit};
 
@@ -165,9 +165,8 @@ mod resetting_meta {
         let config = UCB1AgentConfig::default();
         let num_arms = 3;
         let num_episodes_per_trial = 20;
-        let mut env = StatefulMetaEnv::new(
-            Wrapped::new(OneHotBandits::new(num_arms), WithState),
-            num_episodes_per_trial,
+        let mut env = PomdpEnv::new(
+            MetaEnv::new(OneHotBandits::new(num_arms), num_episodes_per_trial),
             0,
         );
         let mut agent: ResettingMetaAgent<_, UCB1Agent<_, _>, _, _> =

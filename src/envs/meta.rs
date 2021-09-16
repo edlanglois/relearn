@@ -1,6 +1,7 @@
 //! Meta reinforcement learning environment.
 use super::{
     BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment, Pomdp,
+    PomdpDistribution,
 };
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
 use rand::rngs::StdRng;
@@ -217,18 +218,18 @@ where
 
 impl<E> Pomdp for MetaEnv<E>
 where
-    E: EnvDistribution,
-    <E as EnvDistribution>::Environment: Pomdp,
-    <<E as EnvDistribution>::Environment as Pomdp>::Action: Copy,
+    E: PomdpDistribution,
+    <E as PomdpDistribution>::Pomdp: Pomdp,
+    <<E as PomdpDistribution>::Pomdp as Pomdp>::Action: Copy,
 {
-    type State = MetaEnvState<E::Environment>;
+    type State = MetaEnvState<E::Pomdp>;
     type Observation =
-        MetaObservation<<E::Environment as Pomdp>::Observation, <E::Environment as Pomdp>::Action>;
-    type Action = <E::Environment as Pomdp>::Action;
+        MetaObservation<<E::Pomdp as Pomdp>::Observation, <E::Pomdp as Pomdp>::Action>;
+    type Action = <E::Pomdp as Pomdp>::Action;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
         // Sample a new inner environment.
-        let inner_env = self.env_distribution.sample_environment(rng);
+        let inner_env = self.env_distribution.sample_pomdp(rng);
         let inner_state = inner_env.initial_state(rng);
         MetaEnvState {
             inner_env,
@@ -412,7 +413,7 @@ where
 #[cfg(test)]
 #[allow(clippy::float_cmp)] // Comparing exact reward values; 0.0 or 1.0 without error
 mod meta_env_bandits {
-    use super::super::{testing, WithState, Wrapped};
+    use super::super::testing;
     use super::*;
 
     #[test]
@@ -423,11 +424,7 @@ mod meta_env_bandits {
 
     #[test]
     fn stateful_run() {
-        let mut env = StatefulMetaEnv::new(
-            Wrapped::new(testing::RoundRobinDeterministicBandits::new(2), WithState),
-            3,
-            0,
-        );
+        let mut env = StatefulMetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3, 0);
         testing::run_env(&mut env, 1000, 0);
     }
 
@@ -500,11 +497,7 @@ mod meta_env_bandits {
 
     #[test]
     fn stateful_expected_steps() {
-        let mut env = StatefulMetaEnv::new(
-            Wrapped::new(testing::RoundRobinDeterministicBandits::new(2), WithState),
-            3,
-            0,
-        );
+        let mut env = StatefulMetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3, 0);
 
         // Trial 0; Ep 0; Init
         let observation = env.reset();

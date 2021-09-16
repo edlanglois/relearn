@@ -1,5 +1,5 @@
 //! Generic Markov Decision Processes
-use super::{BuildEnvDist, EnvDistribution, EnvStructure, Mdp};
+use super::{BuildEnvDist, EnvStructure, Mdp, PomdpDistribution};
 use crate::spaces::IndexSpace;
 use ndarray::{Array2, Axis};
 use rand::{distributions::Distribution, rngs::StdRng};
@@ -129,11 +129,11 @@ impl EnvStructure for DirichletRandomMdps {
     }
 }
 
-impl EnvDistribution for DirichletRandomMdps {
-    type Environment = TabularMdp;
+impl PomdpDistribution for DirichletRandomMdps {
+    type Pomdp = TabularMdp;
 
     #[allow(clippy::cast_possible_truncation)]
-    fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment {
+    fn sample_pomdp(&self, rng: &mut StdRng) -> Self::Pomdp {
         // Sample f32 values to save space since the precision of f64 shouldn't be necessary
         let dynamics_prior = Dirichlet::new_with_size(
             self.transition_prior_dirichlet_alpha as f32,
@@ -165,7 +165,7 @@ mod dirichlet_random_mdps {
     fn run_sample() {
         let env_dist = DirichletRandomMdps::default();
         let mut rng = StdRng::seed_from_u64(168);
-        let env = env_dist.sample_environment(&mut rng);
+        let env = env_dist.sample_pomdp(&mut rng);
         testing::run_pomdp(env, 1000, 170);
     }
 

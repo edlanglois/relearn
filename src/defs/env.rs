@@ -4,7 +4,7 @@ use crate::agents::{Agent, BuildAgent, ManagerAgent};
 use crate::envs::{
     Bandit, BuildEnv, Chain as ChainEnv, DirichletRandomMdps, EnvStructure, FixedMeansBanditConfig,
     MemoryGame as MemoryGameEnv, MetaEnvConfig, OneHotBandits, PomdpEnv, PriorMeansBanditConfig,
-    StatefulMetaEnv, StepLimit, UniformBernoulliBandits, WithState, Wrapped,
+    StatefulMetaEnv, StepLimit, UniformBernoulliBandits, Wrapped,
 };
 use crate::error::RLError;
 use crate::simulation::{
@@ -101,21 +101,21 @@ impl EnvDef {
             }
             MetaOneHotBandits(config) => {
                 boxed_simulation!(
-                    StatefulMetaEnv<Wrapped<OneHotBandits, WithState>>,
+                    StatefulMetaEnv<OneHotBandits>,
                     config,
                     ForMetaFiniteFinite<_>
                 )
             }
             MetaUniformBernoulliBandits(config) => {
                 boxed_simulation!(
-                    StatefulMetaEnv<Wrapped<UniformBernoulliBandits, WithState>>,
+                    StatefulMetaEnv<UniformBernoulliBandits>,
                     config,
                     ForMetaFiniteFinite<_>
                 )
             }
             MetaDirichletMdps(config) => {
                 boxed_simulation!(
-                    StatefulMetaEnv<Wrapped<Wrapped<DirichletRandomMdps, StepLimit>, WithState>>,
+                    StatefulMetaEnv<Wrapped<DirichletRandomMdps, StepLimit>>,
                     config,
                     ForMetaFiniteFinite<_>
                 )
@@ -192,21 +192,21 @@ impl EnvDef {
             }
             MetaOneHotBandits(config) => {
                 boxed_simulation!(
-                    StatefulMetaEnv<Wrapped<OneHotBandits, WithState>>,
+                    StatefulMetaEnv<OneHotBandits>,
                     config,
                     ForMetaFiniteFinite<_>
                 )
             }
             MetaUniformBernoulliBandits(config) => {
                 boxed_simulation!(
-                    StatefulMetaEnv<Wrapped<UniformBernoulliBandits, WithState>>,
+                    StatefulMetaEnv<UniformBernoulliBandits>,
                     config,
                     ForMetaFiniteFinite<_>
                 )
             }
             MetaDirichletMdps(config) => {
                 boxed_simulation!(
-                    StatefulMetaEnv<Wrapped<Wrapped<DirichletRandomMdps, StepLimit>, WithState>>,
+                    StatefulMetaEnv<Wrapped<DirichletRandomMdps, StepLimit>>,
                     config,
                     ForMetaFiniteFinite<_>
                 )
