@@ -22,7 +22,7 @@ impl<E: Pomdp + CloneBuild> BuildPomdp for E {
     }
 }
 
-/// Build an [`Environment`].
+/// Build an [`Environment`](super::Environment).
 ///
 /// Environment is an associated trait rather than a generic parameter to facilitate
 /// reproducibility: a given environment configuration can construct exactly one environment.

@@ -11,7 +11,8 @@ use rand::rngs::StdRng;
 ///
 /// Consists of the inner object and the wrapper state.
 ///
-/// Cannot currently be used to wrap [`Environment`] or [`EnvDistribution`].
+/// Cannot currently be used to wrap [`Environment`](super::Environment) or
+/// [`EnvDistribution`](super::EnvDistribution).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Wrapped<T, W> {
     /// Wrapped object

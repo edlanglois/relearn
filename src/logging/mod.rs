@@ -128,7 +128,7 @@ impl<T: Logger + ?Sized> LoggerHelper for T {}
 /// An event represents the period fo time ending with a call to [`TimeSeriesLogger::end_event`]
 /// and starting with either
 /// * the most recent call to [`TimeSeriesLogger::start_event`],
-/// * the last call to [`TimeSeriesEventLogger::start_event`],
+/// * the last call to [`TimeSeriesLogger::end_event`],
 /// * or the creation time of the logger.
 ///
 /// Examples of events include an environment step, an environment episode, or a training epoch.
@@ -151,8 +151,6 @@ pub trait TimeSeriesLogger {
     /// * `value` - The value to log.
     ///
     /// # Errors
-    /// * May return [`LogError::InactiveEvent`] if there is not a currently active event instance.
-    ///     Call [`TimeSeriesLogger::start_event`] first.
     /// * May return [`LogError::IncompatibleValue`] if the logged value is structurally
     ///     incompatible with previous values logged under the same name.
     fn log(&mut self, event: Event, name: &'static str, value: Loggable) -> Result<(), LogError> {

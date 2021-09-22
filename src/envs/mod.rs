@@ -209,7 +209,7 @@ where
 /// A reinforcement learning environment with internal state.
 ///
 /// Prefer implementing [`Pomdp`] since [`PomdpEnv`] can be used
-/// to create an `Environment` out of a `Pomdp`.
+/// to create an [`Environment`] out of a [`Pomdp`].
 pub trait Environment {
     type Observation;
     type Action;
