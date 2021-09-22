@@ -57,11 +57,10 @@
 //! `Option<ObservationSpace>` where `None` represents any _terminal states_.
 //!
 //! ## Agents
-//! An [`Agent`] interacts with an environment and learns over the course of multiple episodes.
-//! An [`Actor`] interacts with an environment without changing between episodes.
-//! In both cases, the actor or agent may learn and improve within an episode (but in the case of
-//! an actor, this is forgotten at the end of the episode).
-//! Use the [`Actor`] interface when greedy actions for evaluation are desired.
+//! An [`Actor`] interacts with an environment.
+//! An [`Agent`] is an Actor with the ability to persistently update.
+//! An Actor may "learn" within an episode by conditioning on the observed episode history, but
+//! only [`Agent::update`] allows learning across episodes.
 //!
 //! ### Policy
 //! A policy maps a sequence of episode history features to parameters of an action distribution
