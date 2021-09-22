@@ -14,7 +14,7 @@
 //! description of the observable parts of an environment step.
 //!
 //! ### Episode
-//! A sequence of environment steps each starting from the successor state of the previous.
+//! A sequence of environment steps, each following from the successor state of the previous step.
 //! The initial state is set by calling [`Environment::reset`].
 //! An episode ends when [`Environment::step`] sets the `episode_done` flag in its return
 //! value.
