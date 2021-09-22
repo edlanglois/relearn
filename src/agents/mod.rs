@@ -107,6 +107,7 @@ pub enum ActorMode {
     /// (given the agent's current knowledge) but potentially allow for better strategies to be
     /// discovered over the course of multiple episodes.
     Training,
+
     /// The actor does not expect reward feedback and should maximize return within each episode.
     ///
     /// The actor may learn within an episode, including taking exploratory actions that it expects
@@ -115,12 +116,15 @@ pub enum ActorMode {
     /// This could also be called "greedy" but that term might suggest that a history-based agent
     /// should not attempt to explore and learn within an episode.
     ///
-    /// The user should not call [`Agent::update`] on an agent in `Release` mode.
+    /// [`Agent::update`] should not be called on an agent in release mode.
     /// The agent is free to either ignore the update or perform an update.
     Release,
 }
 
 /// Supports setting the actor mode.
+///
+/// Unless explicitly specified during initialization,
+/// actors must start in [`ActorMode::Training`] mode.
 pub trait SetActorMode {
     /// Set the actor mode.
     fn set_actor_mode(&mut self, _mode: ActorMode) {
