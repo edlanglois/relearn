@@ -1,6 +1,6 @@
 //! Environment testing utilities
 use super::{
-    DeterministicBandit, EnvDistribution, EnvStructure, Environment, IntoEnv, Pomdp,
+    CloneBuild, DeterministicBandit, EnvDistribution, EnvStructure, Environment, IntoEnv, Pomdp,
     PomdpDistribution, StoredEnvStructure,
 };
 use crate::agents::{RandomAgent, Step};
@@ -127,6 +127,8 @@ pub struct RoundRobinDeterministicBandits {
     pub num_arms: usize,
     good_arm: Cell<usize>,
 }
+
+impl CloneBuild for RoundRobinDeterministicBandits {}
 
 impl RoundRobinDeterministicBandits {
     pub const fn new(num_arms: usize) -> Self {

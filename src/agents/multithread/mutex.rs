@@ -127,17 +127,14 @@ mod tests {
     use super::super::super::testing;
     use super::*;
     use crate::agents::{BuildAgent, TabularQLearningAgent, TabularQLearningAgentConfig};
-    use crate::envs::{BuildEnv, DeterministicBandit, FixedMeansBanditConfig, IntoEnv, PomdpEnv};
+    use crate::envs::{DeterministicBandit, IntoEnv};
     use crate::simulation;
     use crate::simulation::hooks::StepLimit;
     use std::sync::{Arc, RwLock};
 
     #[test]
     fn mutex_multithread_learns() {
-        let env_config = FixedMeansBanditConfig {
-            means: vec![0.0, 1.0],
-        };
-        let env: DeterministicBandit = env_config.build_env(0).unwrap();
+        let env = DeterministicBandit::from_means(vec![0.0, 1.0]).unwrap();
         let agent_config = TabularQLearningAgentConfig::default();
         let mut agent: MutexAgentManager<TabularQLearningAgent<_, _>> =
             agent_config.build_agent(&env, 0).unwrap();
@@ -145,15 +142,11 @@ mod tests {
         let hook = StepLimit::new(1000);
         let num_workers = 5;
 
-        simulation::run_agent_multithread::<_, PomdpEnv<DeterministicBandit>, _, _>(
-            &Arc::new(RwLock::new(env_config)),
-            &mut agent,
-            num_workers,
-            &hook,
-            &mut logger,
-        );
+        let locked_env = Arc::new(RwLock::new(env));
+        simulation::run_agent_multithread(&locked_env, &mut agent, num_workers, &hook, &mut logger);
 
         let agent = agent.try_into_inner().unwrap();
+        let env = Arc::try_unwrap(locked_env).unwrap().into_inner().unwrap();
         let mut env = env.into_env(0);
         testing::eval_deterministic_bandit(agent, &mut env, 0.9);
     }

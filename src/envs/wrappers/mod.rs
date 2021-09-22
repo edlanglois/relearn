@@ -2,15 +2,16 @@ mod step_limit;
 
 pub use step_limit::{StepLimit, WithStepLimit};
 
-use super::{BuildEnv, BuildEnvDist, BuildEnvError, EnvStructure, PomdpDistribution};
+use super::{BuildEnvError, BuildPomdp, BuildPomdpDist, EnvStructure, PomdpDistribution};
 use rand::rngs::StdRng;
+
+// TODO: WrappedEnv that provides Env, EnvDistribution, BuildEnv, BuildEnvDist
 
 /// A basic wrapped object.
 ///
 /// Consists of the inner object and the wrapper state.
 ///
-/// May be used as an environment wrapper as `Wrapped<T, SomeWrapper>`
-/// where `SomeWrapper: EnvWrapper + EnvStructureWrapper`
+/// Cannot currently be used to wrap [`Environment`] or [`EnvDistribution`].
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Wrapped<T, W> {
     /// Wrapped object
@@ -59,28 +60,29 @@ where
     }
 }
 
-impl<B, E, W> BuildEnv<Wrapped<E, W>> for Wrapped<B, W>
+impl<B, W> BuildPomdp for Wrapped<B, W>
 where
-    B: BuildEnv<E>,
-    W: Copy,
+    B: BuildPomdp,
+    W: Clone,
 {
-    fn build_env(&self, seed: u64) -> Result<Wrapped<E, W>, BuildEnvError> {
-        Ok(Wrapped {
-            inner: self.inner.build_env(seed)?,
-            wrapper: self.wrapper,
-        })
+    type Pomdp = Wrapped<B::Pomdp, W>;
+
+    fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {
+        Ok(Wrapped::new(
+            self.inner.build_pomdp()?,
+            self.wrapper.clone(),
+        ))
     }
 }
 
-impl<B, D, W> BuildEnvDist<Wrapped<D, W>> for Wrapped<B, W>
+impl<B, W> BuildPomdpDist for Wrapped<B, W>
 where
-    B: BuildEnvDist<D>,
-    W: Copy,
+    B: BuildPomdpDist,
+    W: Clone,
 {
-    fn build_env_dist(&self) -> Wrapped<D, W> {
-        Wrapped {
-            inner: self.inner.build_env_dist(),
-            wrapper: self.wrapper,
-        }
+    type PomdpDistribution = Wrapped<B::PomdpDistribution, W>;
+
+    fn build_pomdp_dist(&self) -> Self::PomdpDistribution {
+        Wrapped::new(self.inner.build_pomdp_dist(), self.wrapper.clone())
     }
 }

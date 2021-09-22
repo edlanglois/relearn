@@ -18,7 +18,7 @@ pub trait RunSimulation {
 }
 
 /// Error building a simulator
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, Error)]
 pub enum BuildSimError {
     #[error(transparent)]
     EnvError(#[from] BuildEnvError),

@@ -1,12 +1,11 @@
 //! Parse environment definition from Options
 use super::{Options, Update, WithUpdate};
-use crate::defs::{env::DistributionType, EnvDef};
+use crate::defs::{env::DistributionType, BanditMeanRewards, EnvDef};
 use crate::envs::{
-    Chain, DirichletRandomMdps, FixedMeansBanditConfig, MemoryGame, MetaEnvConfig, OneHotBandits,
-    PriorMeansBanditConfig, StepLimit, UniformBernoulliBandits, Wrapped,
+    Chain, DirichletRandomMdps, MemoryGame, MetaPomdp, OneHotBandits, StepLimit,
+    UniformBernoulliBandits, Wrapped,
 };
 use clap::ArgEnum;
-use rand::distributions::Standard;
 use std::convert::TryInto;
 
 /// Environment name
@@ -42,37 +41,23 @@ impl From<&Options> for EnvDef {
     }
 }
 
-fn bandit_env_def(sample_distribution: DistributionType, opts: &Options) -> EnvDef {
+fn bandit_env_def(distribution: DistributionType, opts: &Options) -> EnvDef {
     match opts.arm_prior {
-        BanditArmPrior::Fixed => EnvDef::FixedMeanBandit(sample_distribution, opts.into()),
-        BanditArmPrior::Uniform => EnvDef::UniformMeanBandit(sample_distribution, opts.into()),
+        BanditArmPrior::Fixed => EnvDef::Bandit(distribution, opts.into()),
+        BanditArmPrior::Uniform => EnvDef::Bandit(distribution, opts.into()),
     }
 }
 
-impl From<&Options> for FixedMeansBanditConfig {
+impl From<&Options> for BanditMeanRewards {
     fn from(opts: &Options) -> Self {
         Self::default().with_update(opts)
     }
 }
 
-impl Update<&Options> for FixedMeansBanditConfig {
+impl Update<&Options> for BanditMeanRewards {
     fn update(&mut self, opts: &Options) {
-        if let Some(ref arm_rewards) = opts.arm_rewards {
-            self.means = arm_rewards.clone();
-        }
-    }
-}
-
-impl From<&Options> for PriorMeansBanditConfig<Standard> {
-    fn from(opts: &Options) -> Self {
-        Self::default().with_update(opts)
-    }
-}
-
-impl Update<&Options> for PriorMeansBanditConfig<Standard> {
-    fn update(&mut self, opts: &Options) {
-        if let Some(num_actions) = opts.num_actions {
-            self.num_arms = num_actions.try_into().unwrap();
+        if let Some(mean_rewards) = &opts.arm_rewards {
+            self.mean_rewards = mean_rewards.clone()
         }
     }
 }
@@ -111,7 +96,7 @@ impl Update<&Options> for MemoryGame {
     }
 }
 
-impl<'a, EB> From<&'a Options> for MetaEnvConfig<EB>
+impl<'a, E> From<&'a Options> for MetaPomdp<E>
 where
     Self: Default + Update<&'a Options>,
 {
@@ -120,14 +105,14 @@ where
     }
 }
 
-impl<'a, EB> Update<&'a Options> for MetaEnvConfig<EB>
+impl<'a, E> Update<&'a Options> for MetaPomdp<E>
 where
-    EB: Update<&'a Options>,
+    E: Update<&'a Options>,
 {
     fn update(&mut self, opts: &'a Options) {
-        self.env_dist_config.update(opts);
-        if let Some(num_episodes_per_trial) = opts.episodes_per_trial {
-            self.num_episodes_per_trial = num_episodes_per_trial;
+        self.env_distribution.update(opts);
+        if let Some(episodes_per_trial) = opts.episodes_per_trial {
+            self.episodes_per_trial = episodes_per_trial;
         }
     }
 }

@@ -2,40 +2,94 @@ use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
 use super::{AgentDef, MultiThreadAgentDef};
 use crate::agents::{Agent, BuildAgent, ManagerAgent};
 use crate::envs::{
-    Bandit, BuildEnv, Chain as ChainEnv, DirichletRandomMdps, EnvStructure, FixedMeansBanditConfig,
-    MemoryGame as MemoryGameEnv, MetaEnvConfig, OneHotBandits, PomdpEnv, PriorMeansBanditConfig,
-    StatefulMetaEnv, UniformBernoulliBandits, WithStepLimit,
+    Bandit, BuildEnv, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps,
+    EnvStructure, MemoryGame as MemoryGameEnv, MetaPomdp, OneHotBandits, UniformBernoulliBandits,
+    WithStepLimit,
 };
 use crate::error::RLError;
 use crate::simulation::{
     hooks::StepLogger, GenericSimulationHook, MultiThreadSimulatorConfig, RunSimulation, Simulator,
 };
-use crate::utils::distributions::{Bernoulli, Deterministic};
-use rand::distributions::Standard;
+use crate::utils::distributions::{Bernoulli, Deterministic, FromMean};
+use std::borrow::{Borrow, Cow};
+use std::error::Error;
+use std::marker::PhantomData;
 
 /// Environment definition
 #[derive(Debug, Clone)]
 pub enum EnvDef {
-    /// Multi-armed bandit with fixed arm means.
-    FixedMeanBandit(DistributionType, FixedMeansBanditConfig),
-    /// Multi-armed bandit with uniform random arm means (sampled once on creation).
-    UniformMeanBandit(DistributionType, PriorMeansBanditConfig<Standard>),
+    /// Multi-armed bandit with fixed arm distributions.
+    Bandit(DistributionType, BanditMeanRewards),
     /// The Chain environment,
     Chain(ChainEnv),
     /// The Memory Game environment
     MemoryGame(MemoryGameEnv),
-    /// Meta needle-haystack bandits environment
-    MetaOneHotBandits(MetaEnvConfig<OneHotBandits>),
+    /// Meta one-hot bandits environment
+    MetaOneHotBandits(MetaPomdp<OneHotBandits>),
     /// Meta uniform bernoulli bandits environment
-    MetaUniformBernoulliBandits(MetaEnvConfig<UniformBernoulliBandits>),
+    MetaUniformBernoulliBandits(MetaPomdp<UniformBernoulliBandits>),
     /// Meta dirichlet MDPs environment
-    MetaDirichletMdps(MetaEnvConfig<WithStepLimit<DirichletRandomMdps>>),
+    MetaDirichletMdps(MetaPomdp<WithStepLimit<DirichletRandomMdps>>),
 }
 
+/// Definition of a scalar floating-point distribution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DistributionType {
     Deterministic,
     Bernoulli,
+}
+
+/// Bandit mean arm reads
+#[derive(Debug, Clone, PartialEq)]
+pub struct BanditMeanRewards {
+    pub mean_rewards: Vec<f64>,
+}
+
+impl Default for BanditMeanRewards {
+    fn default() -> Self {
+        Self {
+            mean_rewards: vec![0.2, 0.8],
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct BanditConfig<'a, D> {
+    mean_rewards: Cow<'a, [f64]>,
+    // `fn() -> D` is used so that BanditConfig is Send & Sync
+    // Reference: https://stackoverflow.com/a/50201389/1267562
+    distribution: PhantomData<fn() -> D>,
+}
+
+impl<'a, D> From<&'a BanditMeanRewards> for BanditConfig<'a, D> {
+    fn from(config: &'a BanditMeanRewards) -> Self {
+        Self {
+            mean_rewards: Cow::from(&config.mean_rewards),
+            distribution: PhantomData,
+        }
+    }
+}
+
+impl<D> From<BanditMeanRewards> for BanditConfig<'static, D> {
+    fn from(config: BanditMeanRewards) -> Self {
+        Self {
+            mean_rewards: Cow::from(config.mean_rewards),
+            distribution: PhantomData,
+        }
+    }
+}
+
+impl<'a, D: FromMean<f64>> BuildPomdp for BanditConfig<'a, D>
+where
+    D: FromMean<f64>,
+    <D as FromMean<f64>>::Error: Error + 'static,
+{
+    type Pomdp = Bandit<D>;
+
+    fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {
+        let mean_rewards: &[f64] = self.mean_rewards.borrow();
+        Bandit::from_means(mean_rewards).map_err(|e| BuildEnvError::Boxed(Box::new(e)))
+    }
 }
 
 impl EnvDef {
@@ -58,8 +112,8 @@ impl EnvDef {
     {
         /// Construct a boxed agent-environment simulation
         macro_rules! boxed_simulation {
-            ($env_type:ty, $env_config:expr, $agent_builder:ty) => {{
-                let env: Box<$env_type> = Box::new($env_config.build_env(env_seed)?);
+            ($env_config:expr, $agent_builder:ty) => {{
+                let env = Box::new($env_config.build_env(env_seed)?);
                 let agent: Box<dyn Agent<_, _>> =
                     <$agent_builder>::new(agent_def).build_agent(&env, agent_seed)?;
                 let log_hook = StepLogger::new(env.observation_space(), env.action_space());
@@ -69,56 +123,30 @@ impl EnvDef {
 
         use EnvDef::*;
         Ok(match self {
-            FixedMeanBandit(dist_type, config) => match dist_type {
+            Bandit(dist_type, means) => match dist_type {
                 DistributionType::Deterministic => {
-                    boxed_simulation!(
-                        PomdpEnv<Bandit<Deterministic<f64>>>,
-                        config,
-                        ForFiniteFinite<_>
-                    )
+                    let config = BanditConfig::<Deterministic<f64>>::from(means);
+                    boxed_simulation!(config, ForFiniteFinite<_>)
                 }
                 DistributionType::Bernoulli => {
-                    boxed_simulation!(PomdpEnv<Bandit<Bernoulli>>, config, ForFiniteFinite<_>)
-                }
-            },
-            UniformMeanBandit(dist_type, config) => match dist_type {
-                DistributionType::Deterministic => {
-                    boxed_simulation!(
-                        PomdpEnv<Bandit<Deterministic<f64>>>,
-                        config,
-                        ForFiniteFinite<_>
-                    )
-                }
-                DistributionType::Bernoulli => {
-                    boxed_simulation!(PomdpEnv<Bandit<Bernoulli>>, config, ForFiniteFinite<_>)
+                    let config = BanditConfig::<Bernoulli>::from(means);
+                    boxed_simulation!(config, ForFiniteFinite<_>)
                 }
             },
             Chain(config) => {
-                boxed_simulation!(PomdpEnv<ChainEnv>, config, ForFiniteFinite<_>)
+                boxed_simulation!(config, ForFiniteFinite<_>)
             }
             MemoryGame(config) => {
-                boxed_simulation!(PomdpEnv<MemoryGameEnv>, config, ForFiniteFinite<_>)
+                boxed_simulation!(config, ForFiniteFinite<_>)
             }
             MetaOneHotBandits(config) => {
-                boxed_simulation!(
-                    StatefulMetaEnv<OneHotBandits>,
-                    config,
-                    ForMetaFiniteFinite<_>
-                )
+                boxed_simulation!(config, ForMetaFiniteFinite<_>)
             }
             MetaUniformBernoulliBandits(config) => {
-                boxed_simulation!(
-                    StatefulMetaEnv<UniformBernoulliBandits>,
-                    config,
-                    ForMetaFiniteFinite<_>
-                )
+                boxed_simulation!(config, ForMetaFiniteFinite<_>)
             }
             MetaDirichletMdps(config) => {
-                boxed_simulation!(
-                    StatefulMetaEnv<WithStepLimit<DirichletRandomMdps>>,
-                    config,
-                    ForMetaFiniteFinite<_>
-                )
+                boxed_simulation!(config, ForMetaFiniteFinite<_>)
             }
         })
     }
@@ -145,71 +173,42 @@ impl EnvDef {
     {
         /// Construct a boxed agent-environment simulation
         macro_rules! boxed_simulation {
-            ($env_type:ty, $env_config:expr, $agent_builder:ty) => {{
-                let env: $env_type = $env_config.build_env(env_seed)?;
+            ($env_config:expr, $agent_builder:ty) => {{
+                let env = $env_config.build_env(env_seed)?;
                 let agent: Box<dyn ManagerAgent<Worker = Box<dyn Agent<_, _> + Send>>> =
                     <$agent_builder>::new(agent_def).build_agent(&env, agent_seed)?;
                 let log_hook = StepLogger::new(env.observation_space(), env.action_space());
-                sim_config.build_simulator::<_, $env_type, _, _>(
-                    $env_config.clone(),
-                    agent,
-                    (log_hook, hook),
-                )
+                sim_config.build_simulator($env_config.clone(), agent, (log_hook, hook))
             }};
         }
 
         use EnvDef::*;
         Ok(match self {
-            FixedMeanBandit(dist_type, config) => match dist_type {
+            Bandit(dist_type, means) => match dist_type {
+                // TODO: Avoid double clone (in config assignment and in boxed_simulation)
                 DistributionType::Deterministic => {
-                    boxed_simulation!(
-                        PomdpEnv<Bandit<Deterministic<f64>>>,
-                        config,
-                        ForFiniteFinite<_>
-                    )
+                    let config = BanditConfig::<Deterministic<f64>>::from(means.clone());
+                    boxed_simulation!(config, ForFiniteFinite<_>)
                 }
                 DistributionType::Bernoulli => {
-                    boxed_simulation!(PomdpEnv<Bandit<Bernoulli>>, config, ForFiniteFinite<_>)
-                }
-            },
-            UniformMeanBandit(dist_type, config) => match dist_type {
-                DistributionType::Deterministic => {
-                    boxed_simulation!(
-                        PomdpEnv<Bandit<Deterministic<f64>>>,
-                        config,
-                        ForFiniteFinite<_>
-                    )
-                }
-                DistributionType::Bernoulli => {
-                    boxed_simulation!(PomdpEnv<Bandit<Bernoulli>>, config, ForFiniteFinite<_>)
+                    let config = BanditConfig::<Bernoulli>::from(means.clone());
+                    boxed_simulation!(config, ForFiniteFinite<_>)
                 }
             },
             Chain(config) => {
-                boxed_simulation!(PomdpEnv<ChainEnv>, config, ForFiniteFinite<_>)
+                boxed_simulation!(config, ForFiniteFinite<_>)
             }
             MemoryGame(config) => {
-                boxed_simulation!(PomdpEnv<MemoryGameEnv>, config, ForFiniteFinite<_>)
+                boxed_simulation!(config, ForFiniteFinite<_>)
             }
             MetaOneHotBandits(config) => {
-                boxed_simulation!(
-                    StatefulMetaEnv<OneHotBandits>,
-                    config,
-                    ForMetaFiniteFinite<_>
-                )
+                boxed_simulation!(config, ForMetaFiniteFinite<_>)
             }
             MetaUniformBernoulliBandits(config) => {
-                boxed_simulation!(
-                    StatefulMetaEnv<UniformBernoulliBandits>,
-                    config,
-                    ForMetaFiniteFinite<_>
-                )
+                boxed_simulation!(config, ForMetaFiniteFinite<_>)
             }
             MetaDirichletMdps(config) => {
-                boxed_simulation!(
-                    StatefulMetaEnv<WithStepLimit<DirichletRandomMdps>>,
-                    config,
-                    ForMetaFiniteFinite<_>
-                )
+                boxed_simulation!(config, ForMetaFiniteFinite<_>)
             }
         })
     }

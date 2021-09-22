@@ -11,7 +11,7 @@ mod updater;
 
 pub use agent::{AgentDef, MultiThreadAgentDef};
 pub use critic::CriticDef;
-pub use env::EnvDef;
+pub use env::{BanditMeanRewards, EnvDef};
 pub use optimizer::OptimizerDef;
 pub use seq_mod::SeqModDef;
 pub use updater::{CriticUpdaterDef, PolicyUpdaterDef};

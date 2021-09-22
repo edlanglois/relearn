@@ -1,70 +1,10 @@
 //! Multi-armed bandit environments
-use super::{BuildEnv, BuildEnvDist, BuildEnvError, EnvStructure, Mdp, PomdpDistribution};
+use super::{CloneBuild, EnvStructure, Mdp, PomdpDistribution};
 use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
-use rand::distributions::{Distribution, Standard, Uniform};
+use rand::distributions::{Distribution, Uniform};
 use rand::prelude::*;
 use std::borrow::Borrow;
-
-/// Configuration for a Bandit environment with fixed means
-#[derive(Debug, Clone, PartialEq)]
-pub struct FixedMeansBanditConfig {
-    /// The arm means
-    pub means: Vec<f64>,
-}
-
-impl Default for FixedMeansBanditConfig {
-    fn default() -> Self {
-        Self {
-            means: vec![0.2, 0.8],
-        }
-    }
-}
-
-impl<D> BuildEnv<Bandit<D>> for FixedMeansBanditConfig
-where
-    D: Distribution<f64> + FromMean<f64>,
-    <D as FromMean<f64>>::Error: Into<BuildEnvError>,
-{
-    fn build_env(&self, _seed: u64) -> Result<Bandit<D>, BuildEnvError> {
-        Bandit::from_means(&self.means).map_err(Into::into)
-    }
-}
-/// Configuration for a Bandit environment with arm means drawn IID from some distribution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PriorMeansBanditConfig<D> {
-    /// The number of arms
-    pub num_arms: usize,
-    /// The arm mean prior distribution
-    pub mean_prior: D,
-}
-
-impl Default for PriorMeansBanditConfig<Standard> {
-    fn default() -> Self {
-        Self {
-            num_arms: 10,
-            mean_prior: Standard,
-        }
-    }
-}
-
-impl<DR, DM> BuildEnv<Bandit<DR>> for PriorMeansBanditConfig<DM>
-where
-    DR: Distribution<f64> + FromMean<f64>,
-    <DR as FromMean<f64>>::Error: Into<BuildEnvError>,
-    DM: Distribution<f64>,
-{
-    fn build_env(&self, seed: u64) -> Result<Bandit<DR>, BuildEnvError> {
-        let mut rng = StdRng::seed_from_u64(seed);
-        let mean_prior = &self.mean_prior;
-        Bandit::from_means(
-            (0..self.num_arms)
-                .into_iter()
-                .map(|_| mean_prior.sample(&mut rng)),
-        )
-        .map_err(Into::into)
-    }
-}
 
 /// A multi-armed bandit
 ///
@@ -73,6 +13,8 @@ where
 pub struct Bandit<D> {
     distributions: Vec<D>,
 }
+
+impl<D: Clone> CloneBuild for Bandit<D> {}
 
 impl<D> Bandit<D> {
     pub fn new(distributions: Vec<D>) -> Self {
@@ -187,6 +129,8 @@ impl Default for UniformBernoulliBandits {
     }
 }
 
+impl CloneBuild for UniformBernoulliBandits {}
+
 impl EnvStructure for UniformBernoulliBandits {
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
@@ -216,13 +160,6 @@ impl PomdpDistribution for UniformBernoulliBandits {
     }
 }
 
-/// [`UniformBernoulliBandits`] can build itself by cloning
-impl BuildEnvDist<Self> for UniformBernoulliBandits {
-    fn build_env_dist(&self) -> Self {
-        *self
-    }
-}
-
 /// Distribution over deterministic bandits in which one arm has reward 1 and the rest have 0.
 ///
 /// The arm with reward 1 is sampled from a uniform random distribution.
@@ -243,6 +180,8 @@ impl Default for OneHotBandits {
         Self { num_arms: 2 }
     }
 }
+
+impl CloneBuild for OneHotBandits {}
 
 impl EnvStructure for OneHotBandits {
     type ObservationSpace = SingletonSpace;
@@ -273,13 +212,6 @@ impl PomdpDistribution for OneHotBandits {
         let index = rng.gen_range(0..self.num_arms);
         means[index] = 1.0;
         DeterministicBandit::from_means(means).unwrap()
-    }
-}
-
-/// [`OneHotBandits`] can build itself by cloning
-impl BuildEnvDist<Self> for OneHotBandits {
-    fn build_env_dist(&self) -> Self {
-        *self
     }
 }
 

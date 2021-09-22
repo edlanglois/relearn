@@ -1,4 +1,4 @@
-use super::{BuildEnv, BuildEnvError, EnvStructure, Pomdp};
+use super::{CloneBuild, EnvStructure, Pomdp};
 use crate::spaces::IndexSpace;
 use rand::prelude::*;
 
@@ -24,19 +24,14 @@ pub struct MemoryGame {
     pub history_len: usize,
 }
 
+impl CloneBuild for MemoryGame {}
+
 impl Default for MemoryGame {
     fn default() -> Self {
         Self {
             num_actions: 2,
             history_len: 1,
         }
-    }
-}
-
-/// `MemoryGame` is its own configuration
-impl BuildEnv<Self> for MemoryGame {
-    fn build_env(&self, _seed: u64) -> Result<Self, BuildEnvError> {
-        Ok(*self)
     }
 }
 

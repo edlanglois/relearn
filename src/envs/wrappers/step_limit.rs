@@ -67,7 +67,7 @@ impl<E: Pomdp> Pomdp for Wrapped<E, StepLimit> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::{chain::Move, testing, BuildEnv, Chain};
+    use super::super::super::{chain::Move, testing, BuildEnv, Chain, PomdpEnv};
     use super::*;
     use rand::SeedableRng;
 
@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn build() {
         let config = WithStepLimit::<Chain>::default();
-        let _env: WithStepLimit<Chain> = config.build_env(0).unwrap();
+        let _env: PomdpEnv<WithStepLimit<Chain>> = config.build_env(0).unwrap();
     }
 
     #[test]

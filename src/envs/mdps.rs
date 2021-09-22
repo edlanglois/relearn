@@ -1,5 +1,5 @@
 //! Generic Markov Decision Processes
-use super::{BuildEnvDist, EnvStructure, Mdp, PomdpDistribution};
+use super::{CloneBuild, EnvStructure, Mdp, PomdpDistribution};
 use crate::spaces::IndexSpace;
 use ndarray::{Array2, Axis};
 use rand::{distributions::Distribution, rngs::StdRng};
@@ -22,6 +22,8 @@ pub struct TabularMdp<T = WeightedAliasIndex<f32>, R = Normal<f64>> {
     /// Environment discount factor.
     pub discount_factor: f64,
 }
+
+impl<T: Clone, R: Clone> CloneBuild for TabularMdp<T, R> {}
 
 impl<T, R> EnvStructure for TabularMdp<T, R> {
     type ObservationSpace = IndexSpace;
@@ -92,6 +94,8 @@ pub struct DirichletRandomMdps {
     pub discount_factor: f64,
 }
 
+impl CloneBuild for DirichletRandomMdps {}
+
 impl Default for DirichletRandomMdps {
     fn default() -> Self {
         Self {
@@ -102,12 +106,6 @@ impl Default for DirichletRandomMdps {
             reward_prior_stddev: 1.0,
             discount_factor: 1.0, // Assumes that a step limit will be placed on the episodes
         }
-    }
-}
-
-impl BuildEnvDist<Self> for DirichletRandomMdps {
-    fn build_env_dist(&self) -> Self {
-        *self
     }
 }
 

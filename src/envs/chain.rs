@@ -1,5 +1,5 @@
 //! Chain environment
-use super::{BuildEnv, BuildEnvError, EnvStructure, Mdp};
+use super::{CloneBuild, EnvStructure, Mdp};
 use crate::spaces::{IndexSpace, IndexedTypeSpace};
 use rand::prelude::*;
 use rust_rl_derive::Indexed;
@@ -19,6 +19,8 @@ pub struct Chain {
     pub discount_factor: f64,
 }
 
+impl CloneBuild for Chain {}
+
 impl Chain {
     pub const fn new(size: usize, discount_factor: f64) -> Self {
         Self {
@@ -34,13 +36,6 @@ impl Default for Chain {
             size: 5,
             discount_factor: 0.95,
         }
-    }
-}
-
-/// Chain is its own configuration
-impl BuildEnv<Self> for Chain {
-    fn build_env(&self, _seed: u64) -> Result<Self, BuildEnvError> {
-        Ok(*self)
     }
 }
 

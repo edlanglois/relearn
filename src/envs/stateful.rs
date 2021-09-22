@@ -1,5 +1,5 @@
 //! Converting a `Pomdp` into an `Environment`
-use super::{BuildEnv, BuildEnvError, Environment, Pomdp};
+use super::{Environment, Pomdp};
 use crate::envs::EnvStructure;
 use rand::{rngs::StdRng, SeedableRng};
 
@@ -70,7 +70,7 @@ impl<E: Pomdp> Environment for PomdpEnv<E> {
 
 /// Convert into an [`Environment`].
 pub trait IntoEnv {
-    type Environment: Environment;
+    type Environment;
 
     /// Convert into an environment.
     ///
@@ -86,17 +86,5 @@ impl<E: Pomdp> IntoEnv for E {
 
     fn into_env(self, seed: u64) -> Self::Environment {
         PomdpEnv::new(self, seed)
-    }
-}
-
-impl<E: Pomdp, B: BuildEnv<E>> BuildEnv<PomdpEnv<E>> for B {
-    fn build_env(&self, seed: u64) -> Result<PomdpEnv<E>, BuildEnvError> {
-        // Re-use seed so that BuildEnv<E> and BuildEnv<PomdpEnv<E>>
-        // have the same environment structure given the same seed.
-        let structure_seed = seed;
-        // Add an arbitrary offset for the dynamics seed.
-        // Want to avoid collissions with other seed derivations.
-        let dynamics_seed = seed.wrapping_add(135);
-        Ok(self.build_env(structure_seed)?.into_env(dynamics_seed))
     }
 }

@@ -1,5 +1,6 @@
 //! Reinforcement learning environments
 mod bandits;
+mod builders;
 mod chain;
 mod mdps;
 mod memory;
@@ -10,24 +11,21 @@ pub mod testing;
 mod wrappers;
 
 pub use bandits::{
-    Bandit, BernoulliBandit, DeterministicBandit, FixedMeansBanditConfig, OneHotBandits,
-    PriorMeansBanditConfig, UniformBernoulliBandits,
+    Bandit, BernoulliBandit, DeterministicBandit, OneHotBandits, UniformBernoulliBandits,
 };
+pub use builders::{BuildEnv, BuildEnvDist, BuildEnvError, BuildPomdp, BuildPomdpDist, CloneBuild};
 pub use chain::Chain;
 pub use mdps::DirichletRandomMdps;
 pub use memory::MemoryGame;
 pub use meta::{
-    InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaEnvState, MetaObservationSpace, StatefulMetaEnv,
+    InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaObservationSpace, MetaPomdp, MetaState,
 };
 pub use stateful::{IntoEnv, PomdpEnv};
 pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 
 use crate::spaces::Space;
-use rand::distributions::BernoulliError;
 use rand::{rngs::StdRng, Rng};
-use std::convert::Infallible;
 use std::f64;
-use thiserror::Error;
 
 /// The external structure of a reinforcement learning environment.
 pub trait EnvStructure {
@@ -253,30 +251,6 @@ impl<E: Environment + ?Sized> Environment for Box<E> {
     }
 }
 
-/// Builds an environment
-pub trait BuildEnv<E> {
-    /// Build an environment instance.
-    ///
-    /// # Args
-    /// * `seed` - Seed for pseudo-randomness used by the environment.
-    ///     Includes both randomization of the environment structure, and
-    ///     random sampling of step outcomes within this structure.
-    fn build_env(&self, seed: u64) -> Result<E, BuildEnvError>;
-}
-
-/// Error building an environment
-#[derive(Debug, Clone, PartialEq, Error)]
-pub enum BuildEnvError {
-    #[error(transparent)]
-    BernoulliError(#[from] BernoulliError),
-}
-
-impl From<Infallible> for BuildEnvError {
-    fn from(_: Infallible) -> Self {
-        unreachable!();
-    }
-}
-
 /// A distribution of [`Pomdp`] sharing the same external structure.
 ///
 /// The [`EnvStructure`] of each sampled environment must be a subset of the `EnvStructure` of the
@@ -324,9 +298,4 @@ where
     fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment {
         PomdpEnv::new(self.sample_pomdp(rng), rng.gen())
     }
-}
-
-/// Builds an environment distribution.
-pub trait BuildEnvDist<E> {
-    fn build_env_dist(&self) -> E;
 }

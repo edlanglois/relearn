@@ -4,7 +4,6 @@ use crate::agents::{Agent, ManagerAgent};
 use crate::envs::{BuildEnv, Environment};
 use crate::logging::TimeSeriesLogger;
 use std::convert::TryFrom;
-use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
@@ -28,27 +27,30 @@ impl MultiThreadSimulatorConfig {
         Self { num_workers }
     }
 
-    pub fn build_simulator<EB, E, MA, H>(
+    pub fn build_simulator<EB, MA, H>(
         &self,
         env_config: EB,
         manager_agent: MA,
         worker_hook: H,
     ) -> Box<dyn RunSimulation>
     where
-        EB: BuildEnv<E> + Send + Sync + 'static,
-        E: Environment + 'static,
+        EB: BuildEnv + Send + Sync + 'static,
+        <EB as BuildEnv>::Environment: Environment + 'static,
         MA: ManagerAgent + 'static,
-        <MA as ManagerAgent>::Worker:
-            Agent<<E as Environment>::Observation, <E as Environment>::Action> + 'static,
-        <E as Environment>::Observation: Clone,
-        H: SimulationHook<<E as Environment>::Observation, <E as Environment>::Action>
-            + Clone
+        <MA as ManagerAgent>::Worker: Agent<
+                <<EB as BuildEnv>::Environment as Environment>::Observation,
+                <<EB as BuildEnv>::Environment as Environment>::Action,
+            > + 'static,
+        <<EB as BuildEnv>::Environment as Environment>::Observation: Clone,
+        H: SimulationHook<
+                <<EB as BuildEnv>::Environment as Environment>::Observation,
+                <<EB as BuildEnv>::Environment as Environment>::Action,
+            > + Clone
             + Send
             + 'static,
     {
         Box::new(MultiThreadSimulator {
             env_builder: Arc::new(RwLock::new(env_config)),
-            env_type: PhantomData::<*const E>,
             manager_agent,
             num_workers: self.num_workers,
             worker_hook,
@@ -57,26 +59,27 @@ impl MultiThreadSimulatorConfig {
 }
 
 /// Multi-thread simulator
-pub struct MultiThreadSimulator<EB, E, MA, H> {
+pub struct MultiThreadSimulator<EB, MA, H> {
     env_builder: Arc<RwLock<EB>>,
-    // *const E to avoid indicating ownership. See:
-    // https://doc.rust-lang.org/std/marker/struct.PhantomData.html#ownership-and-the-drop-check
-    env_type: PhantomData<*const E>,
     manager_agent: MA,
     num_workers: usize,
     worker_hook: H,
 }
 
-impl<EB, E, MA, H> RunSimulation for MultiThreadSimulator<EB, E, MA, H>
+impl<EB, MA, H> RunSimulation for MultiThreadSimulator<EB, MA, H>
 where
-    EB: BuildEnv<E> + Send + Sync + 'static,
-    E: Environment,
+    EB: BuildEnv + Send + Sync + 'static,
+    <EB as BuildEnv>::Environment: Environment,
     MA: ManagerAgent,
-    <MA as ManagerAgent>::Worker:
-        Agent<<E as Environment>::Observation, <E as Environment>::Action> + 'static,
-    <E as Environment>::Observation: Clone,
-    H: SimulationHook<<E as Environment>::Observation, <E as Environment>::Action>
-        + Clone
+    <MA as ManagerAgent>::Worker: Agent<
+            <<EB as BuildEnv>::Environment as Environment>::Observation,
+            <<EB as BuildEnv>::Environment as Environment>::Action,
+        > + 'static,
+    <<EB as BuildEnv>::Environment as Environment>::Observation: Clone,
+    H: SimulationHook<
+            <<EB as BuildEnv>::Environment as Environment>::Observation,
+            <<EB as BuildEnv>::Environment as Environment>::Action,
+        > + Clone
         + Send
         + 'static,
 {
@@ -91,21 +94,25 @@ where
     }
 }
 
-pub fn run_agent_multithread<EB, E, MA, H>(
+pub fn run_agent_multithread<EB, MA, H>(
     env_config: &Arc<RwLock<EB>>,
     agent_manager: &mut MA,
     num_workers: usize,
     worker_hook: &H,
     logger: &mut dyn TimeSeriesLogger,
 ) where
-    EB: BuildEnv<E> + Send + Sync + 'static,
-    E: Environment,
+    EB: BuildEnv + Send + Sync + 'static,
+    <EB as BuildEnv>::Environment: Environment,
     MA: ManagerAgent,
-    <MA as ManagerAgent>::Worker:
-        Agent<<E as Environment>::Observation, <E as Environment>::Action> + 'static,
-    <E as Environment>::Observation: Clone,
-    H: SimulationHook<<E as Environment>::Observation, <E as Environment>::Action>
-        + Clone
+    <MA as ManagerAgent>::Worker: Agent<
+            <<EB as BuildEnv>::Environment as Environment>::Observation,
+            <<EB as BuildEnv>::Environment as Environment>::Action,
+        > + 'static,
+    <<EB as BuildEnv>::Environment as Environment>::Observation: Clone,
+    H: SimulationHook<
+            <<EB as BuildEnv>::Environment as Environment>::Observation,
+            <<EB as BuildEnv>::Environment as Environment>::Action,
+        > + Clone
         + Send
         + 'static,
 {
@@ -117,7 +124,7 @@ pub fn run_agent_multithread<EB, E, MA, H>(
         let mut worker = agent_manager.make_worker(env_seed + 1);
         let mut hook = worker_hook.clone();
         worker_threads.push(thread::spawn(move || {
-            let mut env: E = (*env_config_.read().unwrap()).build_env(env_seed).unwrap();
+            let mut env = (*env_config_.read().unwrap()).build_env(env_seed).unwrap();
             drop(env_config_);
             run_agent(&mut env, &mut worker, &mut hook, &mut ());
         }));
