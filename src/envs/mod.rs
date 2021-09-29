@@ -278,10 +278,13 @@ pub trait PomdpDistribution: EnvStructure {
 /// distribution as a whole. The discount factors must be identical.
 /// The transition dynamics of the individual environment samples may differ.
 pub trait EnvDistribution: EnvStructure {
-    type Environment: EnvStructure<
-        ObservationSpace = <Self as EnvStructure>::ObservationSpace,
-        ActionSpace = <Self as EnvStructure>::ActionSpace,
-    >;
+    type Environment: Environment<
+            Observation = <<Self as EnvStructure>::ObservationSpace as Space>::Element,
+            Action = <<Self as EnvStructure>::ActionSpace as Space>::Element,
+        > + EnvStructure<
+            ObservationSpace = <Self as EnvStructure>::ObservationSpace,
+            ActionSpace = <Self as EnvStructure>::ActionSpace,
+        >;
 
     /// Sample an environment from the distribution.
     ///

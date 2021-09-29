@@ -235,8 +235,12 @@ impl<EB: Default> Default for MetaEnvConfig<EB> {
 impl<EB> BuildEnv for MetaEnvConfig<EB>
 where
     EB: BuildEnvDist,
-    <EB as BuildEnvDist>::EnvDistribution: EnvDistribution,
+    <EB as BuildEnvDist>::Action: Copy,
 {
+    type Observation = <Self::ObservationSpace as Space>::Element;
+    type Action = <Self::ActionSpace as Space>::Element;
+    type ObservationSpace = <Self::Environment as EnvStructure>::ObservationSpace;
+    type ActionSpace = <Self::Environment as EnvStructure>::ActionSpace;
     type Environment = MetaEnv<EB::EnvDistribution>;
 
     fn build_env(&self, seed: u64) -> Result<Self::Environment, BuildEnvError> {

@@ -1,5 +1,7 @@
 //! Environment builder traits
-use super::{EnvDistribution, EnvStructure, IntoEnv, Pomdp, PomdpDistribution, PomdpEnv};
+use super::{
+    EnvDistribution, EnvStructure, Environment, IntoEnv, Pomdp, PomdpDistribution, PomdpEnv,
+};
 use crate::spaces::Space;
 use std::convert::Infallible;
 use thiserror::Error;
@@ -45,7 +47,12 @@ where
 /// reproducibility: a given environment configuration can construct exactly one environment.
 /// The user does not need to store the environment type.
 pub trait BuildEnv {
-    type Environment;
+    type Observation;
+    type Action;
+    type ObservationSpace: Space<Element = Self::Observation>;
+    type ActionSpace: Space<Element = Self::Action>;
+    type Environment: Environment<Observation = Self::Observation, Action = Self::Action>
+        + EnvStructure<ObservationSpace = Self::ObservationSpace, ActionSpace = Self::ActionSpace>;
 
     /// Build an environment instance.
     ///
@@ -56,11 +63,11 @@ pub trait BuildEnv {
     fn build_env(&self, seed: u64) -> Result<Self::Environment, BuildEnvError>;
 }
 
-impl<T> BuildEnv for T
-where
-    T: BuildPomdp,
-    <T as BuildPomdp>::Pomdp: Pomdp,
-{
+impl<T: BuildPomdp> BuildEnv for T {
+    type Observation = <Self as BuildPomdp>::Observation;
+    type Action = <Self as BuildPomdp>::Action;
+    type ObservationSpace = <Self as BuildPomdp>::ObservationSpace;
+    type ActionSpace = <Self as BuildPomdp>::ActionSpace;
     type Environment = PomdpEnv<T::Pomdp>;
 
     fn build_env(&self, seed: u64) -> Result<Self::Environment, BuildEnvError> {
@@ -113,7 +120,14 @@ where
 
 /// Build an [`EnvDistribution`].
 pub trait BuildEnvDist {
-    type EnvDistribution;
+    type Observation;
+    type Action;
+    type ObservationSpace: Space<Element = Self::Observation>;
+    type ActionSpace: Space<Element = Self::Action>;
+    type EnvDistribution: EnvDistribution<
+        ObservationSpace = Self::ObservationSpace,
+        ActionSpace = Self::ActionSpace,
+    >;
 
     /// Build an environment distribution instance.
     fn build_env_dist(&self) -> Self::EnvDistribution;
@@ -123,6 +137,10 @@ impl<T> BuildEnvDist for T
 where
     T: EnvDistribution + CloneBuild,
 {
+    type Observation = <<Self as BuildEnvDist>::ObservationSpace as Space>::Element;
+    type Action = <<Self as BuildEnvDist>::ActionSpace as Space>::Element;
+    type ObservationSpace = <Self as EnvStructure>::ObservationSpace;
+    type ActionSpace = <Self as EnvStructure>::ActionSpace;
     type EnvDistribution = Self;
 
     fn build_env_dist(&self) -> Self::EnvDistribution {

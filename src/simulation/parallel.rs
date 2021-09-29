@@ -1,7 +1,7 @@
 use super::hooks::SimulationHook;
 use super::{run_agent, RunSimulation};
 use crate::agents::{Agent, ManagerAgent};
-use crate::envs::{BuildEnv, Environment};
+use crate::envs::BuildEnv;
 use crate::logging::TimeSeriesLogger;
 use std::convert::TryFrom;
 use std::sync::{Arc, RwLock};
@@ -35,17 +35,13 @@ impl MultiThreadSimulatorConfig {
     ) -> Box<dyn RunSimulation>
     where
         EB: BuildEnv + Send + Sync + 'static,
-        <EB as BuildEnv>::Environment: Environment + 'static,
+        <EB as BuildEnv>::Environment: 'static,
         MA: ManagerAgent + 'static,
-        <MA as ManagerAgent>::Worker: Agent<
-                <<EB as BuildEnv>::Environment as Environment>::Observation,
-                <<EB as BuildEnv>::Environment as Environment>::Action,
-            > + 'static,
-        <<EB as BuildEnv>::Environment as Environment>::Observation: Clone,
-        H: SimulationHook<
-                <<EB as BuildEnv>::Environment as Environment>::Observation,
-                <<EB as BuildEnv>::Environment as Environment>::Action,
-            > + Clone
+        <MA as ManagerAgent>::Worker:
+            Agent<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action> + 'static,
+        <EB as BuildEnv>::Observation: Clone,
+        H: SimulationHook<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action>
+            + Clone
             + Send
             + 'static,
     {
@@ -69,17 +65,12 @@ pub struct MultiThreadSimulator<EB, MA, H> {
 impl<EB, MA, H> RunSimulation for MultiThreadSimulator<EB, MA, H>
 where
     EB: BuildEnv + Send + Sync + 'static,
-    <EB as BuildEnv>::Environment: Environment,
     MA: ManagerAgent,
-    <MA as ManagerAgent>::Worker: Agent<
-            <<EB as BuildEnv>::Environment as Environment>::Observation,
-            <<EB as BuildEnv>::Environment as Environment>::Action,
-        > + 'static,
-    <<EB as BuildEnv>::Environment as Environment>::Observation: Clone,
-    H: SimulationHook<
-            <<EB as BuildEnv>::Environment as Environment>::Observation,
-            <<EB as BuildEnv>::Environment as Environment>::Action,
-        > + Clone
+    <MA as ManagerAgent>::Worker:
+        Agent<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action> + 'static,
+    <EB as BuildEnv>::Observation: Clone,
+    H: SimulationHook<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action>
+        + Clone
         + Send
         + 'static,
 {
@@ -102,17 +93,12 @@ pub fn run_agent_multithread<EB, MA, H>(
     logger: &mut dyn TimeSeriesLogger,
 ) where
     EB: BuildEnv + Send + Sync + 'static,
-    <EB as BuildEnv>::Environment: Environment,
     MA: ManagerAgent,
-    <MA as ManagerAgent>::Worker: Agent<
-            <<EB as BuildEnv>::Environment as Environment>::Observation,
-            <<EB as BuildEnv>::Environment as Environment>::Action,
-        > + 'static,
-    <<EB as BuildEnv>::Environment as Environment>::Observation: Clone,
-    H: SimulationHook<
-            <<EB as BuildEnv>::Environment as Environment>::Observation,
-            <<EB as BuildEnv>::Environment as Environment>::Action,
-        > + Clone
+    <MA as ManagerAgent>::Worker:
+        Agent<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action> + 'static,
+    <EB as BuildEnv>::Observation: Clone,
+    H: SimulationHook<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action>
+        + Clone
         + Send
         + 'static,
 {
