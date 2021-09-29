@@ -83,7 +83,13 @@ impl<E: Default> Default for MetaPomdp<E> {
 impl<EB> BuildPomdp for MetaPomdp<EB>
 where
     EB: BuildPomdpDist,
+    <EB as BuildPomdpDist>::Action: Copy,
 {
+    type State = <Self::Pomdp as Pomdp>::State;
+    type Observation = <Self::Pomdp as Pomdp>::Observation;
+    type Action = <Self::Pomdp as Pomdp>::Action;
+    type ObservationSpace = <Self::Pomdp as EnvStructure>::ObservationSpace;
+    type ActionSpace = <Self::Pomdp as EnvStructure>::ActionSpace;
     type Pomdp = MetaPomdp<EB::PomdpDistribution>;
 
     fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {
@@ -118,7 +124,6 @@ where
 impl<E> Pomdp for MetaPomdp<E>
 where
     E: PomdpDistribution,
-    <E as PomdpDistribution>::Pomdp: Pomdp,
     <<E as PomdpDistribution>::Pomdp as Pomdp>::Action: Copy,
 {
     type State = MetaState<E::Pomdp>;

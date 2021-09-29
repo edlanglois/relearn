@@ -3,14 +3,15 @@ use super::{AgentDef, MultiThreadAgentDef};
 use crate::agents::{BuildAgent, BuildManagerAgent};
 use crate::envs::{
     Bandit, BuildEnv, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps,
-    EnvStructure, MemoryGame as MemoryGameEnv, MetaPomdp, OneHotBandits, UniformBernoulliBandits,
-    WithStepLimit,
+    EnvStructure, MemoryGame as MemoryGameEnv, MetaPomdp, OneHotBandits, Pomdp,
+    UniformBernoulliBandits, WithStepLimit,
 };
 use crate::error::RLError;
 use crate::simulation::{
     hooks::StepLogger, GenericSimulationHook, MultiThreadSimulatorConfig, RunSimulation, Simulator,
 };
-use crate::utils::distributions::{Bernoulli, Deterministic, FromMean};
+use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
+use rand::distributions::Distribution;
 use std::borrow::{Borrow, Cow};
 use std::error::Error;
 use std::marker::PhantomData;
@@ -81,9 +82,14 @@ impl<D> From<BanditMeanRewards> for BanditConfig<'static, D> {
 
 impl<'a, D: FromMean<f64>> BuildPomdp for BanditConfig<'a, D>
 where
-    D: FromMean<f64>,
+    D: FromMean<f64> + Distribution<f64> + Bounded<f64>,
     <D as FromMean<f64>>::Error: Error + 'static,
 {
+    type State = <Self::Pomdp as Pomdp>::State;
+    type Observation = <Self::Pomdp as Pomdp>::Observation;
+    type Action = <Self::Pomdp as Pomdp>::Action;
+    type ObservationSpace = <Self::Pomdp as EnvStructure>::ObservationSpace;
+    type ActionSpace = <Self::Pomdp as EnvStructure>::ActionSpace;
     type Pomdp = Bandit<D>;
 
     fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {

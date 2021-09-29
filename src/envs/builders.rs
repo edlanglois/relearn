@@ -1,5 +1,6 @@
 //! Environment builder traits
-use super::{EnvDistribution, IntoEnv, Pomdp, PomdpDistribution, PomdpEnv};
+use super::{EnvDistribution, EnvStructure, IntoEnv, Pomdp, PomdpDistribution, PomdpEnv};
+use crate::spaces::Space;
 use std::convert::Infallible;
 use thiserror::Error;
 
@@ -8,13 +9,29 @@ pub trait CloneBuild: Clone {}
 
 /// Build a [`Pomdp`].
 pub trait BuildPomdp {
-    type Pomdp;
+    type State;
+    type Observation;
+    type Action;
+    type ObservationSpace: Space<Element = Self::Observation>;
+    type ActionSpace: Space<Element = Self::Action>;
+    type Pomdp: Pomdp<State = Self::State, Observation = Self::Observation, Action = Self::Action>
+        + EnvStructure<ObservationSpace = Self::ObservationSpace, ActionSpace = Self::ActionSpace>;
 
     /// Build a [`Pomdp`] instance.
     fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError>;
 }
 
-impl<E: Pomdp + CloneBuild> BuildPomdp for E {
+impl<E> BuildPomdp for E
+where
+    E: Pomdp + EnvStructure + CloneBuild,
+    <E as EnvStructure>::ObservationSpace: Space<Element = <Self as Pomdp>::Observation>,
+    <E as EnvStructure>::ActionSpace: Space<Element = <Self as Pomdp>::Action>,
+{
+    type State = <Self as Pomdp>::State;
+    type Observation = <Self as Pomdp>::Observation;
+    type Action = <Self as Pomdp>::Action;
+    type ObservationSpace = <Self as EnvStructure>::ObservationSpace;
+    type ActionSpace = <Self as EnvStructure>::ActionSpace;
     type Pomdp = Self;
 
     fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {
@@ -66,7 +83,14 @@ impl From<Infallible> for BuildEnvError {
 
 /// Build a [`PomdpDistribution`].
 pub trait BuildPomdpDist {
-    type PomdpDistribution;
+    type Observation;
+    type Action;
+    type ObservationSpace: Space<Element = Self::Observation>;
+    type ActionSpace: Space<Element = Self::Action>;
+    type PomdpDistribution: PomdpDistribution<
+        ObservationSpace = Self::ObservationSpace,
+        ActionSpace = Self::ActionSpace,
+    >;
 
     /// Build a POMDP distribution instance.
     fn build_pomdp_dist(&self) -> Self::PomdpDistribution;
@@ -76,6 +100,10 @@ impl<T> BuildPomdpDist for T
 where
     T: PomdpDistribution + CloneBuild,
 {
+    type Observation = <<Self as BuildPomdpDist>::ObservationSpace as Space>::Element;
+    type Action = <<Self as BuildPomdpDist>::ActionSpace as Space>::Element;
+    type ObservationSpace = <Self as EnvStructure>::ObservationSpace;
+    type ActionSpace = <Self as EnvStructure>::ActionSpace;
     type PomdpDistribution = Self;
 
     fn build_pomdp_dist(&self) -> Self::PomdpDistribution {

@@ -257,10 +257,13 @@ impl<E: Environment + ?Sized> Environment for Box<E> {
 /// distribution as a whole. The discount factors must be identical.
 /// The transition dynamics of the individual environment samples may differ.
 pub trait PomdpDistribution: EnvStructure {
-    type Pomdp: EnvStructure<
-        ObservationSpace = <Self as EnvStructure>::ObservationSpace,
-        ActionSpace = <Self as EnvStructure>::ActionSpace,
-    >;
+    type Pomdp: Pomdp<
+            Observation = <<Self as EnvStructure>::ObservationSpace as Space>::Element,
+            Action = <<Self as EnvStructure>::ActionSpace as Space>::Element,
+        > + EnvStructure<
+            ObservationSpace = <Self as EnvStructure>::ObservationSpace,
+            ActionSpace = <Self as EnvStructure>::ActionSpace,
+        >;
 
     /// Sample a POMDP from the distribution.
     ///

@@ -2,7 +2,8 @@ mod step_limit;
 
 pub use step_limit::{StepLimit, WithStepLimit};
 
-use super::{BuildEnvError, BuildPomdp, BuildPomdpDist, EnvStructure, PomdpDistribution};
+use super::{BuildEnvError, BuildPomdp, BuildPomdpDist, EnvStructure, Pomdp, PomdpDistribution};
+use crate::spaces::Space;
 use rand::rngs::StdRng;
 
 // TODO: WrappedEnv that provides Env, EnvDistribution, BuildEnv, BuildEnvDist
@@ -53,6 +54,11 @@ impl<T, W> PomdpDistribution for Wrapped<T, W>
 where
     T: PomdpDistribution,
     W: Clone,
+    Wrapped<T::Pomdp, W>: Pomdp<
+        // State = <<T as PomdpDistribution>::Pomdp as Pomdp>::State,
+        Observation = <<T as PomdpDistribution>::Pomdp as Pomdp>::Observation,
+        Action = <<T as PomdpDistribution>::Pomdp as Pomdp>::Action,
+    >,
 {
     type Pomdp = Wrapped<T::Pomdp, W>;
 
@@ -65,7 +71,13 @@ impl<B, W> BuildPomdp for Wrapped<B, W>
 where
     B: BuildPomdp,
     W: Clone,
+    Wrapped<B::Pomdp, W>: Pomdp<Observation = B::Observation, Action = B::Action>,
 {
+    type State = <Self::Pomdp as Pomdp>::State;
+    type Observation = <Self::Pomdp as Pomdp>::Observation;
+    type Action = <Self::Pomdp as Pomdp>::Action;
+    type ObservationSpace = <Self::Pomdp as EnvStructure>::ObservationSpace;
+    type ActionSpace = <Self::Pomdp as EnvStructure>::ActionSpace;
     type Pomdp = Wrapped<B::Pomdp, W>;
 
     fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {
@@ -80,7 +92,13 @@ impl<B, W> BuildPomdpDist for Wrapped<B, W>
 where
     B: BuildPomdpDist,
     W: Clone,
+    Wrapped<<B::PomdpDistribution as PomdpDistribution>::Pomdp, W>:
+        Pomdp<Observation = B::Observation, Action = B::Action>,
 {
+    type Observation = <Self::ObservationSpace as Space>::Element;
+    type Action = <Self::ActionSpace as Space>::Element;
+    type ObservationSpace = <Self::PomdpDistribution as EnvStructure>::ObservationSpace;
+    type ActionSpace = <Self::PomdpDistribution as EnvStructure>::ActionSpace;
     type PomdpDistribution = Wrapped<B::PomdpDistribution, W>;
 
     fn build_pomdp_dist(&self) -> Self::PomdpDistribution {
