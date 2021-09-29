@@ -1,8 +1,11 @@
-use super::super::critic::{Critic, BuildCritic};
-use super::super::history::{HistoryBuffer, LazyPackedHistoryFeatures};
-use super::super::seq_modules::StatefulIterativeModule;
-use super::super::updaters::{UpdateCritic, UpdatePolicy, BuildUpdater};
-use super::super::BuildModule;
+use super::super::{
+    critic::{BuildCritic, Critic},
+    history::{HistoryBuffer, LazyPackedHistoryFeatures},
+    policy::Policy,
+    seq_modules::StatefulIterativeModule,
+    updaters::{BuildCriticUpdater, BuildPolicyUpdater, UpdateCritic, UpdatePolicy},
+    BuildModule,
+};
 use crate::agents::{Actor, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::{Event, Logger, LoggerHelper, TimeSeriesLogger, TimeSeriesLoggerHelper};
@@ -45,23 +48,27 @@ where
     }
 }
 
-impl<OS, AS, P, PB, PU, PUB, C, CB, CU, CUB, E>
-    BuildAgent<ActorCriticAgent<OS, AS, P, PU, C, CU>, E> for ActorCriticConfig<PB, PUB, CB, CUB>
+impl<PB, PUB, CB, CUB, E> BuildAgent<E> for ActorCriticConfig<PB, PUB, CB, CUB>
 where
-    OS: Space + BaseFeatureSpace,
-    AS: ParameterizedDistributionSpace<Tensor>,
-    PB: BuildModule<P>,
-    PUB: BuildUpdater<PU>,
-    C: Critic,
-    CB: BuildCritic<C>,
-    CUB: BuildUpdater<CU>,
-    E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
+    PB: BuildModule,
+    PUB: BuildPolicyUpdater<<E as EnvStructure>::ActionSpace>,
+    CB: BuildCritic,
+    <CB as BuildCritic>::Critic: Critic,
+    CUB: BuildCriticUpdater,
+    E: EnvStructure + ?Sized,
+    <E as EnvStructure>::ObservationSpace: Space + BaseFeatureSpace,
+    <E as EnvStructure>::ActionSpace: ParameterizedDistributionSpace<Tensor>,
 {
-    fn build_agent(
-        &self,
-        env: &E,
-        _seed: u64,
-    ) -> Result<ActorCriticAgent<OS, AS, P, PU, C, CU>, BuildAgentError> {
+    type Agent = ActorCriticAgent<
+        E::ObservationSpace,
+        E::ActionSpace,
+        PB::Module,
+        PUB::Updater,
+        CB::Critic,
+        CUB::Updater,
+    >;
+
+    fn build_agent(&self, env: &E, _seed: u64) -> Result<Self::Agent, BuildAgentError> {
         Ok(ActorCriticAgent::new(env, self))
     }
 }
@@ -138,14 +145,14 @@ where
     OS: Space + BaseFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
 {
-    pub fn new<E, PB, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
+    fn new<E, PB, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
-        PB: BuildModule<P>,
-        PUB: BuildUpdater<PU>,
+        PB: BuildModule<Module = P>,
+        PUB: BuildPolicyUpdater<AS, Updater = PU>,
         C: Critic,
-        CB: BuildCritic<C>,
-        CUB: BuildUpdater<CU>,
+        CB: BuildCritic<Critic = C>,
+        CUB: BuildCriticUpdater<Updater = CU>,
     {
         let observation_space = NonEmptyFeatures::new(env.observation_space());
         let action_space = env.action_space();
@@ -159,7 +166,7 @@ where
         );
         let policy_updater = config
             .policy_updater_config
-            .build_updater(&policy_variables);
+            .build_policy_updater(&policy_variables);
 
         // A copy of the policy on the CPU for faster actions
         let (cpu_policy, cpu_policy_variables) = if config.device != Device::Cpu {
@@ -182,7 +189,7 @@ where
         let discount_factor = critic.discount_factor(env.discount_factor());
         let critic_updater = config
             .critic_updater_config
-            .build_updater(&critic_variables);
+            .build_critic_updater(&critic_variables);
 
         let history = HistoryBuffer::new(
             Some(max_steps_per_epoch),
@@ -233,9 +240,10 @@ impl<OS, AS, P, PU, C, CU> Agent<OS::Element, AS::Element>
 where
     OS: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
-    P: StatefulIterativeModule,
-    PU: UpdatePolicy<P, C, AS>,
-    CU: UpdateCritic<C>,
+    P: Policy,
+    PU: UpdatePolicy<AS>,
+    C: Critic,
+    CU: UpdateCritic,
 {
     fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn TimeSeriesLogger) {
         let episode_done = step.episode_done;
@@ -254,8 +262,10 @@ impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
     OS: BatchFeatureSpace<Tensor>,
     AS: ParameterizedDistributionSpace<Tensor>,
-    PU: UpdatePolicy<P, C, AS>,
-    CU: UpdateCritic<C>,
+    P: Policy,
+    PU: UpdatePolicy<AS>,
+    C: Critic,
+    CU: UpdateCritic,
 {
     /// Update the actor and critic using the stored history buffer.
     ///

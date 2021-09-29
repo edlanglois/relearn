@@ -4,7 +4,7 @@ use crate::logging::{Event, TimeSeriesLogger, TimeSeriesLoggerHelper};
 
 // TODO: Move the MSE training from critic/ to here
 
-/// Rule that updates a critic by minimizing its loss.
+/// Rule that updates a critic by minimizing its loss for several optimizer iterations.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct CriticLossUpdateRule {
     /// Number of optimizer iterations per update
@@ -19,14 +19,13 @@ impl Default for CriticLossUpdateRule {
     }
 }
 
-impl<C, O> UpdateCriticWithOptimizer<C, O> for CriticLossUpdateRule
+impl<O> UpdateCriticWithOptimizer<O> for CriticLossUpdateRule
 where
-    C: Critic + ?Sized,
     O: Optimizer + ?Sized,
 {
     fn update_critic_with_optimizer(
         &self,
-        critic: &C,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
         logger: &mut dyn TimeSeriesLogger,

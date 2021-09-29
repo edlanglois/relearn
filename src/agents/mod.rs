@@ -16,10 +16,10 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
-pub use batch_update::{BatchUpdate, BatchUpdateAgent, OffPolicyAgent};
-use finite::FiniteSpaceAgent;
-pub use meta::ResettingMetaAgent;
-pub use multithread::{MutexAgentManager, MutexAgentWorker};
+pub use batch_update::{BatchUpdate, BatchUpdateAgent, BatchUpdateAgentConfig, OffPolicyAgent};
+use finite::{BuildIndexAgent, FiniteSpaceAgent};
+pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
+pub use multithread::{MutexAgentConfig, MutexAgentManager, MutexAgentWorker};
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
@@ -133,6 +133,21 @@ pub trait SetActorMode {
     }
 }
 
+// TODO: Replace with BuildMultithreadAgent that constructs a manager and n workers
+// Or maybe builds MultiThreadAgentInitializer with the methods
+// make_worker(&self) -> Self::Worker and
+// into_manager(self) -> Self::Manager
+
+pub trait BuildManagerAgent<E: ?Sized> {
+    type ManagerAgent;
+
+    fn build_manager_agent(
+        &self,
+        env: &E,
+        seed: u64,
+    ) -> Result<Self::ManagerAgent, BuildAgentError>;
+}
+
 /// A manager agent for a set of multi-threaded workers.
 ///
 /// Each worker will be sent to its own thread while the manager is run on the original thread.
@@ -206,17 +221,17 @@ where
 }
 
 /// Build an agent instance.
-pub trait BuildAgent<T, E: ?Sized> {
+pub trait BuildAgent<E: ?Sized> {
+    /// The agent type to build.
+    type Agent;
+
     /// Build an agent for the given environment structure.
-    ///
-    /// If the agent supports [`ActorMode`]
-    /// then the agent must be initialized in [`Training`][`ActorMode::Training`] mode.
     ///
     /// # Args
     /// * `env`  - The structure of the environment in which the agent is to operate.
     /// * `seed` - A number used to seed the agent's random state,
     ///            for those agents that use deterministic pseudo-random number generation.
-    fn build_agent(&self, env: &E, seed: u64) -> Result<T, BuildAgentError>;
+    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError>;
 }
 
 /// Error building an agent

@@ -148,11 +148,12 @@ pub enum OptimizerStepError {
 }
 
 /// Build an optimizer
-pub trait BuildOptimizer<T> {
+pub trait BuildOptimizer {
+    type Optimizer;
     type Error: Error;
 
     /// Build an optimizer for the trainable variables in a variable store.
-    fn build_optimizer(&self, vs: &VarStore) -> Result<T, Self::Error>;
+    fn build_optimizer(&self, vs: &VarStore) -> Result<Self::Optimizer, Self::Error>;
 }
 
 #[cfg(test)]
@@ -160,10 +161,10 @@ mod testing {
     use super::*;
     use tch::{Device, Kind};
 
-    pub fn check_optimizes_quadratic<O, OB>(builder: &OB, num_steps: u64)
+    pub fn check_optimizes_quadratic<OC>(optimizer_config: &OC, num_steps: u64)
     where
-        O: Optimizer,
-        OB: BuildOptimizer<O>,
+        OC: BuildOptimizer,
+        <OC as BuildOptimizer>::Optimizer: Optimizer,
     {
         // Minimize f(x) = 1/2*x'Mx + b'x
         // with M = [1  -1]  b = [ 2]
@@ -175,7 +176,7 @@ mod testing {
 
         let vs = VarStore::new(Device::Cpu);
         let x = vs.root().f_zeros("x", &[2]).unwrap();
-        let mut optimizer = builder.build_optimizer(&vs).unwrap();
+        let mut optimizer = optimizer_config.build_optimizer(&vs).unwrap();
 
         let loss_fn = || m.mv(&x).dot(&x) / 2 + b.dot(&x);
 
@@ -192,10 +193,10 @@ mod testing {
         );
     }
 
-    pub fn check_trust_region_optimizes_quadratic<O, OB>(builder: &OB, num_steps: u64)
+    pub fn check_trust_region_optimizes_quadratic<OC>(optimizer_config: &OC, num_steps: u64)
     where
-        O: TrustRegionOptimizer,
-        OB: BuildOptimizer<O>,
+        OC: BuildOptimizer,
+        <OC as BuildOptimizer>::Optimizer: TrustRegionOptimizer,
     {
         // Minimize f(x) = 1/2*x'Mx + b'x
         // with M = [1  -1]  b = [ 2]
@@ -207,7 +208,7 @@ mod testing {
 
         let vs = VarStore::new(Device::Cpu);
         let x = vs.root().zeros("x", &[2]);
-        let optimizer = builder.build_optimizer(&vs).unwrap();
+        let optimizer = optimizer_config.build_optimizer(&vs).unwrap();
 
         let x_last = x.detach().copy();
         let loss_distance_fn = || {

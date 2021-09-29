@@ -3,7 +3,7 @@ use crate::agents::{
     BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::defs::{
-    AgentDef, CriticDef, CriticUpdaterDef, MultiThreadAgentDef, PolicyUpdaterDef, SeqModDef,
+    AgentDef, CriticDef, CriticUpdaterDef, MultiThreadAgentDef, PolicyDef, PolicyUpdaterDef,
 };
 use crate::torch::agents::ActorCriticConfig;
 use clap::ArgEnum;
@@ -213,7 +213,7 @@ impl Update<&Options> for UCB1AgentConfig {
 }
 
 impl Update<&Options>
-    for ActorCriticConfig<SeqModDef, PolicyUpdaterDef, CriticDef, CriticUpdaterDef>
+    for ActorCriticConfig<PolicyDef, PolicyUpdaterDef, CriticDef, CriticUpdaterDef>
 {
     fn update(&mut self, opts: &Options) {
         self.policy_config.update(opts);

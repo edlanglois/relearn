@@ -1,6 +1,8 @@
-use super::history::HistoryBuffer;
+use super::history::{BuildHistoryBuffer, HistoryBuffer};
 use super::{Actor, ActorMode, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
+use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
+use crate::spaces::Space;
 
 /// An agent that can update from a batch of on-policy history steps.
 pub trait BatchUpdate<O, A> {
@@ -28,20 +30,36 @@ impl<T: OffPolicyAgent + Agent<O, A>, O, A> BatchUpdate<O, A> for T {
 }
 
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
-pub struct BatchUpdateAgentConfig<B, HBB> {
-    pub actor_config: B,
-    pub history_buffer_config: HBB,
+pub struct BatchUpdateAgentConfig<AC, HBC> {
+    pub actor_config: AC,
+    pub history_buffer_config: HBC,
 }
 
-impl<T, B, HB, HBB, E> BuildAgent<BatchUpdateAgent<T, HB>, E> for BatchUpdateAgentConfig<B, HBB>
+impl<AC, HBC> BatchUpdateAgentConfig<AC, HBC> {
+    pub const fn new(actor_config: AC, history_buffer_config: HBC) -> Self {
+        Self {
+            actor_config,
+            history_buffer_config,
+        }
+    }
+}
+
+impl<AC, HBC, E> BuildAgent<E> for BatchUpdateAgentConfig<AC, HBC>
 where
-    B: BuildAgent<T, E>,
-    HB: for<'a> From<&'a HBB>,
-    E: ?Sized,
+    AC: BuildAgent<E>,
+    HBC: BuildHistoryBuffer<
+        <<E as EnvStructure>::ObservationSpace as Space>::Element,
+        <<E as EnvStructure>::ActionSpace as Space>::Element,
+    >,
+    E: EnvStructure + ?Sized,
+    <E as EnvStructure>::ObservationSpace: Space,
+    <E as EnvStructure>::ActionSpace: Space,
 {
-    fn build_agent(&self, env: &E, seed: u64) -> Result<BatchUpdateAgent<T, HB>, BuildAgentError> {
+    type Agent = BatchUpdateAgent<AC::Agent, HBC::HistoryBuffer>;
+
+    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         let actor = self.actor_config.build_agent(env, seed)?;
-        let history = (&self.history_buffer_config).into();
+        let history = self.history_buffer_config.build_history_buffer();
         Ok(BatchUpdateAgent { actor, history })
     }
 }
@@ -87,26 +105,19 @@ where
 #[cfg(test)]
 mod batch_tabular_q_learning {
     use super::super::{
-        history::{EpisodeBuffer, EpisodeBufferConfig},
-        testing, TabularQLearningAgent, TabularQLearningAgentConfig,
+        history::EpisodeBufferConfig, testing, BuildAgent, TabularQLearningAgentConfig,
     };
     use super::*;
 
     #[test]
     fn learns_determinstic_bandit() {
-        let config = BatchUpdateAgentConfig {
-            actor_config: TabularQLearningAgentConfig::default(),
-            history_buffer_config: EpisodeBufferConfig {
+        let config = BatchUpdateAgentConfig::new(
+            TabularQLearningAgentConfig::default(),
+            EpisodeBufferConfig {
                 ep_done_step_threshold: 20,
                 step_threshold: 25,
             },
-        };
-        testing::train_deterministic_bandit(
-            |env_structure| -> BatchUpdateAgent<TabularQLearningAgent<_, _>, EpisodeBuffer<_, _>> {
-                config.build_agent(env_structure, 0).unwrap()
-            },
-            1000,
-            0.9,
         );
+        testing::train_deterministic_bandit(|env| config.build_agent(env, 0).unwrap(), 1000, 0.9);
     }
 }

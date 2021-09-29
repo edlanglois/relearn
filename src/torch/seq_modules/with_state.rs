@@ -4,6 +4,30 @@ use crate::torch::backends::CudnnSupport;
 use std::borrow::Borrow;
 use tch::{nn::Path, Tensor};
 
+/// Configuration for [`WithState`].
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct WithStateConfig<T> {
+    pub module_config: T,
+}
+
+impl<T> From<T> for WithStateConfig<T> {
+    fn from(module_config: T) -> Self {
+        Self { module_config }
+    }
+}
+
+impl<T> BuildModule for WithStateConfig<T>
+where
+    T: BuildModule,
+    <T as BuildModule>::Module: IterativeModule,
+{
+    type Module = WithState<T::Module>;
+
+    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
+        self.module_config.build_module(vs, in_dim, out_dim).into()
+    }
+}
+
 /// [`IterativeModule`] wrapper that also stores the state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WithState<T: IterativeModule> {
@@ -48,9 +72,8 @@ where
     }
 }
 
-// Note: Consider deleting this.
-// It is currently unused and can lead the compiler to try
-// an infinite regression of WithState<WithState<...>>
+// TODO: Consider deleting this.
+// It can lead the compiler to try an infinite regression of WithState<WithState<...>>
 //
 // As an alternative, could implement Deref<T> for WithState<T>.
 impl<T> IterativeModule for WithState<T>
@@ -75,20 +98,10 @@ where
     }
 }
 
-impl<T, MB> BuildModule<WithState<T>> for MB
-where
-    MB: BuildModule<T>,
-    T: IterativeModule,
-{
-    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> WithState<T> {
-        self.build_module(vs, in_dim, out_dim).into()
-    }
-}
-
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod with_state {
-    use super::super::{testing, Gru, MlpConfig, RnnConfig};
+    use super::super::{testing, Gru, GruConfig, MlpConfig};
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{nn, nn::LinearConfig, Device};
@@ -140,9 +153,9 @@ mod with_state {
 
     #[test]
     fn linear_module_builder() {
-        let config = MlpConfig::default();
+        let config = WithStateConfig::from(MlpConfig::default());
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: WithState<nn::Sequential> = config.build_module(&vs.root(), 1, 1);
+        let _ = config.build_module(&vs.root(), 1, 1);
     }
 
     #[rstest]
@@ -169,8 +182,8 @@ mod with_state {
 
     #[test]
     fn gru_module_builder() {
-        let config = RnnConfig::default();
+        let config = WithStateConfig::from(GruConfig::default());
         let vs = nn::VarStore::new(Device::Cpu);
-        let _: WithState<Gru> = config.build_module(&vs.root(), 1, 1);
+        let _ = config.build_module(&vs.root(), 1, 1);
     }
 }

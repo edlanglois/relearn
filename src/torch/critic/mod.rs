@@ -50,13 +50,15 @@ pub trait Critic {
 }
 
 /// Build a [`Critic`] instance.
-pub trait BuildCritic<T> {
+pub trait BuildCritic {
+    type Critic;
+
     /// Build a new [`Critic`] instance.
     ///
     /// # Args
     /// * `vs` - Variable store and namespace.
     /// * `in_dim` - Number of input feature dimensions.
-    fn build_critic(&self, vs: &Path, in_dim: usize) -> T;
+    fn build_critic(&self, vs: &Path, in_dim: usize) -> Self::Critic;
 }
 
 /// Value steps using the empirical discounted step return.
@@ -83,9 +85,11 @@ impl Critic for Return {
     }
 }
 
-impl BuildCritic<Self> for Return {
-    fn build_critic(&self, _: &Path, _: usize) -> Self {
-        Return
+impl BuildCritic for Return {
+    type Critic = Self;
+
+    fn build_critic(&self, _vs: &Path, _in_dim: usize) -> Self::Critic {
+        Self
     }
 }
 

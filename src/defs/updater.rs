@@ -1,12 +1,9 @@
 use super::OptimizerDef;
 use crate::spaces::ParameterizedDistributionSpace;
-use crate::torch::backends::CudnnSupport;
-use crate::torch::critic::Critic;
-use crate::torch::optimizers::{ConjugateGradientOptimizerConfig, BuildOptimizer};
-use crate::torch::seq_modules::SequenceModule;
+use crate::torch::optimizers::{BuildOptimizer, ConjugateGradientOptimizerConfig};
 use crate::torch::updaters::{
-    CriticLossUpdateRule, PolicyGradientUpdateRule, PpoPolicyUpdateRule, TrpoPolicyUpdateRule,
-    UpdateCritic, UpdatePolicy, BuildUpdater, WithOptimizer,
+    BuildCriticUpdater, BuildPolicyUpdater, CriticLossUpdateRule, PolicyGradientUpdateRule,
+    PpoPolicyUpdateRule, TrpoPolicyUpdateRule, UpdateCritic, UpdatePolicy, WithOptimizer,
 };
 use tch::{nn::VarStore, Tensor};
 
@@ -39,13 +36,13 @@ impl PolicyUpdaterDef {
     }
 }
 
-impl<P, C, AS> BuildUpdater<Box<dyn UpdatePolicy<P, C, AS>>> for PolicyUpdaterDef
+impl<AS> BuildPolicyUpdater<AS> for PolicyUpdaterDef
 where
-    P: SequenceModule + CudnnSupport + ?Sized,
-    C: Critic + ?Sized,
     AS: ParameterizedDistributionSpace<Tensor> + ?Sized,
 {
-    fn build_updater(&self, vs: &VarStore) -> Box<dyn UpdatePolicy<P, C, AS>> {
+    type Updater = Box<dyn UpdatePolicy<AS>>;
+
+    fn build_policy_updater(&self, vs: &VarStore) -> Self::Updater {
         use PolicyUpdaterDef::*;
         match self {
             PolicyGradient(update_rule, optimizer_def) => Box::new(WithOptimizer {
@@ -76,11 +73,10 @@ impl Default for CriticUpdaterDef {
     }
 }
 
-impl<C> BuildUpdater<Box<dyn UpdateCritic<C>>> for CriticUpdaterDef
-where
-    C: Critic + ?Sized,
-{
-    fn build_updater(&self, vs: &VarStore) -> Box<dyn UpdateCritic<C>> {
+impl BuildCriticUpdater for CriticUpdaterDef {
+    type Updater = Box<dyn UpdateCritic>;
+
+    fn build_critic_updater(&self, vs: &VarStore) -> Self::Updater {
         use CriticUpdaterDef::*;
         match self {
             CriticLoss(update_rule, optimizer_def) => Box::new(WithOptimizer {

@@ -1,44 +1,37 @@
 //! PPO actor-critic tests
 use crate::agents::{testing, BuildAgent};
-use crate::torch::agents::{ActorCriticAgent, ActorCriticConfig};
-use crate::torch::critic::{Critic, BuildCritic, Gae, GaeConfig, Return};
-use crate::torch::modules::{MlpConfig, BuildModule};
+use crate::torch::agents::ActorCriticConfig;
+use crate::torch::critic::{BuildCritic, Critic, GaeConfig, Return};
+use crate::torch::modules::{BuildModule, MlpConfig};
 use crate::torch::optimizers::AdamConfig;
-use crate::torch::seq_modules::{
-    GruMlp, RnnMlpConfig, SequenceModule, StatefulIterativeModule, WithState,
-};
+use crate::torch::policy::Policy;
+use crate::torch::seq_modules::{GruMlpConfig, WithStateConfig};
 use crate::torch::updaters::{CriticLossUpdateRule, PpoPolicyUpdateRule, WithOptimizer};
-use tch::{nn::Sequential, Device};
+use tch::Device;
 
-fn test_train_policy_gradient<P, PB, V, VB>(
+fn test_train_policy_gradient<PB, CB>(
     mut config: ActorCriticConfig<
         PB,
         WithOptimizer<PpoPolicyUpdateRule, AdamConfig>,
-        VB,
+        CB,
         WithOptimizer<CriticLossUpdateRule, AdamConfig>,
     >,
 ) where
-    P: SequenceModule + StatefulIterativeModule,
-    PB: BuildModule<P>,
-    V: Critic,
-    VB: BuildCritic<V>,
+    PB: BuildModule,
+    <PB as BuildModule>::Module: Policy,
+    CB: BuildCritic,
+    <CB as BuildCritic>::Critic: Critic,
 {
     // Speed up learning for this simple environment
     config.steps_per_epoch = 25;
     config.policy_updater_config.optimizer.learning_rate = 0.1;
     config.critic_updater_config.optimizer.learning_rate = 0.1;
-    testing::train_deterministic_bandit(
-        |env_structure| -> ActorCriticAgent<_, _, P, _, V, _> {
-            config.build_agent(env_structure, 0).unwrap()
-        },
-        1_000,
-        0.9,
-    );
+    testing::train_deterministic_bandit(|env| config.build_agent(env, 0).unwrap(), 1_000, 0.9);
 }
 
 #[test]
 fn default_mlp_return_learns_derministic_bandit() {
-    test_train_policy_gradient::<Sequential, MlpConfig, Return, Return>(Default::default())
+    test_train_policy_gradient::<MlpConfig, Return>(Default::default())
 }
 
 #[test]
@@ -47,39 +40,31 @@ fn default_mlp_return_learns_derministic_bandit_cuda_if_available() {
         device: Device::cuda_if_available(),
         ..ActorCriticConfig::default()
     };
-    test_train_policy_gradient::<Sequential, MlpConfig, Return, Return>(config)
+    test_train_policy_gradient::<MlpConfig, Return>(config)
 }
 
 #[test]
 fn default_mlp_gae_mlp_learns_derministic_bandit() {
-    test_train_policy_gradient::<Sequential, MlpConfig, Gae<Sequential>, GaeConfig<MlpConfig>>(
+    test_train_policy_gradient::<MlpConfig, GaeConfig<MlpConfig>>(Default::default())
+}
+
+#[test]
+fn default_gru_mlp_return_learns_derministic_bandit() {
+    test_train_policy_gradient::<WithStateConfig<GruMlpConfig>, Return>(Default::default())
+}
+
+#[test]
+fn default_gru_mlp_gae_mlp_derministic_bandit() {
+    test_train_policy_gradient::<WithStateConfig<GruMlpConfig>, GaeConfig<MlpConfig>>(
         Default::default(),
     )
 }
 
 #[test]
-fn default_gru_mlp_return_learns_derministic_bandit() {
-    test_train_policy_gradient::<WithState<GruMlp>, RnnMlpConfig, Return, Return>(Default::default())
-}
-
-#[test]
-fn default_gru_mlp_gae_mlp_derministic_bandit() {
-    test_train_policy_gradient::<
-        WithState<GruMlp>,
-        RnnMlpConfig,
-        Gae<Sequential>,
-        GaeConfig<MlpConfig>,
-    >(Default::default())
-}
-
-#[test]
 fn default_gru_mlp_gae_gru_mlp_derministic_bandit() {
-    test_train_policy_gradient::<
-        WithState<GruMlp>,
-        RnnMlpConfig,
-        Gae<WithState<GruMlp>>,
-        GaeConfig<RnnMlpConfig>,
-    >(Default::default())
+    test_train_policy_gradient::<WithStateConfig<GruMlpConfig>, GaeConfig<GruMlpConfig>>(
+        Default::default(),
+    )
 }
 
 #[test]
@@ -88,10 +73,5 @@ fn default_gru_mlp_gae_gru_mlp_derministic_bandit_cuda_if_available() {
         device: Device::cuda_if_available(),
         ..ActorCriticConfig::default()
     };
-    test_train_policy_gradient::<
-        WithState<GruMlp>,
-        RnnMlpConfig,
-        Gae<WithState<GruMlp>>,
-        GaeConfig<RnnMlpConfig>,
-    >(config)
+    test_train_policy_gradient::<WithStateConfig<GruMlpConfig>, GaeConfig<GruMlpConfig>>(config)
 }

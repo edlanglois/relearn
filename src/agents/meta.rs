@@ -5,75 +5,82 @@ use crate::logging::TimeSeriesLogger;
 use crate::spaces::{SampleSpace, Space};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-/// A cloneable [`BuildAgent`] for `A` can also build `ResettingMetaAgent<_, A>`
-impl<B, A, E, OS, AS> BuildAgent<ResettingMetaAgent<Self, A, OS, AS>, E> for B
+/// Configuration for a [`ResettingMetaAgent`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct ResettingMetaAgentConfig<T> {
+    pub agent_config: T,
+}
+
+impl<T> ResettingMetaAgentConfig<T> {
+    pub const fn new(agent_config: T) -> Self {
+        Self { agent_config }
+    }
+}
+
+impl<T, E, OS, AS> BuildAgent<E> for ResettingMetaAgentConfig<T>
 where
-    B: BuildAgent<A, StoredEnvStructure<OS, AS>> + Clone,
+    T: BuildAgent<StoredEnvStructure<OS, AS>> + Clone,
     E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
     OS: Space,
     AS: Space,
 {
-    fn build_agent(
-        &self,
-        env: &E,
-        seed: u64,
-    ) -> Result<ResettingMetaAgent<Self, A, OS, AS>, BuildAgentError> {
+    type Agent = ResettingMetaAgent<T, OS, AS>;
+
+    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         let inner_env_structure = StoredEnvStructure::from(&InnerEnvStructure::<E, &E>::new(env));
-        Ok(ResettingMetaAgent::new(
-            self.clone(),
-            inner_env_structure,
-            seed,
-        ))
+        ResettingMetaAgent::new(self.agent_config.clone(), inner_env_structure, seed)
     }
 }
 
 /// Lifts a regular agent to act on a meta environment by resetting between each trial.
-pub struct ResettingMetaAgent<B, A, OS: Space, AS> {
-    inner_agent_builder: B,
+pub struct ResettingMetaAgent<AC, OS, AS>
+where
+    OS: Space,
+    AC: BuildAgent<StoredEnvStructure<OS, AS>>,
+{
+    inner_agent_config: AC,
     inner_env_structure: StoredEnvStructure<OS, AS>,
     rng: StdRng,
-    agent: A,
+    agent: AC::Agent,
     prev_observation: Option<OS::Element>,
     prev_episode_done: bool,
 }
 
-impl<B, A, OS, AS> ResettingMetaAgent<B, A, OS, AS>
+impl<AC, OS, AS> ResettingMetaAgent<AC, OS, AS>
 where
-    B: BuildAgent<A, StoredEnvStructure<OS, AS>>,
+    AC: BuildAgent<StoredEnvStructure<OS, AS>>,
     OS: Space,
     AS: Space,
 {
     /// Intialize a new resetting meta agent.
     ///
     /// # Args
-    /// * `inner_agent_builder` - A builder for the inner agent.
+    /// * `inner_agent_config` - A builder for the inner agent.
     /// * `inner_env_structure` - The inner environment structure.
     /// * `seed` - Seeds the internal pseudo random state.
     pub fn new(
-        inner_agent_builder: B,
+        inner_agent_config: AC,
         inner_env_structure: StoredEnvStructure<OS, AS>,
         seed: u64,
-    ) -> Self {
+    ) -> Result<Self, BuildAgentError> {
         let mut rng = StdRng::seed_from_u64(seed);
-        let agent = inner_agent_builder
-            .build_agent(&inner_env_structure, rng.gen())
-            .expect("Failed to build inner agent");
-        Self {
-            inner_agent_builder,
+        let agent = inner_agent_config.build_agent(&inner_env_structure, rng.gen())?;
+        Ok(Self {
+            inner_agent_config,
             inner_env_structure,
             rng,
             agent,
             prev_observation: None,
             prev_episode_done: true,
-        }
+        })
     }
 }
 
-impl<B, A, OS, AS> Actor<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>
-    for ResettingMetaAgent<B, A, OS, AS>
+impl<AC, OS, AS> Actor<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>
+    for ResettingMetaAgent<AC, OS, AS>
 where
-    B: BuildAgent<A, StoredEnvStructure<OS, AS>>,
-    A: Agent<OS::Element, AS::Element>,
+    AC: BuildAgent<StoredEnvStructure<OS, AS>>,
+    <AC as BuildAgent<StoredEnvStructure<OS, AS>>>::Agent: Agent<OS::Element, AS::Element>,
     OS: Space,
     <OS as Space>::Element: Clone,
     AS: SampleSpace,
@@ -89,7 +96,7 @@ where
         if new_episode {
             // Reset the agent
             self.agent = self
-                .inner_agent_builder
+                .inner_agent_config
                 .build_agent(&self.inner_env_structure, self.rng.gen())
                 .expect("Failed to build inner agent");
             self.prev_observation = None;
@@ -110,7 +117,6 @@ where
         }
 
         let action = if let Some(inner_observation) = inner_observation {
-            // NOTE: This is Agent::act because the inner agent is learning
             self.agent.act(inner_observation, self.prev_episode_done)
         } else {
             // If there is no inner observation then the current state is terminal
@@ -130,11 +136,11 @@ where
     }
 }
 
-impl<B, A, OS, AS> Agent<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>
-    for ResettingMetaAgent<B, A, OS, AS>
+impl<AC, OS, AS> Agent<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>
+    for ResettingMetaAgent<AC, OS, AS>
 where
-    B: BuildAgent<A, StoredEnvStructure<OS, AS>>,
-    A: Agent<OS::Element, AS::Element>,
+    AC: BuildAgent<StoredEnvStructure<OS, AS>>,
+    <AC as BuildAgent<StoredEnvStructure<OS, AS>>>::Agent: Agent<OS::Element, AS::Element>,
     OS: Space,
     <OS as Space>::Element: Clone,
     AS: SampleSpace,
@@ -150,11 +156,16 @@ where
 }
 
 /// Never learns on a meta level. Always acts like "Release" mode.
-impl<B, A, OS: Space, AS> SetActorMode for ResettingMetaAgent<B, A, OS, AS> {}
+impl<AC, OS, AS> SetActorMode for ResettingMetaAgent<AC, OS, AS>
+where
+    OS: Space,
+    AC: BuildAgent<StoredEnvStructure<OS, AS>>,
+{
+}
 
 #[cfg(test)]
 mod resetting_meta {
-    use super::super::{ActorMode, UCB1Agent, UCB1AgentConfig};
+    use super::super::{ActorMode, UCB1AgentConfig};
     use super::*;
     use crate::envs::{MetaPomdp, OneHotBandits, PomdpEnv};
     use crate::simulation;
@@ -162,15 +173,14 @@ mod resetting_meta {
 
     #[test]
     fn ucb_one_hot_bandits() {
-        let config = UCB1AgentConfig::default();
+        let config = ResettingMetaAgentConfig::new(UCB1AgentConfig::default());
         let num_arms = 3;
         let num_episodes_per_trial = 20;
         let mut env = PomdpEnv::new(
             MetaPomdp::new(OneHotBandits::new(num_arms), num_episodes_per_trial),
             0,
         );
-        let mut agent: ResettingMetaAgent<_, UCB1Agent<_, _>, _, _> =
-            config.build_agent(&env, 0).unwrap();
+        let mut agent = config.build_agent(&env, 0).unwrap();
 
         let mut hooks = (RewardStatistics::new(), StepLimit::new(1000));
         agent.set_actor_mode(ActorMode::Release);

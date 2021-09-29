@@ -16,15 +16,13 @@ impl RandomAgentConfig {
     }
 }
 
-impl<E> BuildAgent<RandomAgent<E::ActionSpace>, E> for RandomAgentConfig
+impl<E> BuildAgent<E> for RandomAgentConfig
 where
     E: EnvStructure + ?Sized,
 {
-    fn build_agent(
-        &self,
-        env: &E,
-        seed: u64,
-    ) -> Result<RandomAgent<E::ActionSpace>, BuildAgentError> {
+    type Agent = RandomAgent<E::ActionSpace>;
+
+    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         Ok(RandomAgent::new(env.action_space(), seed))
     }
 }

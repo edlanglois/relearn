@@ -24,8 +24,10 @@ impl Default for MlpConfig {
     }
 }
 
-impl BuildModule<nn::Sequential> for MlpConfig {
-    fn build_module(&self, vs: &nn::Path, input_dim: usize, output_dim: usize) -> nn::Sequential {
+impl BuildModule for MlpConfig {
+    type Module = nn::Sequential;
+
+    fn build_module(&self, vs: &nn::Path, input_dim: usize, output_dim: usize) -> Self::Module {
         let iter_in_dim = iter::once(&input_dim).chain(self.hidden_sizes.iter());
         let iter_out_dim = self.hidden_sizes.iter().chain(iter::once(&output_dim));
 

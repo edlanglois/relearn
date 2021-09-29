@@ -4,6 +4,13 @@ mod basic;
 use super::super::Step;
 pub use basic::{EpisodeBuffer, EpisodeBufferConfig};
 
+/// Build a [`HistoryBuffer`].
+pub trait BuildHistoryBuffer<O, A> {
+    type HistoryBuffer;
+
+    fn build_history_buffer(&self) -> Self::HistoryBuffer;
+}
+
 /// A step history buffer.
 pub trait HistoryBuffer<O, A>: for<'a> HistoryBufferSteps<'a, O, A> {
     /// Push a new step into the buffer.

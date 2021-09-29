@@ -1,5 +1,5 @@
 use super::super::Step;
-use super::{HistoryBuffer, HistoryBufferSteps};
+use super::{BuildHistoryBuffer, HistoryBuffer, HistoryBufferSteps};
 use std::vec;
 
 /// Configuration for [`EpisodeBuffer`].
@@ -36,11 +36,13 @@ pub struct EpisodeBuffer<O, A> {
     buffer: Vec<Step<O, A>>,
 }
 
-impl<'a, O, A> From<&'a EpisodeBufferConfig> for EpisodeBuffer<O, A> {
-    fn from(config: &'a EpisodeBufferConfig) -> Self {
-        Self {
-            ep_done_step_threshold: config.ep_done_step_threshold,
-            step_threshold: config.step_threshold,
+impl<O, A> BuildHistoryBuffer<O, A> for EpisodeBufferConfig {
+    type HistoryBuffer = EpisodeBuffer<O, A>;
+
+    fn build_history_buffer(&self) -> Self::HistoryBuffer {
+        EpisodeBuffer {
+            ep_done_step_threshold: self.ep_done_step_threshold,
+            step_threshold: self.step_threshold,
             buffer: Vec::new(),
         }
     }

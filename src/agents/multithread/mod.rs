@@ -1,4 +1,4 @@
 //! Multi-thread agents
 mod mutex;
 
-pub use mutex::{MutexAgentManager, MutexAgentWorker};
+pub use mutex::{MutexAgentConfig, MutexAgentManager, MutexAgentWorker};

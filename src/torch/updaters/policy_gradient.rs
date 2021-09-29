@@ -1,7 +1,6 @@
 //! Policy-gradient policy updater.
 use super::super::{
-    critic::Critic, history::PackedHistoryFeaturesView, optimizers::Optimizer,
-    seq_modules::SequenceModule,
+    critic::Critic, history::PackedHistoryFeaturesView, optimizers::Optimizer, policy::Policy,
 };
 use super::{PolicyStats, UpdatePolicyWithOptimizer};
 use crate::logging::{Event, TimeSeriesLogger};
@@ -14,17 +13,15 @@ use tch::{Kind, Tensor};
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PolicyGradientUpdateRule;
 
-impl<P, C, O, AS> UpdatePolicyWithOptimizer<P, C, O, AS> for PolicyGradientUpdateRule
+impl<O, AS> UpdatePolicyWithOptimizer<O, AS> for PolicyGradientUpdateRule
 where
-    P: SequenceModule + ?Sized,
-    C: Critic + ?Sized,
     O: Optimizer + ?Sized,
     AS: ParameterizedDistributionSpace<Tensor> + ?Sized,
 {
     fn update_policy_with_optimizer(
         &self,
-        policy: &P,
-        critic: &C,
+        policy: &dyn Policy,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
         action_space: &AS,

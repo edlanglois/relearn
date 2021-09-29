@@ -1,9 +1,9 @@
 use super::super::{
-    backends::{CudnnSupport, WithCudnnEnabled},
+    backends::WithCudnnEnabled,
     critic::Critic,
     history::PackedHistoryFeaturesView,
     optimizers::{OptimizerStepError, TrustRegionOptimizer},
-    seq_modules::SequenceModule,
+    policy::Policy,
 };
 use super::{PolicyStats, UpdatePolicyWithOptimizer};
 use crate::logging::{Event, TimeSeriesLogger, TimeSeriesLoggerHelper};
@@ -31,17 +31,15 @@ impl Default for TrpoPolicyUpdateRule {
     }
 }
 
-impl<P, C, O, AS> UpdatePolicyWithOptimizer<P, C, O, AS> for TrpoPolicyUpdateRule
+impl<O, AS> UpdatePolicyWithOptimizer<O, AS> for TrpoPolicyUpdateRule
 where
-    P: SequenceModule + CudnnSupport + ?Sized,
-    C: Critic + ?Sized,
-    AS: ParameterizedDistributionSpace<Tensor> + ?Sized,
     O: TrustRegionOptimizer + ?Sized,
+    AS: ParameterizedDistributionSpace<Tensor> + ?Sized,
 {
     fn update_policy_with_optimizer(
         &self,
-        policy: &P,
-        critic: &C,
+        policy: &dyn Policy,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
         action_space: &AS,

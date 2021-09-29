@@ -1,19 +1,19 @@
 //! Generalized Advantage Estimation
 use super::super::history::PackedHistoryFeaturesView;
-use super::{Critic, BuildCritic};
+use super::{BuildCritic, Critic};
 use crate::torch::{seq_modules::SequenceModule, BuildModule};
 use crate::utils::packed;
 use tch::{nn::Path, Reduction, Tensor};
 
 /// Generalized Advantage Estimator Config
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GaeConfig<VB> {
+pub struct GaeConfig<VC> {
     pub gamma: f64,
     pub lambda: f64,
-    pub value_fn_config: VB,
+    pub value_fn_config: VC,
 }
 
-impl<VB: Default> Default for GaeConfig<VB> {
+impl<VC: Default> Default for GaeConfig<VC> {
     fn default() -> Self {
         Self {
             gamma: 0.99,
@@ -23,12 +23,13 @@ impl<VB: Default> Default for GaeConfig<VB> {
     }
 }
 
-impl<VB, V> BuildCritic<Gae<V>> for GaeConfig<VB>
+impl<VC> BuildCritic for GaeConfig<VC>
 where
-    VB: BuildModule<V>,
-    V: SequenceModule,
+    VC: BuildModule,
 {
-    fn build_critic(&self, vs: &Path, in_dim: usize) -> Gae<V> {
+    type Critic = Gae<VC::Module>;
+
+    fn build_critic(&self, vs: &Path, in_dim: usize) -> Self::Critic {
         Gae {
             gamma: self.gamma,
             lambda: self.lambda,

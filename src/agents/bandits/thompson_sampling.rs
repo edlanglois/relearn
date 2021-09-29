@@ -1,11 +1,9 @@
 //! Thompson sampling bandit agent
 use super::super::{
-    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, FiniteSpaceAgent, OffPolicyAgent,
+    Actor, ActorMode, Agent, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent,
     SetActorMode, Step,
 };
-use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
-use crate::spaces::{FiniteSpace, IndexSpace};
 use crate::utils::iter::ArgMaxBy;
 use ndarray::{Array, Array2, Axis};
 use rand::distributions::Distribution;
@@ -33,19 +31,21 @@ impl Default for BetaThompsonSamplingAgentConfig {
     }
 }
 
-impl<E> BuildAgent<BaseBetaThompsonSamplingAgent, E> for BetaThompsonSamplingAgentConfig
-where
-    E: EnvStructure<ObservationSpace = IndexSpace, ActionSpace = IndexSpace> + ?Sized,
-{
-    fn build_agent(
+impl BuildIndexAgent for BetaThompsonSamplingAgentConfig {
+    type Agent = BaseBetaThompsonSamplingAgent;
+
+    fn build_index_agent(
         &self,
-        env: &E,
+        num_observations: usize,
+        num_actions: usize,
+        reward_range: (f64, f64),
+        _discount_factor: f64,
         seed: u64,
-    ) -> Result<BaseBetaThompsonSamplingAgent, BuildAgentError> {
+    ) -> Result<Self::Agent, BuildAgentError> {
         Ok(BaseBetaThompsonSamplingAgent::new(
-            env.observation_space().size(),
-            env.action_space().size(),
-            env.reward_range(),
+            num_observations,
+            num_actions,
+            reward_range,
             self.num_samples,
             seed,
         ))
@@ -185,18 +185,12 @@ impl SetActorMode for BaseBetaThompsonSamplingAgent {
 
 #[cfg(test)]
 mod beta_thompson_sampling {
-    use super::super::super::testing;
+    use super::super::super::{testing, BuildAgent};
     use super::*;
 
     #[test]
     fn learns_determinstic_bandit() {
         let config = BetaThompsonSamplingAgentConfig::default();
-        testing::train_deterministic_bandit(
-            |env_structure| -> BetaThompsonSamplingAgent<_, _> {
-                config.build_agent(env_structure, 0).unwrap()
-            },
-            1000,
-            0.9,
-        );
+        testing::train_deterministic_bandit(|env| config.build_agent(env, 0).unwrap(), 1000, 0.9);
     }
 }

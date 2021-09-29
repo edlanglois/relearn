@@ -105,12 +105,14 @@ where
     }
 }
 
-impl<T, TC, U, UC> BuildModule<Stacked<'static, T, U>> for StackedConfig<TC, UC>
+impl<TC, UC> BuildModule for StackedConfig<TC, UC>
 where
-    TC: BuildModule<T>,
-    UC: BuildModule<U>,
+    TC: BuildModule,
+    UC: BuildModule,
 {
-    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Stacked<'static, T, U> {
+    type Module = Stacked<'static, TC::Module, UC::Module>;
+
+    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
         Stacked::new(
             self.seq_config
                 .build_module(&(vs / "rnn"), in_dim, self.seq_output_dim),
@@ -170,8 +172,8 @@ mod stacked_module {
 
 #[cfg(test)]
 mod stacked_module_config {
-    use super::super::super::seq_modules::{testing, GruMlp, LstmMlp};
-    use super::super::RnnMlpConfig;
+    use super::super::super::seq_modules::testing;
+    use super::super::{GruMlp, GruMlpConfig, LstmMlp, LstmMlpConfig};
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{nn, Device};
@@ -180,7 +182,7 @@ mod stacked_module_config {
     fn gru_mlp_default_module() -> (GruMlp, usize, usize) {
         let in_dim = 3;
         let out_dim = 2;
-        let config = RnnMlpConfig::default();
+        let config = GruMlpConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
         let module = config.build_module(&vs.root(), in_dim, out_dim);
         (module, in_dim, out_dim)
@@ -202,7 +204,7 @@ mod stacked_module_config {
     fn lstm_mlp_default_module() -> (LstmMlp, usize, usize) {
         let in_dim = 3;
         let out_dim = 2;
-        let config = RnnMlpConfig::default();
+        let config = LstmMlpConfig::default();
         let vs = nn::VarStore::new(Device::Cpu);
         let module = config.build_module(&vs.root(), in_dim, out_dim);
         (module, in_dim, out_dim)

@@ -63,10 +63,11 @@ impl Default for ConjugateGradientOptimizerConfig {
     }
 }
 
-impl BuildOptimizer<ConjugateGradientOptimizer> for ConjugateGradientOptimizerConfig {
+impl BuildOptimizer for ConjugateGradientOptimizerConfig {
+    type Optimizer = ConjugateGradientOptimizer;
     type Error = Infallible;
 
-    fn build_optimizer(&self, vs: &VarStore) -> Result<ConjugateGradientOptimizer, Infallible> {
+    fn build_optimizer(&self, vs: &VarStore) -> Result<Self::Optimizer, Self::Error> {
         Ok(ConjugateGradientOptimizer::new(vs, *self))
     }
 }

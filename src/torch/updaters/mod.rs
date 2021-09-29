@@ -20,25 +20,24 @@ pub use ppo::PpoPolicyUpdateRule;
 pub use trpo::TrpoPolicyUpdateRule;
 pub use with_optimizer::WithOptimizer;
 
+use super::critic::Critic;
 use super::history::PackedHistoryFeaturesView;
+use super::policy::Policy;
 use crate::logging::TimeSeriesLogger;
 use tch::nn::VarStore;
 
-// TODO: Remove ActionSpace
+// TODO: Remove generic <AS> from all updater traits
 
-/// Build an updater
-pub trait BuildUpdater<U> {
-    /// Build an updater for the trainable variables in a variable store.
-    fn build_updater(&self, vs: &VarStore) -> U;
+/// Build an [`UpdatePolicy`] object.
+pub trait BuildPolicyUpdater<AS: ?Sized> {
+    type Updater;
+
+    /// Build a policy updater for the trainable variables in a variable store.
+    fn build_policy_updater(&self, vs: &VarStore) -> Self::Updater;
 }
 
 /// Self-contained policy updater.
-pub trait UpdatePolicy<P, C, AS>
-where
-    P: ?Sized,
-    C: ?Sized,
-    AS: ?Sized,
-{
+pub trait UpdatePolicy<AS: ?Sized> {
     /// Update policy variables (manged internally).
     ///
     /// # Args
@@ -51,24 +50,19 @@ where
     /// * `logger` - A logger for update statistics.
     fn update_policy(
         &mut self,
-        policy: &P,
-        critic: &C,
+        policy: &dyn Policy,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         action_space: &AS,
         logger: &mut dyn TimeSeriesLogger,
     ) -> PolicyStats;
 }
 
-impl<P, C, AS> UpdatePolicy<P, C, AS> for Box<dyn UpdatePolicy<P, C, AS>>
-where
-    P: ?Sized,
-    C: ?Sized,
-    AS: ?Sized,
-{
+impl<AS: ?Sized> UpdatePolicy<AS> for Box<dyn UpdatePolicy<AS>> {
     fn update_policy(
         &mut self,
-        policy: &P,
-        critic: &C,
+        policy: &dyn Policy,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         action_space: &AS,
         logger: &mut dyn TimeSeriesLogger,
@@ -79,13 +73,7 @@ where
 }
 
 /// A policy update rule using an external optimizer.
-pub trait UpdatePolicyWithOptimizer<P, C, O, AS>
-where
-    P: ?Sized,
-    C: ?Sized,
-    O: ?Sized,
-    AS: ?Sized,
-{
+pub trait UpdatePolicyWithOptimizer<O: ?Sized, AS: ?Sized> {
     /// Update policy variables using an external optimizer.
     ///
     /// # Args
@@ -97,8 +85,8 @@ where
     /// * `logger` - A logger for update statistics.
     fn update_policy_with_optimizer(
         &self,
-        policy: &P,
-        critic: &C,
+        policy: &dyn Policy,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
         action_space: &AS,
@@ -112,31 +100,36 @@ pub struct PolicyStats {
     pub entropy: Option<f64>,
 }
 
+/// Build an [`UpdateCritic`] object.
+pub trait BuildCriticUpdater {
+    type Updater;
+
+    /// Build a critic updater for the trainable variables in a variable store.
+    fn build_critic_updater(&self, vs: &VarStore) -> Self::Updater;
+}
+
 /// Self-contained critic updater.
-pub trait UpdateCritic<C>
-where
-    C: ?Sized,
-{
+pub trait UpdateCritic {
     /// Update critic variables (manged internally).
     ///
     /// # Args
     /// * `critic` - The critic to update.
     ///     The set of variables to update is stored internally by the updater, not obtained from
-    ///     the policy, so only the policy for which the updater was initialized should be used.
+    ///     the critic, so only the critic for which the updater was initialized should be used.
     /// * `features` - Packed history features collected with the current policy variable values.
     /// * `logger` - A logger for update statistics.
     fn update_critic(
         &mut self,
-        critic: &C,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         logger: &mut dyn TimeSeriesLogger,
     );
 }
 
-impl<C: ?Sized> UpdateCritic<C> for Box<dyn UpdateCritic<C>> {
+impl UpdateCritic for Box<dyn UpdateCritic> {
     fn update_critic(
         &mut self,
-        critic: &C,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         logger: &mut dyn TimeSeriesLogger,
     ) {
@@ -145,23 +138,19 @@ impl<C: ?Sized> UpdateCritic<C> for Box<dyn UpdateCritic<C>> {
 }
 
 /// A critic update rule using an external optimizer.
-pub trait UpdateCriticWithOptimizer<C, O>
-where
-    C: ?Sized,
-    O: ?Sized,
-{
+pub trait UpdateCriticWithOptimizer<O: ?Sized> {
     /// Update critic variables using an external optimizer.
     ///
     /// # Args
     /// * `critic` - The critic to update.
     ///     The set of variables to update is stored internally by the updater, not obtained from
-    ///     the policy, so only the policy for which the updater was initialized should be used.
+    ///     the critic, so only the critic for which the updater was initialized should be used.
     /// * `features` - Packed history features collected with the current policy variable values.
     /// * `optimizer` - An optimizer on the policy variables.
     /// * `logger` - A logger for update statistics.
     fn update_critic_with_optimizer(
         &self,
-        critic: &C,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
         logger: &mut dyn TimeSeriesLogger,

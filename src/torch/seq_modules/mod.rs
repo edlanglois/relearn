@@ -6,19 +6,17 @@ mod stacked;
 pub mod testing;
 mod with_state;
 
-pub use rnn::{Gru, Lstm, RnnConfig};
+pub use rnn::{Gru, GruConfig, Lstm, LstmConfig};
 pub use stacked::{Stacked, StackedConfig};
-pub use with_state::WithState;
+pub use with_state::{WithState, WithStateConfig};
 
-use super::modules::MlpConfig;
-use tch::{nn, IndexOp, Tensor};
+use super::modules::{BuildModule, MlpConfig};
+use tch::{IndexOp, Tensor};
 
-/// An MLP stacked on top of a GRU.
-pub type GruMlp = Stacked<'static, Gru, nn::Sequential>;
-/// An MLP stacked on top of an LSTM.
-pub type LstmMlp = Stacked<'static, Lstm, nn::Sequential>;
-/// Configuration for an MLP stacked on top of an RNN.
-pub type RnnMlpConfig = StackedConfig<RnnConfig, MlpConfig>;
+pub type GruMlpConfig = StackedConfig<GruConfig, MlpConfig>;
+pub type GruMlp = <GruMlpConfig as BuildModule>::Module;
+pub type LstmMlpConfig = StackedConfig<LstmConfig, MlpConfig>;
+pub type LstmMlp = <LstmMlpConfig as BuildModule>::Module;
 
 /// A network module that operates on a sequence of data.
 pub trait SequenceModule {
@@ -70,6 +68,8 @@ pub trait SequenceModule {
     fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor;
 }
 
+box_impl_sequence_module!(dyn SequenceModule + Send);
+
 /// A network module that operates iteratively on a sequence of data.
 pub trait IterativeModule {
     /// Internal state of the module.
@@ -107,13 +107,6 @@ pub trait StatefulIterativeModule {
     /// It is not necessary to call this at the start of the first sequence.
     fn reset(&mut self);
 }
-
-/// Sequence module with stateful iteration
-pub trait StatefulIterSeqModule: SequenceModule + StatefulIterativeModule {}
-impl<T: SequenceModule + StatefulIterativeModule> StatefulIterSeqModule for T {}
-
-box_impl_sequence_module!(dyn StatefulIterSeqModule);
-box_impl_stateful_iterative_module!(dyn StatefulIterSeqModule);
 
 /// Helper function to implement [`SequenceModule::seq_serial`] from a single-sequence closure.
 ///

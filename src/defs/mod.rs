@@ -13,5 +13,5 @@ pub use agent::{AgentDef, MultiThreadAgentDef};
 pub use critic::CriticDef;
 pub use env::{BanditMeanRewards, EnvDef};
 pub use optimizer::OptimizerDef;
-pub use seq_mod::SeqModDef;
+pub use seq_mod::{PolicyDef, SeqModDef};
 pub use updater::{CriticUpdaterDef, PolicyUpdaterDef};

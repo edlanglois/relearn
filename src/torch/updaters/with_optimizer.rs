@@ -1,8 +1,9 @@
-use super::super::history::PackedHistoryFeaturesView;
-use super::super::optimizers::BuildOptimizer;
+use super::super::{
+    critic::Critic, history::PackedHistoryFeaturesView, optimizers::BuildOptimizer, policy::Policy,
+};
 use super::{
-    PolicyStats, UpdateCritic, UpdateCriticWithOptimizer, UpdatePolicy, UpdatePolicyWithOptimizer,
-    BuildUpdater,
+    BuildCriticUpdater, BuildPolicyUpdater, PolicyStats, UpdateCritic, UpdateCriticWithOptimizer,
+    UpdatePolicy, UpdatePolicyWithOptimizer,
 };
 use crate::logging::TimeSeriesLogger;
 use tch::nn::VarStore;
@@ -14,17 +15,15 @@ pub struct WithOptimizer<U, O> {
     pub optimizer: O,
 }
 
-impl<U, P, C, O, AS> UpdatePolicy<P, C, AS> for WithOptimizer<U, O>
+impl<U, O, AS> UpdatePolicy<AS> for WithOptimizer<U, O>
 where
-    U: UpdatePolicyWithOptimizer<P, C, O, AS>,
-    P: ?Sized,
-    C: ?Sized,
+    U: UpdatePolicyWithOptimizer<O, AS>,
     AS: ?Sized,
 {
     fn update_policy(
         &mut self,
-        policy: &P,
-        critic: &C,
+        policy: &dyn Policy,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         action_space: &AS,
         logger: &mut dyn TimeSeriesLogger,
@@ -40,14 +39,13 @@ where
     }
 }
 
-impl<U, C, O> UpdateCritic<C> for WithOptimizer<U, O>
+impl<U, O> UpdateCritic for WithOptimizer<U, O>
 where
-    U: UpdateCriticWithOptimizer<C, O>,
-    C: ?Sized,
+    U: UpdateCriticWithOptimizer<O>,
 {
     fn update_critic(
         &mut self,
-        critic: &C,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         logger: &mut dyn TimeSeriesLogger,
     ) {
@@ -56,15 +54,33 @@ where
     }
 }
 
-impl<U, O, OB> BuildUpdater<WithOptimizer<U, O>> for WithOptimizer<U, OB>
+impl<U, OC, AS> BuildPolicyUpdater<AS> for WithOptimizer<U, OC>
 where
     U: Clone,
-    OB: BuildOptimizer<O>,
+    OC: BuildOptimizer,
+    AS: ?Sized,
 {
-    fn build_updater(&self, vs: &VarStore) -> WithOptimizer<U, O> {
+    type Updater = WithOptimizer<U, OC::Optimizer>;
+
+    fn build_policy_updater(&self, vs: &VarStore) -> Self::Updater {
         WithOptimizer {
             update_rule: self.update_rule.clone(),
-            optimizer: self.optimizer.build_optimizer(vs).unwrap(),
+            optimizer: self.optimizer.build_optimizer(vs).unwrap(), // TODO: Error handling
+        }
+    }
+}
+
+impl<U, OC> BuildCriticUpdater for WithOptimizer<U, OC>
+where
+    U: Clone,
+    OC: BuildOptimizer,
+{
+    type Updater = WithOptimizer<U, OC::Optimizer>;
+
+    fn build_critic_updater(&self, vs: &VarStore) -> Self::Updater {
+        WithOptimizer {
+            update_rule: self.update_rule.clone(),
+            optimizer: self.optimizer.build_optimizer(vs).unwrap(), // TODO: Error handling
         }
     }
 }

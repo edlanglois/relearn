@@ -1,5 +1,5 @@
 //! Torch optimizer wrappers and configuration
-use super::{BaseOptimizer, OnceOptimizer, BuildOptimizer, OptimizerStepError};
+use super::{BaseOptimizer, BuildOptimizer, OnceOptimizer, OptimizerStepError};
 use crate::logging::Logger;
 use std::convert::{TryFrom, TryInto};
 use tch::{nn::VarStore, COptimizer, TchError, Tensor};
@@ -29,13 +29,14 @@ impl OnceOptimizer for COptimizer {
     }
 }
 
-impl<T> BuildOptimizer<COptimizer> for T
+impl<T> BuildOptimizer for T
 where
     for<'a> &'a Self: TryInto<COptimizer, Error = TchError>,
 {
+    type Optimizer = COptimizer;
     type Error = TchError;
 
-    fn build_optimizer(&self, vs: &VarStore) -> Result<COptimizer, TchError> {
+    fn build_optimizer(&self, vs: &VarStore) -> Result<Self::Optimizer, Self::Error> {
         let mut optimizer: COptimizer = self.try_into()?;
         let variables = vs.variables_.lock().unwrap();
         for var in &variables.trainable_variables {

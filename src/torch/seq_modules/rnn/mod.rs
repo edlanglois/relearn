@@ -3,14 +3,13 @@ mod config;
 mod gru;
 mod lstm;
 
-pub use config::RnnConfig;
+pub use config::{GruConfig, LstmConfig};
 pub use gru::Gru;
 pub use lstm::Lstm;
 
 use std::convert::TryInto;
 use tch::{nn::Path, Cuda, Device, Tensor};
 
-#[allow(clippy::doc_markdown)] // false positive on cuDNN
 /// cuDNN RNN mode code
 ///
 /// See <https://github.com/pytorch/pytorch/blob/d6909732954ad182d13fa8ab9959502a386e9d3a/torch/csrc/api/src/nn/modules/rnn.cpp#L29>

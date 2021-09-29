@@ -1,6 +1,5 @@
 use super::SeqModDef;
-use crate::torch::critic::{Critic, BuildCritic, Gae, GaeConfig, Return};
-use crate::torch::seq_modules::StatefulIterSeqModule;
+use crate::torch::critic::{BuildCritic, Critic, GaeConfig, Return};
 use tch::nn::Path;
 
 /// Critic definition
@@ -16,14 +15,13 @@ impl Default for CriticDef {
     }
 }
 
-impl BuildCritic<Box<dyn Critic>> for CriticDef {
-    fn build_critic(&self, vs: &Path, in_dim: usize) -> Box<dyn Critic> {
+impl BuildCritic for CriticDef {
+    type Critic = Box<dyn Critic + Send>;
+
+    fn build_critic(&self, vs: &Path, in_dim: usize) -> Self::Critic {
         match self {
             CriticDef::Return => Box::new(Return.build_critic(vs, in_dim)),
-            CriticDef::Gae(gae_config) => {
-                let gae: Gae<Box<dyn StatefulIterSeqModule>> = gae_config.build_critic(vs, in_dim);
-                Box::new(gae)
-            }
+            CriticDef::Gae(gae_config) => Box::new(gae_config.build_critic(vs, in_dim)),
         }
     }
 }

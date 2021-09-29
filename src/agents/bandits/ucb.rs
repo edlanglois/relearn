@@ -1,11 +1,9 @@
 //! Upper confidence bound bandit agent.
 use super::super::{
-    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, FiniteSpaceAgent, OffPolicyAgent,
+    Actor, ActorMode, Agent, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent,
     SetActorMode, Step,
 };
-use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
-use crate::spaces::{FiniteSpace, IndexSpace};
 use crate::utils::iter::ArgMaxBy;
 use ndarray::{Array, Array1, Array2, Axis};
 use std::f64;
@@ -33,15 +31,21 @@ impl Default for UCB1AgentConfig {
     }
 }
 
-impl<E> BuildAgent<BaseUCB1Agent, E> for UCB1AgentConfig
-where
-    E: EnvStructure<ObservationSpace = IndexSpace, ActionSpace = IndexSpace> + ?Sized,
-{
-    fn build_agent(&self, env: &E, _seed: u64) -> Result<BaseUCB1Agent, BuildAgentError> {
+impl BuildIndexAgent for UCB1AgentConfig {
+    type Agent = BaseUCB1Agent;
+
+    fn build_index_agent(
+        &self,
+        num_observations: usize,
+        num_actions: usize,
+        reward_range: (f64, f64),
+        _discount_factor: f64,
+        _seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
         BaseUCB1Agent::new(
-            env.observation_space().size(),
-            env.action_space().size(),
-            env.reward_range(),
+            num_observations,
+            num_actions,
+            reward_range,
             self.exploration_rate,
         )
     }
@@ -182,16 +186,12 @@ impl SetActorMode for BaseUCB1Agent {
 
 #[cfg(test)]
 mod ucb1_agent {
-    use super::super::super::testing;
+    use super::super::super::{testing, BuildAgent};
     use super::*;
 
     #[test]
     fn learns_determinstic_bandit() {
         let config = UCB1AgentConfig::default();
-        testing::train_deterministic_bandit(
-            |env_structure| -> UCB1Agent<_, _> { config.build_agent(env_structure, 0).unwrap() },
-            1000,
-            0.9,
-        );
+        testing::train_deterministic_bandit(|env| config.build_agent(env, 0).unwrap(), 1000, 0.9);
     }
 }

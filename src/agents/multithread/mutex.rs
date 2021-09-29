@@ -1,18 +1,45 @@
 use super::super::{
-    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, ManagerAgent, SetActorMode, Step,
+    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, BuildManagerAgent, ManagerAgent,
+    SetActorMode, Step,
 };
 use crate::logging::{self, ForwardingLogger, TimeSeriesLogger};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-impl<B, T, E> BuildAgent<MutexAgentManager<T>, E> for B
+/// Configuration for [`MutexAgentManager`] and [`MutexAgentWorker`].
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct MutexAgentConfig<AC> {
+    pub agent_config: AC,
+}
+
+impl<AC> MutexAgentConfig<AC> {
+    pub const fn new(agent_config: AC) -> Self {
+        Self { agent_config }
+    }
+}
+
+impl<AC> From<AC> for MutexAgentConfig<AC> {
+    fn from(agent_config: AC) -> Self {
+        Self { agent_config }
+    }
+}
+
+impl<AC, E> BuildManagerAgent<E> for MutexAgentConfig<AC>
 where
-    B: BuildAgent<T, E>,
+    AC: BuildAgent<E>,
     E: ?Sized,
 {
-    fn build_agent(&self, env: &E, seed: u64) -> Result<MutexAgentManager<T>, BuildAgentError> {
-        Ok(MutexAgentManager::new(self.build_agent(env, seed)?))
+    type ManagerAgent = MutexAgentManager<AC::Agent>;
+
+    fn build_manager_agent(
+        &self,
+        env: &E,
+        seed: u64,
+    ) -> Result<Self::ManagerAgent, BuildAgentError> {
+        Ok(MutexAgentManager::new(
+            self.agent_config.build_agent(env, seed)?,
+        ))
     }
 }
 
@@ -126,7 +153,7 @@ impl<T: Send + 'static> ManagerAgent for MutexAgentManager<T> {
 mod tests {
     use super::super::super::testing;
     use super::*;
-    use crate::agents::{BuildAgent, TabularQLearningAgent, TabularQLearningAgentConfig};
+    use crate::agents::{BuildManagerAgent, TabularQLearningAgentConfig};
     use crate::envs::{DeterministicBandit, IntoEnv};
     use crate::simulation;
     use crate::simulation::hooks::StepLimit;
@@ -135,9 +162,8 @@ mod tests {
     #[test]
     fn mutex_multithread_learns() {
         let env = DeterministicBandit::from_means(vec![0.0, 1.0]).unwrap();
-        let agent_config = TabularQLearningAgentConfig::default();
-        let mut agent: MutexAgentManager<TabularQLearningAgent<_, _>> =
-            agent_config.build_agent(&env, 0).unwrap();
+        let agent_config = MutexAgentConfig::new(TabularQLearningAgentConfig::default());
+        let mut agent = agent_config.build_manager_agent(&env, 0).unwrap();
         let mut logger = ();
         let hook = StepLimit::new(1000);
         let num_workers = 5;

@@ -1,9 +1,8 @@
-use super::{CriticDef, CriticUpdaterDef, PolicyUpdaterDef, SeqModDef};
+use super::{CriticDef, CriticUpdaterDef, PolicyDef, PolicyUpdaterDef};
 use crate::agents::{
-    Agent, BuildAgent, BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, BoxingManager,
-    BuildAgentError, ManagerAgent, MutexAgentManager, RandomAgent, RandomAgentConfig,
-    ResettingMetaAgent, TabularQLearningAgent, TabularQLearningAgentConfig, UCB1Agent,
-    UCB1AgentConfig,
+    Agent, BetaThompsonSamplingAgentConfig, BoxingManager, BuildAgent, BuildAgentError,
+    BuildManagerAgent, ManagerAgent, MutexAgentManager, RandomAgentConfig, ResettingMetaAgent,
+    TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::Loggable;
@@ -11,7 +10,7 @@ use crate::spaces::{
     BatchFeatureSpace, ElementRefInto, FeatureSpace, FiniteSpace, ParameterizedDistributionSpace,
     SampleSpace, Space,
 };
-use crate::torch::agents::{ActorCriticBoxedAgent, ActorCriticConfig};
+use crate::torch::agents::ActorCriticConfig;
 use std::borrow::Borrow;
 use std::fmt::Debug;
 use tch::Tensor;
@@ -30,7 +29,7 @@ pub enum AgentDef {
     /// UCB1 agent from Auer 2002
     UCB1(UCB1AgentConfig),
     /// Torch actor-critic agent
-    ActorCritic(Box<ActorCriticConfig<SeqModDef, PolicyUpdaterDef, CriticDef, CriticUpdaterDef>>),
+    ActorCritic(Box<ActorCriticConfig<PolicyDef, PolicyUpdaterDef, CriticDef, CriticUpdaterDef>>),
     /// Applies a non-meta agent to a meta environment by resetting between trials
     ResettingMeta(Box<AgentDef>),
 }
@@ -57,6 +56,8 @@ impl<T: RLSpace + FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>> RLObservatio
 pub trait RLActionSpace: RLSpace + ParameterizedDistributionSpace<Tensor> {}
 impl<T: RLSpace + ParameterizedDistributionSpace<Tensor>> RLActionSpace for T {}
 
+// TODO Change ForAnyAny etc into BuildAgent-like traits
+
 /// Wrapper implementing [`BuildAgent`] for [`AgentDef`] for any observation and action space.
 ///
 /// More specifically, any observation and action space satisfying the relatively generic
@@ -73,73 +74,53 @@ impl<T> ForAnyAny<T> {
     }
 }
 
-macro_rules! agent_builder_boxed_for_any_any {
-    ($type:ty$(, $bound:tt )*) => {
-        impl<T, E> BuildAgent<Box<$type>, E> for ForAnyAny<T>
-        where
-            T: Borrow<AgentDef>,
-            E: EnvStructure + ?Sized,
-            <E as EnvStructure>::ObservationSpace: RLObservationSpace $(+ $bound)* + 'static,
-            <E as EnvStructure>::ActionSpace: RLActionSpace $(+ $bound)* + 'static,
-        {
-            fn build_agent(&self, env: &E, seed: u64) -> Result<Box<$type>, BuildAgentError> {
-                use AgentDef::*;
-                match self.0.borrow() {
-                    Random => RandomAgentConfig::new()
-                        .build_agent(env, seed)
-                        .map(|a: RandomAgent<_>| Box::new(a) as _),
-                    ActorCritic(config) => config
-                        .as_ref()
-                        .build_agent(env, seed)
-                        .map(|a: ActorCriticBoxedAgent<_, _>| Box::new(a) as _),
-                    _ => Err(BuildAgentError::InvalidSpaceBounds),
-                }
-            }
-        }
-    };
-}
-agent_builder_boxed_for_any_any!(DynEnvAgent<E>);
-// agent_builder_boxed_for_any_any!(DynSendEnvAgent<E>, Send);
-
-impl<T, E> BuildAgent<Box<DynSendEnvAgent<E>>, E> for ForAnyAny<T>
+impl<T, E> BuildAgent<E> for ForAnyAny<T>
 where
     T: Borrow<AgentDef>,
     E: EnvStructure + ?Sized,
     <E as EnvStructure>::ObservationSpace: RLObservationSpace + Send + 'static,
     <E as EnvStructure>::ActionSpace: RLActionSpace + Send + 'static,
 {
-    fn build_agent(&self, env: &E, seed: u64) -> Result<Box<DynSendEnvAgent<E>>, BuildAgentError> {
+    type Agent = Box<DynSendEnvAgent<E>>;
+
+    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
         match self.0.borrow() {
             Random => RandomAgentConfig::new()
                 .build_agent(env, seed)
-                .map(|a: RandomAgent<_>| Box::new(a) as _),
-            // TODO: Fix and use macro
-            ActorCritic(_) => panic!("ActorCritic is not yet Send"),
+                .map(|a| Box::new(a) as _),
+            // TODO: Implement Send for ActorCriticAgent
+            /*
+            ActorCritic(config) => config
+                .as_ref()
+                .build_agent(env, seed)
+                .map(|a| Box::new(a) as _),
+            */
             _ => Err(BuildAgentError::InvalidSpaceBounds),
         }
     }
 }
 
-impl<T, E> BuildAgent<Box<DynEnvManagerAgent<E>>, E> for ForAnyAny<T>
+impl<T, E> BuildManagerAgent<E> for ForAnyAny<T>
 where
+    T: Borrow<MultiThreadAgentDef>,
     T: Borrow<MultiThreadAgentDef>,
     E: EnvStructure + ?Sized,
     <E as EnvStructure>::ObservationSpace: RLObservationSpace + Send + 'static,
     <E as EnvStructure>::ActionSpace: RLActionSpace + Send + 'static,
 {
-    fn build_agent(
+    type ManagerAgent = Box<DynEnvManagerAgent<E>>;
+
+    fn build_manager_agent(
         &self,
         env: &E,
         seed: u64,
-    ) -> Result<Box<DynEnvManagerAgent<E>>, BuildAgentError> {
+    ) -> Result<Self::ManagerAgent, BuildAgentError> {
         use MultiThreadAgentDef::*;
         match self.0.borrow() {
-            Mutex(config) => ForAnyAny(config.borrow()).build_agent(env, seed).map(
-                |a: Box<DynSendEnvAgent<E>>| {
-                    Box::new(BoxingManager::new(MutexAgentManager::new(a))) as _
-                },
-            ),
+            Mutex(config) => ForAnyAny(config.borrow())
+                .build_agent(env, seed)
+                .map(|a| Box::new(BoxingManager::new(MutexAgentManager::new(a))) as _),
         }
     }
 }
@@ -157,56 +138,45 @@ impl<T> ForFiniteFinite<T> {
     }
 }
 
-macro_rules! agent_builder_boxed_for_finite_finite {
-    ($type:ty$(, $bound:tt )*) => {
-        impl<T, E> BuildAgent<Box<$type>, E> for ForFiniteFinite<T>
-        where
-            T: Borrow<AgentDef>,
-            E: EnvStructure + ?Sized,
-            <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace $(+ $bound )* + 'static,
-            <E as EnvStructure>::ActionSpace: RLActionSpace + FiniteSpace $(+ $bound )* + 'static,
-        {
-            fn build_agent(&self, env: &E, seed: u64) -> Result<Box<$type>, BuildAgentError> {
-                use AgentDef::*;
-                match self.0.borrow() {
-                    TabularQLearning(config) => config
-                        .build_agent(env, seed)
-                        .map(|a: TabularQLearningAgent<_, _>| Box::new(a) as _),
-                    BetaThompsonSampling(config) => config
-                        .build_agent(env, seed)
-                        .map(|a: BetaThompsonSamplingAgent<_, _>| Box::new(a) as _),
-                    UCB1(config) => config
-                        .build_agent(env, seed)
-                        .map(|a: UCB1Agent<_, _>| Box::new(a) as _),
-                    agent_def => ForAnyAny::new(agent_def).build_agent(env, seed),
-                }
-            }
+impl<T, E> BuildAgent<E> for ForFiniteFinite<T>
+where
+    T: Borrow<AgentDef>,
+    E: EnvStructure + ?Sized,
+    <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace + Send + 'static,
+    <E as EnvStructure>::ActionSpace: RLActionSpace + FiniteSpace + Send + 'static,
+{
+    type Agent = Box<DynSendEnvAgent<E>>;
+
+    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
+        use AgentDef::*;
+        match self.0.borrow() {
+            TabularQLearning(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            BetaThompsonSampling(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            UCB1(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            agent_def => ForAnyAny::new(agent_def).build_agent(env, seed),
         }
-    };
+    }
 }
 
-agent_builder_boxed_for_finite_finite!(DynEnvAgent<E>);
-agent_builder_boxed_for_finite_finite!(DynSendEnvAgent<E>, Send);
-
-impl<T, E> BuildAgent<Box<DynEnvManagerAgent<E>>, E> for ForFiniteFinite<T>
+impl<T, E> BuildManagerAgent<E> for ForFiniteFinite<T>
 where
     T: Borrow<MultiThreadAgentDef>,
     E: EnvStructure + ?Sized,
     <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace + Send + 'static,
     <E as EnvStructure>::ActionSpace: RLActionSpace + FiniteSpace + Send + 'static,
 {
-    fn build_agent(
+    type ManagerAgent = Box<DynEnvManagerAgent<E>>;
+
+    fn build_manager_agent(
         &self,
         env: &E,
         seed: u64,
-    ) -> Result<Box<DynEnvManagerAgent<E>>, BuildAgentError> {
+    ) -> Result<Self::ManagerAgent, BuildAgentError> {
         use MultiThreadAgentDef::*;
         match self.0.borrow() {
-            Mutex(config) => ForFiniteFinite(config.borrow()).build_agent(env, seed).map(
-                |a: Box<DynSendEnvAgent<E>>| {
-                    Box::new(BoxingManager::new(MutexAgentManager::new(a))) as _
-                },
-            ),
+            Mutex(config) => ForFiniteFinite(config.borrow())
+                .build_agent(env, seed)
+                .map(|a| Box::new(BoxingManager::new(MutexAgentManager::new(a))) as _),
         }
     }
 }
@@ -227,76 +197,62 @@ impl<T> ForMetaFiniteFinite<T> {
     }
 }
 
-macro_rules! agent_builder_boxed_for_meta_finite_finite {
-    ($type:ty$(, $bound:tt )*) => {
-        impl<T, E, OS, AS> BuildAgent<Box<$type>, E> for ForMetaFiniteFinite<T>
-        where
-            T: Borrow<AgentDef>,
-            E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
-            <E as EnvStructure>::ObservationSpace: RLObservationSpace + 'static,
-            OS: RLObservationSpace + FiniteSpace + Clone $(+ $bound)* + 'static,
-            // ResettingMetaAgent: Send requires OS::Element: Send
-            <OS as Space>::Element: Clone $(+ $bound)*,
-            AS: RLActionSpace + FiniteSpace + Clone $(+ $bound)* + 'static,
-            <AS as Space>::Element: Clone,
-        {
-            fn build_agent(&self, env: &E, seed: u64) -> Result<Box<$type>, BuildAgentError> {
-                use AgentDef::*;
-
-                match self.0.borrow() {
-                    ResettingMeta(inner_agent_def) => {
-                        Ok(Box::new(ResettingMetaAgent::<
-                                    _,
-                                    Box<dyn Agent<OS::Element, AS::Element> $(+ $bound)*>,
-                                    _, _>::new(
-                            ForFiniteFinite::new(inner_agent_def.as_ref().clone()),
-                            (&InnerEnvStructure::<E, &E>::new(env)).into(),
-                            seed,
-                        )) as _)
-                    }
-                    agent_def => ForAnyAny::new(agent_def).build_agent(env, seed),
-                }
-            }
-        }
-    };
-}
-
-agent_builder_boxed_for_meta_finite_finite!(DynEnvAgent<E>);
-agent_builder_boxed_for_meta_finite_finite!(DynSendEnvAgent<E>, Send);
-
-impl<T, E, OS, AS> BuildAgent<Box<DynEnvManagerAgent<E>>, E> for ForMetaFiniteFinite<T>
+impl<T, E, OS, AS> BuildAgent<E> for ForMetaFiniteFinite<T>
 where
-    T: Borrow<MultiThreadAgentDef>,
+    T: Borrow<AgentDef>,
     E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
-    <E as EnvStructure>::ObservationSpace: RLObservationSpace + 'static,
     OS: RLObservationSpace + FiniteSpace + Clone + Send + 'static,
-    <OS as Space>::Element: Clone + Send,
+    <OS as Space>::Element: Clone + Send, // ResettingMetaAgent: Send requires OS::Element: Send
     AS: RLActionSpace + FiniteSpace + Clone + Send + 'static,
     <AS as Space>::Element: Clone,
+    // I think this ought to be inferrable but for whatever reason it isn't
+    <E as EnvStructure>::ObservationSpace: RLObservationSpace,
 {
-    fn build_agent(
-        &self,
-        env: &E,
-        seed: u64,
-    ) -> Result<Box<DynEnvManagerAgent<E>>, BuildAgentError> {
-        use MultiThreadAgentDef::*;
+    type Agent = Box<DynSendEnvAgent<E>>;
+
+    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
+        use AgentDef::*;
+
         match self.0.borrow() {
-            Mutex(config) => ForMetaFiniteFinite(config.borrow())
-                .build_agent(env, seed)
-                .map(|a: Box<DynSendEnvAgent<E>>| {
-                    Box::new(BoxingManager::new(MutexAgentManager::new(a))) as _
-                }),
+            ResettingMeta(inner_agent_def) => ResettingMetaAgent::new(
+                ForFiniteFinite::new(inner_agent_def.as_ref().clone()),
+                (&InnerEnvStructure::<E, &E>::new(env)).into(),
+                seed,
+            )
+            .map(|a| Box::new(a) as _),
+            agent_def => ForAnyAny::new(agent_def).build_agent(env, seed),
         }
     }
 }
 
-/// The agent trait object for a given environment structure.
-pub type DynEnvAgent<E> = dyn Agent<
-    <<E as EnvStructure>::ObservationSpace as Space>::Element,
-    <<E as EnvStructure>::ActionSpace as Space>::Element,
->;
+impl<T, E, OS, AS> BuildManagerAgent<E> for ForMetaFiniteFinite<T>
+where
+    T: Borrow<MultiThreadAgentDef>,
+    E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
+    OS: RLObservationSpace + FiniteSpace + Clone + Send + 'static,
+    <OS as Space>::Element: Clone + Send, // ResettingMetaAgent: Send requires OS::Element: Send
+    AS: RLActionSpace + FiniteSpace + Clone + Send + 'static,
+    <AS as Space>::Element: Clone,
+    // I think this ought to be inferrable but for whatever reason it isn't
+    <E as EnvStructure>::ObservationSpace: RLObservationSpace,
+{
+    type ManagerAgent = Box<DynEnvManagerAgent<E>>;
 
-/// The send-able trait object ofr a given environment structure.
+    fn build_manager_agent(
+        &self,
+        env: &E,
+        seed: u64,
+    ) -> Result<Self::ManagerAgent, BuildAgentError> {
+        use MultiThreadAgentDef::*;
+        match self.0.borrow() {
+            Mutex(config) => ForMetaFiniteFinite(config.borrow())
+                .build_agent(env, seed)
+                .map(|a| Box::new(BoxingManager::new(MutexAgentManager::new(a))) as _),
+        }
+    }
+}
+
+/// The send-able agent trait object of a given environment structure.
 pub type DynSendEnvAgent<E> = dyn Agent<
         <<E as EnvStructure>::ObservationSpace as Space>::Element,
         <<E as EnvStructure>::ActionSpace as Space>::Element,

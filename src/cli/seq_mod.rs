@@ -1,7 +1,7 @@
 use super::{Options, Update, WithUpdate};
-use crate::defs::SeqModDef;
+use crate::defs::{PolicyDef, SeqModDef};
 use crate::torch::modules::MlpConfig;
-use crate::torch::seq_modules::{RnnConfig, StackedConfig};
+use crate::torch::seq_modules::{GruConfig, LstmConfig, StackedConfig};
 use clap::ArgEnum;
 
 /// Sequence module type
@@ -47,7 +47,8 @@ impl Update<&Options> for SeqModDef {
 
         match self {
             Mlp(ref mut config) => config.update(opts),
-            GruMlp(ref mut config) | LstmMlp(ref mut config) => config.update(opts),
+            GruMlp(ref mut config) => config.update(opts),
+            LstmMlp(ref mut config) => config.update(opts),
         }
     }
 }
@@ -96,12 +97,34 @@ where
     }
 }
 
-impl From<&Options> for RnnConfig {
+impl From<&Options> for GruConfig {
     fn from(opts: &Options) -> Self {
         Self::default().with_update(opts)
     }
 }
 
-impl Update<&Options> for RnnConfig {
+impl Update<&Options> for GruConfig {
     fn update(&mut self, _opts: &Options) {}
+}
+
+impl From<&Options> for LstmConfig {
+    fn from(opts: &Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for LstmConfig {
+    fn update(&mut self, _opts: &Options) {}
+}
+
+impl From<&Options> for PolicyDef {
+    fn from(opts: &Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for PolicyDef {
+    fn update(&mut self, opts: &Options) {
+        self.0.update(opts)
+    }
 }

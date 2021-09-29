@@ -1,7 +1,6 @@
 //! Proximal policy optimization policy updater.
 use super::super::{
-    critic::Critic, history::PackedHistoryFeaturesView, optimizers::Optimizer,
-    seq_modules::SequenceModule,
+    critic::Critic, history::PackedHistoryFeaturesView, optimizers::Optimizer, policy::Policy,
 };
 use super::{PolicyStats, UpdatePolicyWithOptimizer};
 use crate::logging::{Event, TimeSeriesLogger};
@@ -31,17 +30,15 @@ impl Default for PpoPolicyUpdateRule {
     }
 }
 
-impl<P, C, O, AS> UpdatePolicyWithOptimizer<P, C, O, AS> for PpoPolicyUpdateRule
+impl<O, AS> UpdatePolicyWithOptimizer<O, AS> for PpoPolicyUpdateRule
 where
-    P: SequenceModule + ?Sized,
-    C: Critic + ?Sized,
     O: Optimizer + ?Sized,
     AS: ParameterizedDistributionSpace<Tensor> + ?Sized,
 {
     fn update_policy_with_optimizer(
         &self,
-        policy: &P,
-        critic: &C,
+        policy: &dyn Policy,
+        critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
         action_space: &AS,

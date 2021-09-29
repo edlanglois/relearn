@@ -1,9 +1,26 @@
 use super::{
-    Actor, ActorMode, Agent, BuildAgent, BatchUpdate, BuildAgentError, SetActorMode, Step,
+    Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, SetActorMode, Step,
 };
-use crate::envs::{EnvStructure, StoredEnvStructure};
+use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
-use crate::spaces::{FiniteSpace, IndexSpace};
+use crate::spaces::FiniteSpace;
+
+/// Build an agent for finite, indexed action and observation spaces.
+///
+/// This is a helper trait that automatically implements [`BuildAgent`]
+/// with all finite-space environments.
+pub trait BuildIndexAgent {
+    type Agent;
+
+    fn build_index_agent(
+        &self,
+        num_observations: usize,
+        num_actions: usize,
+        reward_range: (f64, f64),
+        discount_factor: f64,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError>;
+}
 
 /// Wraps an index-space agent as an agent over finite spaces.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
@@ -107,28 +124,27 @@ where
     }
 }
 
-impl<B, T, E> BuildAgent<FiniteSpaceAgent<T, E::ObservationSpace, E::ActionSpace>, E> for B
+impl<E, B> BuildAgent<E> for B
 where
-    B: BuildAgent<T, StoredEnvStructure<IndexSpace, IndexSpace>>,
+    B: BuildIndexAgent,
     E: EnvStructure + ?Sized,
     <E as EnvStructure>::ObservationSpace: FiniteSpace,
     <E as EnvStructure>::ActionSpace: FiniteSpace,
 {
-    fn build_agent(
-        &self,
-        env: &E,
-        seed: u64,
-    ) -> Result<FiniteSpaceAgent<T, E::ObservationSpace, E::ActionSpace>, BuildAgentError> {
+    type Agent =
+        FiniteSpaceAgent<<Self as BuildIndexAgent>::Agent, E::ObservationSpace, E::ActionSpace>;
+
+    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         let observation_space = env.observation_space();
         let action_space = env.action_space();
-        let index_space_env = StoredEnvStructure {
-            observation_space: (&observation_space).into(),
-            action_space: (&action_space).into(),
-            reward_range: env.reward_range(),
-            discount_factor: env.discount_factor(),
-        };
         Ok(FiniteSpaceAgent {
-            agent: self.build_agent(&index_space_env, seed)?,
+            agent: self.build_index_agent(
+                observation_space.size(),
+                action_space.size(),
+                env.reward_range(),
+                env.discount_factor(),
+                seed,
+            )?,
             observation_space,
             action_space,
         })

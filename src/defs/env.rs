@@ -1,6 +1,6 @@
 use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
 use super::{AgentDef, MultiThreadAgentDef};
-use crate::agents::{Agent, BuildAgent, ManagerAgent};
+use crate::agents::{BuildAgent, BuildManagerAgent};
 use crate::envs::{
     Bandit, BuildEnv, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps,
     EnvStructure, MemoryGame as MemoryGameEnv, MetaPomdp, OneHotBandits, UniformBernoulliBandits,
@@ -114,8 +114,7 @@ impl EnvDef {
         macro_rules! boxed_simulation {
             ($env_config:expr, $agent_builder:ty) => {{
                 let env = Box::new($env_config.build_env(env_seed)?);
-                let agent: Box<dyn Agent<_, _>> =
-                    <$agent_builder>::new(agent_def).build_agent(&env, agent_seed)?;
+                let agent = <$agent_builder>::new(agent_def).build_agent(&env, agent_seed)?;
                 let log_hook = StepLogger::new(env.observation_space(), env.action_space());
                 Box::new(Simulator::new(env, agent, (log_hook, hook)))
             }};
@@ -175,8 +174,8 @@ impl EnvDef {
         macro_rules! boxed_simulation {
             ($env_config:expr, $agent_builder:ty) => {{
                 let env = $env_config.build_env(env_seed)?;
-                let agent: Box<dyn ManagerAgent<Worker = Box<dyn Agent<_, _> + Send>>> =
-                    <$agent_builder>::new(agent_def).build_agent(&env, agent_seed)?;
+                let agent =
+                    <$agent_builder>::new(agent_def).build_manager_agent(&env, agent_seed)?;
                 let log_hook = StepLogger::new(env.observation_space(), env.action_space());
                 sim_config.build_simulator($env_config.clone(), agent, (log_hook, hook))
             }};
