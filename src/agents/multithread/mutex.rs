@@ -29,6 +29,7 @@ impl<AC> From<AC> for MutexAgentConfig<AC> {
 impl<AC, E> BuildManagerAgent<E> for MutexAgentConfig<AC>
 where
     AC: BuildAgent<E>,
+    AC::Agent: Send + 'static,
     E: EnvStructure + ?Sized,
 {
     type ManagerAgent = MutexAgentManager<AC::Agent>;

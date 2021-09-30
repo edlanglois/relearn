@@ -149,7 +149,7 @@ impl<T: SetActorMode + ?Sized> SetActorMode for Box<T> {
 // into_manager(self) -> Self::Manager
 
 pub trait BuildManagerAgent<E: ?Sized> {
-    type ManagerAgent;
+    type ManagerAgent: ManagerAgent;
 
     fn build_manager_agent(
         &self,
