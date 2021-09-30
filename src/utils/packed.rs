@@ -47,7 +47,7 @@ where
     pub fn new<U>(sequences: U) -> Self
     where
         U: IntoIterator,
-        <U as IntoIterator>::Item: IntoIterator<IntoIter = T>,
+        U::Item: IntoIterator<IntoIter = T>,
     {
         let mut sequences: Vec<_> = sequences.into_iter().map(IntoIterator::into_iter).collect();
         // Sort in descending order of length.
@@ -69,7 +69,7 @@ where
     pub fn from_sorted<U>(sequences: U) -> Self
     where
         U: IntoIterator,
-        <U as IntoIterator>::Item: IntoIterator<IntoIter = T>,
+        U::Item: IntoIterator<IntoIter = T>,
     {
         let sequences: Vec<_> = sequences.into_iter().map(IntoIterator::into_iter).collect();
         let batch_size = sequences.len();
@@ -85,7 +85,7 @@ impl<T> Iterator for PackedIter<T>
 where
     T: ExactSizeIterator,
 {
-    type Item = <T as Iterator>::Item;
+    type Item = T::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut result = self.sequences[self.seq_idx].next();

@@ -66,7 +66,7 @@ pub fn one_hot_out(labels: &Tensor, out: &mut Tensor) {
 pub fn f_flatten_tensors<I>(tensors: I) -> Result<Tensor, TchError>
 where
     I: IntoIterator,
-    <I as IntoIterator>::Item: Borrow<Tensor>,
+    I::Item: Borrow<Tensor>,
 {
     Tensor::f_cat(
         &tensors
@@ -87,7 +87,7 @@ where
 pub fn flatten_tensors<I>(tensors: I) -> Tensor
 where
     I: IntoIterator,
-    <I as IntoIterator>::Item: Borrow<Tensor>,
+    I::Item: Borrow<Tensor>,
 {
     f_flatten_tensors(tensors).unwrap()
 }

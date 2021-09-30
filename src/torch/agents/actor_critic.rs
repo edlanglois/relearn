@@ -50,12 +50,12 @@ where
 impl<PB, PUB, CB, CUB, E> BuildAgent<E> for ActorCriticConfig<PB, PUB, CB, CUB>
 where
     PB: BuildPolicy,
-    PUB: BuildPolicyUpdater<<E as EnvStructure>::ActionSpace>,
+    PUB: BuildPolicyUpdater<E::ActionSpace>,
     CB: BuildCritic,
     CUB: BuildCriticUpdater,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
-    <E as EnvStructure>::ActionSpace: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
+    E::ObservationSpace: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
+    E::ActionSpace: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
 {
     #[allow(clippy::type_complexity)]
     type Agent = ActorCriticAgent<

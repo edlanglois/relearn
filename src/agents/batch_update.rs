@@ -6,13 +6,9 @@ use crate::spaces::Space;
 
 /// Build an actor supporting batch updates ([`BatchUpdate`]).
 pub trait BuildBatchUpdateActor<E: EnvStructure + ?Sized> {
-    type BatchUpdateActor: Actor<
-            <<E as EnvStructure>::ObservationSpace as Space>::Element,
-            <<E as EnvStructure>::ActionSpace as Space>::Element,
-        > + BatchUpdate<
-            <<E as EnvStructure>::ObservationSpace as Space>::Element,
-            <<E as EnvStructure>::ActionSpace as Space>::Element,
-        > + SetActorMode;
+    type BatchUpdateActor: Actor<<E::ObservationSpace as Space>::Element, <E::ActionSpace as Space>::Element>
+        + BatchUpdate<<E::ObservationSpace as Space>::Element, <E::ActionSpace as Space>::Element>
+        + SetActorMode;
 
     /// Build an actor for the given environment structure ([`EnvStructure`]).
     ///
@@ -73,8 +69,8 @@ impl<AC, HBC, E> BuildAgent<E> for BatchUpdateAgentConfig<AC, HBC>
 where
     AC: BuildBatchUpdateActor<E>,
     HBC: BuildHistoryBuffer<
-        <<E as EnvStructure>::ObservationSpace as Space>::Element,
-        <<E as EnvStructure>::ActionSpace as Space>::Element,
+        <E::ObservationSpace as Space>::Element,
+        <E::ActionSpace as Space>::Element,
     >,
     E: EnvStructure + ?Sized,
 {

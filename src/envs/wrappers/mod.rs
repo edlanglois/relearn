@@ -55,9 +55,9 @@ where
     T: PomdpDistribution,
     W: Clone,
     Wrapped<T::Pomdp, W>: Pomdp<
-        // State = <<T as PomdpDistribution>::Pomdp as Pomdp>::State,
-        Observation = <<T as PomdpDistribution>::Pomdp as Pomdp>::Observation,
-        Action = <<T as PomdpDistribution>::Pomdp as Pomdp>::Action,
+        // State = <T::Pomdp as Pomdp>::State,
+        Observation = <T::Pomdp as Pomdp>::Observation,
+        Action = <T::Pomdp as Pomdp>::Action,
     >,
 {
     type Pomdp = Wrapped<T::Pomdp, W>;

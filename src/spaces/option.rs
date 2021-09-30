@@ -4,7 +4,7 @@ use super::{
     FeatureSpaceOut, FiniteSpace, Space,
 };
 use crate::logging::Loggable;
-use ndarray::{s, Array, ArrayBase, ArrayViewMut, DataMut, Ix1, Ix2, RawData};
+use ndarray::{s, Array, ArrayBase, ArrayViewMut, DataMut, Ix1, Ix2};
 use num_traits::{One, Zero};
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -92,7 +92,7 @@ impl<S, T> FeatureSpaceOut<ArrayBase<T, Ix1>> for OptionSpace<S>
 where
     S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, T::Elem, Ix1>>,
     T: DataMut,
-    <T as RawData>::Elem: Clone + Zero + One,
+    T::Elem: Clone + Zero + One,
 {
     fn features_out(&self, element: &Self::Element, out: &mut ArrayBase<T, Ix1>, zeroed: bool) {
         if let Some(inner_elem) = element {
@@ -122,7 +122,7 @@ where
     ) -> Array<T, Ix2>
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator,
         Self::Element: 'a,
     {
         let elements = elements.into_iter();
@@ -136,7 +136,7 @@ impl<S, T> PhantomBatchFeatureSpaceOut<ArrayBase<T, Ix2>> for OptionSpace<S>
 where
     S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, T::Elem, Ix1>>,
     T: DataMut,
-    <T as RawData>::Elem: Clone + Zero + One,
+    T::Elem: Clone + Zero + One,
 {
     fn phantom_batch_features_out<'a, I>(
         &self,
@@ -194,7 +194,7 @@ where
     ) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator,
         Self::Element: 'a,
     {
         // NOTE:
@@ -253,7 +253,7 @@ impl<S: BatchFeatureSpace<Tensor>> PhantomBatchFeatureSpaceOut<Tensor> for Optio
 
 impl<S> Distribution<<Self as Space>::Element> for OptionSpace<S>
 where
-    S: Space + Distribution<<S as Space>::Element>,
+    S: Space + Distribution<S::Element>,
 {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
         // Sample None half of the time.
@@ -294,7 +294,7 @@ pub trait PhantomBatchFeatureSpace<T2>: Space {
     ) -> T2
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator,
         Self::Element: 'a;
 }
 
@@ -324,7 +324,7 @@ where
     fn batch_features<'a, I>(&self, elements: I) -> T2
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator,
         Self::Element: 'a,
     {
         self.phantom_batch_features(elements, PhantomData)

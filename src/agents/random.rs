@@ -19,7 +19,7 @@ impl RandomAgentConfig {
 impl<E> BuildAgent<E> for RandomAgentConfig
 where
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ActionSpace: SampleSpace,
+    E::ActionSpace: SampleSpace,
 {
     type Agent = RandomAgent<E::ActionSpace>;
 

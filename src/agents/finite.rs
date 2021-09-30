@@ -129,11 +129,10 @@ impl<E, B> BuildAgent<E> for B
 where
     B: BuildIndexAgent,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: FiniteSpace,
-    <E as EnvStructure>::ActionSpace: FiniteSpace,
+    E::ObservationSpace: FiniteSpace,
+    E::ActionSpace: FiniteSpace,
 {
-    type Agent =
-        FiniteSpaceAgent<<Self as BuildIndexAgent>::Agent, E::ObservationSpace, E::ActionSpace>;
+    type Agent = FiniteSpaceAgent<B::Agent, E::ObservationSpace, E::ActionSpace>;
 
     fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         let observation_space = env.observation_space();
@@ -156,10 +155,10 @@ impl<E, B> BuildBatchUpdateActor<E> for B
 where
     // NOTE: This is slightly over-restrictive. Don't need BuildIndexAgent::Agent: Agent
     B: BuildIndexAgent,
-    <B as BuildIndexAgent>::Agent: BatchUpdate<usize, usize>,
+    B::Agent: BatchUpdate<usize, usize>,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: FiniteSpace,
-    <E as EnvStructure>::ActionSpace: FiniteSpace,
+    E::ObservationSpace: FiniteSpace,
+    E::ActionSpace: FiniteSpace,
 {
     type BatchUpdateActor = <Self as BuildAgent<E>>::Agent;
 

@@ -58,7 +58,7 @@ fn build_module_with_state<T>(
 ) -> WithState<T::Module>
 where
     T: BuildModule + ?Sized,
-    <T as BuildModule>::Module: IterativeModule,
+    T::Module: IterativeModule,
 {
     config.build_module(vs, in_dim, out_dim).into()
 }

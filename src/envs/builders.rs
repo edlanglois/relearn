@@ -26,14 +26,14 @@ pub trait BuildPomdp {
 impl<E> BuildPomdp for E
 where
     E: Pomdp + EnvStructure + CloneBuild,
-    <E as EnvStructure>::ObservationSpace: Space<Element = <Self as Pomdp>::Observation>,
-    <E as EnvStructure>::ActionSpace: Space<Element = <Self as Pomdp>::Action>,
+    E::ObservationSpace: Space<Element = E::Observation>,
+    E::ActionSpace: Space<Element = E::Action>,
 {
-    type State = <Self as Pomdp>::State;
-    type Observation = <Self as Pomdp>::Observation;
-    type Action = <Self as Pomdp>::Action;
-    type ObservationSpace = <Self as EnvStructure>::ObservationSpace;
-    type ActionSpace = <Self as EnvStructure>::ActionSpace;
+    type State = E::State;
+    type Observation = E::Observation;
+    type Action = E::Action;
+    type ObservationSpace = E::ObservationSpace;
+    type ActionSpace = E::ActionSpace;
     type Pomdp = Self;
 
     fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {
@@ -64,10 +64,10 @@ pub trait BuildEnv {
 }
 
 impl<T: BuildPomdp> BuildEnv for T {
-    type Observation = <Self as BuildPomdp>::Observation;
-    type Action = <Self as BuildPomdp>::Action;
-    type ObservationSpace = <Self as BuildPomdp>::ObservationSpace;
-    type ActionSpace = <Self as BuildPomdp>::ActionSpace;
+    type Observation = T::Observation;
+    type Action = T::Action;
+    type ObservationSpace = T::ObservationSpace;
+    type ActionSpace = T::ActionSpace;
     type Environment = PomdpEnv<T::Pomdp>;
 
     fn build_env(&self, seed: u64) -> Result<Self::Environment, BuildEnvError> {
@@ -107,10 +107,10 @@ impl<T> BuildPomdpDist for T
 where
     T: PomdpDistribution + CloneBuild,
 {
-    type Observation = <<Self as BuildPomdpDist>::ObservationSpace as Space>::Element;
-    type Action = <<Self as BuildPomdpDist>::ActionSpace as Space>::Element;
-    type ObservationSpace = <Self as EnvStructure>::ObservationSpace;
-    type ActionSpace = <Self as EnvStructure>::ActionSpace;
+    type Observation = <T::ObservationSpace as Space>::Element;
+    type Action = <T::ActionSpace as Space>::Element;
+    type ObservationSpace = T::ObservationSpace;
+    type ActionSpace = T::ActionSpace;
     type PomdpDistribution = Self;
 
     fn build_pomdp_dist(&self) -> Self::PomdpDistribution {
@@ -137,10 +137,10 @@ impl<T> BuildEnvDist for T
 where
     T: EnvDistribution + CloneBuild,
 {
-    type Observation = <<Self as BuildEnvDist>::ObservationSpace as Space>::Element;
-    type Action = <<Self as BuildEnvDist>::ActionSpace as Space>::Element;
-    type ObservationSpace = <Self as EnvStructure>::ObservationSpace;
-    type ActionSpace = <Self as EnvStructure>::ActionSpace;
+    type Observation = <T::ObservationSpace as Space>::Element;
+    type Action = <T::ActionSpace as Space>::Element;
+    type ObservationSpace = T::ObservationSpace;
+    type ActionSpace = T::ActionSpace;
     type EnvDistribution = Self;
 
     fn build_env_dist(&self) -> Self::EnvDistribution {

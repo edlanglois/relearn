@@ -85,8 +85,8 @@ impl<T, E> BuildAgent<E> for ForAnyAny<T>
 where
     T: Borrow<AgentDef>,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: RLObservationSpace,
-    <E as EnvStructure>::ActionSpace: RLActionSpace,
+    E::ObservationSpace: RLObservationSpace,
+    E::ActionSpace: RLActionSpace,
 {
     type Agent = Box<DynFullAgent<E>>;
 
@@ -110,8 +110,8 @@ where
     T: Borrow<MultiThreadAgentDef>,
     T: Borrow<MultiThreadAgentDef>,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: RLObservationSpace,
-    <E as EnvStructure>::ActionSpace: RLActionSpace,
+    E::ObservationSpace: RLObservationSpace,
+    E::ActionSpace: RLActionSpace,
 {
     type ManagerAgent = Box<DynEnvManagerAgent<E>>;
 
@@ -146,8 +146,8 @@ impl<T, E> BuildAgent<E> for ForFiniteFinite<T>
 where
     T: Borrow<AgentDef>,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace,
-    <E as EnvStructure>::ActionSpace: RLActionSpace + FiniteSpace,
+    E::ObservationSpace: RLObservationSpace + FiniteSpace,
+    E::ActionSpace: RLActionSpace + FiniteSpace,
 {
     type Agent = Box<DynFullAgent<E>>;
 
@@ -166,8 +166,8 @@ impl<T, E> BuildManagerAgent<E> for ForFiniteFinite<T>
 where
     T: Borrow<MultiThreadAgentDef>,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace,
-    <E as EnvStructure>::ActionSpace: RLActionSpace + FiniteSpace,
+    E::ObservationSpace: RLObservationSpace + FiniteSpace,
+    E::ActionSpace: RLActionSpace + FiniteSpace,
 {
     type ManagerAgent = Box<DynEnvManagerAgent<E>>;
 
@@ -206,11 +206,11 @@ where
     T: Borrow<AgentDef>,
     E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
     OS: RLObservationSpace + FiniteSpace + Clone,
-    <OS as Space>::Element: Clone,
+    OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace + Clone,
-    <AS as Space>::Element: Clone,
+    AS::Element: Clone,
     // I think this ought to be inferrable but for whatever reason it isn't
-    <E as EnvStructure>::ObservationSpace: RLObservationSpace,
+    E::ObservationSpace: RLObservationSpace,
 {
     type Agent = Box<DynFullAgent<E>>;
 
@@ -234,11 +234,11 @@ where
     T: Borrow<MultiThreadAgentDef>,
     E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
     OS: RLObservationSpace + FiniteSpace + Clone,
-    <OS as Space>::Element: Clone,
+    OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace + Clone,
-    <AS as Space>::Element: Clone,
+    AS::Element: Clone,
     // I think this ought to be inferrable but for whatever reason it isn't
-    <E as EnvStructure>::ObservationSpace: RLObservationSpace,
+    E::ObservationSpace: RLObservationSpace,
 {
     type ManagerAgent = Box<DynEnvManagerAgent<E>>;
 

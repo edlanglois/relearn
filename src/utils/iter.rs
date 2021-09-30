@@ -64,7 +64,7 @@ pub trait ArgMaxBy {
 }
 
 impl<I: Iterator> ArgMaxBy for I {
-    type Item = <Self as Iterator>::Item;
+    type Item = I::Item;
 
     fn argmax_by<F>(self, mut compare: F) -> Option<usize>
     where

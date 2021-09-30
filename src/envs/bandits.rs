@@ -68,7 +68,7 @@ impl<D: FromMean<f64>> Bandit<D> {
     /// Create a new Bandit from a list of means.
     pub fn from_means<I: IntoIterator<Item = T>, T: Borrow<f64>>(
         means: I,
-    ) -> Result<Self, <D as FromMean<f64>>::Error> {
+    ) -> Result<Self, D::Error> {
         means
             .into_iter()
             .map(|m| D::from_mean(*m.borrow()))

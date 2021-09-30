@@ -182,11 +182,11 @@ pub trait Pomdp {
 
 impl<E: Mdp> Pomdp for E
 where
-    <Self as Mdp>::State: Copy,
+    E::State: Copy,
 {
-    type State = <Self as Mdp>::State;
-    type Observation = <Self as Mdp>::State;
-    type Action = <Self as Mdp>::Action;
+    type State = E::State;
+    type Observation = E::State;
+    type Action = E::Action;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
         Mdp::initial_state(self, rng)
@@ -258,12 +258,9 @@ impl<E: Environment + ?Sized> Environment for Box<E> {
 /// The transition dynamics of the individual environment samples may differ.
 pub trait PomdpDistribution: EnvStructure {
     type Pomdp: Pomdp<
-            Observation = <<Self as EnvStructure>::ObservationSpace as Space>::Element,
-            Action = <<Self as EnvStructure>::ActionSpace as Space>::Element,
-        > + EnvStructure<
-            ObservationSpace = <Self as EnvStructure>::ObservationSpace,
-            ActionSpace = <Self as EnvStructure>::ActionSpace,
-        >;
+            Observation = <Self::ObservationSpace as Space>::Element,
+            Action = <Self::ActionSpace as Space>::Element,
+        > + EnvStructure<ObservationSpace = Self::ObservationSpace, ActionSpace = Self::ActionSpace>;
 
     /// Sample a POMDP from the distribution.
     ///
@@ -279,12 +276,9 @@ pub trait PomdpDistribution: EnvStructure {
 /// The transition dynamics of the individual environment samples may differ.
 pub trait EnvDistribution: EnvStructure {
     type Environment: Environment<
-            Observation = <<Self as EnvStructure>::ObservationSpace as Space>::Element,
-            Action = <<Self as EnvStructure>::ActionSpace as Space>::Element,
-        > + EnvStructure<
-            ObservationSpace = <Self as EnvStructure>::ObservationSpace,
-            ActionSpace = <Self as EnvStructure>::ActionSpace,
-        >;
+            Observation = <Self::ObservationSpace as Space>::Element,
+            Action = <Self::ActionSpace as Space>::Element,
+        > + EnvStructure<ObservationSpace = Self::ObservationSpace, ActionSpace = Self::ActionSpace>;
 
     /// Sample an environment from the distribution.
     ///
@@ -297,7 +291,6 @@ pub trait EnvDistribution: EnvStructure {
 impl<T> EnvDistribution for T
 where
     T: PomdpDistribution,
-    <T as PomdpDistribution>::Pomdp: Pomdp,
 {
     type Environment = PomdpEnv<T::Pomdp>;
 

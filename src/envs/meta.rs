@@ -83,7 +83,7 @@ impl<E: Default> Default for MetaPomdp<E> {
 impl<EB> BuildPomdp for MetaPomdp<EB>
 where
     EB: BuildPomdpDist,
-    <EB as BuildPomdpDist>::Action: Copy,
+    EB::Action: Copy,
 {
     type State = <Self::Pomdp as Pomdp>::State;
     type Observation = <Self::Pomdp as Pomdp>::Observation;
@@ -124,7 +124,7 @@ where
 impl<E> Pomdp for MetaPomdp<E>
 where
     E: PomdpDistribution,
-    <<E as PomdpDistribution>::Pomdp as Pomdp>::Action: Copy,
+    <E::Pomdp as Pomdp>::Action: Copy,
 {
     type State = MetaState<E::Pomdp>;
     type Observation =
@@ -235,7 +235,7 @@ impl<EB: Default> Default for MetaEnvConfig<EB> {
 impl<EB> BuildEnv for MetaEnvConfig<EB>
 where
     EB: BuildEnvDist,
-    <EB as BuildEnvDist>::Action: Copy,
+    EB::Action: Copy,
 {
     type Observation = <Self::ObservationSpace as Space>::Element;
     type Action = <Self::ActionSpace as Space>::Element;
@@ -310,8 +310,7 @@ impl<E: EnvDistribution + EnvStructure> EnvStructure for MetaEnv<E> {
 impl<E> Environment for MetaEnv<E>
 where
     E: EnvDistribution,
-    <E as EnvDistribution>::Environment: Environment,
-    <<E as EnvDistribution>::Environment as Environment>::Action: Copy,
+    <E::Environment as Environment>::Action: Copy,
 {
     type Observation = MetaObservation<
         <E::Environment as Environment>::Observation,

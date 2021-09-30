@@ -26,7 +26,7 @@ impl<VC: Default> Default for GaeConfig<VC> {
 impl<VC> BuildCritic for GaeConfig<VC>
 where
     VC: BuildModule,
-    <VC as BuildModule>::Module: SequenceModule,
+    VC::Module: SequenceModule,
 {
     type Critic = Gae<VC::Module>;
 

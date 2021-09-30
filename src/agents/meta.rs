@@ -22,9 +22,9 @@ where
     T: BuildAgent<StoredEnvStructure<OS, AS>> + Clone,
     E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
     OS: Space + Clone,
-    <OS as Space>::Element: Clone,
+    OS::Element: Clone,
     AS: SampleSpace + Clone,
-    <AS as Space>::Element: Clone,
+    AS::Element: Clone,
 {
     type Agent = ResettingMetaAgent<T, OS, AS>;
 
@@ -84,9 +84,9 @@ impl<AC, OS, AS> Actor<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Ele
 where
     AC: BuildAgent<StoredEnvStructure<OS, AS>>,
     OS: Space + Clone,
-    <OS as Space>::Element: Clone,
+    OS::Element: Clone,
     AS: SampleSpace + Clone,
-    <AS as Space>::Element: Clone,
+    AS::Element: Clone,
 {
     fn act(
         &mut self,
@@ -143,9 +143,9 @@ impl<AC, OS, AS> Agent<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Ele
 where
     AC: BuildAgent<StoredEnvStructure<OS, AS>>,
     OS: Space + Clone,
-    <OS as Space>::Element: Clone,
+    OS::Element: Clone,
     AS: SampleSpace + Clone,
-    <AS as Space>::Element: Clone,
+    AS::Element: Clone,
 {
     fn update(
         &mut self,

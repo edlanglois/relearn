@@ -38,9 +38,9 @@ impl<E, A, H> Simulator<E, A, H> {
 impl<E, A, H> RunSimulation for Simulator<E, A, H>
 where
     E: Environment,
-    <E as Environment>::Observation: Clone,
-    A: Agent<<E as Environment>::Observation, <E as Environment>::Action>,
-    H: SimulationHook<<E as Environment>::Observation, <E as Environment>::Action>,
+    E::Observation: Clone,
+    A: Agent<E::Observation, E::Action>,
+    H: SimulationHook<E::Observation, E::Action>,
 {
     fn run_simulation(&mut self, logger: &mut dyn TimeSeriesLogger) {
         run_agent(
@@ -71,9 +71,9 @@ pub fn run_agent<E, A, H>(
     //
     // Alternatively, it can use the concrete struct types, which allows inlining.
     E: Environment + ?Sized,
-    <E as Environment>::Observation: Clone,
-    A: Agent<<E as Environment>::Observation, <E as Environment>::Action> + ?Sized,
-    H: SimulationHook<<E as Environment>::Observation, <E as Environment>::Action> + ?Sized,
+    E::Observation: Clone,
+    A: Agent<E::Observation, E::Action> + ?Sized,
+    H: SimulationHook<E::Observation, E::Action> + ?Sized,
 {
     let mut observation = environment.reset();
     let mut new_episode = true;
@@ -119,9 +119,9 @@ pub fn run_agent<E, A, H>(
 pub fn run_actor<E, A, H, L>(environment: &mut E, actor: &mut A, hook: &mut H, logger: &mut L)
 where
     E: Environment + ?Sized,
-    <E as Environment>::Observation: Clone,
-    A: Actor<<E as Environment>::Observation, <E as Environment>::Action> + ?Sized,
-    H: SimulationHook<<E as Environment>::Observation, <E as Environment>::Action> + ?Sized,
+    E::Observation: Clone,
+    A: Actor<E::Observation, E::Action> + ?Sized,
+    H: SimulationHook<E::Observation, E::Action> + ?Sized,
     L: TimeSeriesLogger + ?Sized,
 {
     let mut observation = environment.reset();

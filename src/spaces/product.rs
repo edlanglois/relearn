@@ -36,7 +36,7 @@ impl<T: DisplayForTuple> fmt::Display for ProductSpace<T> {
 }
 
 impl<T: SpaceForTuples> Space for ProductSpace<T> {
-    type Element = <T as SpaceForTuples>::Element;
+    type Element = T::Element;
 
     fn contains(&self, value: &Self::Element) -> bool {
         self.inner_spaces.contains(value)
@@ -102,7 +102,7 @@ where
     fn batch_features<'a, I>(&self, elements: I) -> U
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator,
         Self::Element: 'a,
     {
         let elements = elements.into_iter();

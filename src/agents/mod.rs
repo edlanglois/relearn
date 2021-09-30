@@ -215,7 +215,7 @@ impl<T, O, A> BoxingManager<T, O, A> {
 impl<T, O, A> ManagerAgent for BoxingManager<T, O, A>
 where
     T: ManagerAgent,
-    <T as ManagerAgent>::Worker: Agent<O, A>,
+    T::Worker: Agent<O, A>,
     O: 'static,
     A: 'static,
 {

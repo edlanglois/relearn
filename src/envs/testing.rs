@@ -16,13 +16,13 @@ pub fn run_pomdp<E>(pomdp: E, num_steps: u64, seed: u64)
 where
     E: EnvStructure,
     E: Pomdp<
-        Observation = <<E as EnvStructure>::ObservationSpace as Space>::Element,
-        Action = <<E as EnvStructure>::ActionSpace as Space>::Element,
+        Observation = <E::ObservationSpace as Space>::Element,
+        Action = <E::ActionSpace as Space>::Element,
     >,
-    <E as EnvStructure>::ObservationSpace: Debug,
-    <E as Pomdp>::Observation: Debug + Clone,
-    <E as EnvStructure>::ActionSpace: Debug + SampleSpace,
-    <E as Pomdp>::Action: Debug,
+    E::ObservationSpace: Debug,
+    E::Observation: Debug + Clone,
+    E::ActionSpace: Debug + SampleSpace,
+    E::Action: Debug,
 {
     run_env(&mut pomdp.into_env(seed), num_steps, seed + 1)
 }
@@ -32,13 +32,13 @@ pub fn run_env<E>(env: &mut E, num_steps: u64, seed: u64)
 where
     E: EnvStructure,
     E: Environment<
-        Observation = <<E as EnvStructure>::ObservationSpace as Space>::Element,
-        Action = <<E as EnvStructure>::ActionSpace as Space>::Element,
+        Observation = <E::ObservationSpace as Space>::Element,
+        Action = <E::ActionSpace as Space>::Element,
     >,
-    <E as EnvStructure>::ObservationSpace: Debug,
-    <E as Environment>::Observation: Debug + Clone,
-    <E as EnvStructure>::ActionSpace: Debug + SampleSpace,
-    <E as Environment>::Action: Debug,
+    E::ObservationSpace: Debug,
+    E::Observation: Debug + Clone,
+    E::ActionSpace: Debug + SampleSpace,
+    E::Action: Debug,
 {
     let observation_space = env.observation_space();
     let action_space = env.action_space();
@@ -79,8 +79,8 @@ where
 pub fn check_env_distribution_structure<D>(env_dist: &D, num_samples: usize)
 where
     D: EnvDistribution + EnvStructure + ?Sized,
-    <D as EnvStructure>::ObservationSpace: PartialOrd + Debug,
-    <D as EnvStructure>::ActionSpace: PartialOrd + Debug,
+    D::ObservationSpace: PartialOrd + Debug,
+    D::ActionSpace: PartialOrd + Debug,
 {
     let env_structure = StoredEnvStructure::from(env_dist);
     let (dist_reward_min, dist_reward_max) = env_structure.reward_range;

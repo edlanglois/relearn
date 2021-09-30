@@ -19,7 +19,7 @@ impl<T> From<T> for WithStateConfig<T> {
 impl<T> BuildModule for WithStateConfig<T>
 where
     T: BuildModule,
-    <T as BuildModule>::Module: IterativeModule,
+    T::Module: IterativeModule,
 {
     type Module = WithState<T::Module>;
 

@@ -1,5 +1,5 @@
 //! A generic array interface.
-use ndarray::{Array, ArrayBase, DataMut, Dim, Dimension, Ix, RawData};
+use ndarray::{Array, ArrayBase, DataMut, Dim, Dimension, Ix};
 use num_traits::{One, Zero};
 use std::convert::TryInto;
 use tch::{Device, Tensor};
@@ -87,7 +87,7 @@ basic_ndarray!(6);
 impl<T, D> BasicArrayMut for ArrayBase<T, D>
 where
     T: DataMut,
-    <T as RawData>::Elem: Clone + Zero,
+    T::Elem: Clone + Zero,
     D: Dimension,
 {
     fn zero_(&mut self) {

@@ -36,9 +36,9 @@ pub trait BuildPolicy {
 impl<B> BuildPolicy for B
 where
     B: BuildModule + ?Sized,
-    <B as BuildModule>::Module: Policy,
+    B::Module: Policy,
 {
-    type Policy = <Self as BuildModule>::Module;
+    type Policy = B::Module;
 
     fn build_policy(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Policy {
         self.build_module(vs, in_dim, out_dim)

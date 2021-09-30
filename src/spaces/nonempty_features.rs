@@ -79,7 +79,7 @@ where
     fn batch_features<'a, I>(&self, elements: I) -> T2
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator,
         Self::Element: 'a,
     {
         if self.inner.num_features() == 0 {

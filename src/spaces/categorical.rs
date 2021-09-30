@@ -6,7 +6,7 @@ use super::{
 use crate::logging::Loggable;
 use crate::torch;
 use crate::utils::distributions::ArrayDistribution;
-use ndarray::{Array, ArrayBase, DataMut, Ix1, Ix2, RawData};
+use ndarray::{Array, ArrayBase, DataMut, Ix1, Ix2};
 use num_traits::{One, Zero};
 use std::convert::TryInto;
 use tch::{Device, Kind, Tensor};
@@ -126,7 +126,7 @@ where
     fn batch_features<'a, I>(&self, elements: I) -> Array<T, Ix2>
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        <I as IntoIterator>::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator,
         Self::Element: 'a,
     {
         let elements = elements.into_iter();
@@ -140,7 +140,7 @@ impl<S, T> FeatureSpaceOut<ArrayBase<T, Ix1>> for S
 where
     S: CategoricalSpace,
     T: DataMut,
-    <T as RawData>::Elem: Clone + Zero + One,
+    T::Elem: Clone + Zero + One,
 {
     fn features_out(&self, element: &Self::Element, out: &mut ArrayBase<T, Ix1>, zeroed: bool) {
         if !zeroed {
@@ -154,7 +154,7 @@ impl<S, T> BatchFeatureSpaceOut<ArrayBase<T, Ix2>> for S
 where
     S: CategoricalSpace,
     T: DataMut,
-    <T as RawData>::Elem: Clone + Zero + One,
+    T::Elem: Clone + Zero + One,
 {
     fn batch_features_out<'a, I>(&self, elements: I, out: &mut ArrayBase<T, Ix2>, zeroed: bool)
     where

@@ -35,15 +35,11 @@ impl MultiThreadSimulatorConfig {
     ) -> Box<dyn RunSimulation>
     where
         EB: BuildEnv + Send + Sync + 'static,
-        <EB as BuildEnv>::Environment: 'static,
+        EB::Environment: 'static,
         MA: ManagerAgent + 'static,
-        <MA as ManagerAgent>::Worker:
-            Agent<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action> + 'static,
-        <EB as BuildEnv>::Observation: Clone,
-        H: SimulationHook<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action>
-            + Clone
-            + Send
-            + 'static,
+        MA::Worker: Agent<EB::Observation, EB::Action> + 'static,
+        EB::Observation: Clone,
+        H: SimulationHook<EB::Observation, EB::Action> + Clone + Send + 'static,
     {
         Box::new(MultiThreadSimulator {
             env_builder: Arc::new(RwLock::new(env_config)),
@@ -66,13 +62,9 @@ impl<EB, MA, H> RunSimulation for MultiThreadSimulator<EB, MA, H>
 where
     EB: BuildEnv + Send + Sync + 'static,
     MA: ManagerAgent,
-    <MA as ManagerAgent>::Worker:
-        Agent<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action> + 'static,
-    <EB as BuildEnv>::Observation: Clone,
-    H: SimulationHook<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action>
-        + Clone
-        + Send
-        + 'static,
+    MA::Worker: Agent<EB::Observation, EB::Action> + 'static,
+    EB::Observation: Clone,
+    H: SimulationHook<EB::Observation, EB::Action> + Clone + Send + 'static,
 {
     fn run_simulation(&mut self, logger: &mut dyn TimeSeriesLogger) {
         run_agent_multithread(
@@ -94,13 +86,9 @@ pub fn run_agent_multithread<EB, MA, H>(
 ) where
     EB: BuildEnv + Send + Sync + 'static,
     MA: ManagerAgent,
-    <MA as ManagerAgent>::Worker:
-        Agent<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action> + 'static,
-    <EB as BuildEnv>::Observation: Clone,
-    H: SimulationHook<<EB as BuildEnv>::Observation, <EB as BuildEnv>::Action>
-        + Clone
-        + Send
-        + 'static,
+    MA::Worker: Agent<EB::Observation, EB::Action> + 'static,
+    EB::Observation: Clone,
+    H: SimulationHook<EB::Observation, EB::Action> + Clone + Send + 'static,
 {
     let mut worker_threads = vec![];
     for i in 0..num_workers {

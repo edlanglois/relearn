@@ -20,7 +20,7 @@ fn test_train_policy_gradient<PB, CB>(
     >,
 ) where
     PB: BuildModule,
-    <PB as BuildModule>::Module: Policy,
+    PB::Module: Policy,
     CB: BuildCritic,
 {
     // Speed up learning for this simple environment

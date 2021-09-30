@@ -83,7 +83,7 @@ impl<D> From<BanditMeanRewards> for BanditConfig<'static, D> {
 impl<'a, D: FromMean<f64>> BuildPomdp for BanditConfig<'a, D>
 where
     D: FromMean<f64> + Distribution<f64> + Bounded<f64>,
-    <D as FromMean<f64>>::Error: Error + 'static,
+    D::Error: Error + 'static,
 {
     type State = <Self::Pomdp as Pomdp>::State;
     type Observation = <Self::Pomdp as Pomdp>::Observation;

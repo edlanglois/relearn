@@ -268,7 +268,7 @@ impl fmt::Display for Aggregator {
 
 struct WithPending<A: Accumulator> {
     accumulator: A,
-    pending: Option<<A as Accumulator>::Prepared>,
+    pending: Option<A::Prepared>,
 }
 
 // derive(...) does not work because of the associated type
@@ -276,7 +276,7 @@ struct WithPending<A: Accumulator> {
 impl<A> fmt::Debug for WithPending<A>
 where
     A: Accumulator + fmt::Debug,
-    <A as Accumulator>::Prepared: fmt::Debug,
+    A::Prepared: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("WithPending")
@@ -289,7 +289,7 @@ where
 impl<A> Clone for WithPending<A>
 where
     A: Accumulator + Clone,
-    <A as Accumulator>::Prepared: Clone,
+    A::Prepared: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -302,14 +302,14 @@ where
 impl<A> Copy for WithPending<A>
 where
     A: Accumulator + Copy,
-    <A as Accumulator>::Prepared: Copy,
+    A::Prepared: Copy,
 {
 }
 
 impl<A> PartialEq for WithPending<A>
 where
     A: Accumulator + PartialEq,
-    <A as Accumulator>::Prepared: PartialEq,
+    A::Prepared: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.accumulator == other.accumulator && self.pending == other.pending
@@ -319,7 +319,7 @@ where
 impl<A> Eq for WithPending<A>
 where
     A: Accumulator + Eq,
-    <A as Accumulator>::Prepared: Eq,
+    A::Prepared: Eq,
 {
 }
 
