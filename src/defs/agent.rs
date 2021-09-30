@@ -1,8 +1,8 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyDef, PolicyUpdaterDef};
 use crate::agents::{
     Agent, BetaThompsonSamplingAgentConfig, BoxingManager, BuildAgent, BuildAgentError,
-    BuildManagerAgent, ManagerAgent, MutexAgentManager, RandomAgentConfig, ResettingMetaAgent,
-    TabularQLearningAgentConfig, UCB1AgentConfig,
+    BuildManagerAgent, FullAgent, ManagerAgent, MutexAgentManager, RandomAgentConfig,
+    ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::Loggable;
@@ -81,7 +81,7 @@ where
     <E as EnvStructure>::ObservationSpace: RLObservationSpace + Send + 'static,
     <E as EnvStructure>::ActionSpace: RLActionSpace + Send + 'static,
 {
-    type Agent = Box<DynSendEnvAgent<E>>;
+    type Agent = Box<DynFullAgent<E>>;
 
     fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
@@ -145,7 +145,7 @@ where
     <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace + Send + 'static,
     <E as EnvStructure>::ActionSpace: RLActionSpace + FiniteSpace + Send + 'static,
 {
-    type Agent = Box<DynSendEnvAgent<E>>;
+    type Agent = Box<DynFullAgent<E>>;
 
     fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
@@ -208,7 +208,7 @@ where
     // I think this ought to be inferrable but for whatever reason it isn't
     <E as EnvStructure>::ObservationSpace: RLObservationSpace,
 {
-    type Agent = Box<DynSendEnvAgent<E>>;
+    type Agent = Box<DynFullAgent<E>>;
 
     fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
@@ -252,8 +252,14 @@ where
     }
 }
 
-/// The send-able agent trait object of a given environment structure.
-pub type DynSendEnvAgent<E> = dyn Agent<
+/// Send-able [`FullAgent`] trait object for an environment structure.
+pub type DynFullAgent<E> = dyn FullAgent<
+        <<E as EnvStructure>::ObservationSpace as Space>::Element,
+        <<E as EnvStructure>::ActionSpace as Space>::Element,
+    > + Send;
+
+/// Send-able [`Agent`] trait object for an environment structure.
+pub type DynEnvAgent<E> = dyn Agent<
         <<E as EnvStructure>::ObservationSpace as Space>::Element,
         <<E as EnvStructure>::ActionSpace as Space>::Element,
     > + Send;
@@ -261,4 +267,4 @@ pub type DynSendEnvAgent<E> = dyn Agent<
 /// The agent manager trait object for a given environment structure.
 ///
 /// See also [`BoxingManager`](crate::agents::BoxingManager).
-pub type DynEnvManagerAgent<E> = dyn ManagerAgent<Worker = Box<DynSendEnvAgent<E>>>;
+pub type DynEnvManagerAgent<E> = dyn ManagerAgent<Worker = Box<DynEnvAgent<E>>>;

@@ -1,16 +1,17 @@
 use super::{
-    Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, SetActorMode, Step,
+    Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
+    SetActorMode, Step,
 };
 use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
-use crate::spaces::FiniteSpace;
+use crate::spaces::{FiniteSpace, IndexSpace, Space};
 
 /// Build an agent for finite, indexed action and observation spaces.
 ///
 /// This is a helper trait that automatically implements [`BuildAgent`]
 /// with all finite-space environments.
 pub trait BuildIndexAgent {
-    type Agent;
+    type Agent: Agent<<IndexSpace as Space>::Element, <IndexSpace as Space>::Element> + SetActorMode;
 
     fn build_index_agent(
         &self,
@@ -148,5 +149,25 @@ where
             observation_space,
             action_space,
         })
+    }
+}
+
+impl<E, B> BuildBatchUpdateActor<E> for B
+where
+    // NOTE: This is slightly over-restrictive. Don't need BuildIndexAgent::Agent: Agent
+    B: BuildIndexAgent,
+    <B as BuildIndexAgent>::Agent: BatchUpdate<usize, usize>,
+    E: EnvStructure + ?Sized,
+    <E as EnvStructure>::ObservationSpace: FiniteSpace,
+    <E as EnvStructure>::ActionSpace: FiniteSpace,
+{
+    type BatchUpdateActor = <Self as BuildAgent<E>>::Agent;
+
+    fn build_batch_update_actor(
+        &self,
+        env: &E,
+        seed: u64,
+    ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
+        self.build_agent(env, seed)
     }
 }

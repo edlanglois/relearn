@@ -56,7 +56,7 @@ where
 
 impl<U, OC, AS> BuildPolicyUpdater<AS> for WithOptimizer<U, OC>
 where
-    U: Clone,
+    U: UpdatePolicyWithOptimizer<OC::Optimizer, AS> + Clone,
     OC: BuildOptimizer,
     AS: ?Sized,
 {
@@ -72,7 +72,7 @@ where
 
 impl<U, OC> BuildCriticUpdater for WithOptimizer<U, OC>
 where
-    U: Clone,
+    U: UpdateCriticWithOptimizer<OC::Optimizer> + Clone,
     OC: BuildOptimizer,
 {
     type Updater = WithOptimizer<U, OC::Optimizer>;

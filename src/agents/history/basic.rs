@@ -36,7 +36,7 @@ pub struct EpisodeBuffer<O, A> {
     buffer: Vec<Step<O, A>>,
 }
 
-impl<O, A> BuildHistoryBuffer<O, A> for EpisodeBufferConfig {
+impl<O: 'static, A: 'static> BuildHistoryBuffer<O, A> for EpisodeBufferConfig {
     type HistoryBuffer = EpisodeBuffer<O, A>;
 
     fn build_history_buffer(&self) -> Self::HistoryBuffer {

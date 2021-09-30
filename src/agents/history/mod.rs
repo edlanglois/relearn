@@ -6,7 +6,7 @@ pub use basic::{EpisodeBuffer, EpisodeBufferConfig};
 
 /// Build a [`HistoryBuffer`].
 pub trait BuildHistoryBuffer<O, A> {
-    type HistoryBuffer;
+    type HistoryBuffer: HistoryBuffer<O, A>;
 
     fn build_history_buffer(&self) -> Self::HistoryBuffer;
 }

@@ -4,6 +4,31 @@ use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
 use crate::spaces::Space;
 
+/// Build an actor supporting batch updates ([`BatchUpdate`]).
+pub trait BuildBatchUpdateActor<E: EnvStructure + ?Sized> {
+    type BatchUpdateActor: Actor<
+            <<E as EnvStructure>::ObservationSpace as Space>::Element,
+            <<E as EnvStructure>::ActionSpace as Space>::Element,
+        > + BatchUpdate<
+            <<E as EnvStructure>::ObservationSpace as Space>::Element,
+            <<E as EnvStructure>::ActionSpace as Space>::Element,
+        > + SetActorMode;
+
+    /// Build an actor for the given environment structure ([`EnvStructure`]).
+    ///
+    /// The agent is built in [`ActorMode::Training`].
+    ///
+    /// # Args
+    /// * `env`  - The structure of the environment in which the agent is to operate.
+    /// * `seed` - A number used to seed the agent's random state,
+    ///            for those agents that use deterministic pseudo-random number generation.
+    fn build_batch_update_actor(
+        &self,
+        env: &E,
+        seed: u64,
+    ) -> Result<Self::BatchUpdateActor, BuildAgentError>;
+}
+
 /// An agent that can update from a batch of on-policy history steps.
 pub trait BatchUpdate<O, A> {
     fn batch_update<I: IntoIterator<Item = Step<O, A>>>(
@@ -46,19 +71,17 @@ impl<AC, HBC> BatchUpdateAgentConfig<AC, HBC> {
 
 impl<AC, HBC, E> BuildAgent<E> for BatchUpdateAgentConfig<AC, HBC>
 where
-    AC: BuildAgent<E>,
+    AC: BuildBatchUpdateActor<E>,
     HBC: BuildHistoryBuffer<
         <<E as EnvStructure>::ObservationSpace as Space>::Element,
         <<E as EnvStructure>::ActionSpace as Space>::Element,
     >,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: Space,
-    <E as EnvStructure>::ActionSpace: Space,
 {
-    type Agent = BatchUpdateAgent<AC::Agent, HBC::HistoryBuffer>;
+    type Agent = BatchUpdateAgent<AC::BatchUpdateActor, HBC::HistoryBuffer>;
 
     fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
-        let actor = self.actor_config.build_agent(env, seed)?;
+        let actor = self.actor_config.build_batch_update_actor(env, seed)?;
         let history = self.history_buffer_config.build_history_buffer();
         Ok(BatchUpdateAgent { actor, history })
     }

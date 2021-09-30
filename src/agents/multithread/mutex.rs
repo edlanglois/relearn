@@ -2,6 +2,7 @@ use super::super::{
     Actor, ActorMode, Agent, BuildAgent, BuildAgentError, BuildManagerAgent, ManagerAgent,
     SetActorMode, Step,
 };
+use crate::envs::EnvStructure;
 use crate::logging::{self, ForwardingLogger, TimeSeriesLogger};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
@@ -28,7 +29,7 @@ impl<AC> From<AC> for MutexAgentConfig<AC> {
 impl<AC, E> BuildManagerAgent<E> for MutexAgentConfig<AC>
 where
     AC: BuildAgent<E>,
-    E: ?Sized,
+    E: EnvStructure + ?Sized,
 {
     type ManagerAgent = MutexAgentManager<AC::Agent>;
 

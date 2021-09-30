@@ -21,8 +21,10 @@ impl<T, E, OS, AS> BuildAgent<E> for ResettingMetaAgentConfig<T>
 where
     T: BuildAgent<StoredEnvStructure<OS, AS>> + Clone,
     E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
-    OS: Space,
-    AS: Space,
+    OS: Space + Clone,
+    <OS as Space>::Element: Clone,
+    AS: SampleSpace + Clone,
+    <AS as Space>::Element: Clone,
 {
     type Agent = ResettingMetaAgent<T, OS, AS>;
 
@@ -35,8 +37,9 @@ where
 /// Lifts a regular agent to act on a meta environment by resetting between each trial.
 pub struct ResettingMetaAgent<AC, OS, AS>
 where
-    OS: Space,
     AC: BuildAgent<StoredEnvStructure<OS, AS>>,
+    OS: Space + Clone,
+    AS: Space + Clone,
 {
     inner_agent_config: AC,
     inner_env_structure: StoredEnvStructure<OS, AS>,
@@ -49,8 +52,8 @@ where
 impl<AC, OS, AS> ResettingMetaAgent<AC, OS, AS>
 where
     AC: BuildAgent<StoredEnvStructure<OS, AS>>,
-    OS: Space,
-    AS: Space,
+    OS: Space + Clone,
+    AS: Space + Clone,
 {
     /// Intialize a new resetting meta agent.
     ///
@@ -80,10 +83,9 @@ impl<AC, OS, AS> Actor<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Ele
     for ResettingMetaAgent<AC, OS, AS>
 where
     AC: BuildAgent<StoredEnvStructure<OS, AS>>,
-    <AC as BuildAgent<StoredEnvStructure<OS, AS>>>::Agent: Agent<OS::Element, AS::Element>,
-    OS: Space,
+    OS: Space + Clone,
     <OS as Space>::Element: Clone,
-    AS: SampleSpace,
+    AS: SampleSpace + Clone,
     <AS as Space>::Element: Clone,
 {
     fn act(
@@ -140,10 +142,9 @@ impl<AC, OS, AS> Agent<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Ele
     for ResettingMetaAgent<AC, OS, AS>
 where
     AC: BuildAgent<StoredEnvStructure<OS, AS>>,
-    <AC as BuildAgent<StoredEnvStructure<OS, AS>>>::Agent: Agent<OS::Element, AS::Element>,
-    OS: Space,
+    OS: Space + Clone,
     <OS as Space>::Element: Clone,
-    AS: SampleSpace,
+    AS: SampleSpace + Clone,
     <AS as Space>::Element: Clone,
 {
     fn update(
@@ -158,8 +159,9 @@ where
 /// Never learns on a meta level. Always acts like "Release" mode.
 impl<AC, OS, AS> SetActorMode for ResettingMetaAgent<AC, OS, AS>
 where
-    OS: Space,
     AC: BuildAgent<StoredEnvStructure<OS, AS>>,
+    OS: Space + Clone,
+    AS: Space + Clone,
 {
 }
 

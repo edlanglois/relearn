@@ -2,7 +2,7 @@
 use crate::agents::{testing, BuildAgent};
 use crate::torch::{
     agents::ActorCriticConfig,
-    critic::{BuildCritic, Critic, GaeConfig, Return},
+    critic::{BuildCritic, GaeConfig, Return},
     modules::{BuildModule, MlpConfig},
     optimizers::AdamConfig,
     policy::Policy,
@@ -22,7 +22,6 @@ fn test_train_policy_gradient<PB, CB>(
     PB: BuildModule,
     <PB as BuildModule>::Module: Policy,
     CB: BuildCritic,
-    <CB as BuildCritic>::Critic: Critic,
 {
     // Speed up learning for this simple environment
     config.steps_per_epoch = 25;

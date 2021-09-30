@@ -16,14 +16,18 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
-pub use batch_update::{BatchUpdate, BatchUpdateAgent, BatchUpdateAgentConfig, OffPolicyAgent};
+pub use batch_update::{
+    BatchUpdate, BatchUpdateAgent, BatchUpdateAgentConfig, BuildBatchUpdateActor, OffPolicyAgent,
+};
 use finite::{BuildIndexAgent, FiniteSpaceAgent};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
 pub use multithread::{MutexAgentConfig, MutexAgentManager, MutexAgentWorker};
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
+use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
+use crate::spaces::Space;
 use std::marker::PhantomData;
 use tch::TchError;
 use thiserror::Error;
@@ -133,6 +137,12 @@ pub trait SetActorMode {
     }
 }
 
+impl<T: SetActorMode + ?Sized> SetActorMode for Box<T> {
+    fn set_actor_mode(&mut self, mode: ActorMode) {
+        T::set_actor_mode(self, mode)
+    }
+}
+
 // TODO: Replace with BuildMultithreadAgent that constructs a manager and n workers
 // Or maybe builds MultiThreadAgentInitializer with the methods
 // make_worker(&self) -> Self::Worker and
@@ -220,12 +230,21 @@ where
     }
 }
 
-/// Build an agent instance.
-pub trait BuildAgent<E: ?Sized> {
-    /// The agent type to build.
-    type Agent;
+pub trait FullAgent<O, A>: Agent<O, A> + SetActorMode {}
+impl<O, A, T> FullAgent<O, A> for T where T: Agent<O, A> + SetActorMode + ?Sized {}
 
-    /// Build an agent for the given environment structure.
+// TODO: Be more flexible about the bounds on Agent?
+/// Build an agent instance for a given environment structure.
+pub trait BuildAgent<E: EnvStructure + ?Sized> {
+    /// The agent type to build.
+    type Agent: FullAgent<
+        <E::ObservationSpace as Space>::Element,
+        <E::ActionSpace as Space>::Element,
+    >;
+
+    /// Build an agent for the given environment structure ([`EnvStructure`]).
+    ///
+    /// The agent is built in [`ActorMode::Training`].
     ///
     /// # Args
     /// * `env`  - The structure of the environment in which the agent is to operate.

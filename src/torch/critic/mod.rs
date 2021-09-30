@@ -51,7 +51,7 @@ pub trait Critic {
 
 /// Build a [`Critic`] instance.
 pub trait BuildCritic {
-    type Critic;
+    type Critic: Critic;
 
     /// Build a new [`Critic`] instance.
     ///

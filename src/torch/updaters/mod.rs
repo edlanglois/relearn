@@ -30,7 +30,7 @@ use tch::nn::VarStore;
 
 /// Build an [`UpdatePolicy`] object.
 pub trait BuildPolicyUpdater<AS: ?Sized> {
-    type Updater;
+    type Updater: UpdatePolicy<AS>;
 
     /// Build a policy updater for the trainable variables in a variable store.
     fn build_policy_updater(&self, vs: &VarStore) -> Self::Updater;
@@ -102,7 +102,7 @@ pub struct PolicyStats {
 
 /// Build an [`UpdateCritic`] object.
 pub trait BuildCriticUpdater {
-    type Updater;
+    type Updater: UpdateCritic;
 
     /// Build a critic updater for the trainable variables in a variable store.
     fn build_critic_updater(&self, vs: &VarStore) -> Self::Updater;

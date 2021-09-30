@@ -1,10 +1,9 @@
 use super::super::{
     critic::{BuildCritic, Critic},
     history::{HistoryBuffer, LazyPackedHistoryFeatures},
-    policy::Policy,
+    policy::{BuildPolicy, Policy},
     seq_modules::StatefulIterativeModule,
     updaters::{BuildCriticUpdater, BuildPolicyUpdater, UpdateCritic, UpdatePolicy},
-    BuildModule,
 };
 use crate::agents::{Actor, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
 use crate::envs::EnvStructure;
@@ -50,19 +49,18 @@ where
 
 impl<PB, PUB, CB, CUB, E> BuildAgent<E> for ActorCriticConfig<PB, PUB, CB, CUB>
 where
-    PB: BuildModule,
+    PB: BuildPolicy,
     PUB: BuildPolicyUpdater<<E as EnvStructure>::ActionSpace>,
     CB: BuildCritic,
-    <CB as BuildCritic>::Critic: Critic,
     CUB: BuildCriticUpdater,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: Space + BaseFeatureSpace,
-    <E as EnvStructure>::ActionSpace: ParameterizedDistributionSpace<Tensor>,
+    <E as EnvStructure>::ObservationSpace: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
+    <E as EnvStructure>::ActionSpace: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
 {
     type Agent = ActorCriticAgent<
         E::ObservationSpace,
         E::ActionSpace,
-        PB::Module,
+        PB::Policy,
         PUB::Updater,
         CB::Critic,
         CUB::Updater,
@@ -148,7 +146,7 @@ where
     fn new<E, PB, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
-        PB: BuildModule<Module = P>,
+        PB: BuildPolicy<Policy = P>,
         PUB: BuildPolicyUpdater<AS, Updater = PU>,
         C: Critic,
         CB: BuildCritic<Critic = C>,
@@ -159,7 +157,7 @@ where
         let max_steps_per_epoch = config.steps_per_epoch + config.steps_per_epoch / 10;
 
         let policy_variables = VarStore::new(config.device);
-        let policy = config.policy_config.build_module(
+        let policy = config.policy_config.build_policy(
             &policy_variables.root(),
             observation_space.num_features(),
             action_space.num_distribution_params(),
@@ -171,7 +169,7 @@ where
         // A copy of the policy on the CPU for faster actions
         let (cpu_policy, cpu_policy_variables) = if config.device != Device::Cpu {
             let mut cpu_policy_variables = VarStore::new(Device::Cpu);
-            let cpu_policy = config.policy_config.build_module(
+            let cpu_policy = config.policy_config.build_policy(
                 &cpu_policy_variables.root(),
                 observation_space.num_features(),
                 action_space.num_distribution_params(),
