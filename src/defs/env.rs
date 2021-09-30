@@ -1,15 +1,18 @@
 use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
 use super::{AgentDef, MultiThreadAgentDef};
-use crate::agents::{BuildAgent, BuildManagerAgent};
+use crate::agents::{Agent, BuildAgent, BuildManagerAgent, ManagerAgent};
 use crate::envs::{
     Bandit, BuildEnv, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps,
-    EnvStructure, MemoryGame as MemoryGameEnv, MetaPomdp, OneHotBandits, Pomdp,
+    EnvStructure, Environment, MemoryGame as MemoryGameEnv, MetaPomdp, OneHotBandits, Pomdp,
     UniformBernoulliBandits, WithStepLimit,
 };
 use crate::error::RLError;
+use crate::logging::Loggable;
 use crate::simulation::{
-    hooks::StepLogger, GenericSimulationHook, MultiThreadSimulatorConfig, RunSimulation, Simulator,
+    hooks::StepLogger, GenericSimulationHook, MultiThreadSimulatorConfig, RunSimulation,
+    SimulationHook, Simulator,
 };
+use crate::spaces::ElementRefInto;
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use rand::distributions::Distribution;
 use std::borrow::{Borrow, Cow};
@@ -98,6 +101,81 @@ where
     }
 }
 
+/// Construct a boxed agent-environment simulation
+fn boxed_simulation<EC, AC, H>(
+    env_def: &EC,
+    agent_def: &AC,
+    env_seed: u64,
+    agent_seed: u64,
+    hook: H,
+) -> Result<Box<dyn RunSimulation>, RLError>
+where
+    EC: BuildEnv + ?Sized,
+    EC::ObservationSpace: ElementRefInto<Loggable> + 'static,
+    EC::Observation: Clone + 'static,
+    EC::ActionSpace: ElementRefInto<Loggable> + 'static,
+    EC::Action: 'static,
+    EC::Environment: 'static,
+    AC: BuildAgent<
+            dyn EnvStructure<
+                ObservationSpace = EC::ObservationSpace,
+                ActionSpace = EC::ActionSpace,
+            >,
+        > + ?Sized,
+    AC::Agent: 'static,
+    H: SimulationHook<EC::Observation, EC::Action> + 'static,
+{
+    // Boxed so that we we avoid creating a copy of the simulator code for each environment type
+    let env = Box::new(env_def.build_env(env_seed)?);
+
+    // Not boxed because this is expected to be called with (wrapped) AgentDef,
+    // which already boxes the output agent.
+    let agent = agent_def.build_agent(&env, agent_seed)?;
+
+    let log_hook = StepLogger::new(env.observation_space(), env.action_space());
+
+    // Reduce to an environment trait object
+    let env: Box<dyn Environment<Action = _, Observation = _>> = env;
+    Ok(Box::new(Simulator::new(env, agent, (log_hook, hook))))
+}
+
+/// Construct a boxed parallel agent-environment simulation
+fn boxed_parallel_simulation<EC, AC, H>(
+    sim_config: &MultiThreadSimulatorConfig,
+    env_def: &EC,
+    agent_def: &AC,
+    env_seed: u64,
+    agent_seed: u64,
+    hook: H,
+) -> Result<Box<dyn RunSimulation>, RLError>
+where
+    EC: BuildEnv + Clone + Send + Sync + ?Sized + 'static,
+    EC::ObservationSpace: ElementRefInto<Loggable> + Clone + Send + 'static,
+    EC::Observation: Clone + 'static,
+    EC::ActionSpace: ElementRefInto<Loggable> + Clone + Send + 'static,
+    EC::Action: 'static,
+    EC::Environment: 'static,
+    AC: BuildManagerAgent<
+            dyn EnvStructure<
+                ObservationSpace = EC::ObservationSpace,
+                ActionSpace = EC::ActionSpace,
+            >,
+        > + ?Sized,
+    AC::ManagerAgent: 'static,
+    <AC::ManagerAgent as ManagerAgent>::Worker: Agent<EC::Observation, EC::Action> + 'static,
+    H: SimulationHook<EC::Observation, EC::Action> + Clone + Send + 'static,
+{
+    let env = env_def.build_env(env_seed)?;
+
+    // Not boxed because this is expected to be called with (wrapped) AgentManagerDef,
+    // which already boxes the output agent.
+    let agent = agent_def.build_manager_agent(&env, agent_seed)?;
+
+    let log_hook = StepLogger::new(env.observation_space(), env.action_space());
+
+    Ok(sim_config.build_simulator(env_def.clone(), agent, (log_hook, hook)))
+}
+
 impl EnvDef {
     /// Construct a boxed simulation for this environment and a given agent definition.
     ///
@@ -116,44 +194,46 @@ impl EnvDef {
     where
         H: GenericSimulationHook + 'static,
     {
-        /// Construct a boxed agent-environment simulation
-        macro_rules! boxed_simulation {
-            ($env_config:expr, $agent_builder:ty) => {{
-                let env = Box::new($env_config.build_env(env_seed)?);
-                let agent = <$agent_builder>::new(agent_def).build_agent(&env, agent_seed)?;
-                let log_hook = StepLogger::new(env.observation_space(), env.action_space());
-                Box::new(Simulator::new(env, agent, (log_hook, hook)))
-            }};
+        macro_rules! make_simulation {
+            ($env_config:expr, $agent_builder:ty) => {
+                boxed_simulation(
+                    $env_config,
+                    &<$agent_builder>::new(agent_def),
+                    env_seed,
+                    agent_seed,
+                    hook,
+                )
+            };
         }
 
         use EnvDef::*;
-        Ok(match self {
+        match self {
             Bandit(dist_type, means) => match dist_type {
                 DistributionType::Deterministic => {
                     let config = BanditConfig::<Deterministic<f64>>::from(means);
-                    boxed_simulation!(config, ForFiniteFinite<_>)
+                    make_simulation!(&config, ForFiniteFinite<_>)
                 }
                 DistributionType::Bernoulli => {
                     let config = BanditConfig::<Bernoulli>::from(means);
-                    boxed_simulation!(config, ForFiniteFinite<_>)
+                    make_simulation!(&config, ForFiniteFinite<_>)
                 }
             },
             Chain(config) => {
-                boxed_simulation!(config, ForFiniteFinite<_>)
+                make_simulation!(config, ForFiniteFinite<_>)
             }
             MemoryGame(config) => {
-                boxed_simulation!(config, ForFiniteFinite<_>)
+                make_simulation!(config, ForFiniteFinite<_>)
             }
             MetaOneHotBandits(config) => {
-                boxed_simulation!(config, ForMetaFiniteFinite<_>)
+                make_simulation!(config, ForMetaFiniteFinite<_>)
             }
             MetaUniformBernoulliBandits(config) => {
-                boxed_simulation!(config, ForMetaFiniteFinite<_>)
+                make_simulation!(config, ForMetaFiniteFinite<_>)
             }
             MetaDirichletMdps(config) => {
-                boxed_simulation!(config, ForMetaFiniteFinite<_>)
+                make_simulation!(config, ForMetaFiniteFinite<_>)
             }
-        })
+        }
     }
 
     // TODO: De-deuplicate with build_simulatior
@@ -177,44 +257,47 @@ impl EnvDef {
         H: GenericSimulationHook + Clone + Send + 'static,
     {
         /// Construct a boxed agent-environment simulation
-        macro_rules! boxed_simulation {
+        macro_rules! make_simulation {
             ($env_config:expr, $agent_builder:ty) => {{
-                let env = $env_config.build_env(env_seed)?;
-                let agent =
-                    <$agent_builder>::new(agent_def).build_manager_agent(&env, agent_seed)?;
-                let log_hook = StepLogger::new(env.observation_space(), env.action_space());
-                sim_config.build_simulator($env_config.clone(), agent, (log_hook, hook))
+                boxed_parallel_simulation(
+                    sim_config,
+                    $env_config,
+                    &<$agent_builder>::new(agent_def),
+                    env_seed,
+                    agent_seed,
+                    hook,
+                )
             }};
         }
 
         use EnvDef::*;
-        Ok(match self {
+        match self {
             Bandit(dist_type, means) => match dist_type {
                 // TODO: Avoid double clone (in config assignment and in boxed_simulation)
                 DistributionType::Deterministic => {
                     let config = BanditConfig::<Deterministic<f64>>::from(means.clone());
-                    boxed_simulation!(config, ForFiniteFinite<_>)
+                    make_simulation!(&config, ForFiniteFinite<_>)
                 }
                 DistributionType::Bernoulli => {
                     let config = BanditConfig::<Bernoulli>::from(means.clone());
-                    boxed_simulation!(config, ForFiniteFinite<_>)
+                    make_simulation!(&config, ForFiniteFinite<_>)
                 }
             },
             Chain(config) => {
-                boxed_simulation!(config, ForFiniteFinite<_>)
+                make_simulation!(config, ForFiniteFinite<_>)
             }
             MemoryGame(config) => {
-                boxed_simulation!(config, ForFiniteFinite<_>)
+                make_simulation!(config, ForFiniteFinite<_>)
             }
             MetaOneHotBandits(config) => {
-                boxed_simulation!(config, ForMetaFiniteFinite<_>)
+                make_simulation!(config, ForMetaFiniteFinite<_>)
             }
             MetaUniformBernoulliBandits(config) => {
-                boxed_simulation!(config, ForMetaFiniteFinite<_>)
+                make_simulation!(config, ForMetaFiniteFinite<_>)
             }
             MetaDirichletMdps(config) => {
-                boxed_simulation!(config, ForMetaFiniteFinite<_>)
+                make_simulation!(config, ForMetaFiniteFinite<_>)
             }
-        })
+        }
     }
 }
