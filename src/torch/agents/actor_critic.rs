@@ -57,6 +57,7 @@ where
     <E as EnvStructure>::ObservationSpace: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
     <E as EnvStructure>::ActionSpace: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
 {
+    #[allow(clippy::type_complexity)]
     type Agent = ActorCriticAgent<
         E::ObservationSpace,
         E::ActionSpace,
