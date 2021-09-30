@@ -40,7 +40,7 @@ impl<AS> BuildPolicyUpdater<AS> for PolicyUpdaterDef
 where
     AS: ParameterizedDistributionSpace<Tensor> + ?Sized,
 {
-    type Updater = Box<dyn UpdatePolicy<AS>>;
+    type Updater = Box<dyn UpdatePolicy<AS> + Send>;
 
     fn build_policy_updater(&self, vs: &VarStore) -> Self::Updater {
         use PolicyUpdaterDef::*;
@@ -74,7 +74,7 @@ impl Default for CriticUpdaterDef {
 }
 
 impl BuildCriticUpdater for CriticUpdaterDef {
-    type Updater = Box<dyn UpdateCritic>;
+    type Updater = Box<dyn UpdateCritic + Send>;
 
     fn build_critic_updater(&self, vs: &VarStore) -> Self::Updater {
         use CriticUpdaterDef::*;

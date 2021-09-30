@@ -35,3 +35,36 @@ macro_rules! box_impl_cudnn_support {
         }
     };
 }
+
+macro_rules! box_impl_update_policy {
+    ($type:ty, $gen_type:ident) => {
+        impl<$gen_type: ?Sized> UpdatePolicy<AS> for Box<$type> {
+            fn update_policy(
+                &mut self,
+                policy: &dyn Policy,
+                critic: &dyn Critic,
+                features: &dyn PackedHistoryFeaturesView,
+                action_space: &AS,
+                logger: &mut dyn TimeSeriesLogger,
+            ) -> PolicyStats {
+                self.as_mut()
+                    .update_policy(policy, critic, features, action_space, logger)
+            }
+        }
+    };
+}
+
+macro_rules! box_impl_update_critic {
+    ($type:ty) => {
+        impl UpdateCritic for Box<$type> {
+            fn update_critic(
+                &mut self,
+                critic: &dyn Critic,
+                features: &dyn PackedHistoryFeaturesView,
+                logger: &mut dyn TimeSeriesLogger,
+            ) {
+                self.as_mut().update_critic(critic, features, logger)
+            }
+        }
+    };
+}

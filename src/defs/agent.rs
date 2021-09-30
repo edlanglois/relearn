@@ -8,7 +8,7 @@ use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::Loggable;
 use crate::spaces::{
     BatchFeatureSpace, ElementRefInto, FeatureSpace, FiniteSpace, ParameterizedDistributionSpace,
-    SampleSpace, Space,
+    SampleSpace, SendElementSpace, Space,
 };
 use crate::torch::agents::ActorCriticConfig;
 use std::borrow::Borrow;
@@ -45,8 +45,15 @@ pub enum MultiThreadAgentDef {
 ///
 /// This includes most interfaces required by any agent, environment, or simulator
 /// excluding interfaces that can only apply to some spaces, like [`FiniteSpace`].
-pub trait RLSpace: Space + SampleSpace + ElementRefInto<Loggable> + Debug {}
-impl<T: Space + SampleSpace + ElementRefInto<Loggable> + Debug> RLSpace for T {}
+pub trait RLSpace:
+    Space + SendElementSpace + SampleSpace + ElementRefInto<Loggable> + Debug + Send + 'static
+{
+}
+impl<
+        T: Space + SendElementSpace + SampleSpace + ElementRefInto<Loggable> + Debug + Send + 'static,
+    > RLSpace for T
+{
+}
 
 /// Comprehensive observation space for use in reinforcement learning
 pub trait RLObservationSpace: RLSpace + FeatureSpace<Tensor> + BatchFeatureSpace<Tensor> {}
@@ -78,8 +85,8 @@ impl<T, E> BuildAgent<E> for ForAnyAny<T>
 where
     T: Borrow<AgentDef>,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: RLObservationSpace + Send + 'static,
-    <E as EnvStructure>::ActionSpace: RLActionSpace + Send + 'static,
+    <E as EnvStructure>::ObservationSpace: RLObservationSpace,
+    <E as EnvStructure>::ActionSpace: RLActionSpace,
 {
     type Agent = Box<DynFullAgent<E>>;
 
@@ -89,13 +96,10 @@ where
             Random => RandomAgentConfig::new()
                 .build_agent(env, seed)
                 .map(|a| Box::new(a) as _),
-            // TODO: Implement Send for ActorCriticAgent
-            /*
             ActorCritic(config) => config
                 .as_ref()
                 .build_agent(env, seed)
                 .map(|a| Box::new(a) as _),
-            */
             _ => Err(BuildAgentError::InvalidSpaceBounds),
         }
     }
@@ -106,8 +110,8 @@ where
     T: Borrow<MultiThreadAgentDef>,
     T: Borrow<MultiThreadAgentDef>,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: RLObservationSpace + Send + 'static,
-    <E as EnvStructure>::ActionSpace: RLActionSpace + Send + 'static,
+    <E as EnvStructure>::ObservationSpace: RLObservationSpace,
+    <E as EnvStructure>::ActionSpace: RLActionSpace,
 {
     type ManagerAgent = Box<DynEnvManagerAgent<E>>;
 
@@ -142,8 +146,8 @@ impl<T, E> BuildAgent<E> for ForFiniteFinite<T>
 where
     T: Borrow<AgentDef>,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace + Send + 'static,
-    <E as EnvStructure>::ActionSpace: RLActionSpace + FiniteSpace + Send + 'static,
+    <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace,
+    <E as EnvStructure>::ActionSpace: RLActionSpace + FiniteSpace,
 {
     type Agent = Box<DynFullAgent<E>>;
 
@@ -162,8 +166,8 @@ impl<T, E> BuildManagerAgent<E> for ForFiniteFinite<T>
 where
     T: Borrow<MultiThreadAgentDef>,
     E: EnvStructure + ?Sized,
-    <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace + Send + 'static,
-    <E as EnvStructure>::ActionSpace: RLActionSpace + FiniteSpace + Send + 'static,
+    <E as EnvStructure>::ObservationSpace: RLObservationSpace + FiniteSpace,
+    <E as EnvStructure>::ActionSpace: RLActionSpace + FiniteSpace,
 {
     type ManagerAgent = Box<DynEnvManagerAgent<E>>;
 
@@ -201,9 +205,9 @@ impl<T, E, OS, AS> BuildAgent<E> for ForMetaFiniteFinite<T>
 where
     T: Borrow<AgentDef>,
     E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
-    OS: RLObservationSpace + FiniteSpace + Clone + Send + 'static,
-    <OS as Space>::Element: Clone + Send, // ResettingMetaAgent: Send requires OS::Element: Send
-    AS: RLActionSpace + FiniteSpace + Clone + Send + 'static,
+    OS: RLObservationSpace + FiniteSpace + Clone,
+    <OS as Space>::Element: Clone,
+    AS: RLActionSpace + FiniteSpace + Clone,
     <AS as Space>::Element: Clone,
     // I think this ought to be inferrable but for whatever reason it isn't
     <E as EnvStructure>::ObservationSpace: RLObservationSpace,
@@ -229,9 +233,9 @@ impl<T, E, OS, AS> BuildManagerAgent<E> for ForMetaFiniteFinite<T>
 where
     T: Borrow<MultiThreadAgentDef>,
     E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
-    OS: RLObservationSpace + FiniteSpace + Clone + Send + 'static,
-    <OS as Space>::Element: Clone + Send, // ResettingMetaAgent: Send requires OS::Element: Send
-    AS: RLActionSpace + FiniteSpace + Clone + Send + 'static,
+    OS: RLObservationSpace + FiniteSpace + Clone,
+    <OS as Space>::Element: Clone,
+    AS: RLActionSpace + FiniteSpace + Clone,
     <AS as Space>::Element: Clone,
     // I think this ought to be inferrable but for whatever reason it isn't
     <E as EnvStructure>::ObservationSpace: RLObservationSpace,

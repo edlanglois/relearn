@@ -58,19 +58,8 @@ pub trait UpdatePolicy<AS: ?Sized> {
     ) -> PolicyStats;
 }
 
-impl<AS: ?Sized> UpdatePolicy<AS> for Box<dyn UpdatePolicy<AS>> {
-    fn update_policy(
-        &mut self,
-        policy: &dyn Policy,
-        critic: &dyn Critic,
-        features: &dyn PackedHistoryFeaturesView,
-        action_space: &AS,
-        logger: &mut dyn TimeSeriesLogger,
-    ) -> PolicyStats {
-        self.as_mut()
-            .update_policy(policy, critic, features, action_space, logger)
-    }
-}
+box_impl_update_policy!(dyn UpdatePolicy<AS>, AS);
+box_impl_update_policy!(dyn UpdatePolicy<AS> + Send, AS);
 
 /// A policy update rule using an external optimizer.
 pub trait UpdatePolicyWithOptimizer<O: ?Sized, AS: ?Sized> {
@@ -126,16 +115,8 @@ pub trait UpdateCritic {
     );
 }
 
-impl UpdateCritic for Box<dyn UpdateCritic> {
-    fn update_critic(
-        &mut self,
-        critic: &dyn Critic,
-        features: &dyn PackedHistoryFeaturesView,
-        logger: &mut dyn TimeSeriesLogger,
-    ) {
-        self.as_mut().update_critic(critic, features, logger)
-    }
-}
+box_impl_update_critic!(dyn UpdateCritic);
+box_impl_update_critic!(dyn UpdateCritic + Send);
 
 /// A critic update rule using an external optimizer.
 pub trait UpdateCriticWithOptimizer<O: ?Sized> {

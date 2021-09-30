@@ -16,6 +16,9 @@ impl<T: SequenceModule + StatefulIterativeModule + CudnnSupport + ?Sized> Policy
 box_impl_sequence_module!(dyn Policy);
 box_impl_stateful_iterative_module!(dyn Policy);
 box_impl_cudnn_support!(dyn Policy);
+box_impl_sequence_module!(dyn Policy + Send);
+box_impl_stateful_iterative_module!(dyn Policy + Send);
+box_impl_cudnn_support!(dyn Policy + Send);
 
 /// Build a [`Policy`] instance.
 pub trait BuildPolicy {

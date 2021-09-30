@@ -1,6 +1,6 @@
 use crate::torch::{
     modules::MlpConfig,
-    policy::Policy,
+    policy::{BuildPolicy, Policy},
     seq_modules::{
         GruConfig, IterativeModule, LstmConfig, SequenceModule, StackedConfig, WithState,
     },
@@ -63,10 +63,10 @@ where
     config.build_module(vs, in_dim, out_dim).into()
 }
 
-impl BuildModule for PolicyDef {
-    type Module = Box<dyn Policy + Send>;
+impl BuildPolicy for PolicyDef {
+    type Policy = Box<dyn Policy + Send>;
 
-    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
+    fn build_policy(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Policy {
         match &self.0 {
             SeqModDef::Mlp(config) => {
                 Box::new(build_module_with_state(config, vs, in_dim, out_dim))
