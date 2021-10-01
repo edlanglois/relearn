@@ -78,7 +78,7 @@ where
 #[allow(clippy::float_cmp)] // discount factor should be exactly equal
 pub fn check_env_distribution_structure<D>(env_dist: &D, num_samples: usize)
 where
-    D: EnvDistribution + EnvStructure + ?Sized,
+    D: EnvDistribution + ?Sized,
     D::ObservationSpace: PartialOrd + Debug,
     D::ActionSpace: PartialOrd + Debug,
 {
