@@ -1,7 +1,7 @@
 //! Environment testing utilities
 use super::{
-    CloneBuild, DeterministicBandit, EnvDistribution, EnvStructure, Environment, IntoEnv, Pomdp,
-    PomdpDistribution, StoredEnvStructure,
+    CloneBuild, DeterministicBandit, EnvDistribution, EnvStructure, IntoEnv, Pomdp,
+    PomdpDistribution, StoredEnvStructure, StructuredEnvironment,
 };
 use crate::agents::{RandomAgent, Step};
 use crate::simulation;
@@ -30,11 +30,7 @@ where
 /// Run a stateful environment and check that invariants are satisfied.
 pub fn run_env<E>(env: &mut E, num_steps: u64, seed: u64)
 where
-    E: EnvStructure,
-    E: Environment<
-        Observation = <E::ObservationSpace as Space>::Element,
-        Action = <E::ActionSpace as Space>::Element,
-    >,
+    E: StructuredEnvironment,
     E::ObservationSpace: Debug,
     E::Observation: Debug + Clone,
     E::ActionSpace: Debug + SampleSpace,

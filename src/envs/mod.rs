@@ -251,6 +251,29 @@ impl<E: Environment + ?Sized> Environment for Box<E> {
     }
 }
 
+/// An [`Environment`] with consistent [`EnvStructure`].
+///
+/// The reason that [`EnvStructure`] is not already a supertrait of [`Environment`] is because when
+/// simulating environments we only need to know `Observation` and `Action`, not `ObservationSpace`
+/// and `ActionSpace`. The trait object `dyn Environment<Observation=_, Action=_>` can be used
+/// without also having to monomorphize over the space.
+pub trait StructuredEnvironment:
+    EnvStructure
+    + Environment<
+        Observation = <Self::ObservationSpace as Space>::Element,
+        Action = <Self::ActionSpace as Space>::Element,
+    >
+{
+}
+impl<T> StructuredEnvironment for T where
+    T: EnvStructure
+        + Environment<
+            Observation = <Self::ObservationSpace as Space>::Element,
+            Action = <Self::ActionSpace as Space>::Element,
+        >
+{
+}
+
 /// A distribution of [`Pomdp`] sharing the same external structure.
 ///
 /// The [`EnvStructure`] of each sampled environment must be a subset of the `EnvStructure` of the
