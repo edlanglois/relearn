@@ -1,8 +1,28 @@
 //! Simulator hooks.
 use crate::agents::Step;
+use crate::envs::EnvStructure;
 use crate::logging::{Event, Loggable, LoggerHelper, TimeSeriesLogger};
-use crate::spaces::{ElementRefInto, FiniteSpace};
+use crate::spaces::{ElementRefInto, FiniteSpace, Space};
 use impl_trait_for_tuples::impl_for_tuples;
+
+/// Build a [`SimulationHook`] for a given environment structure.
+pub trait BuildStructuredHook<OS: Space, AS: Space> {
+    type Hook: SimulationHook<OS::Element, AS::Element>;
+
+    /// Build a simulation hook.
+    ///
+    /// # Args
+    /// * `env` - Environment structure.
+    /// * `num_threads` - Total number of worker threads for the simulation.
+    /// * `thread_index` - An index in `[0, num_threads)` uniquely identifying
+    ///                    the simulation thread in which this hook will run.
+    fn build_hook(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        num_threads: usize,
+        thread_index: usize,
+    ) -> Self::Hook;
+}
 
 /// A simulation hook.
 ///
@@ -76,6 +96,48 @@ impl<O, A, T: GenericSimulationHook> SimulationHook<O, A> for T {
     }
 }
 
+/// Divide `total` almost evently into `parts` that sum up to `total`.
+///
+/// Each part gets `ceil(total / parts)` or `floor(total / parts)` depending on `part_index`.
+const fn partition_div(total: u64, parts: u64, part_index: u64) -> u64 {
+    let remainder = if total % parts > part_index { 1 } else { 0 };
+    total / parts + remainder
+}
+
+/// Configuration for [`StepLimit`].
+///
+/// Sets a maximum total number of episodes across all simulation threads.
+/// Each thread runs for a maximum of `max_episodes / num_threads` steps (floor or ceil).
+/// The total number of episodes cannot be less than the number of threads because a hook cannot
+/// stop the simulation before the first step.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct StepLimitConfig {
+    pub max_steps: u64,
+}
+
+impl StepLimitConfig {
+    pub const fn new(max_steps: u64) -> Self {
+        Self { max_steps }
+    }
+}
+
+impl<OS: Space, AS: Space> BuildStructuredHook<OS, AS> for StepLimitConfig {
+    type Hook = StepLimit;
+
+    fn build_hook(
+        &self,
+        _env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        num_threads: usize,
+        thread_index: usize,
+    ) -> Self::Hook {
+        StepLimit::new(partition_div(
+            self.max_steps,
+            num_threads as u64,
+            thread_index as u64,
+        ))
+    }
+}
+
 /// A hook that stops the simulation after a maximum number of steps.
 #[derive(Debug, Clone, Copy)]
 pub struct StepLimit {
@@ -98,6 +160,38 @@ impl GenericSimulationHook for StepLimit {
     fn call<O, A, L: TimeSeriesLogger + ?Sized>(&mut self, _: &Step<O, A>, _: &mut L) -> bool {
         self.steps_remaining -= 1;
         self.steps_remaining > 0
+    }
+}
+
+/// Configuration for [`EpisodeLimit`].
+///
+/// Sets a maximum total number of episode across all simulation threads.
+/// Each thread runs for a maximum of `max_steps / num_threads` steps (floor or ceil).
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct EpisodeLimitConfig {
+    pub max_episodes: u64,
+}
+
+impl EpisodeLimitConfig {
+    pub const fn new(max_episodes: u64) -> Self {
+        Self { max_episodes }
+    }
+}
+
+impl<OS: Space, AS: Space> BuildStructuredHook<OS, AS> for EpisodeLimitConfig {
+    type Hook = EpisodeLimit;
+
+    fn build_hook(
+        &self,
+        _env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        num_threads: usize,
+        thread_index: usize,
+    ) -> Self::Hook {
+        EpisodeLimit::new(partition_div(
+            self.max_episodes,
+            num_threads as u64,
+            thread_index as u64,
+        ))
     }
 }
 
@@ -149,6 +243,27 @@ where
 {
     fn call<L: TimeSeriesLogger + ?Sized>(&mut self, step: &Step<O, A>, _: &mut L) -> bool {
         (self.f)(step)
+    }
+}
+
+/// Configuration for [`StepLogger`].
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct StepLoggerConfig;
+
+impl<OS, AS> BuildStructuredHook<OS, AS> for StepLoggerConfig
+where
+    OS: ElementRefInto<Loggable>,
+    AS: ElementRefInto<Loggable>,
+{
+    type Hook = StepLogger<OS, AS>;
+
+    fn build_hook(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        _num_threads: usize,
+        _thread_index: usize,
+    ) -> Self::Hook {
+        StepLogger::new(env.observation_space(), env.action_space())
     }
 }
 
