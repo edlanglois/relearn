@@ -207,10 +207,7 @@ where
     }
 }
 
-// TODO: Generate for other tuple sizes with a macro
-// Consider impl_trait_for_tuples crate
-
-// For a tuple of hooks, continue if all allow continuing.
+// For a tuple of hooks, stop if any request a stop
 
 impl GenericSimulationHook for () {
     fn call<O, A, L: TimeSeriesLogger + ?Sized>(&mut self, _: &Step<O, A>, _: &mut L) -> bool {
