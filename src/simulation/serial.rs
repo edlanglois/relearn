@@ -75,6 +75,9 @@ pub fn run_agent<E, A, H>(
     A: Agent<E::Observation, E::Action> + ?Sized,
     H: SimulationHook<E::Observation, E::Action> + ?Sized,
 {
+    if !hook.start(logger) {
+        return;
+    }
     let mut observation = environment.reset();
     let mut new_episode = true;
 
@@ -124,6 +127,9 @@ where
     H: SimulationHook<E::Observation, E::Action> + ?Sized,
     L: TimeSeriesLogger + ?Sized,
 {
+    if !hook.start(logger) {
+        return;
+    }
     let mut observation = environment.reset();
     let mut new_episode = true;
 

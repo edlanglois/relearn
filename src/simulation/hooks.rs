@@ -8,6 +8,17 @@ use impl_trait_for_tuples::impl_for_tuples;
 ///
 /// A callback function called on each step.
 pub trait SimulationHook<O, A> {
+    /// Call the hook at the start of the simulation.
+    ///
+    /// # Returns
+    /// Whether the simulation should run.
+    fn start<L>(&mut self, _logger: &mut L) -> bool
+    where
+        L: TimeSeriesLogger + ?Sized,
+    {
+        true
+    }
+
     /// Call the hook on the current step.
     ///
     /// # Args
@@ -23,6 +34,17 @@ pub trait SimulationHook<O, A> {
 
 /// A generic simulation hook that applies to every state, action, and logger.
 pub trait GenericSimulationHook {
+    /// Call the hook at the start of the simulation.
+    ///
+    /// # Returns
+    /// Whether the simulation should run.
+    fn start<L>(&mut self, _logger: &mut L) -> bool
+    where
+        L: TimeSeriesLogger + ?Sized,
+    {
+        true
+    }
+
     /// Call the hook on the current step.
     ///
     /// # Args
@@ -39,6 +61,13 @@ pub trait GenericSimulationHook {
 }
 
 impl<O, A, T: GenericSimulationHook> SimulationHook<O, A> for T {
+    fn start<L>(&mut self, logger: &mut L) -> bool
+    where
+        L: TimeSeriesLogger + ?Sized,
+    {
+        GenericSimulationHook::start(self, logger)
+    }
+
     fn call<L>(&mut self, step: &Step<O, A>, logger: &mut L) -> bool
     where
         L: TimeSeriesLogger + ?Sized,
@@ -55,10 +84,7 @@ pub struct StepLimit {
 
 impl StepLimit {
     /// Create a new `StepLimit` hook.
-    ///
-    /// `max_steps` must be >= 1 because hooks cannot stop the simulation before the first step.
-    pub fn new(max_steps: u64) -> Self {
-        assert!(max_steps > 0);
+    pub const fn new(max_steps: u64) -> Self {
         Self {
             steps_remaining: max_steps,
         }
@@ -66,6 +92,9 @@ impl StepLimit {
 }
 
 impl GenericSimulationHook for StepLimit {
+    fn start<L: TimeSeriesLogger + ?Sized>(&mut self, _: &mut L) -> bool {
+        self.steps_remaining > 0
+    }
     fn call<O, A, L: TimeSeriesLogger + ?Sized>(&mut self, _: &Step<O, A>, _: &mut L) -> bool {
         self.steps_remaining -= 1;
         self.steps_remaining > 0
@@ -80,11 +109,7 @@ pub struct EpisodeLimit {
 
 impl EpisodeLimit {
     /// Create a new `EpisodeLimit` hook.
-    ///
-    /// `max_episodes` must be `>= 1` because hooks cannot stop the simulation before the first
-    /// step and this hook only stops at the end of an episode.
-    pub fn new(max_episodes: u64) -> Self {
-        assert!(max_episodes > 0);
+    pub const fn new(max_episodes: u64) -> Self {
         Self {
             episodes_remaining: max_episodes,
         }
@@ -92,6 +117,10 @@ impl EpisodeLimit {
 }
 
 impl GenericSimulationHook for EpisodeLimit {
+    fn start<L: TimeSeriesLogger + ?Sized>(&mut self, _: &mut L) -> bool {
+        self.episodes_remaining > 0
+    }
+
     fn call<O, A, L: TimeSeriesLogger + ?Sized>(&mut self, step: &Step<O, A>, _: &mut L) -> bool {
         if step.episode_done {
             self.episodes_remaining -= 1;
