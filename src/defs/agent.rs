@@ -220,7 +220,7 @@ where
         match self.0.borrow() {
             ResettingMeta(inner_agent_def) => ResettingMetaAgent::new(
                 ForFiniteFinite::new(inner_agent_def.as_ref().clone()),
-                (&InnerEnvStructure::<E, &E>::new(env)).into(),
+                (&InnerEnvStructure::new(env)).into(),
                 seed,
             )
             .map(|a| Box::new(a) as _),

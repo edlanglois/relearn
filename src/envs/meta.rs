@@ -6,8 +6,6 @@ use super::{
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use std::borrow::Borrow;
-use std::marker::PhantomData;
 
 // # MetaPomdp
 
@@ -410,8 +408,7 @@ pub struct MetaState<E: Pomdp> {
 /// Wrapper that provides the inner environment structure of a meta environment.
 ///
 /// # Usage
-/// For an environment `env: U` where `U: Borrow<T>`
-/// and `T` has the structure of a meta-environment (e.g. [`MetaPomdp`], [`MetaEnv`]),
+/// Wraps a meta-environment structure (e.g. [`MetaPomdp`], [`MetaEnv`]),
 ///
 ///     use rust_rl::envs::{InnerEnvStructure, MetaPomdp, OneHotBandits, StoredEnvStructure};
 ///
@@ -419,24 +416,23 @@ pub struct MetaState<E: Pomdp> {
 ///     let meta_env = MetaPomdp::new(base_env, 10);
 ///
 ///     let base_structure = StoredEnvStructure::from(&base_env);
-///     let meta_inner_structure = StoredEnvStructure::from(&InnerEnvStructure::new(meta_env));
+///     let meta_inner_structure = StoredEnvStructure::from(&InnerEnvStructure::new(&meta_env));
 ///
 ///     assert_eq!(base_structure, meta_inner_structure);
 ///
 /// implements an [`EnvStructure`] corresponding to the inner environment structure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InnerEnvStructure<T: ?Sized, U>(U, PhantomData<*const T>);
+pub struct InnerEnvStructure<'a, T: ?Sized>(&'a T);
 
-impl<T: ?Sized, U> InnerEnvStructure<T, U> {
-    pub const fn new(inner_env: U) -> Self {
-        Self(inner_env, PhantomData)
+impl<'a, T: ?Sized> InnerEnvStructure<'a, T> {
+    pub const fn new(inner_env: &'a T) -> Self {
+        Self(inner_env)
     }
 }
 
-impl<T, U, OS, AS> EnvStructure for InnerEnvStructure<T, U>
+impl<'a, T, OS, AS> EnvStructure for InnerEnvStructure<'a, T>
 where
     T: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
-    U: Borrow<T>,
     OS: Space,
     AS: Space,
 {
@@ -444,16 +440,16 @@ where
     type ActionSpace = AS;
 
     fn observation_space(&self) -> Self::ObservationSpace {
-        self.0.borrow().observation_space().inner_spaces.0.inner
+        self.0.observation_space().inner_spaces.0.inner
     }
     fn action_space(&self) -> Self::ActionSpace {
-        self.0.borrow().action_space()
+        self.0.action_space()
     }
     fn reward_range(&self) -> (f64, f64) {
-        self.0.borrow().reward_range()
+        self.0.reward_range()
     }
     fn discount_factor(&self) -> f64 {
-        self.0.borrow().discount_factor()
+        self.0.discount_factor()
     }
 }
 

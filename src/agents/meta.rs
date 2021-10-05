@@ -29,7 +29,7 @@ where
     type Agent = ResettingMetaAgent<T, OS, AS>;
 
     fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
-        let inner_env_structure = StoredEnvStructure::from(&InnerEnvStructure::<E, &E>::new(env));
+        let inner_env_structure = StoredEnvStructure::from(&InnerEnvStructure::new(env));
         ResettingMetaAgent::new(self.agent_config.clone(), inner_env_structure, seed)
     }
 }
