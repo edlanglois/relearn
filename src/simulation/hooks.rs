@@ -332,6 +332,13 @@ impl GenericSimulationHook for () {
 
 #[impl_for_tuples(1, 12)]
 impl<O, A> SimulationHook<O, A> for Tuple {
+    fn start<L>(&mut self, logger: &mut L) -> bool
+    where
+        L: TimeSeriesLogger + ?Sized,
+    {
+        for_tuples!( #( self.Tuple.start(logger) )&* )
+    }
+
     fn call<L>(&mut self, step: &Step<O, A>, logger: &mut L) -> bool
     where
         L: TimeSeriesLogger + ?Sized,
