@@ -1,7 +1,7 @@
 use super::{Actor, Agent, BuildAgent, BuildAgentError, OffPolicyAgent, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
-use crate::spaces::SampleSpace;
+use crate::spaces::{SampleSpace, Space};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::fmt;
@@ -16,14 +16,18 @@ impl RandomAgentConfig {
     }
 }
 
-impl<E> BuildAgent<E> for RandomAgentConfig
+impl<OS, AS> BuildAgent<OS, AS> for RandomAgentConfig
 where
-    E: EnvStructure + ?Sized,
-    E::ActionSpace: SampleSpace,
+    OS: Space,
+    AS: SampleSpace,
 {
-    type Agent = RandomAgent<E::ActionSpace>;
+    type Agent = RandomAgent<AS>;
 
-    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
         Ok(RandomAgent::new(env.action_space(), seed))
     }
 }

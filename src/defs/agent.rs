@@ -81,16 +81,19 @@ impl<T> ForAnyAny<T> {
     }
 }
 
-impl<T, E> BuildAgent<E> for ForAnyAny<T>
+impl<T, OS, AS> BuildAgent<OS, AS> for ForAnyAny<T>
 where
     T: Borrow<AgentDef>,
-    E: EnvStructure + ?Sized,
-    E::ObservationSpace: RLObservationSpace,
-    E::ActionSpace: RLActionSpace,
+    OS: RLObservationSpace,
+    AS: RLActionSpace,
 {
-    type Agent = Box<DynFullAgent<E>>;
+    type Agent = Box<DynFullAgent<OS, AS>>;
 
-    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
         match self.0.borrow() {
             Random => RandomAgentConfig::new()
@@ -105,19 +108,17 @@ where
     }
 }
 
-impl<T, E> BuildManagerAgent<E> for ForAnyAny<T>
+impl<T, OS, AS> BuildManagerAgent<OS, AS> for ForAnyAny<T>
 where
     T: Borrow<MultiThreadAgentDef>,
-    T: Borrow<MultiThreadAgentDef>,
-    E: EnvStructure + ?Sized,
-    E::ObservationSpace: RLObservationSpace,
-    E::ActionSpace: RLActionSpace,
+    OS: RLObservationSpace,
+    AS: RLActionSpace,
 {
-    type ManagerAgent = Box<DynEnvManagerAgent<E>>;
+    type ManagerAgent = Box<DynEnvManagerAgent<OS, AS>>;
 
     fn build_manager_agent(
         &self,
-        env: &E,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::ManagerAgent, BuildAgentError> {
         use MultiThreadAgentDef::*;
@@ -142,16 +143,19 @@ impl<T> ForFiniteFinite<T> {
     }
 }
 
-impl<T, E> BuildAgent<E> for ForFiniteFinite<T>
+impl<T, OS, AS> BuildAgent<OS, AS> for ForFiniteFinite<T>
 where
     T: Borrow<AgentDef>,
-    E: EnvStructure + ?Sized,
-    E::ObservationSpace: RLObservationSpace + FiniteSpace,
-    E::ActionSpace: RLActionSpace + FiniteSpace,
+    OS: RLObservationSpace + FiniteSpace,
+    AS: RLActionSpace + FiniteSpace,
 {
-    type Agent = Box<DynFullAgent<E>>;
+    type Agent = Box<DynFullAgent<OS, AS>>;
 
-    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
         match self.0.borrow() {
             TabularQLearning(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
@@ -162,18 +166,17 @@ where
     }
 }
 
-impl<T, E> BuildManagerAgent<E> for ForFiniteFinite<T>
+impl<T, OS, AS> BuildManagerAgent<OS, AS> for ForFiniteFinite<T>
 where
     T: Borrow<MultiThreadAgentDef>,
-    E: EnvStructure + ?Sized,
-    E::ObservationSpace: RLObservationSpace + FiniteSpace,
-    E::ActionSpace: RLActionSpace + FiniteSpace,
+    OS: RLObservationSpace + FiniteSpace,
+    AS: RLActionSpace + FiniteSpace,
 {
-    type ManagerAgent = Box<DynEnvManagerAgent<E>>;
+    type ManagerAgent = Box<DynEnvManagerAgent<OS, AS>>;
 
     fn build_manager_agent(
         &self,
-        env: &E,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::ManagerAgent, BuildAgentError> {
         use MultiThreadAgentDef::*;
@@ -201,20 +204,23 @@ impl<T> ForMetaFiniteFinite<T> {
     }
 }
 
-impl<T, E, OS, AS> BuildAgent<E> for ForMetaFiniteFinite<T>
+impl<T, OS, AS> BuildAgent<MetaObservationSpace<OS, AS>, AS> for ForMetaFiniteFinite<T>
 where
     T: Borrow<AgentDef>,
-    E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
     OS: RLObservationSpace + FiniteSpace + Clone,
     OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace + Clone,
     AS::Element: Clone,
     // I think this ought to be inferrable but for whatever reason it isn't
-    E::ObservationSpace: RLObservationSpace,
+    MetaObservationSpace<OS, AS>: RLObservationSpace,
 {
-    type Agent = Box<DynFullAgent<E>>;
+    type Agent = Box<DynFullAgent<MetaObservationSpace<OS, AS>, AS>>;
 
-    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
 
         match self.0.borrow() {
@@ -229,22 +235,21 @@ where
     }
 }
 
-impl<T, E, OS, AS> BuildManagerAgent<E> for ForMetaFiniteFinite<T>
+impl<T, OS, AS> BuildManagerAgent<MetaObservationSpace<OS, AS>, AS> for ForMetaFiniteFinite<T>
 where
     T: Borrow<MultiThreadAgentDef>,
-    E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
     OS: RLObservationSpace + FiniteSpace + Clone,
     OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace + Clone,
     AS::Element: Clone,
     // I think this ought to be inferrable but for whatever reason it isn't
-    E::ObservationSpace: RLObservationSpace,
+    MetaObservationSpace<OS, AS>: RLObservationSpace,
 {
-    type ManagerAgent = Box<DynEnvManagerAgent<E>>;
+    type ManagerAgent = Box<DynEnvManagerAgent<MetaObservationSpace<OS, AS>, AS>>;
 
     fn build_manager_agent(
         &self,
-        env: &E,
+        env: &dyn EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::ManagerAgent, BuildAgentError> {
         use MultiThreadAgentDef::*;
@@ -257,18 +262,13 @@ where
 }
 
 /// Send-able [`FullAgent`] trait object for an environment structure.
-pub type DynFullAgent<E> = dyn FullAgent<
-        <<E as EnvStructure>::ObservationSpace as Space>::Element,
-        <<E as EnvStructure>::ActionSpace as Space>::Element,
-    > + Send;
+pub type DynFullAgent<OS, AS> =
+    dyn FullAgent<<OS as Space>::Element, <AS as Space>::Element> + Send;
 
 /// Send-able [`Agent`] trait object for an environment structure.
-pub type DynEnvAgent<E> = dyn Agent<
-        <<E as EnvStructure>::ObservationSpace as Space>::Element,
-        <<E as EnvStructure>::ActionSpace as Space>::Element,
-    > + Send;
+pub type DynEnvAgent<OS, AS> = dyn Agent<<OS as Space>::Element, <AS as Space>::Element> + Send;
 
 /// The agent manager trait object for a given environment structure.
 ///
 /// See also [`BoxingManager`](crate::agents::BoxingManager).
-pub type DynEnvManagerAgent<E> = dyn ManagerAgent<Worker = Box<DynEnvAgent<E>>>;
+pub type DynEnvManagerAgent<OS, AS> = dyn ManagerAgent<Worker = Box<DynEnvAgent<OS, AS>>>;

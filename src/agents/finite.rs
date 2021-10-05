@@ -125,16 +125,19 @@ where
     }
 }
 
-impl<E, B> BuildAgent<E> for B
+impl<B, OS, AS> BuildAgent<OS, AS> for B
 where
     B: BuildIndexAgent,
-    E: EnvStructure + ?Sized,
-    E::ObservationSpace: FiniteSpace,
-    E::ActionSpace: FiniteSpace,
+    OS: FiniteSpace,
+    AS: FiniteSpace,
 {
-    type Agent = FiniteSpaceAgent<B::Agent, E::ObservationSpace, E::ActionSpace>;
+    type Agent = FiniteSpaceAgent<B::Agent, OS, AS>;
 
-    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
         let observation_space = env.observation_space();
         let action_space = env.action_space();
         Ok(FiniteSpaceAgent {
@@ -151,20 +154,19 @@ where
     }
 }
 
-impl<E, B> BuildBatchUpdateActor<E> for B
+impl<B, OS, AS> BuildBatchUpdateActor<OS, AS> for B
 where
     // NOTE: This is slightly over-restrictive. Don't need BuildIndexAgent::Agent: Agent
     B: BuildIndexAgent,
     B::Agent: BatchUpdate<usize, usize>,
-    E: EnvStructure + ?Sized,
-    E::ObservationSpace: FiniteSpace,
-    E::ActionSpace: FiniteSpace,
+    OS: FiniteSpace,
+    AS: FiniteSpace,
 {
-    type BatchUpdateActor = <Self as BuildAgent<E>>::Agent;
+    type BatchUpdateActor = <Self as BuildAgent<OS, AS>>::Agent;
 
     fn build_batch_update_actor(
         &self,
-        env: &E,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
         self.build_agent(env, seed)

@@ -5,9 +5,9 @@ use crate::logging::{Event, TimeSeriesLogger};
 use crate::spaces::Space;
 
 /// Build an actor supporting batch updates ([`BatchUpdate`]).
-pub trait BuildBatchUpdateActor<E: EnvStructure + ?Sized> {
-    type BatchUpdateActor: Actor<<E::ObservationSpace as Space>::Element, <E::ActionSpace as Space>::Element>
-        + BatchUpdate<<E::ObservationSpace as Space>::Element, <E::ActionSpace as Space>::Element>
+pub trait BuildBatchUpdateActor<OS: Space, AS: Space> {
+    type BatchUpdateActor: Actor<OS::Element, AS::Element>
+        + BatchUpdate<OS::Element, AS::Element>
         + SetActorMode;
 
     /// Build an actor for the given environment structure ([`EnvStructure`]).
@@ -20,7 +20,7 @@ pub trait BuildBatchUpdateActor<E: EnvStructure + ?Sized> {
     ///            for those agents that use deterministic pseudo-random number generation.
     fn build_batch_update_actor(
         &self,
-        env: &E,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::BatchUpdateActor, BuildAgentError>;
 }
@@ -65,18 +65,20 @@ impl<AC, HBC> BatchUpdateAgentConfig<AC, HBC> {
     }
 }
 
-impl<AC, HBC, E> BuildAgent<E> for BatchUpdateAgentConfig<AC, HBC>
+impl<AC, HBC, OS, AS> BuildAgent<OS, AS> for BatchUpdateAgentConfig<AC, HBC>
 where
-    AC: BuildBatchUpdateActor<E>,
-    HBC: BuildHistoryBuffer<
-        <E::ObservationSpace as Space>::Element,
-        <E::ActionSpace as Space>::Element,
-    >,
-    E: EnvStructure + ?Sized,
+    AC: BuildBatchUpdateActor<OS, AS>,
+    HBC: BuildHistoryBuffer<OS::Element, AS::Element>,
+    OS: Space,
+    AS: Space,
 {
     type Agent = BatchUpdateAgent<AC::BatchUpdateActor, HBC::HistoryBuffer>;
 
-    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError> {
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
         let actor = self.actor_config.build_batch_update_actor(env, seed)?;
         let history = self.history_buffer_config.build_history_buffer();
         Ok(BatchUpdateAgent { actor, history })

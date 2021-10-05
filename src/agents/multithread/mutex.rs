@@ -4,6 +4,7 @@ use super::super::{
 };
 use crate::envs::EnvStructure;
 use crate::logging::{self, ForwardingLogger, TimeSeriesLogger};
+use crate::spaces::Space;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -26,17 +27,18 @@ impl<AC> From<AC> for MutexAgentConfig<AC> {
     }
 }
 
-impl<AC, E> BuildManagerAgent<E> for MutexAgentConfig<AC>
+impl<AC, OS, AS> BuildManagerAgent<OS, AS> for MutexAgentConfig<AC>
 where
-    AC: BuildAgent<E>,
+    AC: BuildAgent<OS, AS>,
     AC::Agent: Send + 'static,
-    E: EnvStructure + ?Sized,
+    OS: Space,
+    AS: Space,
 {
     type ManagerAgent = MutexAgentManager<AC::Agent>;
 
     fn build_manager_agent(
         &self,
-        env: &E,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::ManagerAgent, BuildAgentError> {
         Ok(MutexAgentManager::new(

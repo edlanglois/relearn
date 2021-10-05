@@ -107,7 +107,7 @@ where
     EC::ActionSpace: ElementRefInto<Loggable> + Clone + 'static, // TODO: Remove Clone when using BuildHook
     EC::Action: 'static,
     EC::Environment: 'static,
-    AC: BuildAgent<EC::Environment> + Clone + 'static,
+    AC: BuildAgent<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
     AC::Agent: 'static,
     H: SimulationHook<EC::Observation, EC::Action> + Clone + 'static,
 {
@@ -137,12 +137,7 @@ where
     EC::ActionSpace: ElementRefInto<Loggable> + Clone + Send + 'static,
     EC::Action: 'static,
     EC::Environment: 'static,
-    AC: BuildManagerAgent<
-            dyn EnvStructure<
-                ObservationSpace = EC::ObservationSpace,
-                ActionSpace = EC::ActionSpace,
-            >,
-        > + ?Sized,
+    AC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace> + ?Sized,
     AC::ManagerAgent: 'static,
     <AC::ManagerAgent as ManagerAgent>::Worker: Agent<EC::Observation, EC::Action> + 'static,
     H: SimulationHook<EC::Observation, EC::Action> + Clone + Send + 'static,

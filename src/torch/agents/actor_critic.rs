@@ -47,27 +47,23 @@ where
     }
 }
 
-impl<PB, PUB, CB, CUB, E> BuildAgent<E> for ActorCriticConfig<PB, PUB, CB, CUB>
+impl<PB, PUB, CB, CUB, OS, AS> BuildAgent<OS, AS> for ActorCriticConfig<PB, PUB, CB, CUB>
 where
     PB: BuildPolicy,
-    PUB: BuildPolicyUpdater<E::ActionSpace>,
+    PUB: BuildPolicyUpdater<AS>,
     CB: BuildCritic,
     CUB: BuildCriticUpdater,
-    E: EnvStructure + ?Sized,
-    E::ObservationSpace: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
-    E::ActionSpace: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
+    OS: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
+    AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
 {
     #[allow(clippy::type_complexity)]
-    type Agent = ActorCriticAgent<
-        E::ObservationSpace,
-        E::ActionSpace,
-        PB::Policy,
-        PUB::Updater,
-        CB::Critic,
-        CUB::Updater,
-    >;
+    type Agent = ActorCriticAgent<OS, AS, PB::Policy, PUB::Updater, CB::Critic, CUB::Updater>;
 
-    fn build_agent(&self, env: &E, _seed: u64) -> Result<Self::Agent, BuildAgentError> {
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        _seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
         Ok(ActorCriticAgent::new(env, self))
     }
 }

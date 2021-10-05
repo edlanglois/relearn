@@ -28,7 +28,7 @@ impl<EC, AC, H> RunSimulation for Simulator<EC, AC, H>
 where
     EC: BuildEnv,
     EC::Observation: Clone,
-    AC: BuildAgent<EC::Environment>,
+    AC: BuildAgent<EC::ObservationSpace, EC::ActionSpace>,
     H: SimulationHook<EC::Observation, EC::Action> + Clone,
 {
     fn run_simulation(

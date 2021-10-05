@@ -148,12 +148,12 @@ impl<T: SetActorMode + ?Sized> SetActorMode for Box<T> {
 // make_worker(&self) -> Self::Worker and
 // into_manager(self) -> Self::Manager
 
-pub trait BuildManagerAgent<E: ?Sized> {
+pub trait BuildManagerAgent<OS, AS> {
     type ManagerAgent: ManagerAgent;
 
     fn build_manager_agent(
         &self,
-        env: &E,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::ManagerAgent, BuildAgentError>;
 }
@@ -235,12 +235,9 @@ impl<O, A, T> FullAgent<O, A> for T where T: Agent<O, A> + SetActorMode + ?Sized
 
 // TODO: Be more flexible about the bounds on Agent?
 /// Build an agent instance for a given environment structure.
-pub trait BuildAgent<E: EnvStructure + ?Sized> {
+pub trait BuildAgent<OS: Space, AS: Space> {
     /// The agent type to build.
-    type Agent: FullAgent<
-        <E::ObservationSpace as Space>::Element,
-        <E::ActionSpace as Space>::Element,
-    >;
+    type Agent: FullAgent<OS::Element, AS::Element>;
 
     /// Build an agent for the given environment structure ([`EnvStructure`]).
     ///
@@ -250,7 +247,11 @@ pub trait BuildAgent<E: EnvStructure + ?Sized> {
     /// * `env`  - The structure of the environment in which the agent is to operate.
     /// * `seed` - A number used to seed the agent's random state,
     ///            for those agents that use deterministic pseudo-random number generation.
-    fn build_agent(&self, env: &E, seed: u64) -> Result<Self::Agent, BuildAgentError>;
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError>;
 }
 
 /// Error building an agent
