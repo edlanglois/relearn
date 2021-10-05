@@ -1,17 +1,5 @@
 use super::{Options, Update, WithUpdate};
-use crate::simulation::{MultiThreadSimulatorConfig, SimulatorConfig};
-
-impl From<&Options> for SimulatorConfig {
-    fn from(opts: &Options) -> Self {
-        Self::default().with_update(opts)
-    }
-}
-
-impl Update<&Options> for SimulatorConfig {
-    fn update(&mut self, opts: &Options) {
-        self.seed = opts.seed;
-    }
-}
+use crate::simulation::MultiThreadSimulatorConfig;
 
 impl From<&Options> for MultiThreadSimulatorConfig {
     fn from(opts: &Options) -> Self {

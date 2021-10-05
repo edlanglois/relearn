@@ -12,9 +12,13 @@ fn run_serial(opts: &Options, env_def: EnvDef) -> Result<(), Box<dyn Error>> {
         .ok_or_else(|| format!("Agent {} is not single-threaded", opts.agent))?;
     println!("Agent:\n{:#?}", agent_def);
 
-    let mut simulation = env_def.build_simulation(&agent_def, opts.seed, opts.seed + 1, ())?;
+    let env_seed = opts.seed;
+    let agent_seed = opts.seed.wrapping_add(1);
+    let mut simulation = env_def.build_simulation(&agent_def, env_seed, agent_seed, ())?;
     let mut logger = CLILogger::new(Duration::from_millis(1000), true);
-    simulation.run_simulation(&mut logger);
+    simulation
+        .run_simulation(env_seed, agent_seed, &mut logger)
+        .expect("Simulation failed");
     Ok(())
 }
 
@@ -39,10 +43,14 @@ fn run_parallel(
         num_threads
     );
 
+    let env_seed = opts.seed;
+    let agent_seed = opts.seed.wrapping_add(1);
     let mut simulation =
-        env_def.build_parallel_simulation(&sim_config, &agent_def, opts.seed, opts.seed + 1, ())?;
+        env_def.build_parallel_simulation(&sim_config, &agent_def, env_seed, agent_seed, ())?;
     let mut logger = CLILogger::new(Duration::from_millis(1000), true);
-    simulation.run_simulation(&mut logger);
+    simulation
+        .run_simulation(env_seed, agent_seed, &mut logger)
+        .expect("Simulation failed");
     Ok(())
 }
 

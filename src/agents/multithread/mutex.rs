@@ -171,7 +171,15 @@ mod tests {
         let num_workers = 5;
 
         let locked_env = Arc::new(RwLock::new(env));
-        simulation::run_agent_multithread(&locked_env, &mut agent, num_workers, &hook, &mut logger);
+        simulation::run_agent_multithread(
+            &locked_env,
+            &mut agent,
+            num_workers,
+            &hook,
+            0,
+            0,
+            &mut logger,
+        );
 
         let agent = agent.try_into_inner().unwrap();
         let env = Arc::try_unwrap(locked_env).unwrap().into_inner().unwrap();

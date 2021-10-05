@@ -1,54 +1,47 @@
 //! Serial (single-thread) simulation.
 use super::hooks::SimulationHook;
 use super::RunSimulation;
-use crate::agents::{Actor, Agent, Step};
-use crate::envs::Environment;
+use crate::agents::{Actor, Agent, BuildAgent, Step};
+use crate::envs::{BuildEnv, Environment};
+use crate::error::RLError;
 use crate::logging::TimeSeriesLogger;
 
-/// Configuration for [`Simulator`].
+/// Serial (single-thread) simulator.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SimulatorConfig {
-    pub seed: u64,
-}
-
-impl SimulatorConfig {
-    pub const fn new(seed: u64) -> Self {
-        Self { seed }
-    }
-}
-
-/// An agent-environment simulator with logging.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Simulator<E, A, H> {
-    environment: E,
-    agent: A,
+pub struct Simulator<EC, AC, H> {
+    env_config: EC,
+    agent_config: AC,
     hook: H,
 }
 
-impl<E, A, H> Simulator<E, A, H> {
-    pub const fn new(environment: E, agent: A, hook: H) -> Self {
+impl<EC, AC, H> Simulator<EC, AC, H> {
+    pub const fn new(env_config: EC, agent_config: AC, hook: H) -> Self {
         Self {
-            environment,
-            agent,
+            env_config,
+            agent_config,
             hook,
         }
     }
 }
 
-impl<E, A, H> RunSimulation for Simulator<E, A, H>
+impl<EC, AC, H> RunSimulation for Simulator<EC, AC, H>
 where
-    E: Environment,
-    E::Observation: Clone,
-    A: Agent<E::Observation, E::Action>,
-    H: SimulationHook<E::Observation, E::Action>,
+    EC: BuildEnv,
+    EC::Observation: Clone,
+    AC: BuildAgent<EC::Environment>,
+    H: SimulationHook<EC::Observation, EC::Action> + Clone,
 {
-    fn run_simulation(&mut self, logger: &mut dyn TimeSeriesLogger) {
-        run_agent(
-            &mut self.environment,
-            &mut self.agent,
-            &mut self.hook,
-            logger,
-        );
+    fn run_simulation(
+        &mut self,
+        env_seed: u64,
+        agent_seed: u64,
+        logger: &mut dyn TimeSeriesLogger,
+    ) -> Result<(), RLError> {
+        let mut env = self.env_config.build_env(env_seed)?;
+        let mut agent = self.agent_config.build_agent(&env, agent_seed)?;
+        let mut hook = self.hook.clone();
+        run_agent(&mut env, &mut agent, &mut hook, logger);
+        Ok(())
     }
 }
 
