@@ -32,10 +32,7 @@ pub trait SimulationHook<O, A> {
     ///
     /// # Returns
     /// Whether the simulation should run.
-    fn start<L>(&mut self, _logger: &mut L) -> bool
-    where
-        L: TimeSeriesLogger + ?Sized,
-    {
+    fn start(&mut self, _logger: &mut dyn TimeSeriesLogger) -> bool {
         true
     }
 
@@ -47,9 +44,7 @@ pub trait SimulationHook<O, A> {
     ///
     /// # Returns
     /// Whether the simulation should continue after this step.
-    fn call<L>(&mut self, step: &Step<O, A>, logger: &mut L) -> bool
-    where
-        L: TimeSeriesLogger + ?Sized;
+    fn call(&mut self, step: &Step<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool;
 }
 
 /// A generic simulation hook that applies to every state, action, and logger.
@@ -58,10 +53,7 @@ pub trait GenericSimulationHook {
     ///
     /// # Returns
     /// Whether the simulation should run.
-    fn start<L>(&mut self, _logger: &mut L) -> bool
-    where
-        L: TimeSeriesLogger + ?Sized,
-    {
+    fn start(&mut self, _logger: &mut dyn TimeSeriesLogger) -> bool {
         true
     }
 
@@ -73,25 +65,15 @@ pub trait GenericSimulationHook {
     ///
     /// # Returns
     /// Whether the simulation should continue after this step.
-    fn call<O, A, L: TimeSeriesLogger + ?Sized>(
-        &mut self,
-        step: &Step<O, A>,
-        logger: &mut L,
-    ) -> bool;
+    fn call<O, A>(&mut self, step: &Step<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool;
 }
 
 impl<O, A, T: GenericSimulationHook> SimulationHook<O, A> for T {
-    fn start<L>(&mut self, logger: &mut L) -> bool
-    where
-        L: TimeSeriesLogger + ?Sized,
-    {
+    fn start(&mut self, logger: &mut dyn TimeSeriesLogger) -> bool {
         GenericSimulationHook::start(self, logger)
     }
 
-    fn call<L>(&mut self, step: &Step<O, A>, logger: &mut L) -> bool
-    where
-        L: TimeSeriesLogger + ?Sized,
-    {
+    fn call(&mut self, step: &Step<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
         GenericSimulationHook::call(self, step, logger)
     }
 }
@@ -154,10 +136,10 @@ impl StepLimit {
 }
 
 impl GenericSimulationHook for StepLimit {
-    fn start<L: TimeSeriesLogger + ?Sized>(&mut self, _: &mut L) -> bool {
+    fn start(&mut self, _: &mut dyn TimeSeriesLogger) -> bool {
         self.steps_remaining > 0
     }
-    fn call<O, A, L: TimeSeriesLogger + ?Sized>(&mut self, _: &Step<O, A>, _: &mut L) -> bool {
+    fn call<O, A>(&mut self, _: &Step<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
         self.steps_remaining -= 1;
         self.steps_remaining > 0
     }
@@ -211,11 +193,11 @@ impl EpisodeLimit {
 }
 
 impl GenericSimulationHook for EpisodeLimit {
-    fn start<L: TimeSeriesLogger + ?Sized>(&mut self, _: &mut L) -> bool {
+    fn start(&mut self, _: &mut dyn TimeSeriesLogger) -> bool {
         self.episodes_remaining > 0
     }
 
-    fn call<O, A, L: TimeSeriesLogger + ?Sized>(&mut self, step: &Step<O, A>, _: &mut L) -> bool {
+    fn call<O, A>(&mut self, step: &Step<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
         if step.episode_done {
             self.episodes_remaining -= 1;
             self.episodes_remaining > 0
@@ -241,7 +223,7 @@ impl<O, A, F> SimulationHook<O, A> for ClosureHook<F>
 where
     F: FnMut(&Step<O, A>) -> bool,
 {
-    fn call<L: TimeSeriesLogger + ?Sized>(&mut self, step: &Step<O, A>, _: &mut L) -> bool {
+    fn call(&mut self, step: &Step<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
         (self.f)(step)
     }
 }
@@ -294,10 +276,11 @@ where
     OS: ElementRefInto<Loggable>,
     AS: ElementRefInto<Loggable>,
 {
-    fn call<L>(&mut self, step: &Step<OS::Element, AS::Element>, logger: &mut L) -> bool
-    where
-        L: TimeSeriesLogger + ?Sized,
-    {
+    fn call(
+        &mut self,
+        step: &Step<OS::Element, AS::Element>,
+        logger: &mut dyn TimeSeriesLogger,
+    ) -> bool {
         let mut step_logger = logger.event_logger(Event::EnvStep);
         step_logger.unwrap_log_scalar("reward", step.reward);
         step_logger.unwrap_log(
@@ -325,24 +308,18 @@ where
 // For a tuple of hooks, stop if any request a stop
 
 impl GenericSimulationHook for () {
-    fn call<O, A, L: TimeSeriesLogger + ?Sized>(&mut self, _: &Step<O, A>, _: &mut L) -> bool {
+    fn call<O, A>(&mut self, _: &Step<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
         true
     }
 }
 
 #[impl_for_tuples(1, 12)]
 impl<O, A> SimulationHook<O, A> for Tuple {
-    fn start<L>(&mut self, logger: &mut L) -> bool
-    where
-        L: TimeSeriesLogger + ?Sized,
-    {
+    fn start(&mut self, logger: &mut dyn TimeSeriesLogger) -> bool {
         for_tuples!( #( self.Tuple.start(logger) )&* )
     }
 
-    fn call<L>(&mut self, step: &Step<O, A>, logger: &mut L) -> bool
-    where
-        L: TimeSeriesLogger + ?Sized,
-    {
+    fn call(&mut self, step: &Step<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
         for_tuples!( #( self.Tuple.call(step, logger) )&* )
     }
 }
@@ -363,10 +340,7 @@ impl<AS: FiniteSpace> IndexedActionCounter<AS> {
     }
 }
 impl<O, AS: FiniteSpace> SimulationHook<O, AS::Element> for IndexedActionCounter<AS> {
-    fn call<L>(&mut self, step: &Step<O, AS::Element>, _: &mut L) -> bool
-    where
-        L: TimeSeriesLogger + ?Sized,
-    {
+    fn call(&mut self, step: &Step<O, AS::Element>, _: &mut dyn TimeSeriesLogger) -> bool {
         self.counts[self.action_space.to_index(&step.action)] += 1;
         true
     }
@@ -402,11 +376,7 @@ impl RewardStatistics {
 }
 
 impl GenericSimulationHook for RewardStatistics {
-    fn call<O, A, L: TimeSeriesLogger + ?Sized>(
-        &mut self,
-        step: &Step<O, A>,
-        _logger: &mut L,
-    ) -> bool {
+    fn call<O, A>(&mut self, step: &Step<O, A>, _logger: &mut dyn TimeSeriesLogger) -> bool {
         self.partial_reward += step.reward;
         self.num_steps += 1;
         if step.episode_done {

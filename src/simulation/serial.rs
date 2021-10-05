@@ -112,13 +112,16 @@ pub fn run_agent<E, A, H>(
 /// * `actor` - The actor to simulate.
 /// * `hook` - A simulation hook run on each step. Controls when the simulation stops.
 /// * `logger` - The logger to use. Passed to hook calls.
-pub fn run_actor<E, A, H, L>(environment: &mut E, actor: &mut A, hook: &mut H, logger: &mut L)
-where
+pub fn run_actor<E, A, H>(
+    environment: &mut E,
+    actor: &mut A,
+    hook: &mut H,
+    logger: &mut dyn TimeSeriesLogger,
+) where
     E: Environment + ?Sized,
     E::Observation: Clone,
     A: Actor<E::Observation, E::Action> + ?Sized,
     H: SimulationHook<E::Observation, E::Action> + ?Sized,
-    L: TimeSeriesLogger + ?Sized,
 {
     if !hook.start(logger) {
         return;
