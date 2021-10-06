@@ -305,7 +305,7 @@ where
     }
 }
 
-// For a tuple of hooks, stop if any request a stop
+// For a collection (list or tuple) of hooks, stop if any hook requests a stop.
 
 impl GenericSimulationHook for () {
     fn call<O, A>(&mut self, _: &Step<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
@@ -321,6 +321,19 @@ impl<O, A> SimulationHook<O, A> for Tuple {
 
     fn call(&mut self, step: &Step<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
         for_tuples!( #( self.Tuple.call(step, logger) )&* )
+    }
+}
+
+impl<T, O, A> SimulationHook<O, A> for [T]
+where
+    T: SimulationHook<O, A>,
+{
+    fn start(&mut self, logger: &mut dyn TimeSeriesLogger) -> bool {
+        self.iter_mut().all(|h| h.start(logger))
+    }
+
+    fn call(&mut self, step: &Step<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
+        self.iter_mut().all(|h| h.call(step, logger))
     }
 }
 
