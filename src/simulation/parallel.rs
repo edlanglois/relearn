@@ -1,5 +1,5 @@
 use super::hooks::SimulationHook;
-use super::{run_agent, RunSimulation};
+use super::{run_agent, Simulator};
 use crate::agents::{Agent, ManagerAgent};
 use crate::envs::BuildEnv;
 use crate::error::RLError;
@@ -7,13 +7,13 @@ use crate::logging::TimeSeriesLogger;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
-/// Configuration for [`MultiThreadSimulator`].
+/// Configuration for [`ParallelSimulator`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct MultiThreadSimulatorConfig {
+pub struct ParallelSimulatorConfig {
     pub num_workers: usize,
 }
 
-impl Default for MultiThreadSimulatorConfig {
+impl Default for ParallelSimulatorConfig {
     fn default() -> Self {
         Self {
             num_workers: num_cpus::get(),
@@ -21,7 +21,7 @@ impl Default for MultiThreadSimulatorConfig {
     }
 }
 
-impl MultiThreadSimulatorConfig {
+impl ParallelSimulatorConfig {
     pub const fn new(num_workers: usize) -> Self {
         Self { num_workers }
     }
@@ -31,7 +31,7 @@ impl MultiThreadSimulatorConfig {
         env_config: EB,
         manager_agent: MA,
         worker_hook: H,
-    ) -> Box<dyn RunSimulation>
+    ) -> Box<dyn Simulator>
     where
         EB: BuildEnv + Send + Sync + 'static,
         EB::Environment: 'static,
@@ -40,7 +40,7 @@ impl MultiThreadSimulatorConfig {
         EB::Observation: Clone,
         H: SimulationHook<EB::Observation, EB::Action> + Clone + Send + 'static,
     {
-        Box::new(MultiThreadSimulator {
+        Box::new(ParallelSimulator {
             env_builder: Arc::new(RwLock::new(env_config)),
             manager_agent,
             num_workers: self.num_workers,
@@ -50,14 +50,14 @@ impl MultiThreadSimulatorConfig {
 }
 
 /// Multi-thread simulator
-pub struct MultiThreadSimulator<EB, MA, H> {
+pub struct ParallelSimulator<EB, MA, H> {
     env_builder: Arc<RwLock<EB>>,
     manager_agent: MA,
     num_workers: usize,
     worker_hook: H,
 }
 
-impl<EB, MA, H> RunSimulation for MultiThreadSimulator<EB, MA, H>
+impl<EB, MA, H> Simulator for ParallelSimulator<EB, MA, H>
 where
     EB: BuildEnv + Send + Sync + 'static,
     MA: ManagerAgent,

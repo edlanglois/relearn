@@ -1,6 +1,6 @@
 //! Serial (single-thread) simulation.
 use super::hooks::SimulationHook;
-use super::RunSimulation;
+use super::Simulator;
 use crate::agents::{Actor, Agent, BuildAgent, Step};
 use crate::envs::{BuildEnv, Environment};
 use crate::error::RLError;
@@ -8,13 +8,13 @@ use crate::logging::TimeSeriesLogger;
 
 /// Serial (single-thread) simulator.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Simulator<EC, AC, H> {
+pub struct SerialSimulator<EC, AC, H> {
     env_config: EC,
     agent_config: AC,
     hook: H,
 }
 
-impl<EC, AC, H> Simulator<EC, AC, H> {
+impl<EC, AC, H> SerialSimulator<EC, AC, H> {
     pub const fn new(env_config: EC, agent_config: AC, hook: H) -> Self {
         Self {
             env_config,
@@ -24,7 +24,7 @@ impl<EC, AC, H> Simulator<EC, AC, H> {
     }
 }
 
-impl<EC, AC, H> RunSimulation for Simulator<EC, AC, H>
+impl<EC, AC, H> Simulator for SerialSimulator<EC, AC, H>
 where
     EC: BuildEnv,
     EC::Observation: Clone,

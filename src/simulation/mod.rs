@@ -4,16 +4,16 @@ mod parallel;
 mod serial;
 
 pub use hooks::{BuildStructuredHook, GenericSimulationHook, SimulationHook};
-pub use parallel::{run_agent_multithread, MultiThreadSimulator, MultiThreadSimulatorConfig};
-pub use serial::{run_actor, run_agent, Simulator};
+pub use parallel::{run_agent_multithread, ParallelSimulator, ParallelSimulatorConfig};
+pub use serial::{run_actor, run_agent, SerialSimulator};
 
 use crate::envs::BuildEnvError;
 use crate::error::RLError;
 use crate::logging::TimeSeriesLogger;
 use thiserror::Error;
 
-/// Runs a simulation.
-pub trait RunSimulation {
+/// Runs agent-environment simulations.
+pub trait Simulator {
     /// Run a simulation
     ///
     /// # Args

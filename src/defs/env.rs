@@ -9,7 +9,7 @@ use crate::envs::{
 use crate::error::RLError;
 use crate::logging::Loggable;
 use crate::simulation::{
-    hooks::StepLogger, GenericSimulationHook, MultiThreadSimulatorConfig, RunSimulation,
+    hooks::StepLogger, GenericSimulationHook, ParallelSimulatorConfig, SerialSimulator,
     SimulationHook, Simulator,
 };
 use crate::spaces::ElementRefInto;
@@ -99,7 +99,7 @@ fn boxed_simulation<EC, AC, H>(
     env_seed: u64,
     _agent_seed: u64,
     hook: H,
-) -> Result<Box<dyn RunSimulation>, RLError>
+) -> Result<Box<dyn Simulator>, RLError>
 where
     EC: BuildEnv + Clone + 'static,
     EC::ObservationSpace: ElementRefInto<Loggable> + Clone + 'static, // TODO: Remove Clone
@@ -114,7 +114,7 @@ where
     // TODO: Avoid having to create this temporary environment
     let env = env_def.build_env(env_seed)?;
     let log_hook = StepLogger::new(env.observation_space(), env.action_space());
-    Ok(Box::new(Simulator::new(
+    Ok(Box::new(SerialSimulator::new(
         env_def.clone(),
         agent_def.clone(),
         (log_hook, hook),
@@ -123,13 +123,13 @@ where
 
 /// Construct a boxed parallel agent-environment simulation
 fn boxed_parallel_simulation<EC, AC, H>(
-    sim_config: &MultiThreadSimulatorConfig,
+    sim_config: &ParallelSimulatorConfig,
     env_def: &EC,
     agent_def: &AC,
     env_seed: u64,
     agent_seed: u64,
     hook: H,
-) -> Result<Box<dyn RunSimulation>, RLError>
+) -> Result<Box<dyn Simulator>, RLError>
 where
     EC: BuildEnv + Clone + Send + Sync + ?Sized + 'static,
     EC::ObservationSpace: ElementRefInto<Loggable> + Clone + Send + 'static,
@@ -167,7 +167,7 @@ impl EnvDef {
         env_seed: u64,
         agent_seed: u64,
         hook: H,
-    ) -> Result<Box<dyn RunSimulation>, RLError>
+    ) -> Result<Box<dyn Simulator>, RLError>
     where
         H: GenericSimulationHook + Clone + 'static,
     {
@@ -224,12 +224,12 @@ impl EnvDef {
     /// * `hook` - A hook called on each step of the simulation. Pass () for no hook.
     pub fn build_parallel_simulation<H>(
         &self,
-        sim_config: &MultiThreadSimulatorConfig,
+        sim_config: &ParallelSimulatorConfig,
         agent_def: &MultiThreadAgentDef,
         env_seed: u64,
         agent_seed: u64,
         hook: H,
-    ) -> Result<Box<dyn RunSimulation>, RLError>
+    ) -> Result<Box<dyn Simulator>, RLError>
     where
         H: GenericSimulationHook + Clone + Send + 'static,
     {

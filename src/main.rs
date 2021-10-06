@@ -1,7 +1,7 @@
 use clap::Clap;
 use rust_rl::cli::Options;
 use rust_rl::logging::CLILogger;
-use rust_rl::simulation::MultiThreadSimulatorConfig;
+use rust_rl::simulation::ParallelSimulatorConfig;
 use rust_rl::{AgentDef, EnvDef, MultiThreadAgentDef};
 use std::convert::From;
 use std::error::Error;
@@ -34,7 +34,7 @@ fn run_parallel(
     if num_threads == 0 {
         num_threads = num_cpus::get();
     }
-    let sim_config = MultiThreadSimulatorConfig {
+    let sim_config = ParallelSimulatorConfig {
         num_workers: num_threads,
     };
     println!("Simulation:\n{:#?}", sim_config);

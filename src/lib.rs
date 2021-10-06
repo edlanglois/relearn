@@ -113,4 +113,4 @@ pub use agents::{Actor, Agent, Step};
 pub use defs::{AgentDef, EnvDef, MultiThreadAgentDef, OptimizerDef, SeqModDef};
 pub use envs::{EnvStructure, Environment, StructuredEnvironment};
 pub use error::RLError;
-pub use simulation::{run_actor, run_agent, RunSimulation};
+pub use simulation::{run_actor, run_agent, Simulator};
