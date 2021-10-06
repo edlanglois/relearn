@@ -1,4 +1,4 @@
-use super::hooks::BuildStructuredHook;
+use super::hooks::BuildSimulationHook;
 use super::{run_agent, Simulator, SimulatorError};
 use crate::agents::{Agent, ManagerAgent};
 use crate::envs::BuildEnv;
@@ -37,7 +37,7 @@ impl ParallelSimulatorConfig {
         MA: ManagerAgent + 'static,
         MA::Worker: Agent<EB::Observation, EB::Action> + 'static,
         EB::Observation: Clone,
-        HC: BuildStructuredHook<EB::ObservationSpace, EB::ActionSpace> + 'static,
+        HC: BuildSimulationHook<EB::ObservationSpace, EB::ActionSpace> + 'static,
         HC::Hook: Send + 'static,
     {
         Box::new(ParallelSimulator {
@@ -63,7 +63,7 @@ where
     MA: ManagerAgent,
     MA::Worker: Agent<EB::Observation, EB::Action> + 'static,
     EB::Observation: Clone,
-    HC: BuildStructuredHook<EB::ObservationSpace, EB::ActionSpace>,
+    HC: BuildSimulationHook<EB::ObservationSpace, EB::ActionSpace>,
     HC::Hook: Send + 'static,
 {
     fn run_simulation(
@@ -98,7 +98,7 @@ pub fn run_agent_multithread<EB, MA, HC>(
     MA: ManagerAgent,
     MA::Worker: Agent<EB::Observation, EB::Action> + 'static,
     EB::Observation: Clone,
-    HC: BuildStructuredHook<EB::ObservationSpace, EB::ActionSpace>,
+    HC: BuildSimulationHook<EB::ObservationSpace, EB::ActionSpace>,
     HC::Hook: Send + 'static,
 {
     // TODO: Avoid the extra env creation.

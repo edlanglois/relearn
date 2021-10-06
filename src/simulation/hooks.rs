@@ -6,7 +6,7 @@ use crate::spaces::{ElementRefInto, FiniteSpace, Space};
 use impl_trait_for_tuples::impl_for_tuples;
 
 /// Build a [`SimulationHook`] for a given environment structure.
-pub trait BuildStructuredHook<OS: Space, AS: Space> {
+pub trait BuildSimulationHook<OS: Space, AS: Space> {
     type Hook: SimulationHook<OS::Element, AS::Element>;
 
     /// Build a simulation hook.
@@ -103,7 +103,7 @@ impl StepLimitConfig {
     }
 }
 
-impl<OS: Space, AS: Space> BuildStructuredHook<OS, AS> for StepLimitConfig {
+impl<OS: Space, AS: Space> BuildSimulationHook<OS, AS> for StepLimitConfig {
     type Hook = StepLimit;
 
     fn build_hook(
@@ -160,7 +160,7 @@ impl EpisodeLimitConfig {
     }
 }
 
-impl<OS: Space, AS: Space> BuildStructuredHook<OS, AS> for EpisodeLimitConfig {
+impl<OS: Space, AS: Space> BuildSimulationHook<OS, AS> for EpisodeLimitConfig {
     type Hook = EpisodeLimit;
 
     fn build_hook(
@@ -232,7 +232,7 @@ where
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct StepLoggerConfig;
 
-impl<OS, AS> BuildStructuredHook<OS, AS> for StepLoggerConfig
+impl<OS, AS> BuildSimulationHook<OS, AS> for StepLoggerConfig
 where
     OS: ElementRefInto<Loggable>,
     AS: ElementRefInto<Loggable>,

@@ -2,7 +2,7 @@ use crate::agents::Step;
 use crate::envs::EnvStructure;
 use crate::logging::{Loggable, TimeSeriesLogger};
 use crate::simulation::hooks::{
-    BuildStructuredHook, EpisodeLimitConfig, SimulationHook, StepLimitConfig, StepLoggerConfig,
+    BuildSimulationHook, EpisodeLimitConfig, SimulationHook, StepLimitConfig, StepLoggerConfig,
 };
 use crate::spaces::ElementRefInto;
 use std::ops::DerefMut;
@@ -27,7 +27,7 @@ impl HooksDef {
     }
 }
 
-impl<OS, AS> BuildStructuredHook<OS, AS> for HookDef
+impl<OS, AS> BuildSimulationHook<OS, AS> for HookDef
 where
     OS: ElementRefInto<Loggable> + Send + 'static,
     AS: ElementRefInto<Loggable> + Send + 'static,
@@ -59,7 +59,7 @@ impl<O, A> SimulationHook<O, A> for Box<dyn SimulationHook<O, A> + Send> {
     }
 }
 
-impl<OS, AS> BuildStructuredHook<OS, AS> for HooksDef
+impl<OS, AS> BuildSimulationHook<OS, AS> for HooksDef
 where
     OS: ElementRefInto<Loggable> + Send + 'static,
     AS: ElementRefInto<Loggable> + Send + 'static,

@@ -1,5 +1,5 @@
 //! Serial (single-thread) simulation.
-use super::hooks::{BuildStructuredHook, SimulationHook};
+use super::hooks::{BuildSimulationHook, SimulationHook};
 use super::{Simulator, SimulatorError};
 use crate::agents::{Actor, Agent, BuildAgent, Step};
 use crate::envs::{BuildEnv, Environment};
@@ -28,7 +28,7 @@ where
     EC: BuildEnv,
     EC::Observation: Clone,
     AC: BuildAgent<EC::ObservationSpace, EC::ActionSpace>,
-    HC: BuildStructuredHook<EC::ObservationSpace, EC::ActionSpace>,
+    HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace>,
 {
     fn run_simulation(
         &mut self,

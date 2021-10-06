@@ -3,7 +3,7 @@ pub mod hooks;
 mod parallel;
 mod serial;
 
-pub use hooks::{BuildStructuredHook, GenericSimulationHook, SimulationHook};
+pub use hooks::{BuildSimulationHook, GenericSimulationHook, SimulationHook};
 pub use parallel::{run_agent_multithread, ParallelSimulator, ParallelSimulatorConfig};
 pub use serial::{run_actor, run_agent, SerialSimulator};
 

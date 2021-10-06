@@ -8,7 +8,7 @@ use crate::envs::{
 };
 use crate::logging::Loggable;
 use crate::simulation::{
-    BuildStructuredHook, ParallelSimulatorConfig, SerialSimulator, Simulator, SimulatorError,
+    BuildSimulationHook, ParallelSimulatorConfig, SerialSimulator, Simulator, SimulatorError,
 };
 use crate::spaces::ElementRefInto;
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
@@ -105,7 +105,7 @@ where
     EC::Environment: 'static,
     AC: BuildAgent<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
     AC::Agent: 'static,
-    HC: BuildStructuredHook<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
+    HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
     HC::Hook: Send + 'static,
 {
     Ok(Box::new(SerialSimulator::new(
@@ -134,7 +134,7 @@ where
     AC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace> + ?Sized,
     AC::ManagerAgent: 'static,
     <AC::ManagerAgent as ManagerAgent>::Worker: Agent<EC::Observation, EC::Action> + 'static,
-    HC: BuildStructuredHook<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
+    HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
     HC::Hook: Send + 'static,
 {
     let env = env_def.build_env(env_seed)?;
