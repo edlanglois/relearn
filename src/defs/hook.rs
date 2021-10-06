@@ -5,6 +5,7 @@ use crate::simulation::hooks::{
     BuildSimulationHook, EpisodeLimitConfig, SimulationHook, StepLimitConfig, StepLoggerConfig,
 };
 use crate::spaces::ElementRefInto;
+use std::iter::FromIterator;
 use std::ops::DerefMut;
 
 /// Simulation hook definition.
@@ -13,6 +14,24 @@ pub enum HookDef {
     StepLimit(StepLimitConfig),
     EpisodeLimit(EpisodeLimitConfig),
     StepLogger(StepLoggerConfig),
+}
+
+impl From<StepLimitConfig> for HookDef {
+    fn from(config: StepLimitConfig) -> Self {
+        Self::StepLimit(config)
+    }
+}
+
+impl From<EpisodeLimitConfig> for HookDef {
+    fn from(config: EpisodeLimitConfig) -> Self {
+        Self::EpisodeLimit(config)
+    }
+}
+
+impl From<StepLoggerConfig> for HookDef {
+    fn from(config: StepLoggerConfig) -> Self {
+        Self::StepLogger(config)
+    }
 }
 
 /// Simulation hooks definition.
@@ -24,6 +43,23 @@ pub struct HooksDef {
 impl HooksDef {
     pub const fn new(hooks: Vec<HookDef>) -> Self {
         Self { hooks }
+    }
+}
+
+impl From<Vec<HookDef>> for HooksDef {
+    fn from(hooks: Vec<HookDef>) -> Self {
+        Self { hooks }
+    }
+}
+
+impl FromIterator<HookDef> for HooksDef {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = HookDef>,
+    {
+        Self {
+            hooks: iter.into_iter().collect(),
+        }
     }
 }
 
