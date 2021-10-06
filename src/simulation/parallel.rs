@@ -25,19 +25,19 @@ impl ParallelSimulatorConfig {
         Self { num_workers }
     }
 
-    pub fn build_simulator<EB, MA, HC>(
+    pub fn build_simulator<EC, MA, HC>(
         &self,
-        env_config: EB,
+        env_config: EC,
         manager_agent: MA,
         hook_config: HC,
     ) -> Box<dyn Simulator>
     where
-        EB: BuildEnv + Send + Sync + 'static,
-        EB::Environment: 'static,
+        EC: BuildEnv + Send + Sync + 'static,
+        EC::Environment: 'static,
         MA: ManagerAgent + 'static,
-        MA::Worker: Agent<EB::Observation, EB::Action> + 'static,
-        EB::Observation: Clone,
-        HC: BuildSimulationHook<EB::ObservationSpace, EB::ActionSpace> + 'static,
+        MA::Worker: Agent<EC::Observation, EC::Action> + 'static,
+        EC::Observation: Clone,
+        HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace> + 'static,
         HC::Hook: Send + 'static,
     {
         Box::new(ParallelSimulator {
@@ -50,20 +50,20 @@ impl ParallelSimulatorConfig {
 }
 
 /// Multi-thread simulator
-pub struct ParallelSimulator<EB, MA, HC> {
-    env_builder: Arc<RwLock<EB>>,
+pub struct ParallelSimulator<EC, MA, HC> {
+    env_builder: Arc<RwLock<EC>>,
     manager_agent: MA,
     num_workers: usize,
     hook_config: HC,
 }
 
-impl<EB, MA, HC> Simulator for ParallelSimulator<EB, MA, HC>
+impl<EC, MA, HC> Simulator for ParallelSimulator<EC, MA, HC>
 where
-    EB: BuildEnv + Send + Sync + 'static,
+    EC: BuildEnv + Send + Sync + 'static,
     MA: ManagerAgent,
-    MA::Worker: Agent<EB::Observation, EB::Action> + 'static,
-    EB::Observation: Clone,
-    HC: BuildSimulationHook<EB::ObservationSpace, EB::ActionSpace>,
+    MA::Worker: Agent<EC::Observation, EC::Action> + 'static,
+    EC::Observation: Clone,
+    HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace>,
     HC::Hook: Send + 'static,
 {
     fn run_simulation(
@@ -85,8 +85,8 @@ where
     }
 }
 
-pub fn run_agent_multithread<EB, MA, HC>(
-    env_config: &Arc<RwLock<EB>>,
+pub fn run_agent_multithread<EC, MA, HC>(
+    env_config: &Arc<RwLock<EC>>,
     agent_manager: &mut MA,
     num_workers: usize,
     worker_hook_config: &HC,
@@ -94,11 +94,11 @@ pub fn run_agent_multithread<EB, MA, HC>(
     agent_seed: u64,
     logger: &mut dyn TimeSeriesLogger,
 ) where
-    EB: BuildEnv + Send + Sync + 'static,
+    EC: BuildEnv + Send + Sync + 'static,
     MA: ManagerAgent,
-    MA::Worker: Agent<EB::Observation, EB::Action> + 'static,
-    EB::Observation: Clone,
-    HC: BuildSimulationHook<EB::ObservationSpace, EB::ActionSpace>,
+    MA::Worker: Agent<EC::Observation, EC::Action> + 'static,
+    EC::Observation: Clone,
+    HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace>,
     HC::Hook: Send + 'static,
 {
     // TODO: Avoid the extra env creation.
