@@ -7,8 +7,8 @@ pub use hooks::{BuildStructuredHook, GenericSimulationHook, SimulationHook};
 pub use parallel::{run_agent_multithread, ParallelSimulator, ParallelSimulatorConfig};
 pub use serial::{run_actor, run_agent, SerialSimulator};
 
+use crate::agents::BuildAgentError;
 use crate::envs::BuildEnvError;
-use crate::error::RLError;
 use crate::logging::TimeSeriesLogger;
 use thiserror::Error;
 
@@ -27,12 +27,14 @@ pub trait Simulator {
         env_seed: u64,
         agent_seed: u64,
         logger: &mut dyn TimeSeriesLogger,
-    ) -> Result<(), RLError>;
+    ) -> Result<(), SimulatorError>;
 }
 
-/// Error building a simulator
-#[derive(Debug, Error)]
-pub enum BuildSimError {
-    #[error(transparent)]
-    EnvError(#[from] BuildEnvError),
+/// Error initializing or running a simulation.
+#[derive(Error, Debug)]
+pub enum SimulatorError {
+    #[error("error building agent")]
+    BuildAgent(#[from] BuildAgentError),
+    #[error("error building environment")]
+    BuildEnv(#[from] BuildEnvError),
 }

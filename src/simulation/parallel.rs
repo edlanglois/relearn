@@ -1,8 +1,7 @@
 use super::hooks::SimulationHook;
-use super::{run_agent, Simulator};
+use super::{run_agent, Simulator, SimulatorError};
 use crate::agents::{Agent, ManagerAgent};
 use crate::envs::BuildEnv;
-use crate::error::RLError;
 use crate::logging::TimeSeriesLogger;
 use std::sync::{Arc, RwLock};
 use std::thread;
@@ -70,7 +69,7 @@ where
         env_seed: u64,
         agent_seed: u64,
         logger: &mut dyn TimeSeriesLogger,
-    ) -> Result<(), RLError> {
+    ) -> Result<(), SimulatorError> {
         run_agent_multithread(
             &self.env_builder,
             &mut self.manager_agent,

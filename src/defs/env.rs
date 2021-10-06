@@ -6,11 +6,10 @@ use crate::envs::{
     EnvStructure, MemoryGame as MemoryGameEnv, MetaPomdp, OneHotBandits, Pomdp,
     UniformBernoulliBandits, WithStepLimit,
 };
-use crate::error::RLError;
 use crate::logging::Loggable;
 use crate::simulation::{
     hooks::StepLogger, GenericSimulationHook, ParallelSimulatorConfig, SerialSimulator,
-    SimulationHook, Simulator,
+    SimulationHook, Simulator, SimulatorError,
 };
 use crate::spaces::ElementRefInto;
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
@@ -99,7 +98,7 @@ fn boxed_simulation<EC, AC, H>(
     env_seed: u64,
     _agent_seed: u64,
     hook: H,
-) -> Result<Box<dyn Simulator>, RLError>
+) -> Result<Box<dyn Simulator>, SimulatorError>
 where
     EC: BuildEnv + Clone + 'static,
     EC::ObservationSpace: ElementRefInto<Loggable> + Clone + 'static, // TODO: Remove Clone
@@ -129,7 +128,7 @@ fn boxed_parallel_simulation<EC, AC, H>(
     env_seed: u64,
     agent_seed: u64,
     hook: H,
-) -> Result<Box<dyn Simulator>, RLError>
+) -> Result<Box<dyn Simulator>, SimulatorError>
 where
     EC: BuildEnv + Clone + Send + Sync + ?Sized + 'static,
     EC::ObservationSpace: ElementRefInto<Loggable> + Clone + Send + 'static,
@@ -167,7 +166,7 @@ impl EnvDef {
         env_seed: u64,
         agent_seed: u64,
         hook: H,
-    ) -> Result<Box<dyn Simulator>, RLError>
+    ) -> Result<Box<dyn Simulator>, SimulatorError>
     where
         H: GenericSimulationHook + Clone + 'static,
     {
@@ -229,7 +228,7 @@ impl EnvDef {
         env_seed: u64,
         agent_seed: u64,
         hook: H,
-    ) -> Result<Box<dyn Simulator>, RLError>
+    ) -> Result<Box<dyn Simulator>, SimulatorError>
     where
         H: GenericSimulationHook + Clone + Send + 'static,
     {

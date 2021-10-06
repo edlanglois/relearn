@@ -1,9 +1,8 @@
 //! Serial (single-thread) simulation.
 use super::hooks::SimulationHook;
-use super::Simulator;
+use super::{Simulator, SimulatorError};
 use crate::agents::{Actor, Agent, BuildAgent, Step};
 use crate::envs::{BuildEnv, Environment};
-use crate::error::RLError;
 use crate::logging::TimeSeriesLogger;
 
 /// Serial (single-thread) simulator.
@@ -36,7 +35,7 @@ where
         env_seed: u64,
         agent_seed: u64,
         logger: &mut dyn TimeSeriesLogger,
-    ) -> Result<(), RLError> {
+    ) -> Result<(), SimulatorError> {
         let mut env = self.env_config.build_env(env_seed)?;
         let mut agent = self.agent_config.build_agent(&env, agent_seed)?;
         let mut hook = self.hook.clone();
