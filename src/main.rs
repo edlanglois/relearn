@@ -1,20 +1,21 @@
 use clap::Clap;
 use rust_rl::cli::Options;
+use rust_rl::defs::{HookDef, HooksDef};
 use rust_rl::logging::CLILogger;
-use rust_rl::simulation::ParallelSimulatorConfig;
+use rust_rl::simulation::{hooks::StepLoggerConfig, ParallelSimulatorConfig};
 use rust_rl::{AgentDef, EnvDef, MultiThreadAgentDef};
 use std::convert::From;
 use std::error::Error;
 use std::time::Duration;
 
-fn run_serial(opts: &Options, env_def: EnvDef) -> Result<(), Box<dyn Error>> {
+fn run_serial(opts: &Options, env_def: EnvDef, hook_def: HooksDef) -> Result<(), Box<dyn Error>> {
     let agent_def = Option::<AgentDef>::from(opts)
         .ok_or_else(|| format!("Agent {} is not single-threaded", opts.agent))?;
     println!("Agent:\n{:#?}", agent_def);
 
     let env_seed = opts.seed;
     let agent_seed = opts.seed.wrapping_add(1);
-    let mut simulation = env_def.build_simulation(&agent_def, env_seed, agent_seed, ())?;
+    let mut simulation = env_def.build_simulation(&agent_def, &hook_def)?;
     let mut logger = CLILogger::new(Duration::from_millis(1000), true);
     simulation
         .run_simulation(env_seed, agent_seed, &mut logger)
@@ -25,6 +26,7 @@ fn run_serial(opts: &Options, env_def: EnvDef) -> Result<(), Box<dyn Error>> {
 fn run_parallel(
     opts: &Options,
     env_def: EnvDef,
+    hook_def: HooksDef,
     mut num_threads: usize,
 ) -> Result<(), Box<dyn Error>> {
     let agent_def = Option::<MultiThreadAgentDef>::from(opts)
@@ -45,8 +47,13 @@ fn run_parallel(
 
     let env_seed = opts.seed;
     let agent_seed = opts.seed.wrapping_add(1);
-    let mut simulation =
-        env_def.build_parallel_simulation(&sim_config, &agent_def, env_seed, agent_seed, ())?;
+    let mut simulation = env_def.build_parallel_simulation(
+        &sim_config,
+        &agent_def,
+        &hook_def,
+        env_seed,
+        agent_seed,
+    )?;
     let mut logger = CLILogger::new(Duration::from_millis(1000), true);
     simulation
         .run_simulation(env_seed, agent_seed, &mut logger)
@@ -60,9 +67,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let env_def = EnvDef::from(&opts);
     println!("Environment:\n{:#?}", env_def);
 
+    // TODO: Load from opts
+    let hook_def = HooksDef::new(vec![HookDef::StepLogger(StepLoggerConfig)]);
+
     if let Some(num_threads) = opts.parallel_threads {
-        run_parallel(&opts, env_def, num_threads)
+        run_parallel(&opts, env_def, hook_def, num_threads)
     } else {
-        run_serial(&opts, env_def)
+        run_serial(&opts, env_def, hook_def)
     }
 }

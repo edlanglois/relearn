@@ -160,7 +160,7 @@ mod tests {
     use crate::agents::{BuildManagerAgent, TabularQLearningAgentConfig};
     use crate::envs::{DeterministicBandit, IntoEnv};
     use crate::simulation;
-    use crate::simulation::hooks::StepLimit;
+    use crate::simulation::hooks::StepLimitConfig;
     use std::sync::{Arc, RwLock};
 
     #[test]
@@ -169,7 +169,7 @@ mod tests {
         let agent_config = MutexAgentConfig::new(TabularQLearningAgentConfig::default());
         let mut agent = agent_config.build_manager_agent(&env, 0).unwrap();
         let mut logger = ();
-        let hook = StepLimit::new(1000);
+        let worker_hook_config = StepLimitConfig::new(1000);
         let num_workers = 5;
 
         let locked_env = Arc::new(RwLock::new(env));
@@ -177,7 +177,7 @@ mod tests {
             &locked_env,
             &mut agent,
             num_workers,
-            &hook,
+            &worker_hook_config,
             0,
             0,
             &mut logger,

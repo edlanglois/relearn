@@ -1,5 +1,5 @@
 //! Serial (single-thread) simulation.
-use super::hooks::SimulationHook;
+use super::hooks::{BuildStructuredHook, SimulationHook};
 use super::{Simulator, SimulatorError};
 use crate::agents::{Actor, Agent, BuildAgent, Step};
 use crate::envs::{BuildEnv, Environment};
@@ -7,28 +7,28 @@ use crate::logging::TimeSeriesLogger;
 
 /// Serial (single-thread) simulator.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SerialSimulator<EC, AC, H> {
+pub struct SerialSimulator<EC, AC, HC> {
     env_config: EC,
     agent_config: AC,
-    hook: H,
+    hook_config: HC,
 }
 
-impl<EC, AC, H> SerialSimulator<EC, AC, H> {
-    pub const fn new(env_config: EC, agent_config: AC, hook: H) -> Self {
+impl<EC, AC, HC> SerialSimulator<EC, AC, HC> {
+    pub const fn new(env_config: EC, agent_config: AC, hook_config: HC) -> Self {
         Self {
             env_config,
             agent_config,
-            hook,
+            hook_config,
         }
     }
 }
 
-impl<EC, AC, H> Simulator for SerialSimulator<EC, AC, H>
+impl<EC, AC, HC> Simulator for SerialSimulator<EC, AC, HC>
 where
     EC: BuildEnv,
     EC::Observation: Clone,
     AC: BuildAgent<EC::ObservationSpace, EC::ActionSpace>,
-    H: SimulationHook<EC::Observation, EC::Action> + Clone,
+    HC: BuildStructuredHook<EC::ObservationSpace, EC::ActionSpace>,
 {
     fn run_simulation(
         &mut self,
@@ -38,7 +38,7 @@ where
     ) -> Result<(), SimulatorError> {
         let mut env = self.env_config.build_env(env_seed)?;
         let mut agent = self.agent_config.build_agent(&env, agent_seed)?;
-        let mut hook = self.hook.clone();
+        let mut hook = self.hook_config.build_hook(&env, 1, 0);
         run_agent(&mut env, &mut agent, &mut hook, logger);
         Ok(())
     }

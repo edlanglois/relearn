@@ -1,5 +1,5 @@
 use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
-use super::{AgentDef, MultiThreadAgentDef};
+use super::{AgentDef, HooksDef, MultiThreadAgentDef};
 use crate::agents::{Agent, BuildAgent, BuildManagerAgent, ManagerAgent};
 use crate::envs::{
     Bandit, BuildEnv, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps,
@@ -8,8 +8,7 @@ use crate::envs::{
 };
 use crate::logging::Loggable;
 use crate::simulation::{
-    hooks::StepLogger, GenericSimulationHook, ParallelSimulatorConfig, SerialSimulator,
-    SimulationHook, Simulator, SimulatorError,
+    BuildStructuredHook, ParallelSimulatorConfig, SerialSimulator, Simulator, SimulatorError,
 };
 use crate::spaces::ElementRefInto;
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
@@ -92,12 +91,10 @@ where
 }
 
 /// Construct a boxed agent-environment simulation
-fn boxed_simulation<EC, AC, H>(
+fn boxed_simulation<EC, AC, HC>(
     env_def: &EC,
     agent_def: &AC,
-    env_seed: u64,
-    _agent_seed: u64,
-    hook: H,
+    hook_def: &HC,
 ) -> Result<Box<dyn Simulator>, SimulatorError>
 where
     EC: BuildEnv + Clone + 'static,
@@ -108,26 +105,24 @@ where
     EC::Environment: 'static,
     AC: BuildAgent<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
     AC::Agent: 'static,
-    H: SimulationHook<EC::Observation, EC::Action> + Clone + 'static,
+    HC: BuildStructuredHook<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
+    HC::Hook: Send + 'static,
 {
-    // TODO: Avoid having to create this temporary environment
-    let env = env_def.build_env(env_seed)?;
-    let log_hook = StepLogger::new(env.observation_space(), env.action_space());
     Ok(Box::new(SerialSimulator::new(
         env_def.clone(),
         agent_def.clone(),
-        (log_hook, hook),
+        hook_def.clone(),
     )))
 }
 
 /// Construct a boxed parallel agent-environment simulation
-fn boxed_parallel_simulation<EC, AC, H>(
+fn boxed_parallel_simulation<EC, AC, HC>(
     sim_config: &ParallelSimulatorConfig,
     env_def: &EC,
     agent_def: &AC,
+    hook_def: &HC,
     env_seed: u64,
     agent_seed: u64,
-    hook: H,
 ) -> Result<Box<dyn Simulator>, SimulatorError>
 where
     EC: BuildEnv + Clone + Send + Sync + ?Sized + 'static,
@@ -139,7 +134,8 @@ where
     AC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace> + ?Sized,
     AC::ManagerAgent: 'static,
     <AC::ManagerAgent as ManagerAgent>::Worker: Agent<EC::Observation, EC::Action> + 'static,
-    H: SimulationHook<EC::Observation, EC::Action> + Clone + Send + 'static,
+    HC: BuildStructuredHook<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
+    HC::Hook: Send + 'static,
 {
     let env = env_def.build_env(env_seed)?;
 
@@ -147,9 +143,7 @@ where
     // which already boxes the output agent.
     let agent = agent_def.build_manager_agent(&env, agent_seed)?;
 
-    let log_hook = StepLogger::new(env.observation_space(), env.action_space());
-
-    Ok(sim_config.build_simulator(env_def.clone(), agent, (log_hook, hook)))
+    Ok(sim_config.build_simulator(env_def.clone(), agent, hook_def.clone()))
 }
 
 impl EnvDef {
@@ -160,24 +154,17 @@ impl EnvDef {
     /// * `env_seed` - Random seed used for the environment.
     /// * `agent_seed` - Random seed used for the agent.
     /// * `hook` - A hook called on each step of the simulation. Pass () for no hook.
-    pub fn build_simulation<H>(
+    pub fn build_simulation(
         &self,
         agent_def: &AgentDef,
-        env_seed: u64,
-        agent_seed: u64,
-        hook: H,
-    ) -> Result<Box<dyn Simulator>, SimulatorError>
-    where
-        H: GenericSimulationHook + Clone + 'static,
-    {
+        hook_def: &HooksDef,
+    ) -> Result<Box<dyn Simulator>, SimulatorError> {
         macro_rules! make_simulation {
             ($env_config:expr, $agent_builder:ty) => {
                 boxed_simulation(
                     $env_config,
                     &<$agent_builder>::new(agent_def.clone()), // TODO: Avoid clone
-                    env_seed,
-                    agent_seed,
-                    hook,
+                    hook_def,
                 )
             };
         }
@@ -221,17 +208,14 @@ impl EnvDef {
     /// * `env_seed` - Random seed used for the environment.
     /// * `agent_seed` - Random seed used for the agent.
     /// * `hook` - A hook called on each step of the simulation. Pass () for no hook.
-    pub fn build_parallel_simulation<H>(
+    pub fn build_parallel_simulation(
         &self,
         sim_config: &ParallelSimulatorConfig,
         agent_def: &MultiThreadAgentDef,
+        hook_def: &HooksDef,
         env_seed: u64,
         agent_seed: u64,
-        hook: H,
-    ) -> Result<Box<dyn Simulator>, SimulatorError>
-    where
-        H: GenericSimulationHook + Clone + Send + 'static,
-    {
+    ) -> Result<Box<dyn Simulator>, SimulatorError> {
         /// Construct a boxed agent-environment simulation
         macro_rules! make_simulation {
             ($env_config:expr, $agent_builder:ty) => {{
@@ -239,9 +223,9 @@ impl EnvDef {
                     sim_config,
                     $env_config,
                     &<$agent_builder>::new(agent_def),
+                    hook_def,
                     env_seed,
                     agent_seed,
-                    hook,
                 )
             }};
         }

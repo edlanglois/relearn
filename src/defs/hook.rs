@@ -7,6 +7,7 @@ use crate::simulation::hooks::{
 use crate::spaces::ElementRefInto;
 use std::ops::DerefMut;
 
+/// Simulation hook definition.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum HookDef {
     StepLimit(StepLimitConfig),
@@ -14,17 +15,24 @@ pub enum HookDef {
     StepLogger(StepLoggerConfig),
 }
 
+/// Simulation hooks definition.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HooksDef {
     pub hooks: Vec<HookDef>,
 }
 
+impl HooksDef {
+    pub const fn new(hooks: Vec<HookDef>) -> Self {
+        Self { hooks }
+    }
+}
+
 impl<OS, AS> BuildStructuredHook<OS, AS> for HookDef
 where
-    OS: ElementRefInto<Loggable> + 'static,
-    AS: ElementRefInto<Loggable> + 'static,
+    OS: ElementRefInto<Loggable> + Send + 'static,
+    AS: ElementRefInto<Loggable> + Send + 'static,
 {
-    type Hook = Box<dyn SimulationHook<OS::Element, AS::Element>>;
+    type Hook = Box<dyn SimulationHook<OS::Element, AS::Element> + Send>;
 
     fn build_hook(
         &self,
@@ -41,7 +49,7 @@ where
     }
 }
 
-impl<O, A> SimulationHook<O, A> for Box<dyn SimulationHook<O, A>> {
+impl<O, A> SimulationHook<O, A> for Box<dyn SimulationHook<O, A> + Send> {
     fn start(&mut self, logger: &mut dyn TimeSeriesLogger) -> bool {
         self.as_mut().start(logger)
     }
@@ -53,10 +61,10 @@ impl<O, A> SimulationHook<O, A> for Box<dyn SimulationHook<O, A>> {
 
 impl<OS, AS> BuildStructuredHook<OS, AS> for HooksDef
 where
-    OS: ElementRefInto<Loggable> + 'static,
-    AS: ElementRefInto<Loggable> + 'static,
+    OS: ElementRefInto<Loggable> + Send + 'static,
+    AS: ElementRefInto<Loggable> + Send + 'static,
 {
-    type Hook = Vec<Box<dyn SimulationHook<OS::Element, AS::Element>>>;
+    type Hook = Vec<Box<dyn SimulationHook<OS::Element, AS::Element> + Send>>;
 
     fn build_hook(
         &self,
@@ -71,7 +79,7 @@ where
     }
 }
 
-impl<O, A> SimulationHook<O, A> for Vec<Box<dyn SimulationHook<O, A>>> {
+impl<O, A> SimulationHook<O, A> for Vec<Box<dyn SimulationHook<O, A> + Send>> {
     fn start(&mut self, logger: &mut dyn TimeSeriesLogger) -> bool {
         self.deref_mut().start(logger)
     }
