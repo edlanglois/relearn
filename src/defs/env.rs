@@ -125,12 +125,12 @@ fn boxed_parallel_simulation<EC, AC, HC>(
     agent_seed: u64,
 ) -> Result<Box<dyn Simulator>, SimulatorError>
 where
-    EC: BuildEnv + Clone + Send + Sync + ?Sized + 'static,
+    EC: BuildEnv + Clone + 'static,
     EC::ObservationSpace: ElementRefInto<Loggable> + Clone + Send + 'static,
     EC::Observation: Clone + 'static,
     EC::ActionSpace: ElementRefInto<Loggable> + Clone + Send + 'static,
     EC::Action: 'static,
-    EC::Environment: 'static,
+    EC::Environment: Send + 'static,
     AC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace> + ?Sized,
     AC::ManagerAgent: 'static,
     <AC::ManagerAgent as ManagerAgent>::Worker: Agent<EC::Observation, EC::Action> + 'static,

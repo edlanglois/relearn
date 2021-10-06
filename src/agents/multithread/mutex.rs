@@ -161,7 +161,6 @@ mod tests {
     use crate::envs::{DeterministicBandit, IntoEnv};
     use crate::simulation;
     use crate::simulation::hooks::StepLimitConfig;
-    use std::sync::{Arc, RwLock};
 
     #[test]
     fn mutex_multithread_learns() {
@@ -172,9 +171,8 @@ mod tests {
         let worker_hook_config = StepLimitConfig::new(1000);
         let num_workers = 5;
 
-        let locked_env = Arc::new(RwLock::new(env));
         simulation::run_agent_multithread(
-            &locked_env,
+            &env,
             &mut agent,
             num_workers,
             &worker_hook_config,
@@ -184,7 +182,6 @@ mod tests {
         );
 
         let agent = agent.try_into_inner().unwrap();
-        let env = Arc::try_unwrap(locked_env).unwrap().into_inner().unwrap();
         let mut env = env.into_env(0);
         testing::eval_deterministic_bandit(agent, &mut env, 0.9);
     }
