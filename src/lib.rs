@@ -41,7 +41,8 @@
 //!
 //! ### Return
 //! The discounted sum of future rewards (`return = sum_i { reward_i * discount_factor ** i }`).
-//! May refer to the rewards of an entire episode or the future rewards from a particular step.
+//! May refer to the rewards of an entire episode or the future rewards starting from
+//! a particular step.
 //!
 //! ### Space
 //! A space is a mathematical set with some added structure,
