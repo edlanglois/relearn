@@ -1,16 +1,11 @@
 use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
 use super::{AgentDef, HooksDef, MultiThreadAgentDef};
-use crate::agents::{BuildAgent, BuildManagerAgent};
 use crate::envs::{
-    Bandit, BuildEnv, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps,
-    EnvStructure, MemoryGame as MemoryGameEnv, MetaPomdp, OneHotBandits, Pomdp,
-    UniformBernoulliBandits, WithStepLimit,
+    Bandit, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps, EnvStructure,
+    MemoryGame as MemoryGameEnv, MetaPomdp, OneHotBandits, Pomdp, UniformBernoulliBandits,
+    WithStepLimit,
 };
-use crate::logging::Loggable;
-use crate::simulation::{
-    BuildSimulationHook, ParallelSimulatorConfig, SerialSimulator, Simulator, SimulatorError,
-};
-use crate::spaces::ElementRefInto;
+use crate::simulation::{ParallelSimulatorConfig, SerialSimulator, Simulator, SimulatorError};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use rand::distributions::Distribution;
 use std::borrow::Borrow;
@@ -63,10 +58,10 @@ struct BanditConfig<D> {
     distribution: PhantomData<fn() -> D>,
 }
 
-impl<D> From<&BanditMeanRewards> for BanditConfig<D> {
-    fn from(config: &BanditMeanRewards) -> Self {
+impl<D> From<BanditMeanRewards> for BanditConfig<D> {
+    fn from(config: BanditMeanRewards) -> Self {
         Self {
-            mean_rewards: config.mean_rewards.clone(),
+            mean_rewards: config.mean_rewards,
             distribution: PhantomData,
         }
     }
@@ -90,52 +85,6 @@ where
     }
 }
 
-/// Construct a boxed agent-environment simulation
-fn boxed_simulation<EC, AC, HC>(
-    env_def: &EC,
-    agent_def: &AC,
-    hook_def: &HC,
-) -> Result<Box<dyn Simulator>, SimulatorError>
-where
-    EC: BuildEnv + Clone + 'static,
-    EC::ObservationSpace: ElementRefInto<Loggable> + Clone + 'static, // TODO: Remove Clone
-    EC::Observation: Clone + 'static,
-    EC::ActionSpace: ElementRefInto<Loggable> + Clone + 'static, // TODO: Remove Clone when using BuildHook
-    EC::Action: 'static,
-    EC::Environment: 'static,
-    AC: BuildAgent<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
-    AC::Agent: 'static,
-    HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
-    HC::Hook: Send + 'static,
-{
-    Ok(Box::new(SerialSimulator::new(
-        env_def.clone(),
-        agent_def.clone(),
-        hook_def.clone(),
-    )))
-}
-
-/// Construct a boxed parallel agent-environment simulation
-fn boxed_parallel_simulation<EC, AC, HC>(
-    sim_config: &ParallelSimulatorConfig,
-    env_def: &EC,
-    agent_def: &AC,
-    hook_def: &HC,
-) -> Result<Box<dyn Simulator>, SimulatorError>
-where
-    EC: BuildEnv + Clone + 'static,
-    EC::ObservationSpace: ElementRefInto<Loggable> + Clone + Send + 'static,
-    EC::Observation: Clone + 'static,
-    EC::ActionSpace: ElementRefInto<Loggable> + Clone + Send + 'static,
-    EC::Action: 'static,
-    EC::Environment: Send + 'static,
-    AC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
-    HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
-    HC::Hook: Send + 'static,
-{
-    Ok(sim_config.build_simulator(env_def.clone(), agent_def.clone(), hook_def.clone()))
-}
-
 impl EnvDef {
     /// Construct a boxed simulation for this environment and a given agent definition.
     ///
@@ -144,18 +93,18 @@ impl EnvDef {
     /// * `env_seed` - Random seed used for the environment.
     /// * `agent_seed` - Random seed used for the agent.
     /// * `hook` - A hook called on each step of the simulation. Pass () for no hook.
-    pub fn build_simulation(
-        &self,
-        agent_def: &AgentDef,
-        hook_def: &HooksDef,
+    pub fn into_simulation(
+        self,
+        agent_def: AgentDef,
+        hook_def: HooksDef,
     ) -> Result<Box<dyn Simulator>, SimulatorError> {
         macro_rules! make_simulation {
             ($env_config:expr, $agent_builder:ty) => {
-                boxed_simulation(
+                Ok(Box::new(SerialSimulator::new(
                     $env_config,
-                    &<$agent_builder>::new(agent_def.clone()), // TODO: Avoid clone
+                    <$agent_builder>::new(agent_def),
                     hook_def,
-                )
+                )))
             };
         }
 
@@ -164,11 +113,11 @@ impl EnvDef {
             Bandit(dist_type, means) => match dist_type {
                 DistributionType::Deterministic => {
                     let config = BanditConfig::<Deterministic<f64>>::from(means);
-                    make_simulation!(&config, ForFiniteFinite<_>)
+                    make_simulation!(config, ForFiniteFinite<_>)
                 }
                 DistributionType::Bernoulli => {
                     let config = BanditConfig::<Bernoulli>::from(means);
-                    make_simulation!(&config, ForFiniteFinite<_>)
+                    make_simulation!(config, ForFiniteFinite<_>)
                 }
             },
             Chain(config) => {
@@ -198,21 +147,20 @@ impl EnvDef {
     /// * `env_seed` - Random seed used for the environment.
     /// * `agent_seed` - Random seed used for the agent.
     /// * `hook` - A hook called on each step of the simulation. Pass () for no hook.
-    pub fn build_parallel_simulation(
-        &self,
+    pub fn into_parallel_simulation(
+        self,
         sim_config: &ParallelSimulatorConfig,
-        agent_def: &MultiThreadAgentDef,
-        hook_def: &HooksDef,
+        agent_def: MultiThreadAgentDef,
+        hook_def: HooksDef,
     ) -> Result<Box<dyn Simulator>, SimulatorError> {
         /// Construct a boxed agent-environment simulation
         macro_rules! make_simulation {
             ($env_config:expr, $agent_builder:ty) => {{
-                boxed_parallel_simulation(
-                    sim_config,
+                Ok(sim_config.build_boxed_simulator(
                     $env_config,
-                    &<$agent_builder>::new(agent_def.clone()),
+                    <$agent_builder>::new(agent_def),
                     hook_def,
-                )
+                ))
             }};
         }
 
@@ -221,11 +169,11 @@ impl EnvDef {
             Bandit(dist_type, means) => match dist_type {
                 DistributionType::Deterministic => {
                     let config = BanditConfig::<Deterministic<f64>>::from(means);
-                    make_simulation!(&config, ForFiniteFinite<_>)
+                    make_simulation!(config, ForFiniteFinite<_>)
                 }
                 DistributionType::Bernoulli => {
                     let config = BanditConfig::<Bernoulli>::from(means);
-                    make_simulation!(&config, ForFiniteFinite<_>)
+                    make_simulation!(config, ForFiniteFinite<_>)
                 }
             },
             Chain(config) => {

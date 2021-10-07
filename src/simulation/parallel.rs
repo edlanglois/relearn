@@ -24,7 +24,7 @@ impl ParallelSimulatorConfig {
         Self { num_workers }
     }
 
-    pub fn build_simulator<EC, MAC, HC>(
+    pub fn build_boxed_simulator<EC, MAC, HC>(
         &self,
         env_config: EC,
         manager_agent_config: MAC,
