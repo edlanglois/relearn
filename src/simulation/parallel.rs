@@ -47,7 +47,7 @@ impl ParallelSimulatorConfig {
     }
 }
 
-/// Multi-thread simulator
+/// Parallel (multi-thread) simulator.
 pub struct ParallelSimulator<EC, MAC, HC> {
     env_config: EC,
     manager_agent_config: MAC,

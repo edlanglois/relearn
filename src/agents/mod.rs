@@ -220,7 +220,7 @@ where
     O: 'static,
     A: 'static,
 {
-    type Worker = Box<dyn Agent<O, A> + Send + 'static>;
+    type Worker = Box<dyn Agent<O, A> + Send>;
 
     fn make_worker(&mut self, seed: u64) -> Self::Worker {
         Box::new(self.inner.make_worker(seed))

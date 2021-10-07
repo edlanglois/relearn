@@ -1,6 +1,6 @@
 use clap::Clap;
 use rust_rl::cli::Options;
-use rust_rl::defs::{HookDef, HooksDef};
+use rust_rl::defs::{boxed_parallel_simulator, boxed_serial_simulator, HookDef, HooksDef};
 use rust_rl::logging::CLILogger;
 use rust_rl::simulation::{hooks::StepLoggerConfig, ParallelSimulatorConfig};
 use rust_rl::{AgentDef, EnvDef, MultiThreadAgentDef};
@@ -15,7 +15,7 @@ fn run_serial(opts: &Options, env_def: EnvDef, hook_def: HooksDef) -> Result<(),
 
     let env_seed = opts.seed;
     let agent_seed = opts.seed.wrapping_add(1);
-    let mut simulation = env_def.into_simulation(agent_def, hook_def)?;
+    let mut simulation = boxed_serial_simulator(env_def, agent_def, hook_def);
     let mut logger = CLILogger::new(Duration::from_millis(1000), true);
     simulation
         .run_simulation(env_seed, agent_seed, &mut logger)
@@ -47,7 +47,7 @@ fn run_parallel(
 
     let env_seed = opts.seed;
     let agent_seed = opts.seed.wrapping_add(1);
-    let mut simulation = env_def.into_parallel_simulation(&sim_config, agent_def, hook_def)?;
+    let mut simulation = boxed_parallel_simulator(sim_config, env_def, agent_def, hook_def);
     let mut logger = CLILogger::new(Duration::from_millis(1000), true);
     simulation
         .run_simulation(env_seed, agent_seed, &mut logger)

@@ -63,8 +63,6 @@ impl<T: RLSpace + FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>> RLObservatio
 pub trait RLActionSpace: RLSpace + ParameterizedDistributionSpace<Tensor> {}
 impl<T: RLSpace + ParameterizedDistributionSpace<Tensor>> RLActionSpace for T {}
 
-// TODO Change ForAnyAny etc into BuildAgent-like traits
-
 /// Wrapper implementing [`BuildAgent`] for [`AgentDef`] for any observation and action space.
 ///
 /// More specifically, any observation and action space satisfying the relatively generic

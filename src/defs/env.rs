@@ -1,11 +1,10 @@
-use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
-use super::{AgentDef, HooksDef, MultiThreadAgentDef};
+use super::agent::{RLActionSpace, RLObservationSpace};
 use crate::envs::{
-    Bandit, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps, EnvStructure,
-    MemoryGame as MemoryGameEnv, MetaPomdp, OneHotBandits, Pomdp, UniformBernoulliBandits,
-    WithStepLimit,
+    Bandit, BuildEnv, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps,
+    EnvStructure, MemoryGame as MemoryGameEnv, MetaObservationSpace, MetaPomdp, OneHotBandits,
+    Pomdp, UniformBernoulliBandits, WithStepLimit,
 };
-use crate::simulation::{ParallelSimulatorConfig, SerialSimulator, Simulator, SimulatorError};
+use crate::spaces::FiniteSpace;
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use rand::distributions::Distribution;
 use std::borrow::Borrow;
@@ -86,111 +85,74 @@ where
 }
 
 impl EnvDef {
-    /// Construct a boxed simulation for this environment and a given agent definition.
-    ///
-    /// # Args
-    /// * `agent_def` - Agent definition.
-    /// * `env_seed` - Random seed used for the environment.
-    /// * `agent_seed` - Random seed used for the agent.
-    /// * `hook` - A hook called on each step of the simulation. Pass () for no hook.
-    pub fn into_simulation(
-        self,
-        agent_def: AgentDef,
-        hook_def: HooksDef,
-    ) -> Result<Box<dyn Simulator>, SimulatorError> {
-        macro_rules! make_simulation {
-            ($env_config:expr, $agent_builder:ty) => {
-                Ok(Box::new(SerialSimulator::new(
-                    $env_config,
-                    <$agent_builder>::new(agent_def),
-                    hook_def,
-                )))
-            };
-        }
-
+    /// Transform according to a visitor.
+    pub fn visit<T>(self, visitor: T) -> T::Out
+    where
+        T: VisitEnvFiniteFinite + VisitEnvMetaFinitFinite + VisitEnvAnyAny,
+    {
         use EnvDef::*;
         match self {
             Bandit(dist_type, means) => match dist_type {
                 DistributionType::Deterministic => {
                     let config = BanditConfig::<Deterministic<f64>>::from(means);
-                    make_simulation!(config, ForFiniteFinite<_>)
+                    visitor.visit_env_finite_finite(config)
                 }
                 DistributionType::Bernoulli => {
                     let config = BanditConfig::<Bernoulli>::from(means);
-                    make_simulation!(config, ForFiniteFinite<_>)
+                    visitor.visit_env_finite_finite(config)
                 }
             },
-            Chain(config) => {
-                make_simulation!(config, ForFiniteFinite<_>)
-            }
-            MemoryGame(config) => {
-                make_simulation!(config, ForFiniteFinite<_>)
-            }
-            MetaOneHotBandits(config) => {
-                make_simulation!(config, ForMetaFiniteFinite<_>)
-            }
-            MetaUniformBernoulliBandits(config) => {
-                make_simulation!(config, ForMetaFiniteFinite<_>)
-            }
-            MetaDirichletMdps(config) => {
-                make_simulation!(config, ForMetaFiniteFinite<_>)
-            }
+            Chain(config) => visitor.visit_env_finite_finite(config),
+            MemoryGame(config) => visitor.visit_env_finite_finite(config),
+            MetaOneHotBandits(config) => visitor.visit_env_meta_finite_finite(config),
+            MetaUniformBernoulliBandits(config) => visitor.visit_env_meta_finite_finite(config),
+            MetaDirichletMdps(config) => visitor.visit_env_meta_finite_finite(config),
         }
     }
+}
 
-    // TODO: De-deuplicate with build_simulatior
-    /// Construct a multi-thread boxed simulation for this environment and given agent definition.
+/// Base trait that defines the output type of `VisitEnv*` visitors.
+pub trait VisitEnvBase {
+    type Out;
+}
+
+/// Visit an environment configuration with finite action and observation spaces.
+pub trait VisitEnvFiniteFinite: VisitEnvBase {
+    /// Transform into another type given an environment configuration.
     ///
-    /// # Args
-    /// * `sim_config` - Simulator configuration.
-    /// * `agent_def` - Agent definition.
-    /// * `env_seed` - Random seed used for the environment.
-    /// * `agent_seed` - Random seed used for the agent.
-    /// * `hook` - A hook called on each step of the simulation. Pass () for no hook.
-    pub fn into_parallel_simulation(
-        self,
-        sim_config: &ParallelSimulatorConfig,
-        agent_def: MultiThreadAgentDef,
-        hook_def: HooksDef,
-    ) -> Result<Box<dyn Simulator>, SimulatorError> {
-        /// Construct a boxed agent-environment simulation
-        macro_rules! make_simulation {
-            ($env_config:expr, $agent_builder:ty) => {{
-                Ok(sim_config.build_boxed_simulator(
-                    $env_config,
-                    <$agent_builder>::new(agent_def),
-                    hook_def,
-                ))
-            }};
-        }
+    /// The environment configuration must build an environment with
+    /// finite observation and action spaces.
+    fn visit_env_finite_finite<EC>(self, env_config: EC) -> Self::Out
+    where
+        EC: BuildEnv + 'static,
+        EC::ObservationSpace: RLObservationSpace + FiniteSpace,
+        EC::Observation: Clone,
+        EC::ActionSpace: RLActionSpace + FiniteSpace,
+        EC::Environment: Send + 'static;
+}
 
-        use EnvDef::*;
-        match self {
-            Bandit(dist_type, means) => match dist_type {
-                DistributionType::Deterministic => {
-                    let config = BanditConfig::<Deterministic<f64>>::from(means);
-                    make_simulation!(config, ForFiniteFinite<_>)
-                }
-                DistributionType::Bernoulli => {
-                    let config = BanditConfig::<Bernoulli>::from(means);
-                    make_simulation!(config, ForFiniteFinite<_>)
-                }
-            },
-            Chain(config) => {
-                make_simulation!(config, ForFiniteFinite<_>)
-            }
-            MemoryGame(config) => {
-                make_simulation!(config, ForFiniteFinite<_>)
-            }
-            MetaOneHotBandits(config) => {
-                make_simulation!(config, ForMetaFiniteFinite<_>)
-            }
-            MetaUniformBernoulliBandits(config) => {
-                make_simulation!(config, ForMetaFiniteFinite<_>)
-            }
-            MetaDirichletMdps(config) => {
-                make_simulation!(config, ForMetaFiniteFinite<_>)
-            }
-        }
-    }
+/// Visit a meta environment configuration with finite inner action and observation spaces.
+pub trait VisitEnvMetaFinitFinite: VisitEnvBase {
+    fn visit_env_meta_finite_finite<EC, OS, AS>(self, env_config: EC) -> Self::Out
+    where
+        EC: BuildEnv<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + 'static,
+        EC::Environment: Send + 'static,
+        OS: RLObservationSpace + FiniteSpace + Clone,
+        OS::Element: Clone,
+        AS: RLActionSpace + FiniteSpace + Clone,
+        AS::Element: Clone,
+        // See impl BuildAgent for ForMetaFiniteFinite
+        EC::ObservationSpace: RLObservationSpace,
+        EC::Observation: Clone;
+}
+
+/// Visit an environment configuration for any reinforcement learning environment.
+pub trait VisitEnvAnyAny: VisitEnvBase {
+    fn visit_env_any_any<EC>(self, env_config: EC) -> Self::Out
+    where
+        EC: BuildEnv + 'static,
+        EC::ObservationSpace: RLObservationSpace,
+        EC::Observation: Clone,
+        EC::ActionSpace: RLActionSpace,
+        EC::Environment: Send + 'static;
 }
