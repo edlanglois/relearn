@@ -11,8 +11,8 @@ Set `steps-per-epoch` to whatever value fits on the GPU so long as data
 collection does not take more than about 15s.
 ```sh
 cargo run --release -- \
-    meta-uniform-bernoulli-bandits \
-    trpo \
+    --environment meta-uniform-bernoulli-bandits \
+    --agent trpo \
     --num-actions 5 \
     --episodes-per-trial 10 \
     --gae-discount-factor 0.99 \
@@ -30,8 +30,8 @@ By 50 epochs it should be near the optimal value of 6.6 or 6.7
 #### Bandits - UCB Baseline
 ```
 cargo run --release -- \
-    meta-uniform-bernoulli-bandits \
-    resetting-meta:ucb1 \
+    --environment meta-uniform-bernoulli-bandits \
+    --agent resetting-meta:ucb1 \
     --num-actions 5 \
     --episodes-per-trial 10 \
 ```
