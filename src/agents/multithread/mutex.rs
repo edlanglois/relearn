@@ -35,6 +35,7 @@ where
     AS: Space,
 {
     type ManagerAgent = MutexAgentManager<AC::Agent>;
+    type Worker = MutexAgentWorker<AC::Agent>;
 
     fn build_manager_agent(
         &self,

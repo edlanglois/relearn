@@ -148,8 +148,9 @@ impl<T: SetActorMode + ?Sized> SetActorMode for Box<T> {
 // make_worker(&self) -> Self::Worker and
 // into_manager(self) -> Self::Manager
 
-pub trait BuildManagerAgent<OS, AS> {
-    type ManagerAgent: ManagerAgent;
+pub trait BuildManagerAgent<OS: Space, AS: Space> {
+    type ManagerAgent: ManagerAgent<Worker = Self::Worker>;
+    type Worker: Agent<OS::Element, AS::Element> + Send + 'static;
 
     fn build_manager_agent(
         &self,

@@ -1,6 +1,6 @@
 use super::agent::{ForFiniteFinite, ForMetaFiniteFinite};
 use super::{AgentDef, HooksDef, MultiThreadAgentDef};
-use crate::agents::{Agent, BuildAgent, BuildManagerAgent, ManagerAgent};
+use crate::agents::{BuildAgent, BuildManagerAgent};
 use crate::envs::{
     Bandit, BuildEnv, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps,
     EnvStructure, MemoryGame as MemoryGameEnv, MetaPomdp, OneHotBandits, Pomdp,
@@ -133,7 +133,6 @@ where
     EC::Environment: Send + 'static,
     AC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace> + ?Sized,
     AC::ManagerAgent: 'static,
-    <AC::ManagerAgent as ManagerAgent>::Worker: Agent<EC::Observation, EC::Action> + 'static,
     HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
     HC::Hook: Send + 'static,
 {

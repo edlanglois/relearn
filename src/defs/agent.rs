@@ -115,6 +115,7 @@ where
     AS: RLActionSpace,
 {
     type ManagerAgent = Box<DynEnvManagerAgent<OS, AS>>;
+    type Worker = Box<dyn Agent<OS::Element, AS::Element> + Send>;
 
     fn build_manager_agent(
         &self,
@@ -173,6 +174,7 @@ where
     AS: RLActionSpace + FiniteSpace,
 {
     type ManagerAgent = Box<DynEnvManagerAgent<OS, AS>>;
+    type Worker = Box<dyn Agent<OS::Element, AS::Element> + Send>;
 
     fn build_manager_agent(
         &self,
@@ -246,6 +248,8 @@ where
     MetaObservationSpace<OS, AS>: RLObservationSpace,
 {
     type ManagerAgent = Box<DynEnvManagerAgent<MetaObservationSpace<OS, AS>, AS>>;
+    type Worker =
+        Box<dyn Agent<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element> + Send>;
 
     fn build_manager_agent(
         &self,
@@ -265,10 +269,9 @@ where
 pub type DynFullAgent<OS, AS> =
     dyn FullAgent<<OS as Space>::Element, <AS as Space>::Element> + Send;
 
-/// Send-able [`Agent`] trait object for an environment structure.
-pub type DynEnvAgent<OS, AS> = dyn Agent<<OS as Space>::Element, <AS as Space>::Element> + Send;
-
 /// The agent manager trait object for a given environment structure.
 ///
 /// See also [`BoxingManager`](crate::agents::BoxingManager).
-pub type DynEnvManagerAgent<OS, AS> = dyn ManagerAgent<Worker = Box<DynEnvAgent<OS, AS>>>;
+pub type DynEnvManagerAgent<OS, AS> = dyn ManagerAgent<
+    Worker = Box<dyn Agent<<OS as Space>::Element, <AS as Space>::Element> + Send>,
+>;
