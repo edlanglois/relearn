@@ -11,7 +11,7 @@ use std::cmp::Ordering;
 use std::fmt;
 use tch::{Device, Kind, Tensor};
 
-/// A space containing a boolean value.
+/// The space `{false, true}`.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BooleanSpace;
 

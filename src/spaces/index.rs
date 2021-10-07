@@ -5,7 +5,7 @@ use rand::Rng;
 use std::cmp::Ordering;
 use std::fmt;
 
-/// An index space; integers `0 .. size-1`
+/// An index space; consists of the integers `0` to `size - 1`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IndexSpace {
     pub size: usize,

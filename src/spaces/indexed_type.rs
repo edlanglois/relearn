@@ -8,7 +8,10 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
-/// An indexed set of finitely many possiblities.
+/// An indexed set of finitely many possibilities.
+///
+/// Can be implemented automatically for enum types with no internal data
+/// using `#[derive(Indexed)]`.
 pub trait Indexed {
     /// The number of possible values this type can represent.
     const SIZE: usize;
@@ -23,6 +26,10 @@ pub trait Indexed {
 }
 
 /// A space defined over an indexed type.
+///
+/// The wrapped type must implement [`Indexed`].
+/// Use `#[derive(Indexed)]` to implement `Indexed` automatically for enum types that have no
+/// internal data.
 #[derive(Default, Clone, Copy)]
 pub struct IndexedTypeSpace<T> {
     element_type: PhantomData<T>,
