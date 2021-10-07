@@ -410,7 +410,7 @@ pub struct MetaState<E: Pomdp> {
 /// # Usage
 /// Wraps a meta-environment structure (e.g. [`MetaPomdp`], [`MetaEnv`]),
 ///
-///     use rust_rl::envs::{InnerEnvStructure, MetaPomdp, OneHotBandits, StoredEnvStructure};
+///     use relearn::envs::{InnerEnvStructure, MetaPomdp, OneHotBandits, StoredEnvStructure};
 ///
 ///     let base_env = OneHotBandits::default();
 ///     let meta_env = MetaPomdp::new(base_env, 10);

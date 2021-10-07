@@ -1,9 +1,9 @@
 use clap::Clap;
-use rust_rl::cli::Options;
-use rust_rl::defs::{boxed_parallel_simulator, boxed_serial_simulator, HookDef, HooksDef};
-use rust_rl::logging::CLILogger;
-use rust_rl::simulation::{hooks::StepLoggerConfig, ParallelSimulatorConfig};
-use rust_rl::{AgentDef, EnvDef, MultiThreadAgentDef};
+use relearn::cli::Options;
+use relearn::defs::{boxed_parallel_simulator, boxed_serial_simulator, HookDef, HooksDef};
+use relearn::logging::CLILogger;
+use relearn::simulation::{hooks::StepLoggerConfig, ParallelSimulatorConfig};
+use relearn::{AgentDef, EnvDef, MultiThreadAgentDef};
 use std::convert::From;
 use std::error::Error;
 use std::time::Duration;

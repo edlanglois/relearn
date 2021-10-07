@@ -2,7 +2,7 @@
 use super::{CloneBuild, EnvStructure, Mdp};
 use crate::spaces::{IndexSpace, IndexedTypeSpace};
 use rand::prelude::*;
-use rust_rl_derive::Indexed;
+use relearn_derive::Indexed;
 
 /// Chain Environment
 ///

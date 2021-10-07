@@ -1,4 +1,4 @@
-# Reinforcement Learning with Rust
+# ReLearn: A Reinforcement Learning Library
 
 ## Saved Runs
 ### RL Squared Training

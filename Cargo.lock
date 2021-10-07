@@ -796,20 +796,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
 
 [[package]]
-name = "rstest"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5056bc1e7cfd438570e8292ef9512774b1d0afc8a50d683fda0ebe74f6233cc6"
-dependencies = [
- "cfg-if",
- "proc-macro2",
- "quote",
- "rustc_version 0.3.3",
- "syn",
-]
-
-[[package]]
-name = "rust-rl"
+name = "relearn"
 version = "0.1.0"
 dependencies = [
  "clap 3.0.0-beta.4",
@@ -824,18 +811,31 @@ dependencies = [
  "once_cell",
  "rand",
  "rand_distr",
+ "relearn_derive",
  "rstest",
- "rust_rl_derive",
  "smallvec",
  "tch",
  "thiserror",
 ]
 
 [[package]]
-name = "rust_rl_derive"
+name = "relearn_derive"
 version = "0.1.0"
 dependencies = [
  "quote",
+ "syn",
+]
+
+[[package]]
+name = "rstest"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5056bc1e7cfd438570e8292ef9512774b1d0afc8a50d683fda0ebe74f6233cc6"
+dependencies = [
+ "cfg-if",
+ "proc-macro2",
+ "quote",
+ "rustc_version 0.3.3",
  "syn",
 ]
 

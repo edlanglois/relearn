@@ -2,8 +2,8 @@ use criterion::{
     criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration,
     Throughput,
 };
-use rust_rl::torch::seq_modules::{Gru, RnnConfig, SequenceModule};
-use rust_rl::torch::ModuleBuilder;
+use relearn::torch::seq_modules::{Gru, RnnConfig, SequenceModule};
+use relearn::torch::ModuleBuilder;
 use std::array::IntoIter;
 use tch::{nn::VarStore, Device, Kind, Tensor};
 

@@ -15,7 +15,7 @@ use tch::{IndexOp, Scalar, Tensor};
 ///
 /// # Example
 /// ```
-/// use rust_rl::utils::packed::PackedIter;
+/// use relearn::utils::packed::PackedIter;
 ///
 /// let sequences = [vec![0, 1, 2, 3], vec![10, 11], vec![100, 101]];
 /// let packed: Vec<_> = PackedIter::from_sorted(&sequences).map(|&x| x).collect();
@@ -116,7 +116,7 @@ impl<T> ExactSizeIterator for PackedIter<T> where T: ExactSizeIterator {}
 ///
 /// # Example
 /// ```
-/// use rust_rl::utils::packed::PackingIndices;
+/// use relearn::utils::packed::PackingIndices;
 ///
 /// let data = [0, 1, 2, 3, 10, 11, 100, 101];
 /// let ranges = [0..4, 4..6, 6..8];
@@ -190,7 +190,7 @@ impl<'a> ExactSizeIterator for PackingIndices<'a> {}
 ///
 /// # Example
 /// ```
-/// use rust_rl::utils::packed::PackedBatchSizes;
+/// use relearn::utils::packed::PackedBatchSizes;
 ///
 /// let sequence_lengths = [4, 2, 2];
 /// let batch_sizes: Vec<_> = PackedBatchSizes::from_sorted_lengths(&sequence_lengths).collect();

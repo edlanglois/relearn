@@ -45,7 +45,7 @@ where
 /// Get the argmax of an iterator of floats and panic if any are NaN:
 ///
 /// ```
-/// use rust_rl::utils::iter::ArgMaxBy;
+/// use relearn::utils::iter::ArgMaxBy;
 ///
 /// let v = vec![1.0, 2.5, -3.0];
 /// let argmax = v.into_iter().argmax_by(|a, b| a.partial_cmp(b).unwrap());

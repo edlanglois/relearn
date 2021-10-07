@@ -207,7 +207,7 @@ impl<S: CategoricalSpace> ElementRefInto<Loggable> for S {
 
 #[cfg(test)]
 mod trit {
-    use rust_rl_derive::Indexed;
+    use relearn_derive::Indexed;
 
     #[derive(Debug, Indexed, PartialEq, Eq)]
     pub enum Trit {

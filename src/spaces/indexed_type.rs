@@ -221,7 +221,7 @@ mod space {
 #[cfg(test)]
 mod partial_ord {
     use super::*;
-    use rust_rl_derive::Indexed;
+    use relearn_derive::Indexed;
 
     #[derive(Debug, Indexed)]
     enum TestEnum {
@@ -258,7 +258,7 @@ mod partial_ord {
 /// Test the derive(Indexed) macro
 mod finite_space {
     use super::*;
-    use rust_rl_derive::Indexed;
+    use relearn_derive::Indexed;
 
     #[derive(Debug, Indexed)]
     enum EmptyEnum {}
