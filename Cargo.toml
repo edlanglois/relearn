@@ -30,6 +30,12 @@ thiserror = "1.0"
 rstest = "0.7.0"
 criterion = { version = "0.3", features = ["html_reports"] }
 
+[features]
+doc-only = ["tch/doc-only"]
+
+[package.metadata.docs.rs]
+features = [ "doc-only" ]
+
 [[bench]]
 name = "rust"
 harness = false
