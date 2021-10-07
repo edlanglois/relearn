@@ -6,6 +6,17 @@
 //!
 //! It uses [PyTorch](https://pytorch.org/) via [tch].
 //!
+//! This library makes heavy use of the [builder pattern][builder] to construct agents,
+//! environments, and other objects. A trait `BuildFoo` defines an interface for constructing
+//! objects implementing trait `Foo` and an object `Bar` can often be built from `BarConfig`.
+//! Configurations are often defined compositionally in terms of other configurations.
+//! Using these configuration objects creates a concise, serializable representation that uniquely
+//! identifies an agent / environment / experiment / etc.
+//! Two important builder traits are [`BuildEnv`] and [`BuildAgent`].
+//!
+//! [builder]: (https://rust-unofficial.github.io/patterns/patterns/creational/builder.html)
+//!
+//! # Glossary
 //! ## Environments
 //! A reinforcement learning [`Environment`] is an environment structure with internal state.
 //! The fundamental operation is to take a [step](Environment::step) from a state given
@@ -108,7 +119,7 @@ pub mod spaces;
 pub mod torch;
 pub mod utils;
 
-pub use agents::{Actor, Agent, Step};
+pub use agents::{Actor, Agent, BuildAgent, Step};
 pub use defs::{AgentDef, EnvDef, MultiThreadAgentDef, OptimizerDef, SeqModDef};
-pub use envs::{EnvStructure, Environment, StructuredEnvironment};
+pub use envs::{BuildEnv, EnvStructure, Environment, StructuredEnvironment};
 pub use simulation::{run_actor, run_agent, Simulator};

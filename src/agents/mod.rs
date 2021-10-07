@@ -237,7 +237,7 @@ impl<O, A, T> FullAgent<O, A> for T where T: Agent<O, A> + SetActorMode + ?Sized
 // TODO: Be more flexible about the bounds on Agent?
 /// Build an agent instance for a given environment structure.
 pub trait BuildAgent<OS: Space, AS: Space> {
-    /// The agent type to build.
+    /// Type of agent to build
     type Agent: FullAgent<OS::Element, AS::Element>;
 
     /// Build an agent for the given environment structure ([`EnvStructure`]).

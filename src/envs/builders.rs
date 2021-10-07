@@ -47,10 +47,15 @@ where
 /// reproducibility: a given environment configuration can construct exactly one environment.
 /// The user does not need to store the environment type.
 pub trait BuildEnv {
+    /// Environment observation type.
     type Observation;
+    /// Environment action type.
     type Action;
+    /// Environment observation space type.
     type ObservationSpace: Space<Element = Self::Observation>;
+    /// Environment action space type.
     type ActionSpace: Space<Element = Self::Action>;
+    /// Type of environment to build
     type Environment: Environment<Observation = Self::Observation, Action = Self::Action>
         + EnvStructure<ObservationSpace = Self::ObservationSpace, ActionSpace = Self::ActionSpace>;
 
