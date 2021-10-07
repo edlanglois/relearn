@@ -1,6 +1,6 @@
 # ReLearn: A Reinforcement Learning Library
 A reinforcement learning library and experiment runner.
-Uses pytorch ask the neural network backend via the [tch](https://docs.rs/tch)
+Uses pytorch as the neural network backend via the [tch](https://docs.rs/tch)
 interface to the C++ API.
 
 At the moment this is designed for personal use. It is in-development and
