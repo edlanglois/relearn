@@ -47,13 +47,7 @@ fn run_parallel(
 
     let env_seed = opts.seed;
     let agent_seed = opts.seed.wrapping_add(1);
-    let mut simulation = env_def.build_parallel_simulation(
-        &sim_config,
-        &agent_def,
-        &hook_def,
-        env_seed,
-        agent_seed,
-    )?;
+    let mut simulation = env_def.build_parallel_simulation(&sim_config, &agent_def, &hook_def)?;
     let mut logger = CLILogger::new(Duration::from_millis(1000), true);
     simulation
         .run_simulation(env_seed, agent_seed, &mut logger)

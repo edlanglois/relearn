@@ -121,8 +121,6 @@ fn boxed_parallel_simulation<EC, AC, HC>(
     env_def: &EC,
     agent_def: &AC,
     hook_def: &HC,
-    env_seed: u64,
-    agent_seed: u64,
 ) -> Result<Box<dyn Simulator>, SimulatorError>
 where
     EC: BuildEnv + Clone + 'static,
@@ -131,18 +129,11 @@ where
     EC::ActionSpace: ElementRefInto<Loggable> + Clone + Send + 'static,
     EC::Action: 'static,
     EC::Environment: Send + 'static,
-    AC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace> + ?Sized,
-    AC::ManagerAgent: 'static,
+    AC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
     HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace> + Clone + 'static,
     HC::Hook: Send + 'static,
 {
-    let env = env_def.build_env(env_seed)?;
-
-    // Not boxed because this is expected to be called with (wrapped) AgentManagerDef,
-    // which already boxes the output agent.
-    let agent = agent_def.build_manager_agent(&env, agent_seed)?;
-
-    Ok(sim_config.build_simulator(env_def.clone(), agent, hook_def.clone()))
+    Ok(sim_config.build_simulator(env_def.clone(), agent_def.clone(), hook_def.clone()))
 }
 
 impl EnvDef {
@@ -212,8 +203,6 @@ impl EnvDef {
         sim_config: &ParallelSimulatorConfig,
         agent_def: &MultiThreadAgentDef,
         hook_def: &HooksDef,
-        env_seed: u64,
-        agent_seed: u64,
     ) -> Result<Box<dyn Simulator>, SimulatorError> {
         /// Construct a boxed agent-environment simulation
         macro_rules! make_simulation {
@@ -221,10 +210,8 @@ impl EnvDef {
                 boxed_parallel_simulation(
                     sim_config,
                     $env_config,
-                    &<$agent_builder>::new(agent_def),
+                    &<$agent_builder>::new(agent_def.clone()),
                     hook_def,
-                    env_seed,
-                    agent_seed,
                 )
             }};
         }

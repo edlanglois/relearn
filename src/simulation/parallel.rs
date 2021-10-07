@@ -1,6 +1,6 @@
 use super::hooks::BuildSimulationHook;
 use super::{run_agent, Simulator, SimulatorError};
-use crate::agents::{Agent, ManagerAgent};
+use crate::agents::{Agent, BuildManagerAgent, ManagerAgent};
 use crate::envs::BuildEnv;
 use crate::logging::TimeSeriesLogger;
 use std::thread;
@@ -24,24 +24,23 @@ impl ParallelSimulatorConfig {
         Self { num_workers }
     }
 
-    pub fn build_simulator<EC, MA, HC>(
+    pub fn build_simulator<EC, MAC, HC>(
         &self,
         env_config: EC,
-        manager_agent: MA,
+        manager_agent_config: MAC,
         hook_config: HC,
     ) -> Box<dyn Simulator>
     where
         EC: BuildEnv + 'static,
         EC::Environment: Send + 'static,
-        MA: ManagerAgent + 'static,
-        MA::Worker: Agent<EC::Observation, EC::Action> + 'static,
         EC::Observation: Clone,
+        MAC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace> + 'static,
         HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace> + 'static,
         HC::Hook: Send + 'static,
     {
         Box::new(ParallelSimulator {
             env_config,
-            manager_agent,
+            manager_agent_config,
             num_workers: self.num_workers,
             hook_config,
         })
@@ -49,20 +48,19 @@ impl ParallelSimulatorConfig {
 }
 
 /// Multi-thread simulator
-pub struct ParallelSimulator<EC, MA, HC> {
+pub struct ParallelSimulator<EC, MAC, HC> {
     env_config: EC,
-    manager_agent: MA,
+    manager_agent_config: MAC,
     num_workers: usize,
     hook_config: HC,
 }
 
-impl<EC, MA, HC> Simulator for ParallelSimulator<EC, MA, HC>
+impl<EC, MAC, HC> Simulator for ParallelSimulator<EC, MAC, HC>
 where
     EC: BuildEnv,
     EC::Environment: Send + 'static,
-    MA: ManagerAgent,
-    MA::Worker: Agent<EC::Observation, EC::Action> + 'static,
     EC::Observation: Clone,
+    MAC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace>,
     HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace>,
     HC::Hook: Send + 'static,
 {
@@ -72,9 +70,14 @@ where
         agent_seed: u64,
         logger: &mut dyn TimeSeriesLogger,
     ) -> Result<(), SimulatorError> {
+        let env_structure = self.env_config.build_env(env_seed)?;
+        let mut manager_agent = self
+            .manager_agent_config
+            .build_manager_agent(&env_structure, agent_seed)?;
+        drop(env_structure);
         run_agent_multithread(
             &self.env_config,
-            &mut self.manager_agent,
+            &mut manager_agent,
             self.num_workers,
             &self.hook_config,
             env_seed,
