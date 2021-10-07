@@ -1,10 +1,18 @@
 # ReLearn: A Reinforcement Learning Library
+A reinforcement learning library and experiment runner.
+Uses pytorch ask the neural network backend via the [tch](https://docs.rs/tch)
+interface to the C++ API.
 
-## Saved Runs
+At the moment this is designed for personal use. It is in-development and
+unstable so expect breaking changes with updates.
+
+Read the documentation at <https://docs.rs/relearn>.
+
+## Example Runs
 ### RL Squared Training
 Replications of some results from the paper
 RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning
-by Duan et al. https://arxiv.org/pdf/1611.02779.pdf
+by Duan et al. <https://arxiv.org/pdf/1611.02779.pdf>
 
 #### Bandits - TRPO RL2
 Set `steps-per-epoch` to whatever value fits on the GPU so long as data
