@@ -3,7 +3,7 @@ use relearn::cli::Options;
 use relearn::defs::{boxed_multithread_simulator, boxed_serial_simulator, HookDef, HooksDef};
 use relearn::logging::CLILogger;
 use relearn::simulation::{hooks::StepLoggerConfig, MultithreadSimulatorConfig};
-use relearn::{AgentDef, EnvDef, MultiThreadAgentDef};
+use relearn::{AgentDef, EnvDef, MultithreadAgentDef};
 use std::convert::From;
 use std::error::Error;
 use std::time::Duration;
@@ -29,7 +29,7 @@ fn run_multithread(
     hook_def: HooksDef,
     mut num_threads: usize,
 ) -> Result<(), Box<dyn Error>> {
-    let agent_def = Option::<MultiThreadAgentDef>::from(opts)
+    let agent_def = Option::<MultithreadAgentDef>::from(opts)
         .ok_or_else(|| format!("Agent {} is not multi-threaded", opts.agent))?;
     println!("Agent:\n{:#?}", agent_def);
 

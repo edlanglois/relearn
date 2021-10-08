@@ -3,7 +3,7 @@ use crate::agents::{
     BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::defs::{
-    AgentDef, CriticDef, CriticUpdaterDef, MultiThreadAgentDef, PolicyDef, PolicyUpdaterDef,
+    AgentDef, CriticDef, CriticUpdaterDef, MultithreadAgentDef, PolicyDef, PolicyUpdaterDef,
 };
 use crate::torch::agents::ActorCriticConfig;
 use clap::ArgEnum;
@@ -90,10 +90,10 @@ impl AgentWrapperType {
         &self,
         inner: AgentDef,
         _opts: &Options,
-    ) -> Option<MultiThreadAgentDef> {
+    ) -> Option<MultithreadAgentDef> {
         use AgentWrapperType::*;
         match self {
-            Mutex => Some(MultiThreadAgentDef::Mutex(Box::new(inner))),
+            Mutex => Some(MultithreadAgentDef::Mutex(Box::new(inner))),
             _ => None,
         }
     }
@@ -146,13 +146,13 @@ impl AgentType {
         Some(agent_def)
     }
 
-    pub fn multi_thread_agent_def(&self, opts: &Options) -> Option<MultiThreadAgentDef> {
+    pub fn multi_thread_agent_def(&self, opts: &Options) -> Option<MultithreadAgentDef> {
         if let Some(AgentWrapperType::Mutex) = self.wrappers.first() {
             let inner = Self {
                 base: self.base,
                 wrappers: self.wrappers[1..].into(),
             };
-            return Some(MultiThreadAgentDef::Mutex(Box::new(inner.agent_def(opts)?)));
+            return Some(MultithreadAgentDef::Mutex(Box::new(inner.agent_def(opts)?)));
         }
         None
     }
@@ -164,7 +164,7 @@ impl From<&Options> for Option<AgentDef> {
     }
 }
 
-impl From<&Options> for Option<MultiThreadAgentDef> {
+impl From<&Options> for Option<MultithreadAgentDef> {
     fn from(opts: &Options) -> Self {
         opts.agent.multi_thread_agent_def(opts)
     }

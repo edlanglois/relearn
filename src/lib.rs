@@ -121,6 +121,6 @@ pub mod torch;
 pub mod utils;
 
 pub use agents::{Actor, Agent, BuildAgent, Step};
-pub use defs::{AgentDef, EnvDef, MultiThreadAgentDef, OptimizerDef, SeqModDef};
+pub use defs::{AgentDef, EnvDef, MultithreadAgentDef, OptimizerDef, SeqModDef};
 pub use envs::{BuildEnv, EnvStructure, Environment, StructuredEnvironment};
 pub use simulation::{run_actor, run_agent, Simulator};

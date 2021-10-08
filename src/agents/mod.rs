@@ -144,7 +144,7 @@ impl<T: SetActorMode + ?Sized> SetActorMode for Box<T> {
 }
 
 // TODO: Replace with BuildMultithreadAgent that constructs a manager and n workers
-// Or maybe builds MultiThreadAgentInitializer with the methods
+// Or maybe builds MultithreadAgentInitializer with the methods
 // make_worker(&self) -> Self::Worker and
 // into_manager(self) -> Self::Manager
 

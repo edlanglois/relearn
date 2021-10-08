@@ -2,7 +2,7 @@ use super::agent::{
     ForAnyAny, ForFiniteFinite, ForMetaFiniteFinite, RLActionSpace, RLObservationSpace,
 };
 use super::env::{VisitEnvAnyAny, VisitEnvBase, VisitEnvFiniteFinite, VisitEnvMetaFinitFinite};
-use super::{AgentDef, EnvDef, HooksDef, MultiThreadAgentDef};
+use super::{AgentDef, EnvDef, HooksDef, MultithreadAgentDef};
 use crate::envs::{BuildEnv, MetaObservationSpace};
 use crate::simulation::{MultithreadSimulatorConfig, SerialSimulator, Simulator};
 use crate::spaces::FiniteSpace;
@@ -40,7 +40,7 @@ pub fn boxed_serial_simulator(
 pub fn boxed_multithread_simulator(
     sim_config: MultithreadSimulatorConfig,
     env_def: EnvDef,
-    agent_def: MultiThreadAgentDef,
+    agent_def: MultithreadAgentDef,
     hooks_def: HooksDef,
 ) -> Box<dyn Simulator> {
     env_def.visit(MultithreadSimulatorVisitor {
@@ -114,7 +114,7 @@ impl VisitEnvAnyAny for SerialSimulatorVisitor {
 /// Environment visitor that constructs a multithread simulator
 struct MultithreadSimulatorVisitor {
     pub sim_config: MultithreadSimulatorConfig,
-    pub agent_def: MultiThreadAgentDef,
+    pub agent_def: MultithreadAgentDef,
     pub hooks_def: HooksDef,
 }
 

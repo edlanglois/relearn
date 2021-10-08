@@ -34,10 +34,10 @@ pub enum AgentDef {
     ResettingMeta(Box<AgentDef>),
 }
 
-/// Multi-thread agent definition
+/// Multithread agent definition
 #[derive(Debug, Clone, PartialEq)]
-pub enum MultiThreadAgentDef {
-    /// A mutex-based simulated multi-thread agent. Does not provide meaningful parallelism.
+pub enum MultithreadAgentDef {
+    /// A mutex-based simulated multithread agent. Does not provide meaningful parallelism.
     Mutex(Box<AgentDef>),
 }
 
@@ -108,7 +108,7 @@ where
 
 impl<T, OS, AS> BuildManagerAgent<OS, AS> for ForAnyAny<T>
 where
-    T: Borrow<MultiThreadAgentDef>,
+    T: Borrow<MultithreadAgentDef>,
     OS: RLObservationSpace,
     AS: RLActionSpace,
 {
@@ -120,7 +120,7 @@ where
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::ManagerAgent, BuildAgentError> {
-        use MultiThreadAgentDef::*;
+        use MultithreadAgentDef::*;
         match self.0.borrow() {
             Mutex(config) => ForAnyAny(config.borrow())
                 .build_agent(env, seed)
@@ -167,7 +167,7 @@ where
 
 impl<T, OS, AS> BuildManagerAgent<OS, AS> for ForFiniteFinite<T>
 where
-    T: Borrow<MultiThreadAgentDef>,
+    T: Borrow<MultithreadAgentDef>,
     OS: RLObservationSpace + FiniteSpace,
     AS: RLActionSpace + FiniteSpace,
 {
@@ -179,7 +179,7 @@ where
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::ManagerAgent, BuildAgentError> {
-        use MultiThreadAgentDef::*;
+        use MultithreadAgentDef::*;
         match self.0.borrow() {
             Mutex(config) => ForFiniteFinite(config.borrow())
                 .build_agent(env, seed)
@@ -237,7 +237,7 @@ where
 
 impl<T, OS, AS> BuildManagerAgent<MetaObservationSpace<OS, AS>, AS> for ForMetaFiniteFinite<T>
 where
-    T: Borrow<MultiThreadAgentDef>,
+    T: Borrow<MultithreadAgentDef>,
     OS: RLObservationSpace + FiniteSpace + Clone,
     OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace + Clone,
@@ -254,7 +254,7 @@ where
         env: &dyn EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::ManagerAgent, BuildAgentError> {
-        use MultiThreadAgentDef::*;
+        use MultithreadAgentDef::*;
         match self.0.borrow() {
             Mutex(config) => ForMetaFiniteFinite(config.borrow())
                 .build_agent(env, seed)
