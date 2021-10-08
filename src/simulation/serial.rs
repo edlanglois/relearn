@@ -57,11 +57,6 @@ pub fn run_agent<E, A, H>(
     hook: &mut H,
     logger: &mut dyn TimeSeriesLogger,
 ) where
-    // The ?Sized allows this function to be called with types
-    // (&mut dyn Environment, &mut dyn Agent, ...
-    // In that case it only needs to be instantiated once and can work with trait pointers.
-    //
-    // Alternatively, it can use the concrete struct types, which allows inlining.
     E: Environment + ?Sized,
     E::Observation: Clone,
     A: Agent<E::Observation, E::Action> + ?Sized,
