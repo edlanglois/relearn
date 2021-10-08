@@ -1,10 +1,10 @@
 //! Simulating agent-environment interaction
 pub mod hooks;
-mod parallel;
+mod multithread;
 mod serial;
 
 pub use hooks::{BuildSimulationHook, GenericSimulationHook, SimulationHook};
-pub use parallel::{run_agent_multithread, ParallelSimulator, ParallelSimulatorConfig};
+pub use multithread::{run_agent_multithread, MultithreadSimulator, MultithreadSimulatorConfig};
 pub use serial::{run_actor, run_agent, SerialSimulator};
 
 use crate::agents::BuildAgentError;

@@ -5,13 +5,13 @@ use crate::envs::BuildEnv;
 use crate::logging::TimeSeriesLogger;
 use std::thread;
 
-/// Configuration for [`ParallelSimulator`].
+/// Configuration for [`MultithreadSimulator`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ParallelSimulatorConfig {
+pub struct MultithreadSimulatorConfig {
     pub num_workers: usize,
 }
 
-impl Default for ParallelSimulatorConfig {
+impl Default for MultithreadSimulatorConfig {
     fn default() -> Self {
         Self {
             num_workers: num_cpus::get(),
@@ -19,7 +19,7 @@ impl Default for ParallelSimulatorConfig {
     }
 }
 
-impl ParallelSimulatorConfig {
+impl MultithreadSimulatorConfig {
     pub const fn new(num_workers: usize) -> Self {
         Self { num_workers }
     }
@@ -38,7 +38,7 @@ impl ParallelSimulatorConfig {
         HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace> + 'static,
         HC::Hook: Send + 'static,
     {
-        Box::new(ParallelSimulator {
+        Box::new(MultithreadSimulator {
             env_config,
             manager_agent_config,
             num_workers: self.num_workers,
@@ -47,15 +47,15 @@ impl ParallelSimulatorConfig {
     }
 }
 
-/// Parallel (multi-thread) simulator.
-pub struct ParallelSimulator<EC, MAC, HC> {
+/// Multithread simulator
+pub struct MultithreadSimulator<EC, MAC, HC> {
     env_config: EC,
     manager_agent_config: MAC,
     num_workers: usize,
     hook_config: HC,
 }
 
-impl<EC, MAC, HC> Simulator for ParallelSimulator<EC, MAC, HC>
+impl<EC, MAC, HC> Simulator for MultithreadSimulator<EC, MAC, HC>
 where
     EC: BuildEnv,
     EC::Environment: Send + 'static,

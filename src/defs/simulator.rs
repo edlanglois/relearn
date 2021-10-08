@@ -4,7 +4,7 @@ use super::agent::{
 use super::env::{VisitEnvAnyAny, VisitEnvBase, VisitEnvFiniteFinite, VisitEnvMetaFinitFinite};
 use super::{AgentDef, EnvDef, HooksDef, MultiThreadAgentDef};
 use crate::envs::{BuildEnv, MetaObservationSpace};
-use crate::simulation::{ParallelSimulatorConfig, SerialSimulator, Simulator};
+use crate::simulation::{MultithreadSimulatorConfig, SerialSimulator, Simulator};
 use crate::spaces::FiniteSpace;
 
 /// Construct a boxed serial agent-environment simulator
@@ -27,7 +27,7 @@ pub fn boxed_serial_simulator(
     })
 }
 
-/// Construct a boxed parallel agent-environment simulator.
+/// Construct a boxed multithread agent-environment simulator.
 ///
 /// [`Simulator::run_simulation`] will return an error if
 /// the agent and environment are incompatible.
@@ -37,13 +37,13 @@ pub fn boxed_serial_simulator(
 /// * `env_def` - Environment definition
 /// * `agent_def` - Multi-thread agent definition
 /// * `hooks_def` - Simulation hooks definition
-pub fn boxed_parallel_simulator(
-    sim_config: ParallelSimulatorConfig,
+pub fn boxed_multithread_simulator(
+    sim_config: MultithreadSimulatorConfig,
     env_def: EnvDef,
     agent_def: MultiThreadAgentDef,
     hooks_def: HooksDef,
 ) -> Box<dyn Simulator> {
-    env_def.visit(ParallelSimulatorVisitor {
+    env_def.visit(MultithreadSimulatorVisitor {
         sim_config,
         agent_def,
         hooks_def,
@@ -111,18 +111,18 @@ impl VisitEnvAnyAny for SerialSimulatorVisitor {
     }
 }
 
-/// Environment visitor that constructs a parallel simulator
-struct ParallelSimulatorVisitor {
-    pub sim_config: ParallelSimulatorConfig,
+/// Environment visitor that constructs a multithread simulator
+struct MultithreadSimulatorVisitor {
+    pub sim_config: MultithreadSimulatorConfig,
     pub agent_def: MultiThreadAgentDef,
     pub hooks_def: HooksDef,
 }
 
-impl VisitEnvBase for ParallelSimulatorVisitor {
+impl VisitEnvBase for MultithreadSimulatorVisitor {
     type Out = Box<dyn Simulator>;
 }
 
-impl VisitEnvFiniteFinite for ParallelSimulatorVisitor {
+impl VisitEnvFiniteFinite for MultithreadSimulatorVisitor {
     fn visit_env_finite_finite<EC>(self, env_config: EC) -> Self::Out
     where
         EC: BuildEnv + 'static,
@@ -139,7 +139,7 @@ impl VisitEnvFiniteFinite for ParallelSimulatorVisitor {
     }
 }
 
-impl VisitEnvMetaFinitFinite for ParallelSimulatorVisitor {
+impl VisitEnvMetaFinitFinite for MultithreadSimulatorVisitor {
     fn visit_env_meta_finite_finite<EC, OS, AS>(self, env_config: EC) -> Self::Out
     where
         EC: BuildEnv<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + 'static,
@@ -159,7 +159,7 @@ impl VisitEnvMetaFinitFinite for ParallelSimulatorVisitor {
     }
 }
 
-impl VisitEnvAnyAny for ParallelSimulatorVisitor {
+impl VisitEnvAnyAny for MultithreadSimulatorVisitor {
     fn visit_env_any_any<EC>(self, env_config: EC) -> Self::Out
     where
         EC: BuildEnv + 'static,

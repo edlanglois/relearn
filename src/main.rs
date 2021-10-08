@@ -1,8 +1,8 @@
 use clap::Clap;
 use relearn::cli::Options;
-use relearn::defs::{boxed_parallel_simulator, boxed_serial_simulator, HookDef, HooksDef};
+use relearn::defs::{boxed_multithread_simulator, boxed_serial_simulator, HookDef, HooksDef};
 use relearn::logging::CLILogger;
-use relearn::simulation::{hooks::StepLoggerConfig, ParallelSimulatorConfig};
+use relearn::simulation::{hooks::StepLoggerConfig, MultithreadSimulatorConfig};
 use relearn::{AgentDef, EnvDef, MultiThreadAgentDef};
 use std::convert::From;
 use std::error::Error;
@@ -23,7 +23,7 @@ fn run_serial(opts: &Options, env_def: EnvDef, hook_def: HooksDef) -> Result<(),
     Ok(())
 }
 
-fn run_parallel(
+fn run_multithread(
     opts: &Options,
     env_def: EnvDef,
     hook_def: HooksDef,
@@ -36,7 +36,7 @@ fn run_parallel(
     if num_threads == 0 {
         num_threads = num_cpus::get();
     }
-    let sim_config = ParallelSimulatorConfig {
+    let sim_config = MultithreadSimulatorConfig {
         num_workers: num_threads,
     };
     println!("Simulation:\n{:#?}", sim_config);
@@ -47,7 +47,7 @@ fn run_parallel(
 
     let env_seed = opts.seed;
     let agent_seed = opts.seed.wrapping_add(1);
-    let mut simulation = boxed_parallel_simulator(sim_config, env_def, agent_def, hook_def);
+    let mut simulation = boxed_multithread_simulator(sim_config, env_def, agent_def, hook_def);
     let mut logger = CLILogger::new(Duration::from_millis(1000), true);
     simulation
         .run_simulation(env_seed, agent_seed, &mut logger)
@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let hook_def = HooksDef::new(vec![HookDef::StepLogger(StepLoggerConfig)]);
 
     if let Some(num_threads) = opts.parallel_threads {
-        run_parallel(&opts, env_def, hook_def, num_threads)
+        run_multithread(&opts, env_def, hook_def, num_threads)
     } else {
         run_serial(&opts, env_def, hook_def)
     }

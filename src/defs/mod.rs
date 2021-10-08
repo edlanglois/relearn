@@ -17,5 +17,5 @@ pub use env::{BanditMeanRewards, EnvDef};
 pub use hook::{HookDef, HooksDef};
 pub use optimizer::OptimizerDef;
 pub use seq_mod::{PolicyDef, SeqModDef};
-pub use simulator::{boxed_parallel_simulator, boxed_serial_simulator};
+pub use simulator::{boxed_multithread_simulator, boxed_serial_simulator};
 pub use updater::{CriticUpdaterDef, PolicyUpdaterDef};
