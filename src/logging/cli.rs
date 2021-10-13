@@ -21,19 +21,16 @@ pub struct CLILogger {
     // but will log anyways if urgent_display_period is reached.
     urgent_display_period: Duration,
     last_display_time: Instant,
-
-    average_between_displays: bool,
 }
 
 impl CLILogger {
-    pub fn new(display_period: Duration, average_between_displays: bool) -> Self {
+    pub fn new(display_period: Duration) -> Self {
         let urgent_display_period = display_period.mul_f32(1.1);
         Self {
             events: enum_map! { _ => EventLog::new() },
             display_period,
             urgent_display_period,
             last_display_time: Instant::now(),
-            average_between_displays,
         }
     }
 
@@ -47,16 +44,12 @@ impl CLILogger {
             }
 
             print!("==== ");
-            if self.average_between_displays {
-                print!(
-                    "{:?}s {} - {}",
-                    event,
-                    event_log.summary_start_index,
-                    event_log.index - 1
-                );
-            } else {
-                print!("{:?} {}", event, event_log.index - 1);
-            }
+            print!(
+                "{:?}s {} - {}",
+                event,
+                event_log.summary_start_index,
+                event_log.index - 1
+            );
             print!(
                 " ({:?} / event)",
                 event_log.total_duration / summary_size.try_into().unwrap()
