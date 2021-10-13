@@ -1,7 +1,7 @@
 //! Command-line logger
 use super::{
-    Event, Id, IncompatibleValueError, LogError, Loggable, ScopedLogger, TimeSeriesEventLogger,
-    TimeSeriesLogger,
+    BuildThreadLogger, Event, Id, IncompatibleValueError, LogError, Loggable, ScopedLogger,
+    TimeSeriesEventLogger, TimeSeriesLogger,
 };
 use enum_map::{enum_map, EnumMap};
 use std::borrow::Cow;
@@ -10,6 +10,48 @@ use std::convert::TryInto;
 use std::fmt;
 use std::ops::Drop;
 use std::time::{Duration, Instant};
+
+/// Configuration for [`CLILogger`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct CLILoggerConfig {
+    /// Target display period.
+    ///
+    /// Output is produced on event boundaries when the time since last display exceeds
+    /// `display_period`.
+    /// Certain high-frequency events do not trigger output in order to align output with more
+    /// important events.
+    pub display_period: Duration,
+    /// Urgent fallback display period.
+    ///
+    /// Triggers output on any event once this period has elapsed without any output.
+    pub urgent_display_period: Duration,
+}
+
+impl Default for CLILoggerConfig {
+    fn default() -> Self {
+        let display_period = Duration::from_millis(1000);
+        let urgent_display_period = Duration::from_millis(1100);
+        Self {
+            display_period,
+            urgent_display_period,
+        }
+    }
+}
+
+impl CLILoggerConfig {
+    pub fn build_logger(&self) -> CLILogger {
+        CLILogger::new(self.display_period, self.urgent_display_period)
+    }
+}
+
+impl BuildThreadLogger for CLILoggerConfig {
+    // TODO: Lock stdout to avoid simultaneous writes
+    type ThreadLogger = CLILogger;
+
+    fn build_thread_logger(&self, _thread_id: usize) -> Self::ThreadLogger {
+        CLILogger::new(self.display_period, self.urgent_display_period)
+    }
+}
 
 /// Time series logger that writes summaries to stderr.
 #[derive(Debug, Clone)]
@@ -24,8 +66,7 @@ pub struct CLILogger {
 }
 
 impl CLILogger {
-    pub fn new(display_period: Duration) -> Self {
-        let urgent_display_period = display_period.mul_f32(1.1);
+    pub fn new(display_period: Duration, urgent_display_period: Duration) -> Self {
         Self {
             events: enum_map! { _ => EventLog::new() },
             display_period,
