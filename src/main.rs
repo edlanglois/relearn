@@ -14,10 +14,10 @@ fn run_serial(opts: &Options, env_def: EnvDef, hook_def: HooksDef) -> Result<(),
 
     let env_seed = opts.seed;
     let agent_seed = opts.seed.wrapping_add(1);
-    let mut simulation = boxed_serial_simulator(env_def, agent_def, hook_def);
+    let simulator = boxed_serial_simulator(env_def, agent_def, hook_def);
     let logger_config = CLILoggerConfig::default();
     let mut logger = logger_config.build_logger();
-    simulation
+    simulator
         .run_simulation(env_seed, agent_seed, &mut logger)
         .expect("Simulation failed");
     Ok(())
@@ -47,10 +47,10 @@ fn run_multithread(
 
     let env_seed = opts.seed;
     let agent_seed = opts.seed.wrapping_add(1);
-    let mut simulation = boxed_multithread_simulator(sim_config, env_def, agent_def, hook_def);
+    let simulator = boxed_multithread_simulator(sim_config, env_def, agent_def, hook_def);
     let logger_config = CLILoggerConfig::default();
     let mut logger = logger_config.build_logger();
-    simulation
+    simulator
         .run_simulation(env_seed, agent_seed, &mut logger)
         .expect("Simulation failed");
     Ok(())

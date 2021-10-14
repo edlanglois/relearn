@@ -23,7 +23,7 @@ pub trait Simulator {
     ///                Agnet workers use the seeds `agent_seed`, `agent_seed + 1`, etc.
     /// * `logger` - The logger for the main thread.
     fn run_simulation(
-        &mut self,
+        &self,
         env_seed: u64,
         agent_seed: u64,
         logger: &mut dyn TimeSeriesLogger,

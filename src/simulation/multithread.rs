@@ -65,7 +65,7 @@ where
     HC::Hook: Send + 'static,
 {
     fn run_simulation(
-        &mut self,
+        &self,
         env_seed: u64,
         agent_seed: u64,
         logger: &mut dyn TimeSeriesLogger,
