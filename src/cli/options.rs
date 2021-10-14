@@ -190,6 +190,10 @@ pub struct Options {
     /// Maximum number of experiment steps (total steps when running parallel simulations)"
     pub max_steps: Option<u64>,
 
+    #[clap(long, help_heading = Some("SIMULATION OPTIONS"))]
+    /// Maximum number of experiment episodes (total episodes when running parallel simulations)"
+    pub max_episodes: Option<u64>,
+
     #[clap(short, long, visible_alias="parallel", default_missing_value="0",
            help_heading = Some("SIMULATION OPTIONS"))]
     /// Number of parallel simulation threads. An additional thread runs the agent manager.

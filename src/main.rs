@@ -1,8 +1,8 @@
 use clap::Clap;
 use relearn::cli::Options;
-use relearn::defs::{boxed_multithread_simulator, boxed_serial_simulator, HookDef, HooksDef};
+use relearn::defs::{boxed_multithread_simulator, boxed_serial_simulator, HooksDef};
 use relearn::logging::CLILoggerConfig;
-use relearn::simulation::{hooks::StepLoggerConfig, MultithreadSimulatorConfig};
+use relearn::simulation::MultithreadSimulatorConfig;
 use relearn::{AgentDef, EnvDef, MultithreadAgentDef};
 use std::convert::From;
 use std::error::Error;
@@ -62,12 +62,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let env_def = EnvDef::from(&opts);
     println!("Environment:\n{:#?}", env_def);
 
-    // TODO: Load from opts
-    let hook_def = HooksDef::new(vec![HookDef::StepLogger(StepLoggerConfig)]);
+    let hooks_def = HooksDef::from(&opts);
+    println!("Simulation Hooks:\n{:#?}", hooks_def);
 
     if let Some(num_threads) = opts.parallel_threads {
-        run_multithread(&opts, env_def, hook_def, num_threads)
+        run_multithread(&opts, env_def, hooks_def, num_threads)
     } else {
-        run_serial(&opts, env_def, hook_def)
+        run_serial(&opts, env_def, hooks_def)
     }
 }
