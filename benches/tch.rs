@@ -264,7 +264,7 @@ fn replicate_module<F: FnOnce(&nn::Path) -> T, T>(
 ) -> T {
     let mut vs = nn::VarStore::new(device);
     let module = f(&vs.root());
-    vs.copy(&src_vs).unwrap();
+    vs.copy(src_vs).unwrap();
     module
 }
 

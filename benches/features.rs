@@ -35,7 +35,7 @@ pub fn one_hot_out(labels: &Tensor, out: &mut Tensor) {
 }
 
 fn option_index_features_by_copy(elements: &[Option<usize>], num_classes: usize) -> Tensor {
-    let (none_indices, some_indices, some_values) = split_option_array(&elements);
+    let (none_indices, some_indices, some_values) = split_option_array(elements);
     let mut out = Tensor::empty(
         &[elements.len() as i64, (num_classes + 1) as i64],
         (Kind::Float, Device::Cpu),
