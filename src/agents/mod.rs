@@ -21,14 +21,16 @@ pub use batch_update::{
 };
 use finite::{BuildIndexAgent, FiniteSpaceAgent};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
-pub use multithread::{MutexAgentConfig, MutexAgentManager, MutexAgentWorker};
+pub use multithread::{
+    BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager, MutexAgentConfig,
+    MutexAgentInitializer, MutexAgentManager, MutexAgentWorker,
+};
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::Space;
-use std::marker::PhantomData;
 use tch::TchError;
 use thiserror::Error;
 
@@ -140,94 +142,6 @@ pub trait SetActorMode {
 impl<T: SetActorMode + ?Sized> SetActorMode for Box<T> {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         T::set_actor_mode(self, mode)
-    }
-}
-
-// TODO: Replace with BuildMultithreadAgent that constructs a manager and n workers
-// Or maybe builds MultithreadAgentInitializer with the methods
-// make_worker(&self) -> Self::Worker and
-// into_manager(self) -> Self::Manager
-
-pub trait BuildManagerAgent<OS: Space, AS: Space> {
-    type ManagerAgent: ManagerAgent<Worker = Self::Worker>;
-    type Worker: Agent<OS::Element, AS::Element> + Send + 'static;
-
-    fn build_manager_agent(
-        &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
-        seed: u64,
-    ) -> Result<Self::ManagerAgent, BuildAgentError>;
-}
-
-/// A manager agent for a set of multi-threaded workers.
-///
-/// Each worker will be sent to its own thread while the manager is run on the original thread.
-/// The workers will be run on a sequence of environment steps.
-/// The managers and workers are responsible for internally coordinating updates and
-/// synchronization.
-pub trait ManagerAgent {
-    type Worker: Send + 'static;
-
-    /// Create a new worker instance.
-    fn make_worker(&mut self, seed: u64) -> Self::Worker;
-
-    /// Run the manager.
-    ///
-    /// This function will be run on a separate thread from the workers.
-    ///
-    /// For example, it might collect data from the workers, perform policy updates,
-    /// and distribute the updated policy back to the workers.
-    fn run(&mut self, logger: &mut dyn TimeSeriesLogger);
-}
-
-impl<T> ManagerAgent for Box<T>
-where
-    T: ManagerAgent + ?Sized,
-{
-    type Worker = T::Worker;
-
-    fn make_worker(&mut self, seed: u64) -> Self::Worker {
-        T::make_worker(self, seed)
-    }
-
-    fn run(&mut self, logger: &mut dyn TimeSeriesLogger) {
-        T::run(self, logger)
-    }
-}
-
-/// Wraps a [`ManagerAgent`] to return boxed workers.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct BoxingManager<T, O, A> {
-    inner: T,
-    observation_type: PhantomData<*const O>,
-    action_type: PhantomData<*const A>,
-}
-
-impl<T, O, A> BoxingManager<T, O, A> {
-    pub const fn new(inner: T) -> Self {
-        Self {
-            inner,
-            observation_type: PhantomData,
-            action_type: PhantomData,
-        }
-    }
-}
-
-impl<T, O, A> ManagerAgent for BoxingManager<T, O, A>
-where
-    T: ManagerAgent,
-    T::Worker: Agent<O, A>,
-    O: 'static,
-    A: 'static,
-{
-    type Worker = Box<dyn Agent<O, A> + Send>;
-
-    fn make_worker(&mut self, seed: u64) -> Self::Worker {
-        Box::new(self.inner.make_worker(seed))
-    }
-
-    fn run(&mut self, logger: &mut dyn TimeSeriesLogger) {
-        self.inner.run(logger)
     }
 }
 

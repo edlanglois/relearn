@@ -1,8 +1,9 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyDef, PolicyUpdaterDef};
 use crate::agents::{
-    Agent, BetaThompsonSamplingAgentConfig, BoxingManager, BuildAgent, BuildAgentError,
-    BuildManagerAgent, FullAgent, ManagerAgent, MutexAgentManager, RandomAgentConfig,
-    ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
+    Agent, BetaThompsonSamplingAgentConfig, BuildAgent, BuildAgentError, BuildMultithreadAgent,
+    FullAgent, InitializeMultithreadAgent, MultithreadAgentManager, MutexAgentConfig,
+    MutexAgentInitializer, RandomAgentConfig, ResettingMetaAgent, TabularQLearningAgentConfig,
+    UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::Loggable;
@@ -106,26 +107,61 @@ where
     }
 }
 
-impl<T, OS, AS> BuildManagerAgent<OS, AS> for ForAnyAny<T>
+/// [`InitializeMultithreadAgent`] for the agents defined by [`MultithreadAgentDef`].
+///
+/// This is used instead of `Box<dyn InitializeMultithreadAgent>`
+/// because it is not possible to implement `InitializeMultithreadAgent` for the latter
+/// because [`InitializeMultithreadAgent::into_manager`] takes the sized `self`.
+pub enum GenericMultithreadInitializer<OS: Space, AS: Space> {
+    Mutex(MutexAgentInitializer<Box<dyn FullAgent<OS::Element, AS::Element> + Send>>),
+}
+
+impl<OS, AS> InitializeMultithreadAgent<OS::Element, AS::Element>
+    for GenericMultithreadInitializer<OS, AS>
+where
+    OS: Space + 'static,
+    OS::Element: 'static,
+    AS: Space + 'static,
+    AS::Element: 'static,
+{
+    type Manager = Box<dyn MultithreadAgentManager>;
+    type Worker = Box<dyn Agent<OS::Element, AS::Element> + Send>;
+
+    fn make_worker(&self, id: usize) -> Self::Worker {
+        use GenericMultithreadInitializer::*;
+        match self {
+            Mutex(initializer) => Box::new(initializer.make_worker(id)),
+        }
+    }
+
+    fn into_manager(self) -> Self::Manager {
+        use GenericMultithreadInitializer::*;
+        match self {
+            Mutex(initializer) => Box::new(initializer.into_manager()),
+        }
+    }
+}
+
+impl<T, OS, AS> BuildMultithreadAgent<OS, AS> for ForAnyAny<T>
 where
     T: Borrow<MultithreadAgentDef>,
     OS: RLObservationSpace,
     AS: RLActionSpace,
 {
-    type ManagerAgent = Box<DynEnvManagerAgent<OS, AS>>;
-    type Worker = Box<dyn Agent<OS::Element, AS::Element> + Send>;
+    type MultithreadAgent = GenericMultithreadInitializer<OS, AS>;
 
-    fn build_manager_agent(
+    fn build_multithread_agent(
         &self,
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
-    ) -> Result<Self::ManagerAgent, BuildAgentError> {
+    ) -> Result<Self::MultithreadAgent, BuildAgentError> {
         use MultithreadAgentDef::*;
-        match self.0.borrow() {
-            Mutex(config) => ForAnyAny(config.borrow())
-                .build_agent(env, seed)
-                .map(|a| Box::new(BoxingManager::new(MutexAgentManager::new(a))) as _),
-        }
+        Ok(match self.0.borrow() {
+            Mutex(config) => GenericMultithreadInitializer::Mutex(
+                MutexAgentConfig::new(ForAnyAny(config.borrow()))
+                    .build_multithread_agent(env, seed)?,
+            ),
+        })
     }
 }
 
@@ -165,26 +201,26 @@ where
     }
 }
 
-impl<T, OS, AS> BuildManagerAgent<OS, AS> for ForFiniteFinite<T>
+impl<T, OS, AS> BuildMultithreadAgent<OS, AS> for ForFiniteFinite<T>
 where
     T: Borrow<MultithreadAgentDef>,
     OS: RLObservationSpace + FiniteSpace,
     AS: RLActionSpace + FiniteSpace,
 {
-    type ManagerAgent = Box<DynEnvManagerAgent<OS, AS>>;
-    type Worker = Box<dyn Agent<OS::Element, AS::Element> + Send>;
+    type MultithreadAgent = GenericMultithreadInitializer<OS, AS>;
 
-    fn build_manager_agent(
+    fn build_multithread_agent(
         &self,
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
-    ) -> Result<Self::ManagerAgent, BuildAgentError> {
+    ) -> Result<Self::MultithreadAgent, BuildAgentError> {
         use MultithreadAgentDef::*;
-        match self.0.borrow() {
-            Mutex(config) => ForFiniteFinite(config.borrow())
-                .build_agent(env, seed)
-                .map(|a| Box::new(BoxingManager::new(MutexAgentManager::new(a))) as _),
-        }
+        Ok(match self.0.borrow() {
+            Mutex(config) => GenericMultithreadInitializer::Mutex(
+                MutexAgentConfig::new(ForFiniteFinite(config.borrow()))
+                    .build_multithread_agent(env, seed)?,
+            ),
+        })
     }
 }
 
@@ -211,7 +247,8 @@ where
     OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace + Clone,
     AS::Element: Clone,
-    // I think this ought to be inferrable but for whatever reason it isn't
+    // I think this ought to be inferrable but for some reason it isn't
+    // It may have to do with SendElementSpace
     MetaObservationSpace<OS, AS>: RLObservationSpace,
 {
     type Agent = Box<DynFullAgent<MetaObservationSpace<OS, AS>, AS>>;
@@ -235,41 +272,34 @@ where
     }
 }
 
-impl<T, OS, AS> BuildManagerAgent<MetaObservationSpace<OS, AS>, AS> for ForMetaFiniteFinite<T>
+impl<T, OS, AS> BuildMultithreadAgent<MetaObservationSpace<OS, AS>, AS> for ForMetaFiniteFinite<T>
 where
     T: Borrow<MultithreadAgentDef>,
     OS: RLObservationSpace + FiniteSpace + Clone,
     OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace + Clone,
     AS::Element: Clone,
-    // I think this ought to be inferrable but for whatever reason it isn't
+    // I think this ought to be inferrable but for some reason it isn't
+    // It may have to do with SendElementSpace
     MetaObservationSpace<OS, AS>: RLObservationSpace,
 {
-    type ManagerAgent = Box<DynEnvManagerAgent<MetaObservationSpace<OS, AS>, AS>>;
-    type Worker =
-        Box<dyn Agent<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element> + Send>;
+    type MultithreadAgent = GenericMultithreadInitializer<MetaObservationSpace<OS, AS>, AS>;
 
-    fn build_manager_agent(
+    fn build_multithread_agent(
         &self,
         env: &dyn EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
         seed: u64,
-    ) -> Result<Self::ManagerAgent, BuildAgentError> {
+    ) -> Result<Self::MultithreadAgent, BuildAgentError> {
         use MultithreadAgentDef::*;
-        match self.0.borrow() {
-            Mutex(config) => ForMetaFiniteFinite(config.borrow())
-                .build_agent(env, seed)
-                .map(|a| Box::new(BoxingManager::new(MutexAgentManager::new(a))) as _),
-        }
+        Ok(match self.0.borrow() {
+            Mutex(config) => GenericMultithreadInitializer::Mutex(
+                MutexAgentConfig::new(ForMetaFiniteFinite(config.borrow()))
+                    .build_multithread_agent(env, seed)?,
+            ),
+        })
     }
 }
 
 /// Send-able [`FullAgent`] trait object for an environment structure.
 pub type DynFullAgent<OS, AS> =
     dyn FullAgent<<OS as Space>::Element, <AS as Space>::Element> + Send;
-
-/// The agent manager trait object for a given environment structure.
-///
-/// See also [`BoxingManager`](crate::agents::BoxingManager).
-pub type DynEnvManagerAgent<OS, AS> = dyn ManagerAgent<
-    Worker = Box<dyn Agent<<OS as Space>::Element, <AS as Space>::Element> + Send>,
->;

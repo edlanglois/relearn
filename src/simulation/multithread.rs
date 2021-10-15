@@ -1,8 +1,8 @@
 use super::hooks::BuildSimulationHook;
 use super::{run_agent, Simulator, SimulatorError};
-use crate::agents::{Agent, BuildManagerAgent, ManagerAgent};
-use crate::envs::BuildEnv;
-use crate::logging::TimeSeriesLogger;
+use crate::agents::{BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager};
+use crate::envs::{BuildEnv, EnvStructure};
+use crate::logging::{BuildThreadLogger, TimeSeriesLogger};
 use std::thread;
 
 /// Configuration for [`MultithreadSimulator`].
@@ -24,45 +24,93 @@ impl MultithreadSimulatorConfig {
         Self { num_workers }
     }
 
-    pub fn build_boxed_simulator<EC, MAC, HC>(
+    pub const fn build_simulator<EC, AC, HC, LC>(
         &self,
         env_config: EC,
-        manager_agent_config: MAC,
+        agent_config: AC,
         hook_config: HC,
-    ) -> Box<dyn Simulator>
-    where
-        EC: BuildEnv + 'static,
-        EC::Environment: Send + 'static,
-        EC::Observation: Clone,
-        MAC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace> + 'static,
-        HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace> + 'static,
-        HC::Hook: Send + 'static,
-    {
-        Box::new(MultithreadSimulator {
+        worker_logger_config: LC,
+    ) -> MultithreadSimulator<EC, AC, HC, LC> {
+        MultithreadSimulator {
             env_config,
-            manager_agent_config,
-            num_workers: self.num_workers,
+            agent_config,
             hook_config,
-        })
+            worker_logger_config,
+            num_workers: self.num_workers,
+        }
     }
 }
 
-/// Multithread simulator
-pub struct MultithreadSimulator<EC, MAC, HC> {
-    env_config: EC,
-    manager_agent_config: MAC,
-    num_workers: usize,
-    hook_config: HC,
+/// An agent-environment simulator with multiple individual simulation threads.
+#[derive(Debug)]
+pub struct MultithreadSimulator<EC, AC, HC, LC> {
+    pub env_config: EC,
+    pub agent_config: AC,
+    pub hook_config: HC,
+    pub worker_logger_config: LC,
+    pub num_workers: usize,
 }
 
-impl<EC, MAC, HC> Simulator for MultithreadSimulator<EC, MAC, HC>
+impl<EC, AC, HC, LC> MultithreadSimulator<EC, AC, HC, LC>
 where
     EC: BuildEnv,
-    EC::Environment: Send + 'static,
     EC::Observation: Clone,
-    MAC: BuildManagerAgent<EC::ObservationSpace, EC::ActionSpace>,
+    EC::Environment: Send + 'static,
+    AC: BuildMultithreadAgent<EC::ObservationSpace, EC::ActionSpace>,
     HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace>,
     HC::Hook: Send + 'static,
+    LC: BuildThreadLogger,
+    LC::ThreadLogger: TimeSeriesLogger + Send + 'static,
+{
+    #[allow(clippy::type_complexity)]
+    /// Run a simulation and return the trained manager agent.
+    pub fn train(
+        &self,
+        env_seed: u64,
+        agent_seed: u64,
+        logger: &mut dyn TimeSeriesLogger,
+    ) -> Result<
+        <AC::MultithreadAgent as InitializeMultithreadAgent<EC::Observation, EC::Action>>::Manager,
+        SimulatorError,
+    > {
+        let mut worker_threads = vec![];
+        let env_structure: &dyn EnvStructure<ObservationSpace = _, ActionSpace = _> =
+            &self.env_config.build_env(env_seed).unwrap();
+        let agent_initializer = self
+            .agent_config
+            .build_multithread_agent(env_structure, agent_seed)
+            .unwrap();
+
+        for i in 0..self.num_workers {
+            let mut env = self.env_config.build_env(env_seed.wrapping_add(i as u64))?;
+            let mut worker = agent_initializer.make_worker(i);
+            let mut hook = self.hook_config.build_hook(&env, self.num_workers, i);
+            let mut worker_logger = self.worker_logger_config.build_thread_logger(i);
+            worker_threads.push(thread::spawn(move || {
+                run_agent(&mut env, &mut worker, &mut hook, &mut worker_logger);
+            }));
+        }
+
+        let mut manager = agent_initializer.into_manager();
+        manager.run(logger);
+
+        for thread in worker_threads.into_iter() {
+            thread.join().expect("Worker thread panic");
+        }
+        Ok(manager)
+    }
+}
+
+impl<EC, AC, HC, LC> Simulator for MultithreadSimulator<EC, AC, HC, LC>
+where
+    EC: BuildEnv,
+    EC::Observation: Clone,
+    EC::Environment: Send + 'static,
+    AC: BuildMultithreadAgent<EC::ObservationSpace, EC::ActionSpace>,
+    HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace>,
+    HC::Hook: Send + 'static,
+    LC: BuildThreadLogger,
+    LC::ThreadLogger: TimeSeriesLogger + Send + 'static,
 {
     fn run_simulation(
         &self,
@@ -70,57 +118,7 @@ where
         agent_seed: u64,
         logger: &mut dyn TimeSeriesLogger,
     ) -> Result<(), SimulatorError> {
-        let env_structure = self.env_config.build_env(env_seed)?;
-        let mut manager_agent = self
-            .manager_agent_config
-            .build_manager_agent(&env_structure, agent_seed)?;
-        drop(env_structure);
-        run_agent_multithread(
-            &self.env_config,
-            &mut manager_agent,
-            self.num_workers,
-            &self.hook_config,
-            env_seed,
-            agent_seed,
-            logger,
-        );
+        self.train(env_seed, agent_seed, logger)?;
         Ok(())
-    }
-}
-
-pub fn run_agent_multithread<EC, MA, HC>(
-    env_config: &EC,
-    agent_manager: &mut MA,
-    num_workers: usize,
-    worker_hook_config: &HC,
-    env_seed: u64,
-    agent_seed: u64,
-    logger: &mut dyn TimeSeriesLogger,
-) where
-    EC: BuildEnv + ?Sized,
-    EC::Environment: Send + 'static,
-    MA: ManagerAgent,
-    MA::Worker: Agent<EC::Observation, EC::Action> + 'static,
-    EC::Observation: Clone,
-    HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace>,
-    HC::Hook: Send + 'static,
-{
-    let mut worker_threads = vec![];
-    for i in 0..num_workers {
-        let env_seed_i = env_seed.wrapping_add(i as u64);
-        let mut env = env_config
-            .build_env(env_seed_i)
-            .expect("failed to build environment");
-        let agent_seed_i = agent_seed.wrapping_add(i as u64);
-        let mut worker = agent_manager.make_worker(agent_seed_i);
-        let mut hook = worker_hook_config.build_hook(&env, num_workers, i);
-        worker_threads.push(thread::spawn(move || {
-            run_agent(&mut env, &mut worker, &mut hook, &mut ());
-        }));
-    }
-
-    agent_manager.run(logger);
-    for thread in worker_threads.into_iter() {
-        thread.join().unwrap();
     }
 }

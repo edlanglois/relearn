@@ -4,7 +4,7 @@ mod multithread;
 mod serial;
 
 pub use hooks::{BuildSimulationHook, GenericSimulationHook, SimulationHook};
-pub use multithread::{run_agent_multithread, MultithreadSimulator, MultithreadSimulatorConfig};
+pub use multithread::{MultithreadSimulator, MultithreadSimulatorConfig};
 pub use serial::{run_actor, run_agent, SerialSimulator};
 
 use crate::agents::BuildAgentError;

@@ -47,9 +47,10 @@ fn run_multithread(
 
     let env_seed = opts.seed;
     let agent_seed = opts.seed.wrapping_add(1);
-    let simulator = boxed_multithread_simulator(sim_config, env_def, agent_def, hook_def);
     let logger_config = CLILoggerConfig::default();
     let mut logger = logger_config.build_logger();
+    let simulator =
+        boxed_multithread_simulator(sim_config, env_def, agent_def, hook_def, logger_config);
     simulator
         .run_simulation(env_seed, agent_seed, &mut logger)
         .expect("Simulation failed");
