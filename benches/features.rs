@@ -5,6 +5,7 @@ use criterion::{
 use ndarray::{s, Array, Array2, ArrayViewMut, Ix1};
 use std::array::IntoIter;
 use std::convert::TryInto;
+use std::time::Duration;
 use tch::{Device, IndexOp, Kind, Tensor};
 
 fn split_option_array(elements: &[Option<usize>]) -> (Vec<i64>, Vec<i64>, Vec<i64>) {
@@ -227,6 +228,12 @@ fn option_index_features(c: &mut Criterion) {
                 }
             })
             .collect();
+        if size >= 100_000 {
+            // Some tests are very slow so measure for a specific time insted of a specific sample
+            // count
+            group.measurement_time(Duration::from_secs(10));
+            group.sample_size(10); // The minimum
+        }
 
         let r1 = option_index_features_by_copy(&elements, num_classes);
         group.bench_function(BenchmarkId::new("by_copy", size), |b| {
