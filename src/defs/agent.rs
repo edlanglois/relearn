@@ -127,7 +127,7 @@ where
     type Manager = Box<dyn MultithreadAgentManager>;
     type Worker = Box<dyn Agent<OS::Element, AS::Element> + Send>;
 
-    fn make_worker(&self, id: usize) -> Self::Worker {
+    fn make_worker(&mut self, id: usize) -> Self::Worker {
         use GenericMultithreadInitializer::*;
         match self {
             Mutex(initializer) => Box::new(initializer.make_worker(id)),

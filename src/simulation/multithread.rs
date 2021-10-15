@@ -76,7 +76,7 @@ where
         let mut worker_threads = vec![];
         let env_structure: &dyn EnvStructure<ObservationSpace = _, ActionSpace = _> =
             &self.env_config.build_env(env_seed).unwrap();
-        let agent_initializer = self
+        let mut agent_initializer = self
             .agent_config
             .build_multithread_agent(env_structure, agent_seed)
             .unwrap();
