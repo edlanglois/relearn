@@ -3,6 +3,7 @@ mod agent;
 mod critic;
 mod env;
 mod hook;
+mod logger;
 mod optimizer;
 mod options;
 mod seq_mod;

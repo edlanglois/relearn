@@ -200,6 +200,10 @@ pub struct Options {
     ///
     /// Passing this option without an argument (or 0) defaults to the number of CPU cores.
     pub parallel_threads: Option<usize>,
+
+    #[clap(long, help_heading = Some("SIMULATION OPTIONS"))]
+    /// Log display period in seconds
+    pub display_period: Option<u64>,
 }
 
 /// Stores the agent argument help message.

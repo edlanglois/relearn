@@ -57,7 +57,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let hooks_def = HooksDef::from(&opts);
     println!("Simulation Hooks:\n{:#?}", hooks_def);
 
-    let logger_config = CLILoggerConfig::default();
+    let logger_config = CLILoggerConfig::from(&opts);
+    println!("Logger:\n{:#?}", logger_config);
     let mut logger = logger_config.build_logger();
 
     let simulator = if let Some(num_threads) = opts.parallel_threads {
