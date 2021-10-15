@@ -25,12 +25,12 @@ fn split_option_array(elements: &[Option<usize>]) -> (Vec<i64>, Vec<i64>, Vec<i6
 fn one_hot(labels: &Tensor, num_classes: usize, kind: Kind) -> Tensor {
     let mut shape = labels.size();
     shape.push(num_classes as i64);
-    Tensor::zeros(&shape, (kind, labels.device())).scatter_1(-1, &labels.unsqueeze(-1), 1)
+    Tensor::zeros(&shape, (kind, labels.device())).scatter_value_(-1, &labels.unsqueeze(-1), 1)
 }
 
 pub fn one_hot_out(labels: &Tensor, out: &mut Tensor) {
     let _ = out.zero_();
-    let _ = out.scatter_1(-1, &labels.unsqueeze(-1), 1);
+    let _ = out.scatter_value_(-1, &labels.unsqueeze(-1), 1);
 }
 
 fn option_index_features_by_copy(elements: &[Option<usize>], num_classes: usize) -> Tensor {

@@ -2,8 +2,8 @@ use criterion::{
     criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration,
     Throughput,
 };
-use relearn::torch::seq_modules::{Gru, RnnConfig, SequenceModule};
-use relearn::torch::ModuleBuilder;
+use relearn::torch::seq_modules::{GruConfig, SequenceModule};
+use relearn::torch::BuildModule;
 use std::array::IntoIter;
 use tch::{nn::VarStore, Device, Kind, Tensor};
 
@@ -16,7 +16,7 @@ fn gru_rnn(c: &mut Criterion) {
     let in_features = 3;
     let out_features = 4;
     let vs = VarStore::new(Device::Cpu);
-    let gru: Gru = RnnConfig::default().build_module(&vs.root(), in_features, out_features);
+    let gru = GruConfig::default().build_module(&vs.root(), in_features, out_features);
 
     for total_steps in IntoIter::new([1usize, 10, 100, 1000]) {
         group.throughput(Throughput::Elements(total_steps as u64));

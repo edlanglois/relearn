@@ -119,22 +119,22 @@ fn tensor_scatter(c: &mut Criterion) {
     for size in IntoIter::new([1usize, 100, 10_000, 1_000_000]) {
         group.throughput(Throughput::Elements(size as u64));
         let indices = if size >= 100 {
-            Tensor::empty(&[100, (size / 100) as i64], (Kind::Int64, Device::Cpu)).random_1(width)
+            Tensor::empty(&[100, (size / 100) as i64], (Kind::Int64, Device::Cpu)).random_to_(width)
         } else {
-            Tensor::empty(&[1, size as i64], (Kind::Int64, Device::Cpu)).random_1(width)
+            Tensor::empty(&[1, size as i64], (Kind::Int64, Device::Cpu)).random_to_(width)
         };
 
         group.bench_function(BenchmarkId::new("scatter", size), |b| {
             b.iter(|| target.scatter(-1, &indices, &source))
         });
-        group.bench_function(BenchmarkId::new("scatter1", size), |b| {
-            b.iter(|| target.scatter1(-1, &indices, 1.0))
+        group.bench_function(BenchmarkId::new("scatter_value", size), |b| {
+            b.iter(|| target.scatter_value(-1, &indices, 1.0))
         });
         group.bench_function(BenchmarkId::new("scatter_", size), |b| {
             b.iter(|| target.scatter_(-1, &indices, &source))
         });
         group.bench_function(BenchmarkId::new("scatter1_", size), |b| {
-            b.iter(|| target.scatter_1(-1, &indices, 1.0))
+            b.iter(|| target.scatter_value_(-1, &indices, 1.0))
         });
     }
 }
@@ -148,9 +148,9 @@ fn tensor_1d_scatter_fill(c: &mut Criterion) {
     let mut target = Tensor::zeros(&[width], (Kind::Float, Device::Cpu));
 
     for size in IntoIter::new([1usize, 100, 10_000, 1_000_000]) {
-        let indices = Tensor::empty(&[size as i64], (Kind::Int64, Device::Cpu)).random_1(width);
-        group.bench_function(BenchmarkId::new("scatter_1", size), |b| {
-            b.iter(|| target.scatter_1(-1, &indices, 1.0))
+        let indices = Tensor::empty(&[size as i64], (Kind::Int64, Device::Cpu)).random_to_(width);
+        group.bench_function(BenchmarkId::new("scatter_value_", size), |b| {
+            b.iter(|| target.scatter_value_(-1, &indices, 1.0))
         });
         group.bench_function(BenchmarkId::new("index_fill_", size), |b| {
             b.iter(|| target.index_fill_(-1, &indices, 1.0))
