@@ -133,7 +133,7 @@ fn tensor_scatter(c: &mut Criterion) {
         group.bench_function(BenchmarkId::new("scatter_", size), |b| {
             b.iter(|| target.scatter_(-1, &indices, &source))
         });
-        group.bench_function(BenchmarkId::new("scatter1_", size), |b| {
+        group.bench_function(BenchmarkId::new("scatter_value_", size), |b| {
             b.iter(|| target.scatter_value_(-1, &indices, 1.0))
         });
     }
