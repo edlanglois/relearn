@@ -24,7 +24,7 @@ pub enum ConcreteAgentType {
 
 impl fmt::Display for ConcreteAgentType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", Self::VARIANTS[*self as usize])
+        write!(f, "{}", self.to_arg_value().unwrap().get_name())
     }
 }
 
@@ -73,7 +73,7 @@ pub enum AgentWrapperType {
 
 impl fmt::Display for AgentWrapperType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", Self::VARIANTS[*self as usize])
+        write!(f, "{}", self.to_arg_value().unwrap().get_name())
     }
 }
 

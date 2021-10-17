@@ -5,17 +5,16 @@ use super::env::{BanditArmPrior, EnvType};
 use super::optimizer::{OptimizerOptions, OptimizerType};
 use super::seq_mod::SeqModType;
 use crate::torch::Activation;
-use clap::{crate_authors, crate_description, crate_version, AppSettings, ArgEnum, Clap};
+use clap::{crate_authors, crate_description, crate_version, ArgEnum, Parser};
 use once_cell::sync::OnceCell;
-use std::{error::Error, fmt, str::FromStr};
+use std::{error::Error, fmt, marker::PhantomData, str::FromStr};
 use tch::Device;
 
-#[derive(Debug, Clone, PartialEq, Clap)]
+#[derive(Debug, Clone, PartialEq, Parser)]
 #[clap(
     version = crate_version!(),
     author = crate_authors!(),
     about = crate_description!(),
-    setting = AppSettings::ColoredHelp,
     after_help = "Most options only apply for some environments/agents and are ignored otherwise.",
 )]
 pub struct Options {
@@ -228,23 +227,30 @@ fn agent_long_about() -> &'static str {
 base-agent: {}
 wrapper: {}
 ",
-            StringListDisplay(ConcreteAgentType::VARIANTS),
-            StringListDisplay(AgentWrapperType::VARIANTS)
+            ArgEnumVariantDisplay::<ConcreteAgentType>::new(),
+            ArgEnumVariantDisplay::<AgentWrapperType>::new()
         )
     })
 }
 
-/// Wrapper for displaying a list of strings
-struct StringListDisplay<'a, 'b>(&'a [&'b str]);
-impl<'a, 'b> fmt::Display for StringListDisplay<'a, 'b> {
+/// Wrapper for displaying the variant names of an ArgEnum type
+struct ArgEnumVariantDisplay<T>(PhantomData<*const T>);
+impl<T> ArgEnumVariantDisplay<T> {
+    pub const fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+impl<T: ArgEnum> fmt::Display for ArgEnumVariantDisplay<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut first = true;
-        for s in self.0 {
-            if !first {
-                write!(f, ", ")?
+        for v in T::value_variants() {
+            if let Some(value) = v.to_arg_value() {
+                if !first {
+                    write!(f, ", ")?
+                }
+                first = false;
+                write!(f, "{}", value.get_name())?;
             }
-            first = false;
-            write!(f, "{}", s)?;
         }
         Ok(())
     }

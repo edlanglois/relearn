@@ -1,4 +1,4 @@
-use clap::Clap;
+use clap::Parser;
 use relearn::cli::Options;
 use relearn::defs::{boxed_multithread_simulator, boxed_serial_simulator, HooksDef};
 use relearn::logging::CLILoggerConfig;
