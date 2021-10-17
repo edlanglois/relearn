@@ -65,7 +65,7 @@ impl<T: PartialOrd> PartialOrd for IntervalSpace<T> {
     }
 }
 
-/// Represent elements as a the same type in a tensor.
+/// Represent elements as the same type in a tensor.
 impl<T> ReprSpace<Tensor> for IntervalSpace<T>
 where
     // NOTE: Remove copy if ever changing batch_repr to take a slice
