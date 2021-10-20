@@ -126,7 +126,7 @@ where
     fn batch_features<'a, I>(&self, elements: I) -> Array<T, Ix2>
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
         let elements = elements.into_iter();

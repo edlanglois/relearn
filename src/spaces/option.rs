@@ -122,7 +122,7 @@ where
     ) -> Array<T, Ix2>
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
         let elements = elements.into_iter();
@@ -194,7 +194,7 @@ where
     ) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
         // NOTE:
@@ -294,7 +294,7 @@ pub trait PhantomBatchFeatureSpace<T2>: Space {
     ) -> T2
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a;
 }
 
@@ -310,6 +310,7 @@ pub trait PhantomBatchFeatureSpaceOut<T2>: Space {
         _marker: PhantomData<&'a Self::Element>,
     ) where
         I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: Clone,
         Self::Element: 'a;
 }
 
@@ -324,7 +325,7 @@ where
     fn batch_features<'a, I>(&self, elements: I) -> T2
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
         self.phantom_batch_features(elements, PhantomData)
@@ -339,6 +340,7 @@ where
     fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2, zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: Clone,
         Self::Element: 'a,
     {
         self.phantom_batch_features_out(elements, out, zeroed, PhantomData)

@@ -137,7 +137,7 @@ pub trait BatchFeatureSpace<T2>: Space + BaseFeatureSpace {
     fn batch_features<'a, I>(&self, elements: I) -> T2
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a;
 }
 
@@ -159,6 +159,7 @@ pub trait BatchFeatureSpaceOut<T2>: Space + BaseFeatureSpace {
     fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2, zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: Clone,
         Self::Element: 'a;
 }
 

@@ -11,7 +11,6 @@ use rand::distributions::Distribution;
 use rand::Rng;
 use std::array::IntoIter;
 use std::cmp::Ordering;
-use std::convert::TryInto;
 use std::fmt;
 use std::marker::PhantomData;
 use tch::Tensor;
@@ -102,7 +101,7 @@ where
     fn batch_features<'a, I>(&self, elements: I) -> U
     where
         I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator,
+        I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
         let elements = elements.into_iter();
@@ -119,6 +118,7 @@ where
     fn batch_features_out<'a, I>(&self, elements: I, out: &mut U, zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: Clone,
         Self::Element: 'a,
     {
         self.inner_spaces
@@ -205,6 +205,7 @@ pub trait BatchFeatureSpaceOutForTuples<T>: SpaceForTuples + BaseFeatureSpaceFor
         marker: PhantomData<&'a Self::Element>,
     ) where
         I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: Clone,
         Self::Element: 'a;
 }
 
@@ -364,30 +365,28 @@ impl BatchFeatureSpaceOutForTuples<Tensor> for Tuple {
         _marker: PhantomData<&'a Self::Element>,
     ) where
         I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: Clone,
         Self::Element: 'a,
     {
-        let elements = elements.into_iter();
-        let num_elements: usize = out
-            .size2()
-            .expect("out must be a 2D tensor")
-            .0
-            .try_into()
-            .unwrap();
+        let elements_iter = elements.into_iter();
 
-        // Unzip and collect elements into vectors
-        let mut split_elements = (for_tuples!( #( Vec::with_capacity(num_elements) ),* ));
-        for element in elements.into_iter() {
-            for_tuples!( #(
-                split_elements.Tuple.push(&element.Tuple);
-            )* );
-        }
-
-        // Partion the tensor into views and fill the inner batch features for each.
+        // Partition the output tensor into a view for each inner space
         let sizes = [for_tuples!( #( self.Tuple.num_features() as i64 ),* )];
+        // An iterator over the partitions
         let mut views_iter = out.split_with_sizes(&sizes, -1).into_iter();
+
+        // For each inner space with index `Tuple` ...
         for_tuples!( #(
-            self.Tuple.batch_features_out(split_elements.Tuple, &mut views_iter.next().unwrap(), zeroed);
-        )* );
+            // Call batch_features_out on the inner space
+            self.Tuple.batch_features_out(
+                // with an iterator of elements from that inner space
+                #[allow(clippy::redundant_clone)] // redundant on last call but hard to avoid
+                elements_iter.clone().map(|e| &e.Tuple),
+                // and the corresponding view
+                &mut views_iter.next().expect("Given tensor has too few columns"),
+                zeroed
+            );
+        )*);
     }
 }
 
