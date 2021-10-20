@@ -136,6 +136,7 @@ where
         Self::Element: 'a,
     {
         let elements: Vec<f32> = elements.into_iter().map(|&x| x.cast_into()).collect();
+        // TODO: Avoid double copy
         let _ = out.copy_(&Tensor::of_slice(&elements).unsqueeze_(-1));
     }
 }

@@ -96,9 +96,10 @@ where
     fn batch_features<'a, I>(&self, elements: I) -> T2
     where
         I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: ExactSizeIterator,
         Self::Element: 'a,
     {
-        let num_elements = elements.into_iter().count();
+        let num_elements = elements.into_iter().len();
         T2::zeros([num_elements, 0])
     }
 }

@@ -132,6 +132,7 @@ impl BatchFeatureSpaceOut<Tensor> for BooleanSpace {
         Self::Element: 'a,
     {
         let elements: Vec<f64> = elements.into_iter().map(|&x| f64::from(x as u8)).collect();
+        // TODO: Avoid double copy
         let _ = out.copy_(&Tensor::of_slice(&elements).unsqueeze_(-1));
     }
 }

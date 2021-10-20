@@ -93,7 +93,7 @@ where
         Self::Element: 'a,
     {
         if self.inner.num_features() == 0 {
-            let num_elements = elements.into_iter().count();
+            let num_elements = elements.into_iter().len();
             T2::zeros([num_elements, 1])
         } else {
             self.inner.batch_features(elements)
