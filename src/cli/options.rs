@@ -233,7 +233,7 @@ wrapper: {}
     })
 }
 
-/// Wrapper for displaying the variant names of an ArgEnum type
+/// Wrapper for displaying the variant names of an `ArgEnum` type
 struct ArgEnumVariantDisplay<T>(PhantomData<*const T>);
 impl<T> ArgEnumVariantDisplay<T> {
     pub const fn new() -> Self {
