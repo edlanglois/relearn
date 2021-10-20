@@ -38,21 +38,5 @@ doc-only = ["tch/doc-only"]
 features = [ "doc-only" ]
 
 [[bench]]
-name = "rust"
-harness = false
-
-[[bench]]
-name = "features"
-harness = false
-
-[[bench]]
-name = "multithread"
-harness = false
-
-[[bench]]
 name = "rnn"
-harness = false
-
-[[bench]]
-name = "tch"
 harness = false
