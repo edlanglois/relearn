@@ -4,6 +4,8 @@ use super::{
     FiniteSpace, Space,
 };
 use crate::utils::array::{BasicArray, BasicArrayMut};
+use rand::distributions::Distribution;
+use rand::Rng;
 use std::fmt;
 
 // Note: This could be renamed to something like TorchSpace if other helper changes end up being
@@ -48,6 +50,14 @@ impl<S: FiniteSpace> FiniteSpace for NonEmptyFeatures<S> {
 
     fn from_index(&self, index: usize) -> Option<Self::Element> {
         self.inner.from_index(index)
+    }
+}
+
+impl<S: Space + Distribution<S::Element>> Distribution<<Self as Space>::Element>
+    for NonEmptyFeatures<S>
+{
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
+        self.inner.sample(rng)
     }
 }
 
@@ -124,6 +134,24 @@ where
         } else {
             self.inner.batch_features_out(elements, out, zeroed);
         }
+    }
+}
+
+#[cfg(test)]
+mod space {
+    use super::super::{testing, IndexSpace, SingletonSpace};
+    use super::*;
+
+    #[test]
+    fn contains_samples_singleton() {
+        let space = NonEmptyFeatures::new(SingletonSpace::new());
+        testing::check_contains_samples(&space, 100);
+    }
+
+    #[test]
+    fn contains_samples_index() {
+        let space = NonEmptyFeatures::new(IndexSpace::new(5));
+        testing::check_contains_samples(&space, 100);
     }
 }
 
