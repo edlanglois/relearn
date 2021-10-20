@@ -2,10 +2,10 @@
 use ndarray::{Array, ArrayBase, DataMut, Dim, Dimension, Ix};
 use num_traits::{One, Zero};
 use std::convert::TryInto;
-use tch::{Device, Tensor};
+use tch::{Device, Kind, Tensor};
 
 /// A basic multidimensional array with simple operations.
-pub trait BasicArray<T, const N: usize> {
+pub trait BasicArray<const N: usize> {
     /// Allocate a new array with the given shape.
     ///
     /// Also returns a boolean indiciating whether the array is zero-initialized (`true`)
@@ -34,23 +34,25 @@ fn shape_i64(shape: &[usize]) -> Vec<i64> {
     shape.iter().map(|&x| x.try_into().unwrap()).collect()
 }
 
-impl<T: tch::kind::Element, const N: usize> BasicArray<T, N> for Tensor {
+// Tensor does not make the element type part of its type so we have to pick one.
+// Use f32 on the CPU. Could create a wrapper type if we want to be able to specify these.
+impl<const N: usize> BasicArray<N> for Tensor {
     fn allocate(shape: [usize; N]) -> (Self, bool)
     where
         Self: Sized,
     {
         (
-            Self::empty(&shape_i64(&shape), (T::KIND, Device::Cpu)),
+            Self::empty(&shape_i64(&shape), (Kind::Float, Device::Cpu)),
             false,
         )
     }
 
     fn zeros(shape: [usize; N]) -> Self {
-        Self::zeros(&shape_i64(&shape), (T::KIND, Device::Cpu))
+        Self::zeros(&shape_i64(&shape), (Kind::Float, Device::Cpu))
     }
 
     fn ones(shape: [usize; N]) -> Self {
-        Self::ones(&shape_i64(&shape), (T::KIND, Device::Cpu))
+        Self::ones(&shape_i64(&shape), (Kind::Float, Device::Cpu))
     }
 }
 
@@ -62,7 +64,7 @@ impl BasicArrayMut for Tensor {
 
 macro_rules! basic_ndarray {
     ($n:expr) => {
-        impl<T> BasicArray<T, $n> for Array<T, Dim<[Ix; $n]>>
+        impl<T> BasicArray<$n> for Array<T, Dim<[Ix; $n]>>
         where
             T: Clone + Zero + One,
         {

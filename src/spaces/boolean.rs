@@ -93,7 +93,7 @@ impl BaseFeatureSpace for BooleanSpace {
 
 impl<T> FeatureSpace<T> for BooleanSpace
 where
-    T: BasicArray<f32, 1>,
+    T: BasicArray<1>,
 {
     fn features(&self, element: &Self::Element) -> T {
         if *element {

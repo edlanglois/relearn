@@ -82,7 +82,7 @@ impl BaseFeatureSpace for SingletonSpace {
 /// Represent elements as a float vector of length 0.
 impl<T> FeatureSpace<T> for SingletonSpace
 where
-    T: BasicArray<f32, 1>,
+    T: BasicArray<1>,
 {
     fn features(&self, _element: &Self::Element) -> T {
         T::zeros([0])
@@ -91,7 +91,7 @@ where
 
 impl<T2> BatchFeatureSpace<T2> for SingletonSpace
 where
-    T2: BasicArray<f32, 2>,
+    T2: BasicArray<2>,
 {
     fn batch_features<'a, I>(&self, elements: I) -> T2
     where

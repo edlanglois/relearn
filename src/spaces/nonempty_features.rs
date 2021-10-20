@@ -70,7 +70,7 @@ impl<S: BaseFeatureSpace> BaseFeatureSpace for NonEmptyFeatures<S> {
 impl<S, T> FeatureSpace<T> for NonEmptyFeatures<S>
 where
     S: FeatureSpace<T>,
-    T: BasicArray<f32, 1>,
+    T: BasicArray<1>,
 {
     fn features(&self, element: &Self::Element) -> T {
         if self.inner.num_features() == 0 {
@@ -84,7 +84,7 @@ where
 impl<S, T2> BatchFeatureSpace<T2> for NonEmptyFeatures<S>
 where
     S: BatchFeatureSpace<T2>,
-    T2: BasicArray<f32, 2>,
+    T2: BasicArray<2>,
 {
     fn batch_features<'a, I>(&self, elements: I) -> T2
     where

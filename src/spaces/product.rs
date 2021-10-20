@@ -75,7 +75,7 @@ impl<T: BaseFeatureSpaceForTuples> BaseFeatureSpace for ProductSpace<T> {
 impl<T, U> FeatureSpace<U> for ProductSpace<T>
 where
     T: FeatureSpaceOutForTuples<U>,
-    U: BasicArray<f32, 1>,
+    U: BasicArray<1>,
 {
     fn features(&self, element: &Self::Element) -> U {
         let (mut out, zeroed) = U::allocate([self.num_features()]);
@@ -96,7 +96,7 @@ where
 impl<T, U> BatchFeatureSpace<U> for ProductSpace<T>
 where
     T: BatchFeatureSpaceOutForTuples<U>,
-    U: BasicArray<f32, 2>,
+    U: BasicArray<2>,
 {
     fn batch_features<'a, I>(&self, elements: I) -> U
     where
