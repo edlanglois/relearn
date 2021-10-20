@@ -40,3 +40,7 @@ features = [ "doc-only" ]
 [[bench]]
 name = "rnn"
 harness = false
+
+[[bench]]
+name = "spaces"
+harness = false
