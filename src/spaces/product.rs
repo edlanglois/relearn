@@ -137,6 +137,7 @@ where
 
 impl<T: SpaceForTuples> ElementRefInto<Loggable> for ProductSpace<T> {
     fn elem_ref_into(&self, _element: &Self::Element) -> Loggable {
+        // Too complex to log
         Loggable::Nothing
     }
 }
