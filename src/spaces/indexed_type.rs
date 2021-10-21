@@ -30,16 +30,26 @@ pub trait Indexed {
 /// The wrapped type must implement [`Indexed`].
 /// Use `#[derive(Indexed)]` to implement `Indexed` automatically for enum types that have no
 /// internal data.
-#[derive(Default, Clone, Copy)]
 pub struct IndexedTypeSpace<T> {
-    element_type: PhantomData<T>,
+    // <fn(T) -> T> allows Sync and Send without adding a drop check
+    // https://stackoverflow.com/a/50201389/1267562
+    element_type: PhantomData<fn(T) -> T>,
 }
 
 impl<T> IndexedTypeSpace<T> {
-    pub const fn new() -> Self {
+    // Cannot be const because
+    // E0658: function pointers cannot appear in constant functions
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn new() -> Self {
         Self {
             element_type: PhantomData,
         }
+    }
+}
+
+impl<T> Default for IndexedTypeSpace<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -54,6 +64,14 @@ impl<T> fmt::Display for IndexedTypeSpace<T> {
         write!(f, "IndexedTypeSpace<{}>", any::type_name::<T>())
     }
 }
+
+impl<T> Clone for IndexedTypeSpace<T> {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+}
+
+impl<T> Copy for IndexedTypeSpace<T> {}
 
 impl<T> Space for IndexedTypeSpace<T> {
     type Element = T;
