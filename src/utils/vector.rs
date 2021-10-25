@@ -1,6 +1,8 @@
 //! Mathematical finite-dimensional vector.
 use num_traits::{MulAdd, MulAddAssign, Zero};
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{
+    Add, AddAssign, Deref, DerefMut, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign,
+};
 
 /// A mathematical vector in a finite dimensional vector space.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -15,6 +17,20 @@ impl<T, const N: usize> From<[T; N]> for Vector<T, N> {
 impl<T: Zero, const N: usize> Default for Vector<T, N> {
     fn default() -> Self {
         Self::zero()
+    }
+}
+
+impl<T, const N: usize> Deref for Vector<T, N> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T, const N: usize> DerefMut for Vector<T, N> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -153,6 +169,21 @@ mod tests {
     fn default() {
         let v: Vector<i64, 3> = Default::default();
         assert_eq!(Vector([0, 0, 0]), v);
+    }
+
+    #[test]
+    fn deref() {
+        let v = Vector([1, 2, 3]);
+        assert_eq!(v.len(), 3);
+        let v_slice: &[isize] = &v;
+        assert_eq!(v_slice.len(), 3);
+    }
+
+    #[test]
+    fn deref_mut() {
+        let mut v = Vector([1, 2, 3]);
+        v.reverse();
+        assert_eq!(v, Vector([3, 2, 1]));
     }
 
     #[test]
