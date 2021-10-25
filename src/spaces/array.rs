@@ -7,7 +7,6 @@ use crate::logging::Loggable;
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::cmp::Ordering;
-use std::convert::TryInto;
 use tch::{Device, Kind, Tensor};
 
 /// A Cartesian product of n copies of the same space.
@@ -342,7 +341,6 @@ mod finite_space {
 mod feature_space {
     use super::super::{BooleanSpace, IndexSpace};
     use super::*;
-    use std::array::IntoIter;
 
     #[test]
     fn d3_boolean_num_features() {
@@ -393,7 +391,11 @@ mod feature_space {
     );
 
     fn tensor_from_arrays<const N: usize, const M: usize>(data: [[f32; M]; N]) -> Tensor {
-        let flat_data: Vec<f32> = IntoIter::new(data).map(IntoIter::new).flatten().collect();
+        let flat_data: Vec<f32> = data
+            .into_iter()
+            .map(IntoIterator::into_iter)
+            .flatten()
+            .collect();
         Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
     }
 

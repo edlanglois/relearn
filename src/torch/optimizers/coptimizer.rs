@@ -1,7 +1,6 @@
 //! Torch optimizer wrappers and configuration
 use super::{BaseOptimizer, BuildOptimizer, OnceOptimizer, OptimizerStepError};
 use crate::logging::Logger;
-use std::convert::{TryFrom, TryInto};
 use tch::{nn::VarStore, COptimizer, TchError, Tensor};
 
 impl BaseOptimizer for COptimizer {

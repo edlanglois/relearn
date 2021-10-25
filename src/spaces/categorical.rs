@@ -8,7 +8,6 @@ use crate::torch;
 use crate::utils::distributions::ArrayDistribution;
 use ndarray::{Array, ArrayBase, DataMut, Ix1, Ix2};
 use num_traits::{One, Zero};
-use std::convert::TryInto;
 use tch::{Device, Kind, Tensor};
 
 /// A space consisting of `N` distinct elements treated as distinct and unrelated.

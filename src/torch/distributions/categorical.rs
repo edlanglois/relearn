@@ -1,6 +1,5 @@
 //! Categorical distribution
 use crate::utils::distributions::ArrayDistribution;
-use std::convert::TryInto;
 use tch::{Kind, Tensor};
 
 /// Categorical distribution(s).

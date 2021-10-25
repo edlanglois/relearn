@@ -1,6 +1,5 @@
 //! Deterministic distribution
 use crate::utils::distributions::ArrayDistribution;
-use std::convert::TryInto;
 use tch::{Device, Kind, Tensor};
 
 /// A deterministic distribution over size-0 vectors.

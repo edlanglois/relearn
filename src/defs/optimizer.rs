@@ -1,5 +1,4 @@
 use crate::torch::optimizers::{AdamConfig, AdamWConfig, RmsPropConfig, SgdConfig};
-use std::convert::{TryFrom, TryInto};
 use tch::{COptimizer, TchError};
 
 /// Torch optimizer definition

@@ -1,7 +1,6 @@
 //! A generic array interface.
 use ndarray::{Array, ArrayBase, DataMut, Dim, Dimension, Ix};
 use num_traits::{One, Zero};
-use std::convert::TryInto;
 use tch::{Device, Kind, Tensor};
 
 /// A basic multidimensional array with simple operations.

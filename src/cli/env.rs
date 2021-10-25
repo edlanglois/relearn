@@ -6,7 +6,6 @@ use crate::envs::{
     UniformBernoulliBandits, Wrapped,
 };
 use clap::ArgEnum;
-use std::convert::TryInto;
 
 /// Environment name
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]

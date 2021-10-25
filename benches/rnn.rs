@@ -4,7 +4,6 @@ use criterion::{
 };
 use relearn::torch::seq_modules::{GruConfig, SequenceModule};
 use relearn::torch::BuildModule;
-use std::array::IntoIter;
 use tch::{nn::VarStore, Device, Kind, Tensor};
 
 fn gru_rnn(c: &mut Criterion) {
@@ -18,7 +17,7 @@ fn gru_rnn(c: &mut Criterion) {
     let vs = VarStore::new(Device::Cpu);
     let gru = GruConfig::default().build_module(&vs.root(), in_features, out_features);
 
-    for total_steps in IntoIter::new([1usize, 10, 100, 1000]) {
+    for total_steps in [1usize, 10, 100, 1000].into_iter() {
         group.throughput(Throughput::Elements(total_steps as u64));
         let input = Tensor::ones(
             &[batch_size, total_steps as i64, in_features as i64],

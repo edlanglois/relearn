@@ -1,6 +1,5 @@
 //! Mathematical finite-dimensional vector.
 use num_traits::{MulAdd, MulAddAssign, Zero};
-use std::array::IntoIter;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 /// A mathematical vector in a finite dimensional vector space.
@@ -38,21 +37,14 @@ impl<T: Add<Output = T>, const N: usize> Add for Vector<T, N> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        Self(
-            array_init::from_iter(
-                IntoIter::new(self.0)
-                    .zip(IntoIter::new(other.0))
-                    .map(|(a, b)| a + b),
-            )
-            .unwrap(),
-        )
+        Self(array_init::from_iter(self.0.into_iter().zip(other.0).map(|(a, b)| a + b)).unwrap())
     }
 }
 
 /// In-place vector addition
 impl<T: AddAssign, const N: usize> AddAssign for Vector<T, N> {
     fn add_assign(&mut self, other: Self) {
-        for (a, b) in self.0.iter_mut().zip(IntoIter::new(other.0)) {
+        for (a, b) in self.0.iter_mut().zip(other.0) {
             *a += b
         }
     }
@@ -63,21 +55,14 @@ impl<T: Sub<Output = T>, const N: usize> Sub for Vector<T, N> {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        Self(
-            array_init::from_iter(
-                IntoIter::new(self.0)
-                    .zip(IntoIter::new(other.0))
-                    .map(|(a, b)| a - b),
-            )
-            .unwrap(),
-        )
+        Self(array_init::from_iter(self.0.into_iter().zip(other.0).map(|(a, b)| a - b)).unwrap())
     }
 }
 
 /// In-place vector subtraction
 impl<T: SubAssign, const N: usize> SubAssign for Vector<T, N> {
     fn sub_assign(&mut self, other: Self) {
-        for (a, b) in self.0.iter_mut().zip(IntoIter::new(other.0)) {
+        for (a, b) in self.0.iter_mut().zip(other.0) {
             *a -= b
         }
     }
@@ -88,7 +73,7 @@ impl<T: Neg<Output = T>, const N: usize> Neg for Vector<T, N> {
     type Output = Self;
 
     fn neg(self) -> Self {
-        Self(array_init::from_iter(IntoIter::new(self.0).map(|a| -a)).unwrap())
+        Self(array_init::from_iter(self.0.map(|a| -a)).unwrap())
     }
 }
 
@@ -97,7 +82,7 @@ impl<T: Mul<Output = T> + Copy, const N: usize> Mul<T> for Vector<T, N> {
     type Output = Self;
 
     fn mul(self, scalar: T) -> Self {
-        Self(array_init::from_iter(IntoIter::new(self.0).map(|a| a * scalar)).unwrap())
+        Self(array_init::from_iter(self.0.map(|a| a * scalar)).unwrap())
     }
 }
 
@@ -115,7 +100,7 @@ impl<T: Div<Output = T> + Copy, const N: usize> Div<T> for Vector<T, N> {
     type Output = Self;
 
     fn div(self, scalar: T) -> Self {
-        Self(array_init::from_iter(IntoIter::new(self.0).map(|a| a / scalar)).unwrap())
+        Self(array_init::from_iter(self.0.map(|a| a / scalar)).unwrap())
     }
 }
 
@@ -135,8 +120,9 @@ impl<T: MulAdd<Output = T> + Copy, const N: usize> MulAdd<T> for Vector<T, N> {
     fn mul_add(self, scalar: T, vector: Self) -> Self {
         Self(
             array_init::from_iter(
-                IntoIter::new(self.0)
-                    .zip(IntoIter::new(vector.0))
+                self.0
+                    .into_iter()
+                    .zip(vector.0)
                     .map(|(a, b)| a.mul_add(scalar, b)),
             )
             .unwrap(),
@@ -147,7 +133,7 @@ impl<T: MulAdd<Output = T> + Copy, const N: usize> MulAdd<T> for Vector<T, N> {
 /// In-place fused scalar multiply and vector add.
 impl<T: MulAddAssign + Copy, const N: usize> MulAddAssign<T> for Vector<T, N> {
     fn mul_add_assign(&mut self, scalar: T, vector: Self) {
-        for (a, b) in self.0.iter_mut().zip(IntoIter::new(vector.0)) {
+        for (a, b) in self.0.iter_mut().zip(vector.0) {
             a.mul_add_assign(scalar, b);
         }
     }

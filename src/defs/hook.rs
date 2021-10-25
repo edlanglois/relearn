@@ -5,7 +5,6 @@ use crate::simulation::hooks::{
     BuildSimulationHook, EpisodeLimitConfig, SimulationHook, StepLimitConfig, StepLoggerConfig,
 };
 use crate::spaces::ElementRefInto;
-use std::iter::FromIterator;
 use std::ops::DerefMut;
 
 /// Simulation hook definition.

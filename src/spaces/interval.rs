@@ -347,12 +347,15 @@ mod partial_ord {
 #[cfg(test)]
 mod feature_space {
     use super::*;
-    use std::array::IntoIter;
 
     fn tensor_from_arrays<T: tch::kind::Element, const N: usize, const M: usize>(
         data: [[T; M]; N],
     ) -> Tensor {
-        let flat_data: Vec<T> = IntoIter::new(data).map(IntoIter::new).flatten().collect();
+        let flat_data: Vec<T> = data
+            .into_iter()
+            .map(IntoIterator::into_iter)
+            .flatten()
+            .collect();
         Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
     }
 

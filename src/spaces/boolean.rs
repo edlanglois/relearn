@@ -230,7 +230,6 @@ mod finite_space {
 #[cfg(test)]
 mod feature_space {
     use super::*;
-    use std::array::IntoIter;
 
     #[test]
     fn num_features() {
@@ -268,7 +267,11 @@ mod feature_space {
     features_tests!(true_, true, [1.0]);
 
     fn tensor_from_arrays<const N: usize, const M: usize>(data: [[f32; M]; N]) -> Tensor {
-        let flat_data: Vec<f32> = IntoIter::new(data).map(IntoIter::new).flatten().collect();
+        let flat_data: Vec<f32> = data
+            .into_iter()
+            .map(IntoIterator::into_iter)
+            .flatten()
+            .collect();
         Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
     }
 

@@ -32,7 +32,7 @@ use super::super::utils;
 use super::{BaseOptimizer, BuildOptimizer, OptimizerStepError, TrustRegionOptimizer};
 use crate::logging::{Logger, LoggerHelper};
 use std::borrow::Borrow;
-use std::convert::{Infallible, TryInto};
+use std::convert::Infallible;
 use tch::{nn::VarStore, Tensor};
 
 /// Configuration for the Conjugate Gradient Optimizer

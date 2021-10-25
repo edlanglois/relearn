@@ -9,7 +9,6 @@ use crate::utils::array::BasicArray;
 use impl_trait_for_tuples::impl_for_tuples;
 use rand::distributions::Distribution;
 use rand::Rng;
-use std::array::IntoIter;
 use std::cmp::Ordering;
 use std::fmt;
 use std::marker::PhantomData;
@@ -314,7 +313,7 @@ impl FiniteSpaceForTuples for Tuple {
             return None;
         }
 
-        let mut indices_iter = IntoIter::new(indices);
+        let mut indices_iter = indices.into_iter();
         Some(for_tuples!( ( #( self.Tuple.from_index(indices_iter.next().unwrap())? ),* ) ))
     }
 
@@ -719,7 +718,11 @@ mod batch_feature_space {
     use super::*;
 
     fn tensor_from_arrays<const N: usize, const M: usize>(data: [[f32; M]; N]) -> Tensor {
-        let flat_data: Vec<f32> = IntoIter::new(data).map(IntoIter::new).flatten().collect();
+        let flat_data: Vec<f32> = data
+            .into_iter()
+            .map(IntoIterator::into_iter)
+            .flatten()
+            .collect();
         Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
     }
 

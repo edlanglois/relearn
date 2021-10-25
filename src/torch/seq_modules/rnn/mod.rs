@@ -7,7 +7,6 @@ pub use config::{GruConfig, LstmConfig};
 pub use gru::Gru;
 pub use lstm::Lstm;
 
-use std::convert::TryInto;
 use tch::{nn::Path, Cuda, Device, Tensor};
 
 /// cuDNN RNN mode code

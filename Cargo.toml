@@ -2,7 +2,7 @@
 name = "relearn"
 version = "0.1.2"
 authors = ["Eric Langlois <eric@langlois.xyz>"]
-edition = "2018"
+edition = "2021"
 description = "A Reinforcement Learning library"
 license = "LGPL-3.0-only"
 repository = "https://github.com/edlanglois/relearn"

@@ -8,7 +8,6 @@ use ndarray::{s, Array, ArrayBase, ArrayViewMut, DataMut, Ix1, Ix2};
 use num_traits::{One, Zero};
 use rand::distributions::Distribution;
 use rand::Rng;
-use std::convert::TryInto;
 use std::fmt;
 use std::marker::PhantomData;
 use tch::{Device, Kind, Tensor};
@@ -505,12 +504,15 @@ mod batch_feature_space {
     use super::super::{IndexSpace, SingletonSpace};
     use super::*;
     use ndarray::arr2;
-    use std::array::IntoIter;
 
     fn tensor_from_arrays<T: tch::kind::Element, const N: usize, const M: usize>(
         data: [[T; M]; N],
     ) -> Tensor {
-        let flat_data: Vec<T> = IntoIter::new(data).map(IntoIter::new).flatten().collect();
+        let flat_data: Vec<T> = data
+            .into_iter()
+            .map(IntoIterator::into_iter)
+            .flatten()
+            .collect();
         Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
     }
 

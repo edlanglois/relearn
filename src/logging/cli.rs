@@ -6,7 +6,6 @@ use super::{
 use enum_map::{enum_map, EnumMap};
 use std::borrow::Cow;
 use std::collections::{btree_map, BTreeMap};
-use std::convert::TryInto;
 use std::fmt;
 use std::ops::Drop;
 use std::time::{Duration, Instant};
