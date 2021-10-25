@@ -15,6 +15,7 @@ mod product;
 mod singleton;
 #[cfg(test)]
 pub mod testing;
+mod wrapper;
 
 pub use array::ArraySpace;
 pub use boolean::BooleanSpace;
@@ -26,6 +27,7 @@ pub use nonempty_features::NonEmptyFeatures;
 pub use option::OptionSpace;
 pub use product::ProductSpace;
 pub use singleton::SingletonSpace;
+pub use wrapper::BoxSpace;
 
 use crate::utils::distributions::ArrayDistribution;
 use rand::distributions::Distribution as RandDistribution;
