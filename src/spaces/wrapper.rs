@@ -4,11 +4,21 @@ use super::{
     FeatureSpaceOut, FiniteSpace, ReprSpace, Space,
 };
 use rand::{distributions::Distribution, Rng};
+use std::any;
+use std::cmp::Ordering;
+use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::Deref;
 
 /// A wrapper space that boxes the elements of an inner space.
 pub type BoxSpace<S> = WrapperSpace<S, Box<<S as Space>::Element>>;
+
+impl<S: Space + fmt::Display> fmt::Display for BoxSpace<S> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "BoxSpace<{}>", self.inner_space)
+    }
+}
 
 /// Wraps an inner type
 pub trait Wrapper {
@@ -40,6 +50,63 @@ where
 pub struct WrapperSpace<S, W> {
     inner_space: S,
     wrapper: PhantomData<*const W>,
+}
+
+impl<S: fmt::Debug, W> fmt::Debug for WrapperSpace<S, W> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "WrapperSpace<{}>({:?})",
+            any::type_name::<W>(),
+            self.inner_space
+        )
+    }
+}
+
+impl<S: Default, W> Default for WrapperSpace<S, W> {
+    fn default() -> Self {
+        Self {
+            inner_space: Default::default(),
+            wrapper: PhantomData,
+        }
+    }
+}
+
+impl<S: Clone, W> Clone for WrapperSpace<S, W> {
+    fn clone(&self) -> Self {
+        Self {
+            inner_space: self.inner_space.clone(),
+            wrapper: PhantomData,
+        }
+    }
+}
+
+impl<S: Copy, W> Copy for WrapperSpace<S, W> {}
+
+impl<S: PartialEq, W> PartialEq for WrapperSpace<S, W> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner_space.eq(&other.inner_space)
+    }
+}
+
+impl<S: Eq, W> Eq for WrapperSpace<S, W> {}
+
+impl<S: Hash, W> Hash for WrapperSpace<S, W> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.inner_space.hash(state)
+    }
+}
+
+impl<S: PartialOrd, W> PartialOrd for WrapperSpace<S, W> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.inner_space.partial_cmp(&other.inner_space)
+    }
+}
+
+impl<S: Ord, W> Ord for WrapperSpace<S, W> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.inner_space.cmp(&other.inner_space)
+    }
 }
 
 impl<S, W> Space for WrapperSpace<S, W>
