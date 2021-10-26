@@ -1,5 +1,5 @@
 //! Fruit collection gridworlds.
-use crate::envs::{EnvStructure, Pomdp};
+use crate::envs::{CloneBuild, EnvStructure, Pomdp};
 use crate::spaces::{
     ArraySpace, BooleanSpace, BoxSpace, IndexSpace, IndexedTypeSpace, ProductSpace, Space,
 };
@@ -221,13 +221,14 @@ impl Move {
 /// * `H` - Grid height
 /// * `VW` - Agent viewport width (centered on agent)
 /// * `VH` - Agent viewport height (centered on agent)
-pub struct FruitGame<const W: usize, const H: usize, const VW: usize, const VH: usize> {
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct FruitGameEnv<const W: usize, const H: usize, const VW: usize, const VH: usize> {
     /// Number of fruit of each type
     pub num_fruit: usize,
 }
 
-impl<const W: usize, const H: usize, const VW: usize, const VH: usize> FruitGame<W, H, VW, VH> {
-    /// Initialize a new [`FruitGame`] instance.
+impl<const W: usize, const H: usize, const VW: usize, const VH: usize> FruitGameEnv<W, H, VW, VH> {
+    /// Initialize a new [`FruitGameEnv`] instance.
     ///
     /// # Args
     /// * `num_fruit` - Number of fruit of each type.
@@ -236,8 +237,24 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> FruitGame
     }
 }
 
+impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Default
+    for FruitGameEnv<W, H, VW, VH>
+{
+    fn default() -> Self {
+        let target_inv_density = 2;
+        let num_fruit_types = 2;
+        let num_fruit = W * H / (target_inv_density * num_fruit_types);
+        Self { num_fruit }
+    }
+}
+
+impl<const W: usize, const H: usize, const VW: usize, const VH: usize> CloneBuild
+    for FruitGameEnv<W, H, VW, VH>
+{
+}
+
 impl<const W: usize, const H: usize, const VW: usize, const VH: usize> EnvStructure
-    for FruitGame<W, H, VW, VH>
+    for FruitGameEnv<W, H, VW, VH>
 {
     /// An observation for each agent
     type ObservationSpace = JointObsSpace<VW, VH>;
@@ -267,7 +284,7 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> EnvStruct
 }
 
 impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Pomdp
-    for FruitGame<W, H, VW, VH>
+    for FruitGameEnv<W, H, VW, VH>
 {
     type State = FruitGameState<W, H>;
     type Observation = <JointObsSpace<VW, VH> as Space>::Element;
@@ -337,6 +354,6 @@ mod tests {
 
     #[test]
     fn run_default() {
-        testing::run_pomdp(FruitGame::<5, 5, 5, 5>::new(4), 1000, 0);
+        testing::run_pomdp(FruitGameEnv::<5, 5, 5, 5>::new(4), 1000, 0);
     }
 }
