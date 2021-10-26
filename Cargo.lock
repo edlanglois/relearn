@@ -814,6 +814,7 @@ dependencies = [
  "rand_distr",
  "relearn_derive",
  "rstest",
+ "slice-of-array",
  "smallvec",
  "tch",
  "thiserror",
@@ -923,6 +924,12 @@ dependencies = [
  "ryu",
  "serde",
 ]
+
+[[package]]
+name = "slice-of-array"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af7635b5266b4849f36727e108916b2bd7ec2155b9a7dc844af1a10aa3b71863"
 
 [[package]]
 name = "smallvec"

@@ -23,6 +23,7 @@ once_cell = "1.8"
 rand = "0.8"
 rand_distr = "0.4"
 relearn_derive = { version = "0.1.0", path = "relearn_derive" }
+slice-of-array = "=0.3.1" # pinned b/c low popularity; audit code on change
 smallvec = { version = "1.6", features = ["union"] }
 tch = "0.5"
 thiserror = "1.0"

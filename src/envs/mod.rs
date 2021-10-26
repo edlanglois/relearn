@@ -5,6 +5,7 @@ mod chain;
 mod mdps;
 mod memory;
 mod meta;
+mod multiagent;
 mod stateful;
 #[cfg(test)]
 pub mod testing;
@@ -20,6 +21,7 @@ pub use memory::MemoryGame;
 pub use meta::{
     InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaObservationSpace, MetaPomdp, MetaState,
 };
+pub use multiagent::fruit::FruitGame;
 pub use stateful::{IntoEnv, PomdpEnv};
 pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 
