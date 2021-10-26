@@ -49,7 +49,7 @@ where
 /// Wrapper space that wraps the elements of an inner space without changing semantics.
 pub struct WrapperSpace<S, W> {
     inner_space: S,
-    wrapper: PhantomData<*const W>,
+    wrapper: PhantomData<fn() -> W>,
 }
 
 impl<S, W> WrapperSpace<S, W> {
