@@ -52,6 +52,21 @@ pub struct WrapperSpace<S, W> {
     wrapper: PhantomData<*const W>,
 }
 
+impl<S, W> WrapperSpace<S, W> {
+    pub fn new(inner_space: S) -> Self {
+        Self {
+            inner_space,
+            wrapper: PhantomData,
+        }
+    }
+}
+
+impl<S, W> From<S> for WrapperSpace<S, W> {
+    fn from(inner_space: S) -> Self {
+        Self::new(inner_space)
+    }
+}
+
 impl<S: fmt::Debug, W> fmt::Debug for WrapperSpace<S, W> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
