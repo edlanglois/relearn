@@ -183,6 +183,7 @@ where
     fn batch_repr<'a, I>(&self, elements: I) -> T
     where
         I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
         self.inner_space

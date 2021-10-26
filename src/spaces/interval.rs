@@ -78,6 +78,7 @@ where
     fn batch_repr<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
         let elements: Vec<_> = elements.into_iter().cloned().collect();

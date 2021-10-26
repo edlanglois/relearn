@@ -88,6 +88,7 @@ pub trait ReprSpace<T, T0 = T>: Space {
     fn batch_repr<'a, I>(&self, elements: I) -> T
     where
         I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a;
 }
 

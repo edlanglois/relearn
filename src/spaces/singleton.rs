@@ -66,9 +66,10 @@ impl ReprSpace<Tensor> for SingletonSpace {
     fn batch_repr<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
-        let num_elements = elements.into_iter().count();
+        let num_elements = elements.into_iter().len();
         Tensor::empty(&[num_elements as i64, 0], (Kind::Int64, Device::Cpu))
     }
 }
