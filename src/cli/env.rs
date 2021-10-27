@@ -2,8 +2,8 @@
 use super::{Options, Update, WithUpdate};
 use crate::defs::{env::DistributionType, BanditMeanRewards, EnvDef};
 use crate::envs::{
-    Chain, DirichletRandomMdps, MemoryGame, MetaPomdp, OneHotBandits, StepLimit,
-    UniformBernoulliBandits, Wrapped,
+    Chain, DirichletRandomMdps, FirstPlayerView, FruitGameEnv, MemoryGame, MetaPomdp,
+    OneHotBandits, StepLimit, UniformBernoulliBandits, Wrapped,
 };
 use clap::ArgEnum;
 
@@ -13,6 +13,7 @@ pub enum EnvType {
     DeterministicBandit,
     BernoulliBandit,
     Chain,
+    Fruit,
     MemoryGame,
     MetaOneHotBandits,
     MetaUniformBernoulliBandits,
@@ -32,6 +33,7 @@ impl From<&Options> for EnvDef {
             DeterministicBandit => bandit_env_def(DistributionType::Deterministic, opts),
             BernoulliBandit => bandit_env_def(DistributionType::Bernoulli, opts),
             Chain => Self::Chain(opts.into()),
+            Fruit => Self::Fruit(opts.into()),
             MemoryGame => Self::MemoryGame(opts.into()),
             MetaOneHotBandits => Self::MetaOneHotBandits(opts.into()),
             MetaUniformBernoulliBandits => Self::MetaUniformBernoulliBandits(opts.into()),
@@ -75,6 +77,38 @@ impl Update<&Options> for Chain {
         if let Some(discount_factor) = opts.discount_factor {
             self.discount_factor = discount_factor;
         }
+    }
+}
+
+impl<const W: usize, const H: usize, const VW: usize, const VH: usize> From<&Options>
+    for FruitGameEnv<W, H, VW, VH>
+{
+    fn from(opts: &Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Update<&Options>
+    for FruitGameEnv<W, H, VW, VH>
+{
+    fn update(&mut self, _opts: &Options) {}
+}
+
+impl<'a, E> From<&'a Options> for FirstPlayerView<E>
+where
+    E: From<&'a Options>,
+{
+    fn from(opts: &'a Options) -> Self {
+        Self::new(opts.into())
+    }
+}
+
+impl<'a, E> Update<&'a Options> for FirstPlayerView<E>
+where
+    E: Update<&'a Options>,
+{
+    fn update(&mut self, opts: &'a Options) {
+        self.inner.update(opts)
     }
 }
 

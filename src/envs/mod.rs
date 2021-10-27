@@ -22,6 +22,7 @@ pub use meta::{
     InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaObservationSpace, MetaPomdp, MetaState,
 };
 pub use multiagent::fruit::FruitGameEnv;
+pub use multiagent::views::FirstPlayerView;
 pub use stateful::{IntoEnv, PomdpEnv};
 pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 

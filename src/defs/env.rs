@@ -1,8 +1,8 @@
 use super::agent::{RLActionSpace, RLObservationSpace};
 use crate::envs::{
     Bandit, BuildEnv, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps,
-    EnvStructure, MemoryGame as MemoryGameEnv, MetaObservationSpace, MetaPomdp, OneHotBandits,
-    Pomdp, UniformBernoulliBandits, WithStepLimit,
+    EnvStructure, FirstPlayerView, FruitGameEnv, MemoryGame as MemoryGameEnv, MetaObservationSpace,
+    MetaPomdp, OneHotBandits, Pomdp, UniformBernoulliBandits, WithStepLimit,
 };
 use crate::spaces::FiniteSpace;
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
@@ -18,6 +18,8 @@ pub enum EnvDef {
     Bandit(DistributionType, BanditMeanRewards),
     /// The Chain environment,
     Chain(ChainEnv),
+    /// Fruit game (first player with second player doing nothing),
+    Fruit(WithStepLimit<FirstPlayerView<FruitGameEnv<5, 5, 5, 5>>>),
     /// The Memory Game environment
     MemoryGame(MemoryGameEnv),
     /// Meta one-hot bandits environment
@@ -103,6 +105,7 @@ impl EnvDef {
                 }
             },
             Chain(config) => visitor.visit_env_finite_finite(config),
+            Fruit(config) => visitor.visit_env_finite_finite(config),
             MemoryGame(config) => visitor.visit_env_finite_finite(config),
             MetaOneHotBandits(config) => visitor.visit_env_meta_finite_finite(config),
             MetaUniformBernoulliBandits(config) => visitor.visit_env_meta_finite_finite(config),
