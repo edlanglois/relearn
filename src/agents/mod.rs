@@ -4,8 +4,8 @@
 
 mod bandits;
 mod batch_update;
+pub mod buffers;
 mod finite;
-pub mod history;
 mod meta;
 mod multithread;
 mod random;

@@ -1,4 +1,4 @@
-use super::history::{BuildHistoryBuffer, HistoryBuffer};
+use super::buffers::{BuildHistoryBuffer, HistoryBuffer};
 use super::{Actor, ActorMode, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
