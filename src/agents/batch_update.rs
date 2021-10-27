@@ -126,7 +126,7 @@ where
 #[cfg(test)]
 mod batch_tabular_q_learning {
     use super::super::{
-        history::EpisodeBufferConfig, testing, BuildAgent, TabularQLearningAgentConfig,
+        buffers::SerialBufferConfig, testing, BuildAgent, TabularQLearningAgentConfig,
     };
     use super::*;
 
@@ -134,9 +134,9 @@ mod batch_tabular_q_learning {
     fn learns_determinstic_bandit() {
         let config = BatchUpdateAgentConfig::new(
             TabularQLearningAgentConfig::default(),
-            EpisodeBufferConfig {
-                ep_done_step_threshold: 20,
-                step_threshold: 25,
+            SerialBufferConfig {
+                soft_threshold: 20,
+                hard_threshold: 25,
             },
         );
         testing::train_deterministic_bandit(|env| config.build_agent(env, 0).unwrap(), 1000, 0.9);
