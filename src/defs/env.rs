@@ -1,7 +1,7 @@
 use super::agent::{RLActionSpace, RLObservationSpace};
 use crate::envs::{
     Bandit, BuildEnv, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps,
-    EnvStructure, FirstPlayerView, FruitGameEnv, MemoryGame as MemoryGameEnv, MetaObservationSpace,
+    EnvStructure, FirstPlayerView, FruitGame, MemoryGame as MemoryGameEnv, MetaObservationSpace,
     MetaPomdp, OneHotBandits, Pomdp, UniformBernoulliBandits, WithStepLimit,
 };
 use crate::spaces::FiniteSpace;
@@ -19,7 +19,7 @@ pub enum EnvDef {
     /// The Chain environment,
     Chain(ChainEnv),
     /// Fruit game (first player with second player doing nothing),
-    Fruit(WithStepLimit<FirstPlayerView<FruitGameEnv<5, 5, 5, 5>>>),
+    Fruit(WithStepLimit<FirstPlayerView<FruitGame<5, 5, 5, 5>>>),
     /// The Memory Game environment
     MemoryGame(MemoryGameEnv),
     /// Meta one-hot bandits environment

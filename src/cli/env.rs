@@ -2,8 +2,8 @@
 use super::{Options, Update, WithUpdate};
 use crate::defs::{env::DistributionType, BanditMeanRewards, EnvDef};
 use crate::envs::{
-    Chain, DirichletRandomMdps, FirstPlayerView, FruitGameEnv, MemoryGame, MetaPomdp,
-    OneHotBandits, StepLimit, UniformBernoulliBandits, Wrapped,
+    Chain, DirichletRandomMdps, FirstPlayerView, FruitGame, MemoryGame, MetaPomdp, OneHotBandits,
+    StepLimit, UniformBernoulliBandits, Wrapped,
 };
 use clap::ArgEnum;
 
@@ -81,7 +81,7 @@ impl Update<&Options> for Chain {
 }
 
 impl<const W: usize, const H: usize, const VW: usize, const VH: usize> From<&Options>
-    for FruitGameEnv<W, H, VW, VH>
+    for FruitGame<W, H, VW, VH>
 {
     fn from(opts: &Options) -> Self {
         Self::default().with_update(opts)
@@ -89,7 +89,7 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> From<&Opt
 }
 
 impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Update<&Options>
-    for FruitGameEnv<W, H, VW, VH>
+    for FruitGame<W, H, VW, VH>
 {
     fn update(&mut self, _opts: &Options) {}
 }
