@@ -1,8 +1,8 @@
 //! History buffers
-mod basic;
+mod serial;
 
 use super::super::Step;
-pub use basic::{EpisodeBuffer, EpisodeBufferConfig};
+pub use serial::{SerialBuffer, SerialBufferConfig};
 
 /// Build a [`HistoryBuffer`].
 pub trait BuildHistoryBuffer<O, A> {
