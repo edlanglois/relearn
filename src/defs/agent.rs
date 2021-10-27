@@ -1,9 +1,9 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyDef, PolicyUpdaterDef};
 use crate::agents::{
-    Agent, BetaThompsonSamplingAgentConfig, BuildAgent, BuildAgentError, BuildMultithreadAgent,
-    FullAgent, InitializeMultithreadAgent, MultithreadAgentManager, MutexAgentConfig,
-    MutexAgentInitializer, RandomAgentConfig, ResettingMetaAgent, TabularQLearningAgentConfig,
-    UCB1AgentConfig,
+    buffers::SerialBufferConfig, Agent, BatchUpdateAgentConfig, BetaThompsonSamplingAgentConfig,
+    BuildAgent, BuildAgentError, BuildMultithreadAgent, FullAgent, InitializeMultithreadAgent,
+    MultithreadAgentManager, MutexAgentConfig, MutexAgentInitializer, RandomAgentConfig,
+    ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::Loggable;
@@ -23,6 +23,8 @@ pub enum AgentDef {
     Random,
     /// Epsilon-greedy tabular Q learning.
     TabularQLearning(TabularQLearningAgentConfig),
+    /// Epsilon-greedy tabular Q learning with batch updates.
+    BatchTabularQLearning(BatchUpdateAgentConfig<TabularQLearningAgentConfig, SerialBufferConfig>),
     /// Thompson sampling of for Bernoulli rewards using Beta priors.
     ///
     /// Assumes no relationship between states.
@@ -194,6 +196,9 @@ where
         use AgentDef::*;
         match self.0.borrow() {
             TabularQLearning(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            BatchTabularQLearning(config) => {
+                config.build_agent(env, seed).map(|a| Box::new(a) as _)
+            }
             BetaThompsonSampling(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
             UCB1(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
             agent_def => ForAnyAny::new(agent_def).build_agent(env, seed),

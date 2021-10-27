@@ -1,6 +1,7 @@
 use super::{Options, Update, WithUpdate};
 use crate::agents::{
-    BetaThompsonSamplingAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
+    buffers::SerialBufferConfig, BatchUpdateAgentConfig, BetaThompsonSamplingAgentConfig,
+    TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::defs::{
     AgentDef, CriticDef, CriticUpdaterDef, MultithreadAgentDef, PolicyDef, PolicyUpdaterDef,
@@ -15,6 +16,7 @@ use std::str::FromStr;
 pub enum ConcreteAgentType {
     Random,
     TabularQLearning,
+    BatchTabularQLearning,
     BetaThompsonSampling,
     UCB1,
     PolicyGradient,
@@ -34,6 +36,7 @@ impl ConcreteAgentType {
         match self {
             Random => AgentDef::Random,
             TabularQLearning => AgentDef::TabularQLearning(opts.into()),
+            BatchTabularQLearning => AgentDef::BatchTabularQLearning(opts.into()),
             BetaThompsonSampling => AgentDef::BetaThompsonSampling(opts.into()),
             UCB1 => AgentDef::UCB1(From::from(opts)),
             PolicyGradient => {
@@ -69,6 +72,7 @@ impl ConcreteAgentType {
 pub enum AgentWrapperType {
     ResettingMeta,
     Mutex,
+    Batch,
 }
 
 impl fmt::Display for AgentWrapperType {
@@ -181,6 +185,42 @@ impl Update<&Options> for TabularQLearningAgentConfig {
         if let Some(exploration_rate) = opts.exploration_rate {
             self.exploration_rate = exploration_rate;
         }
+    }
+}
+
+impl<'a, AC, HBC> From<&'a Options> for BatchUpdateAgentConfig<AC, HBC>
+where
+    AC: From<&'a Options>,
+    HBC: From<&'a Options>,
+{
+    fn from(opts: &'a Options) -> Self {
+        Self {
+            actor_config: opts.into(),
+            history_buffer_config: opts.into(),
+        }
+    }
+}
+
+impl<'a, AC, HBC> Update<&'a Options> for BatchUpdateAgentConfig<AC, HBC>
+where
+    AC: Update<&'a Options>,
+    HBC: Update<&'a Options>,
+{
+    fn update(&mut self, opts: &'a Options) {
+        self.actor_config.update(opts);
+        self.history_buffer_config.update(opts);
+    }
+}
+
+impl From<&Options> for SerialBufferConfig {
+    fn from(opts: &Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for SerialBufferConfig {
+    fn update(&mut self, _opts: &Options) {
+        // TODO: Allow setting thresholds
     }
 }
 
