@@ -1,4 +1,4 @@
-use super::buffers::{BuildHistoryBuffer, HistoryBuffer};
+use super::buffers::{BuildHistoryBuffer, HistoryBufferSteps, SerialBuffer, SerialBufferConfig};
 use super::{Actor, ActorMode, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
@@ -51,13 +51,13 @@ impl<T: OffPolicyAgent + Agent<O, A>, O, A> BatchUpdate<O, A> for T {
 }
 
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
-pub struct BatchUpdateAgentConfig<AC, HBC> {
+pub struct BatchUpdateAgentConfig<AC> {
     pub actor_config: AC,
-    pub history_buffer_config: HBC,
+    pub history_buffer_config: SerialBufferConfig,
 }
 
-impl<AC, HBC> BatchUpdateAgentConfig<AC, HBC> {
-    pub const fn new(actor_config: AC, history_buffer_config: HBC) -> Self {
+impl<AC> BatchUpdateAgentConfig<AC> {
+    pub const fn new(actor_config: AC, history_buffer_config: SerialBufferConfig) -> Self {
         Self {
             actor_config,
             history_buffer_config,
@@ -65,14 +65,13 @@ impl<AC, HBC> BatchUpdateAgentConfig<AC, HBC> {
     }
 }
 
-impl<AC, HBC, OS, AS> BuildAgent<OS, AS> for BatchUpdateAgentConfig<AC, HBC>
+impl<AC, OS, AS> BuildAgent<OS, AS> for BatchUpdateAgentConfig<AC>
 where
     AC: BuildBatchUpdateActor<OS, AS>,
-    HBC: BuildHistoryBuffer<OS::Element, AS::Element>,
     OS: Space,
     AS: Space,
 {
-    type Agent = BatchUpdateAgent<AC::BatchUpdateActor, HBC::HistoryBuffer>;
+    type Agent = BatchUpdateAgent<AC::BatchUpdateActor, OS::Element, AS::Element>;
 
     fn build_agent(
         &self,
@@ -86,13 +85,13 @@ where
 }
 
 /// Wrapper that implements an agent for `T: [Actor] + [BatchUpdate]`.
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
-pub struct BatchUpdateAgent<T, HB> {
+#[derive(Debug, Clone)]
+pub struct BatchUpdateAgent<T, O, A> {
     actor: T,
-    history: HB,
+    history: SerialBuffer<O, A>,
 }
 
-impl<O, A, T, HB> Actor<O, A> for BatchUpdateAgent<T, HB>
+impl<T, O, A> Actor<O, A> for BatchUpdateAgent<T, O, A>
 where
     T: Actor<O, A>,
 {
@@ -101,10 +100,9 @@ where
     }
 }
 
-impl<O, A, T, HB> Agent<O, A> for BatchUpdateAgent<T, HB>
+impl<T, O, A> Agent<O, A> for BatchUpdateAgent<T, O, A>
 where
     T: Actor<O, A> + BatchUpdate<O, A>,
-    HB: HistoryBuffer<O, A>,
 {
     fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
         let full = self.history.push(step);
@@ -114,7 +112,7 @@ where
     }
 }
 
-impl<T, HB> SetActorMode for BatchUpdateAgent<T, HB>
+impl<T, O, A> SetActorMode for BatchUpdateAgent<T, O, A>
 where
     T: SetActorMode,
 {

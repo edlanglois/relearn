@@ -6,19 +6,9 @@ pub use serial::{SerialBuffer, SerialBufferConfig};
 
 /// Build a [`HistoryBuffer`].
 pub trait BuildHistoryBuffer<O, A> {
-    type HistoryBuffer: HistoryBuffer<O, A>;
+    type HistoryBuffer;
 
     fn build_history_buffer(&self) -> Self::HistoryBuffer;
-}
-
-/// A step history buffer.
-pub trait HistoryBuffer<O, A>: for<'a> HistoryBufferSteps<'a, O, A> {
-    /// Push a new step into the buffer.
-    ///
-    /// Steps must be pushed consecutively within each episode.
-    ///
-    /// Returns a Boolean indicating whether the buffer is ready to be drained for a model update.
-    fn push(&mut self, step: Step<O, A>) -> bool;
 }
 
 /// History buffer steps interface.

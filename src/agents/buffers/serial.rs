@@ -1,5 +1,5 @@
 use super::super::Step;
-use super::{BuildHistoryBuffer, HistoryBuffer, HistoryBufferSteps};
+use super::{BuildHistoryBuffer, HistoryBufferSteps};
 use std::vec;
 
 /// Configuration for [`SerialBuffer`].
@@ -37,7 +37,7 @@ pub struct SerialBuffer<O, A> {
     buffer: Vec<Step<O, A>>,
 }
 
-impl<O: 'static, A: 'static> BuildHistoryBuffer<O, A> for SerialBufferConfig {
+impl<O, A> BuildHistoryBuffer<O, A> for SerialBufferConfig {
     type HistoryBuffer = SerialBuffer<O, A>;
 
     fn build_history_buffer(&self) -> Self::HistoryBuffer {
@@ -49,8 +49,13 @@ impl<O: 'static, A: 'static> BuildHistoryBuffer<O, A> for SerialBufferConfig {
     }
 }
 
-impl<O: 'static, A: 'static> HistoryBuffer<O, A> for SerialBuffer<O, A> {
-    fn push(&mut self, step: Step<O, A>) -> bool {
+impl<O, A> SerialBuffer<O, A> {
+    /// Push a new step into the buffer.
+    ///
+    /// Steps must be pushed consecutively within each episode.
+    ///
+    /// Returns a Boolean indicating whether the buffer is ready to be drained for a model update.
+    pub fn push(&mut self, step: Step<O, A>) -> bool {
         let episode_done = step.episode_done;
         self.buffer.push(step);
         let num_steps = self.buffer.len();

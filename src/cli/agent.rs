@@ -188,10 +188,9 @@ impl Update<&Options> for TabularQLearningAgentConfig {
     }
 }
 
-impl<'a, AC, HBC> From<&'a Options> for BatchUpdateAgentConfig<AC, HBC>
+impl<'a, AC> From<&'a Options> for BatchUpdateAgentConfig<AC>
 where
     AC: From<&'a Options>,
-    HBC: From<&'a Options>,
 {
     fn from(opts: &'a Options) -> Self {
         Self {
@@ -201,10 +200,9 @@ where
     }
 }
 
-impl<'a, AC, HBC> Update<&'a Options> for BatchUpdateAgentConfig<AC, HBC>
+impl<'a, AC> Update<&'a Options> for BatchUpdateAgentConfig<AC>
 where
     AC: Update<&'a Options>,
-    HBC: Update<&'a Options>,
 {
     fn update(&mut self, opts: &'a Options) {
         self.actor_config.update(opts);
