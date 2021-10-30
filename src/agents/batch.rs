@@ -1,11 +1,15 @@
-use super::buffers::{BuildHistoryBuffer, HistoryBufferSteps, SerialBuffer, SerialBufferConfig};
+use super::buffers::{BuildHistoryBuffer, HistoryBufferData, SerialBuffer, SerialBufferConfig};
 use super::{Actor, ActorMode, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
 use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
 use crate::spaces::Space;
 
 /// Build an actor supporting batch updates ([`BatchUpdate`]).
-pub trait BuildBatchUpdateActor<OS: Space, AS: Space> {
+pub trait BuildBatchUpdateActor<OS: Space, AS: Space>
+where
+    OS::Element: 'static,
+    AS::Element: 'static,
+{
     type BatchUpdateActor: Actor<OS::Element, AS::Element>
         + BatchUpdate<OS::Element, AS::Element>
         + SetActorMode;
@@ -26,10 +30,10 @@ pub trait BuildBatchUpdateActor<OS: Space, AS: Space> {
 }
 
 /// An agent that can update from a batch of on-policy history steps.
-pub trait BatchUpdate<O, A> {
-    fn batch_update<I: IntoIterator<Item = Step<O, A>>>(
+pub trait BatchUpdate<O: 'static, A: 'static> {
+    fn batch_update<H: HistoryBufferData<O, A> + ?Sized>(
         &mut self,
-        steps: I,
+        history: &H,
         logger: &mut dyn TimeSeriesLogger,
     );
 }
@@ -37,14 +41,20 @@ pub trait BatchUpdate<O, A> {
 /// An agent that accepts updates at any time from any policy.
 pub trait OffPolicyAgent {}
 
-impl<T: OffPolicyAgent + Agent<O, A>, O, A> BatchUpdate<O, A> for T {
-    fn batch_update<I: IntoIterator<Item = Step<O, A>>>(
+impl<T, O, A> BatchUpdate<O, A> for T
+where
+    T: OffPolicyAgent + Agent<O, A>,
+    O: Clone + 'static,
+    A: Clone + 'static,
+{
+    fn batch_update<H: HistoryBufferData<O, A> + ?Sized>(
         &mut self,
-        steps: I,
+        history: &H,
         logger: &mut dyn TimeSeriesLogger,
     ) {
-        for step in steps {
-            self.update(step, logger)
+        for step in history.steps() {
+            // TODO: Avoid clone. Maybe update should take &step?
+            self.update(step.clone(), logger)
         }
         logger.end_event(Event::AgentOptPeriod).unwrap();
     }
@@ -69,7 +79,9 @@ impl<AC, OS, AS> BuildAgent<OS, AS> for BatchUpdateAgentConfig<AC>
 where
     AC: BuildBatchUpdateActor<OS, AS>,
     OS: Space,
+    OS::Element: 'static,
     AS: Space,
+    AS::Element: 'static,
 {
     type Agent = BatchUpdateAgent<AC::BatchUpdateActor, OS::Element, AS::Element>;
 
@@ -103,11 +115,14 @@ where
 impl<T, O, A> Agent<O, A> for BatchUpdateAgent<T, O, A>
 where
     T: Actor<O, A> + BatchUpdate<O, A>,
+    O: 'static,
+    A: 'static,
 {
     fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
         let full = self.history.push(step);
         if full {
-            self.actor.batch_update(self.history.drain_steps(), logger);
+            self.actor.batch_update(&self.history, logger);
+            self.history.clear();
         }
     }
 }
