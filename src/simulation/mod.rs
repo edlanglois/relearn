@@ -17,10 +17,8 @@ pub trait Simulator {
     /// Run a simulation
     ///
     /// # Args
-    /// * `env_seed` - Random seed for generating the environment instance or instances.
-    ///                Environment instances use the seeds `env_seed`, `env_seed + 1`, etc.
-    /// * `agent_seed` - Random seed for initializing the agent or agent workers.
-    ///                  Agent workers use the seeds `agent_seed`, `agent_seed + 1`, etc.
+    /// * `env_seed` - Random seed used to derive the environment initialization seed(s).
+    /// * `agent_seed` - Random seed used to derive the agent initialization seed(s).
     /// * `logger` - The logger for the main thread.
     fn run_simulation(
         &self,
