@@ -1,6 +1,6 @@
 use super::super::Step;
 use super::{BuildHistoryBuffer, HistoryBufferEpisodes, HistoryBufferSteps};
-use std::iter::{Chain, Cloned, ExactSizeIterator, FusedIterator};
+use std::iter::{Chain, Cloned, ExactSizeIterator, Extend, FusedIterator};
 use std::{option, slice};
 
 /// Configuration for [`SerialBuffer`].
@@ -77,6 +77,17 @@ impl<O, A> SerialBuffer<O, A> {
     pub fn clear(&mut self) {
         self.steps.clear();
         self.episode_ends.clear();
+    }
+}
+
+impl<O, A> Extend<Step<O, A>> for SerialBuffer<O, A> {
+    fn extend<T>(&mut self, iter: T)
+    where
+        T: IntoIterator<Item = Step<O, A>>,
+    {
+        for step in iter {
+            self.push(step);
+        }
     }
 }
 
@@ -244,11 +255,13 @@ mod tests {
             hard_threshold: 6,
         }
         .build_history_buffer();
-        buffer.push(step(0, None));
-        buffer.push(step(1, Some(2)));
-        buffer.push(step(2, None));
-        buffer.push(step(3, Some(4)));
-        buffer.push(step(4, Some(5)));
+        buffer.extend([
+            step(0, None),
+            step(1, Some(2)),
+            step(2, None),
+            step(3, Some(4)),
+            step(4, Some(5)),
+        ]);
         buffer
     }
 
