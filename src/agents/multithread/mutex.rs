@@ -69,7 +69,7 @@ where
     type Manager = MutexAgentManager<T>;
     type Worker = MutexAgentWorker<T>;
 
-    fn make_worker(&mut self) -> Self::Worker {
+    fn new_worker(&mut self) -> Self::Worker {
         MutexAgentWorker {
             agent: Arc::clone(&self.agent),
         }

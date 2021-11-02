@@ -29,7 +29,7 @@ pub trait InitializeMultithreadAgent<O, A> {
     type Worker: Agent<O, A> + Send + 'static;
 
     /// Create a new worker instance.
-    fn make_worker(&mut self) -> Self::Worker;
+    fn new_worker(&mut self) -> Self::Worker;
 
     /// Convert the initializer into the manager instance.
     fn into_manager(self) -> Self::Manager;
