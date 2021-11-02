@@ -83,8 +83,18 @@ impl<O, A> SerialBuffer<O, A> {
 impl<'a, O: 'a, A: 'a> HistoryBufferSteps<'a, O, A> for SerialBuffer<O, A> {
     type StepsIter = slice::Iter<'a, Step<O, A>>;
 
-    fn steps(&'a self) -> Self::StepsIter {
-        self.steps.iter()
+    fn steps(&'a self, include_incomplete: Option<usize>) -> Self::StepsIter {
+        // Initialize end to the end of completed episodes
+        let mut end: usize = self.episode_ends.last().cloned().unwrap_or(0);
+        if let Some(min_incomplete_len) = include_incomplete {
+            let num_steps = self.steps.len();
+            // If there is an incomplete episode at the end with length at least min_incomplete_len
+            // then change the end to be the last step.
+            if (num_steps - end) >= min_incomplete_len {
+                end = num_steps;
+            }
+        }
+        self.steps[..end].iter()
     }
 }
 
@@ -243,8 +253,26 @@ mod tests {
     }
 
     #[rstest]
-    fn steps(full_buffer: SerialBuffer<usize, bool>) {
-        let mut steps_iter = full_buffer.steps();
+    fn steps_no_incomplete(full_buffer: SerialBuffer<usize, bool>) {
+        let mut steps_iter = full_buffer.steps(None);
+        assert_eq!(steps_iter.next(), Some(&step(0, None)));
+        assert_eq!(steps_iter.next(), Some(&step(1, Some(2))));
+        assert_eq!(steps_iter.next(), Some(&step(2, None)));
+        assert_eq!(steps_iter.next(), None);
+    }
+
+    #[rstest]
+    fn steps_incomplete_ge_5(full_buffer: SerialBuffer<usize, bool>) {
+        let mut steps_iter = full_buffer.steps(Some(5));
+        assert_eq!(steps_iter.next(), Some(&step(0, None)));
+        assert_eq!(steps_iter.next(), Some(&step(1, Some(2))));
+        assert_eq!(steps_iter.next(), Some(&step(2, None)));
+        assert_eq!(steps_iter.next(), None);
+    }
+
+    #[rstest]
+    fn steps_incomplete_ge_1(full_buffer: SerialBuffer<usize, bool>) {
+        let mut steps_iter = full_buffer.steps(Some(1));
         assert_eq!(steps_iter.next(), Some(&step(0, None)));
         assert_eq!(steps_iter.next(), Some(&step(1, Some(2))));
         assert_eq!(steps_iter.next(), Some(&step(2, None)));
@@ -255,7 +283,7 @@ mod tests {
 
     #[rstest]
     fn steps_is_fused(full_buffer: SerialBuffer<usize, bool>) {
-        let mut steps_iter = full_buffer.steps();
+        let mut steps_iter = full_buffer.steps(Some(0));
         for _ in 0..5 {
             assert!(steps_iter.next().is_some());
         }
@@ -265,12 +293,12 @@ mod tests {
 
     #[rstest]
     fn steps_len(full_buffer: SerialBuffer<usize, bool>) {
-        assert_eq!(full_buffer.steps().len(), 5);
+        assert_eq!(full_buffer.steps(Some(0)).len(), 5);
     }
 
     #[rstest]
     fn steps_count(full_buffer: SerialBuffer<usize, bool>) {
-        assert_eq!(full_buffer.steps().count(), 5);
+        assert_eq!(full_buffer.steps(Some(0)).count(), 5);
     }
 
     #[rstest]

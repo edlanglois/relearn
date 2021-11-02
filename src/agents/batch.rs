@@ -52,7 +52,7 @@ where
         history: &H,
         logger: &mut dyn TimeSeriesLogger,
     ) {
-        for step in history.steps() {
+        for step in history.steps(Some(0)) {
             // TODO: Avoid clone. Maybe update should take &step?
             self.update(step.clone(), logger)
         }

@@ -17,7 +17,10 @@ pub trait HistoryBufferSteps<'a, O: 'a, A: 'a> {
     type StepsIter: Iterator<Item = &'a Step<O, A>>;
 
     /// All steps with episode steps ordered contiguously.
-    fn steps(&'a self) -> Self::StepsIter;
+    ///
+    /// # Args
+    /// * `include_incomplete` - Include incomplete episodes if they have at least this many steps.
+    fn steps(&'a self, include_incomplete: Option<usize>) -> Self::StepsIter;
 }
 
 /// Access episodes from a history buffer
