@@ -1,5 +1,5 @@
 use super::super::Step;
-use super::{BuildHistoryBuffer, HistoryBufferData, HistoryBufferEpisodes, HistoryBufferSteps};
+use super::{BuildHistoryBuffer, HistoryBufferEpisodes, HistoryBufferSteps};
 use std::iter::{Chain, Cloned, ExactSizeIterator, FusedIterator};
 use std::{option, slice};
 
@@ -176,5 +176,3 @@ impl<'a, O: 'a, A: 'a> HistoryBufferEpisodes<'a, O, A> for SerialBuffer<O, A> {
         )
     }
 }
-
-impl<O: 'static, A: 'static> HistoryBufferData<O, A> for SerialBuffer<O, A> {}

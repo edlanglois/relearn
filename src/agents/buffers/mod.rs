@@ -12,7 +12,6 @@ pub trait BuildHistoryBuffer<O, A> {
     fn build_history_buffer(&self) -> Self::HistoryBuffer;
 }
 
-
 /// Access steps from a history buffer.
 pub trait HistoryBufferSteps<'a, O: 'a, A: 'a> {
     type StepsIter: Iterator<Item = &'a Step<O, A>>;
@@ -60,5 +59,13 @@ where
 pub trait HistoryBufferData<O: 'static, A: 'static>:
     for<'a> HistoryBufferSteps<'a, O, A> + for<'a> HistoryBufferEpisodes<'a, O, A>
 // + for<'a> HistoryBufferShuffledEpisodes<'a, O, A>
+{
+}
+
+impl<T, O, A> HistoryBufferData<O, A> for T
+where
+    O: 'static,
+    A: 'static,
+    T: for<'a> HistoryBufferSteps<'a, O, A> + for<'a> HistoryBufferEpisodes<'a, O, A>,
 {
 }
