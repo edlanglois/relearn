@@ -76,16 +76,15 @@ where
     > {
         let mut worker_threads = vec![];
         let env_structure: &dyn EnvStructure<ObservationSpace = _, ActionSpace = _> =
-            &self.env_config.build_env(env_seed).unwrap();
+            &self.env_config.build_env(env_seed)?;
         let mut agent_initializer = self
             .agent_config
-            .build_multithread_agent(env_structure, agent_seed)
-            .unwrap();
+            .build_multithread_agent(env_structure, agent_seed)?;
 
         let mut env_seed_rng = StdRng::seed_from_u64(env_seed);
         for i in 0..self.num_workers {
             let mut env = self.env_config.build_env(env_seed_rng.gen())?;
-            let mut worker = agent_initializer.new_worker();
+            let mut worker = agent_initializer.new_worker()?;
             let mut hook = self.hook_config.build_hook(&env, self.num_workers, i);
             let mut worker_logger = self.worker_logger_config.build_thread_logger(i);
             worker_threads.push(thread::spawn(move || {

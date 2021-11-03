@@ -138,12 +138,11 @@ where
     type Manager = MultithreadBatchManager<TC::BatchUpdateActor, OS::Element, AS::Element>;
     type Worker = MultithreadBatchWorker<TC::BatchUpdateActor, OS::Element, AS::Element>;
 
-    fn new_worker(&mut self) -> Self::Worker {
+    fn new_worker(&mut self) -> Result<Self::Worker, BuildAgentError> {
         let mut actor = self
             .actor_config
-            .build_batch_update_actor(&self.env_structure, self.worker_seed_rng.gen())
-            .unwrap();
-        // TODO: Maybe do this in the worker threads (`act`) if the synchronization is slow
+            .build_batch_update_actor(&self.env_structure, self.worker_seed_rng.gen())?;
+        // TODO: Maybe do this in the worker threads (`act`) if the synchronization is slow.
         // Would have to maintain an extra bit to indicate whether the initial sync has occurred.
         // Would also have to be careful to avoid a deadlock if the manager immediately acquires
         // a write lock on the reference actor.
@@ -151,13 +150,13 @@ where
             .sync_params(&self.reference_actor.read().unwrap())
             .expect("Failed to synchronize model parameters");
         self.num_workers += 1;
-        MultithreadBatchWorker {
+        Ok(MultithreadBatchWorker {
             actor,
             reference_actor: Arc::clone(&self.reference_actor),
             buffer: Some(self.buffer_config.build_history_buffer()),
             send_buffer: self.worker_send_buffer.clone(),
             recv_buffer: self.worker_recv_buffer.clone(),
-        }
+        })
     }
 
     fn into_manager(self) -> Self::Manager {
