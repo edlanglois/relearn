@@ -12,6 +12,7 @@ repository = "https://github.com/edlanglois/relearn"
 [dependencies]
 array-init = "2.0"
 clap = "3.0.0-beta.5"
+crossbeam-channel = "0.5"
 enum-map = "1.1"
 impl-trait-for-tuples = "0.2"
 lazycell = "1.3"

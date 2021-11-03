@@ -1,9 +1,9 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyDef, PolicyUpdaterDef};
 use crate::agents::{
-    Agent, BatchUpdateAgentConfig, BetaThompsonSamplingAgentConfig, BuildAgent, BuildAgentError,
-    BuildMultithreadAgent, FullAgent, InitializeMultithreadAgent, MultithreadAgentManager,
-    MutexAgentConfig, MutexAgentInitializer, RandomAgentConfig, ResettingMetaAgent,
-    TabularQLearningAgentConfig, UCB1AgentConfig,
+    multithread::MutexAgentInitializer, Agent, BatchUpdateAgentConfig,
+    BetaThompsonSamplingAgentConfig, BuildAgent, BuildAgentError, BuildMultithreadAgent, FullAgent,
+    InitializeMultithreadAgent, MultithreadAgentManager, MutexAgentConfig, RandomAgentConfig,
+    ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::Loggable;

@@ -1,6 +1,11 @@
 //! Multi-thread agents
+mod batch;
 mod mutex;
 
+pub use batch::{
+    InitializeMultithreadBatchAgent, MultithreadBatchAgentConfig, MultithreadBatchManager,
+    MultithreadBatchWorker,
+};
 pub use mutex::{MutexAgentConfig, MutexAgentInitializer, MutexAgentManager, MutexAgentWorker};
 
 use super::{Agent, BuildAgentError};
@@ -47,4 +52,9 @@ where
     fn run(&mut self, logger: &mut dyn TimeSeriesLogger) {
         T::run(self, logger)
     }
+}
+
+/// Synchronize parameters to match those of a target instance of the same object.
+pub trait SyncParams {
+    fn sync_params(&mut self, target: &Self);
 }

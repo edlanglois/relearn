@@ -7,7 +7,7 @@ mod batch;
 pub mod buffers;
 mod finite;
 mod meta;
-mod multithread;
+pub mod multithread;
 mod random;
 mod tabular;
 #[cfg(test)]
@@ -22,8 +22,8 @@ pub use batch::{
 use finite::{BuildIndexAgent, FiniteSpaceAgent};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
 pub use multithread::{
-    BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager, MutexAgentConfig,
-    MutexAgentInitializer, MutexAgentManager, MutexAgentWorker,
+    BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager,
+    MultithreadBatchAgentConfig, MutexAgentConfig,
 };
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
