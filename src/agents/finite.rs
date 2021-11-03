@@ -1,7 +1,7 @@
 use super::buffers::HistoryBufferData;
 use super::{
     Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
-    OffPolicyAgent, SetActorMode, Step,
+    OffPolicyAgent, SetActorMode, Step, SyncParams, SyncParamsError,
 };
 use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
@@ -128,6 +128,15 @@ where
                 .map(|step| indexed_step(step, &self.observation_space, &self.action_space)),
             logger,
         )
+    }
+}
+
+impl<T, OS, AS> SyncParams for FiniteSpaceAgent<T, OS, AS>
+where
+    T: SyncParams,
+{
+    fn sync_params(&mut self, target: &Self) -> Result<(), SyncParamsError> {
+        self.agent.sync_params(&target.agent)
     }
 }
 

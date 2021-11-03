@@ -1,7 +1,7 @@
 //! Tabular agents
 use super::{
     Actor, ActorMode, Agent, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent,
-    SetActorMode, Step,
+    SetActorMode, Step, SyncParams, SyncParamsError,
 };
 use crate::logging::TimeSeriesLogger;
 use ndarray::{Array, Array2, Axis};
@@ -60,10 +60,10 @@ pub type TabularQLearningAgent<OS, AS> = FiniteSpaceAgent<BaseTabularQLearningAg
 pub struct BaseTabularQLearningAgent {
     pub discount_factor: f64,
     pub exploration_rate: f64,
-    pub state_action_counts: Array2<u32>,
-    pub state_action_values: Array2<f64>,
     pub mode: ActorMode,
 
+    state_action_counts: Array2<u32>,
+    state_action_values: Array2<f64>,
     rng: StdRng,
 }
 
@@ -140,6 +140,18 @@ impl OffPolicyAgent for BaseTabularQLearningAgent {}
 impl SetActorMode for BaseTabularQLearningAgent {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         self.mode = mode;
+    }
+}
+
+impl SyncParams for BaseTabularQLearningAgent {
+    fn sync_params(&mut self, target: &Self) -> Result<(), SyncParamsError> {
+        if self.state_action_counts.raw_dim() == target.state_action_counts.raw_dim() {
+            self.state_action_counts.assign(&target.state_action_counts);
+            self.state_action_values.assign(&target.state_action_values);
+            Ok(())
+        } else {
+            Err(SyncParamsError::Incompatible)
+        }
     }
 }
 

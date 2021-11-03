@@ -145,6 +145,23 @@ impl<T: SetActorMode + ?Sized> SetActorMode for Box<T> {
     }
 }
 
+/// Synchronize model parameters to match those of a target instance of the same object.
+///
+/// Synchronizes parameters that are learned via [`Agent::update`] or
+/// [`BatchUpdate::batch_update`]. Does not synchronize random state or hyper-parameters.
+///
+/// Hyper-parameters are those parameters set at agent construction and not learned.
+/// May fail if the agents have different hyper-parameters.
+pub trait SyncParams {
+    fn sync_params(&mut self, target: &Self) -> Result<(), SyncParamsError>;
+}
+
+#[derive(Error, Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum SyncParamsError {
+    #[error("incompatible parameter sets")]
+    Incompatible,
+}
+
 pub trait FullAgent<O, A>: Agent<O, A> + SetActorMode {}
 impl<O, A, T> FullAgent<O, A> for T where T: Agent<O, A> + SetActorMode + ?Sized {}
 

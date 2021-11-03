@@ -1,8 +1,7 @@
 use super::super::buffers::{BuildHistoryBuffer, SerialBuffer, SerialBufferConfig};
-use super::super::{Actor, Agent, BatchUpdate, BuildBatchUpdateActor, Step};
+use super::super::{Actor, Agent, BatchUpdate, BuildBatchUpdateActor, Step, SyncParams};
 use super::{
     BuildAgentError, BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager,
-    SyncParams,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure};
 use crate::logging::TimeSeriesLogger;
@@ -12,7 +11,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::sync::{Arc, RwLock};
 
 /// Multithread agent based on an inner [`BatchUpdate`] actor.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct MultithreadBatchAgentConfig<TC> {
     pub actor_config: TC,
     pub buffer_config: SerialBufferConfig,
@@ -139,7 +138,9 @@ where
         // Would have to maintain an extra bit to indicate whether the initial sync has occurred.
         // Would also have to be careful to avoid a deadlock if the manager immediately acquires
         // a write lock on the reference actor.
-        actor.sync_params(&self.reference_actor.read().unwrap());
+        actor
+            .sync_params(&self.reference_actor.read().unwrap())
+            .expect("Failed to synchronize model parameters");
         self.num_workers += 1;
         MultithreadBatchWorker {
             actor,
@@ -194,7 +195,8 @@ where
             // because the manager will acquire a write lock on the reference actor before
             // accepting buffers from the workers.
             self.actor
-                .sync_params(&self.reference_actor.read().unwrap());
+                .sync_params(&self.reference_actor.read().unwrap())
+                .expect("Failed to synchronize model parameters");
 
             // Get a buffer back from the manger
             self.buffer = Some(self.recv_buffer.recv().unwrap());

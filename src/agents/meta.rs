@@ -58,7 +58,7 @@ where
     OS: Space + Clone,
     AS: Space + Clone,
 {
-    /// Intialize a new resetting meta agent.
+    /// Initialize a new resetting meta agent.
     ///
     /// # Args
     /// * `inner_agent_config` - A builder for the inner agent.

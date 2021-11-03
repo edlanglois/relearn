@@ -1,5 +1,8 @@
 use super::buffers::{BuildHistoryBuffer, HistoryBufferData, SerialBuffer, SerialBufferConfig};
-use super::{Actor, ActorMode, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
+use super::{
+    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, SetActorMode, Step, SyncParams,
+    SyncParamsError,
+};
 use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
 use crate::spaces::Space;
@@ -133,6 +136,15 @@ where
 {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         self.actor.set_actor_mode(mode)
+    }
+}
+
+impl<T, O, A> SyncParams for BatchUpdateAgent<T, O, A>
+where
+    T: SyncParams,
+{
+    fn sync_params(&mut self, target: &Self) -> Result<(), SyncParamsError> {
+        self.actor.sync_params(&target.actor)
     }
 }
 

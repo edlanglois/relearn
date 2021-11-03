@@ -1,4 +1,7 @@
-use super::{Actor, Agent, BuildAgent, BuildAgentError, OffPolicyAgent, SetActorMode, Step};
+use super::{
+    Actor, Agent, BuildAgent, BuildAgentError, OffPolicyAgent, SetActorMode, Step, SyncParams,
+    SyncParamsError,
+};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::{SampleSpace, Space};
@@ -67,3 +70,10 @@ impl<AS: fmt::Display> fmt::Display for RandomAgent<AS> {
 }
 
 impl<AS> SetActorMode for RandomAgent<AS> {}
+
+impl<AS> SyncParams for RandomAgent<AS> {
+    fn sync_params(&mut self, _target: &Self) -> Result<(), SyncParamsError> {
+        // Nothing to synchronize
+        Ok(())
+    }
+}

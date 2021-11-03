@@ -53,8 +53,3 @@ where
         T::run(self, logger)
     }
 }
-
-/// Synchronize parameters to match those of a target instance of the same object.
-pub trait SyncParams {
-    fn sync_params(&mut self, target: &Self);
-}
