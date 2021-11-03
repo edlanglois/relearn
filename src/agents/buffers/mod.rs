@@ -6,7 +6,7 @@ use super::super::Step;
 use rand::Rng;
 pub use serial::{SerialBuffer, SerialBufferConfig};
 
-/// Build a [`HistoryBuffer`].
+/// Build a history buffer.
 pub trait BuildHistoryBuffer<O, A> {
     type HistoryBuffer;
 
