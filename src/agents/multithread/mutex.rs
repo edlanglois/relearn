@@ -1,5 +1,7 @@
 use super::super::{Actor, Agent, BuildAgent, BuildAgentError, Step};
-use super::{BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager};
+use super::{
+    BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager, TryIntoActor,
+};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::Space;
@@ -120,11 +122,10 @@ impl<T> MultithreadAgentManager for MutexAgentManager<T> {
     fn run(&mut self, _logger: &mut dyn TimeSeriesLogger) {}
 }
 
-impl<T> MutexAgentManager<T> {
-    /// Try to convert into the inner agent.
-    ///
-    /// Fails if any workers still exist, in which case this manager is returned.
-    pub fn try_into_inner(self) -> Result<T, Self> {
+impl<T> TryIntoActor for MutexAgentManager<T> {
+    type Actor = T;
+
+    fn try_into_actor(self) -> Result<Self::Actor, Self> {
         match Arc::try_unwrap(self.agent) {
             Ok(mutex) => Ok(mutex.into_inner().unwrap()),
             Err(agent) => Err(Self { agent }),
@@ -157,7 +158,7 @@ mod tests {
         );
         let manager = simulator.train(0, 0, &mut ()).unwrap();
 
-        let agent = manager.try_into_inner().unwrap();
+        let agent = manager.try_into_actor().unwrap();
         let mut env = env_config.build_env(1).unwrap();
         testing::eval_deterministic_bandit(agent, &mut env, 0.9);
     }

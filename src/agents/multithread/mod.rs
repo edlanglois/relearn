@@ -45,6 +45,18 @@ pub trait MultithreadAgentManager {
     fn run(&mut self, logger: &mut dyn TimeSeriesLogger);
 }
 
+/// Try to convert into a stand-alone actor.
+///
+/// This is generally implemented for [`MultithreadAgentManager`].
+pub trait TryIntoActor: Sized {
+    type Actor;
+
+    /// Try to convert the manager into a standalone actor, otherwise return self
+    ///
+    /// For multithread managers, this is likely to fail if any workers still exist.
+    fn try_into_actor(self) -> Result<Self::Actor, Self>;
+}
+
 impl<T> MultithreadAgentManager for Box<T>
 where
     T: MultithreadAgentManager + ?Sized,

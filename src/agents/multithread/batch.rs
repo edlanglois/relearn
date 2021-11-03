@@ -2,6 +2,7 @@ use super::super::buffers::{BuildHistoryBuffer, SerialBuffer, SerialBufferConfig
 use super::super::{Actor, Agent, BatchUpdate, BuildBatchUpdateActor, Step, SyncParams};
 use super::{
     BuildAgentError, BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager,
+    TryIntoActor,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure};
 use crate::logging::TimeSeriesLogger;
@@ -35,7 +36,8 @@ where
         seed: u64,
     ) -> Result<Self::MultithreadAgent, BuildAgentError> {
         let reference_actor = self.actor_config.build_batch_update_actor(env, seed)?;
-        let (send_buffer, recv_buffer) = crossbeam_channel::bounded(0);
+        let (worker_send_buffer, manager_recv_buffer) = crossbeam_channel::bounded(0);
+        let (manager_send_buffer, worker_recv_buffer) = crossbeam_channel::bounded(0);
         Ok(InitializeMultithreadBatchAgent {
             actor_config: self.actor_config.clone(),
             buffer_config: self.buffer_config,
@@ -43,8 +45,10 @@ where
             reference_actor: Arc::new(RwLock::new(reference_actor)),
             worker_seed_rng: StdRng::seed_from_u64(seed),
             num_workers: 0,
-            send_buffer,
-            recv_buffer,
+            worker_send_buffer,
+            manager_recv_buffer,
+            manager_send_buffer,
+            worker_recv_buffer,
         })
     }
 }
@@ -111,8 +115,13 @@ where
     worker_seed_rng: StdRng,
     num_workers: usize,
 
-    send_buffer: Sender<SerialBuffer<OS::Element, AS::Element>>,
-    recv_buffer: Receiver<SerialBuffer<OS::Element, AS::Element>>,
+    // Separate channels for each direction so that the manager can tell when the workers have
+    // exited
+    worker_send_buffer: Sender<SerialBuffer<OS::Element, AS::Element>>,
+    manager_recv_buffer: Receiver<SerialBuffer<OS::Element, AS::Element>>,
+
+    manager_send_buffer: Sender<SerialBuffer<OS::Element, AS::Element>>,
+    worker_recv_buffer: Receiver<SerialBuffer<OS::Element, AS::Element>>,
 }
 
 impl<TC, OS, AS> InitializeMultithreadAgent<OS::Element, AS::Element>
@@ -146,8 +155,8 @@ where
             actor,
             reference_actor: Arc::clone(&self.reference_actor),
             buffer: Some(self.buffer_config.build_history_buffer()),
-            send_buffer: self.send_buffer.clone(),
-            recv_buffer: self.recv_buffer.clone(),
+            send_buffer: self.worker_send_buffer.clone(),
+            recv_buffer: self.worker_recv_buffer.clone(),
         }
     }
 
@@ -155,12 +164,13 @@ where
         MultithreadBatchManager {
             actor: self.reference_actor,
             num_workers: self.num_workers,
-            send_buffer: self.send_buffer,
-            recv_buffer: self.recv_buffer,
+            send_buffer: self.manager_send_buffer,
+            recv_buffer: self.manager_recv_buffer,
         }
     }
 }
 
+#[derive(Debug)]
 pub struct MultithreadBatchWorker<T, O, A> {
     actor: T,
     reference_actor: Arc<RwLock<T>>,
@@ -204,6 +214,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct MultithreadBatchManager<T, O, A> {
     actor: Arc<RwLock<T>>,
     num_workers: usize,
@@ -226,6 +237,12 @@ where
             // Get full buffers from the worker threads.
             let buffers: Vec<_> = self.recv_buffer.iter().take(self.num_workers).collect();
 
+            if buffers.is_empty() {
+                // Worker threads have exited
+                return;
+            }
+            assert_eq!(buffers.len(), self.num_workers);
+
             actor.batch_update(&buffers, logger);
             drop(actor);
 
@@ -235,5 +252,53 @@ where
                 self.send_buffer.send(buffer).unwrap();
             }
         }
+    }
+}
+
+impl<T, O, A> TryIntoActor for MultithreadBatchManager<T, O, A> {
+    type Actor = T;
+
+    fn try_into_actor(self) -> Result<Self::Actor, Self> {
+        match Arc::try_unwrap(self.actor) {
+            Ok(rwlock) => Ok(rwlock.into_inner().unwrap()),
+            Err(actor) => Err(Self { actor, ..self }),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::super::testing;
+    use super::*;
+    use crate::agents::TabularQLearningAgentConfig;
+    use crate::envs::{BuildEnv, DeterministicBandit};
+    use crate::simulation::hooks::StepLimitConfig;
+    use crate::simulation::MultithreadSimulatorConfig;
+
+    #[test]
+    fn multithread_batch_learns() {
+        let env_config = DeterministicBandit::from_means(vec![0.0, 1.0]).unwrap();
+        let agent_config = MultithreadBatchAgentConfig {
+            actor_config: TabularQLearningAgentConfig::default(),
+            buffer_config: SerialBufferConfig {
+                soft_threshold: 10,
+                hard_threshold: 11,
+            },
+        };
+        let hook_config = StepLimitConfig::new(1000);
+        let worker_logger_config = ();
+        let sim_config = MultithreadSimulatorConfig { num_workers: 3 };
+
+        let simulator = sim_config.build_simulator(
+            env_config.clone(),
+            agent_config,
+            hook_config,
+            worker_logger_config,
+        );
+        let manager = simulator.train(0, 0, &mut ()).unwrap();
+
+        let agent = manager.try_into_actor().unwrap();
+        let mut env = env_config.build_env(1).unwrap();
+        testing::eval_deterministic_bandit(agent, &mut env, 0.9);
     }
 }
