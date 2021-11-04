@@ -114,7 +114,7 @@ impl AgentWrapperType {
     ) -> Option<MultithreadAgentDef> {
         use AgentWrapperType::*;
         match self {
-            Mutex => Some(MultithreadAgentDef::Mutex(Box::new(inner))),
+            Mutex => Some(MultithreadAgentDef::Mutex(inner)),
             _ => None,
         }
     }
@@ -173,7 +173,7 @@ impl AgentType {
                 base: self.base,
                 wrappers: self.wrappers[1..].into(),
             };
-            return Some(MultithreadAgentDef::Mutex(Box::new(inner.agent_def(opts)?)));
+            return Some(MultithreadAgentDef::Mutex(inner.agent_def(opts)?));
         }
         None
     }

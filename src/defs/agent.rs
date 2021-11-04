@@ -56,7 +56,7 @@ pub enum BatchActorDef {
 #[derive(Debug, Clone, PartialEq)]
 pub enum MultithreadAgentDef {
     /// A mutex-based simulated multithread agent. Does not provide meaningful parallelism.
-    Mutex(Box<AgentDef>),
+    Mutex(AgentDef),
 }
 
 /// A comprehensive space trait for use by RL agents.
@@ -475,7 +475,7 @@ where
         use MultithreadAgentDef::*;
         Ok(match self {
             Mutex(config) => GenericMultithreadInitializer::Mutex(
-                MutexAgentConfig::new(For::<M, _>::new(config.deref()))
+                MutexAgentConfig::new(For::<M, _>::new(config))
                     .build_multithread_agent(env, seed)?,
             ),
         })
