@@ -8,11 +8,7 @@ use crate::logging::{Event, TimeSeriesLogger};
 use crate::spaces::Space;
 
 /// Build an actor supporting batch updates ([`BatchUpdate`]).
-pub trait BuildBatchUpdateActor<OS: Space, AS: Space>
-where
-    OS::Element: 'static,
-    AS::Element: 'static,
-{
+pub trait BuildBatchUpdateActor<OS: Space, AS: Space> {
     type BatchUpdateActor: Actor<OS::Element, AS::Element>
         + BatchUpdate<OS::Element, AS::Element>
         + SetActorMode;
@@ -33,7 +29,7 @@ where
 }
 
 /// An agent that can update from a batch of on-policy history steps.
-pub trait BatchUpdate<O: 'static, A: 'static> {
+pub trait BatchUpdate<O, A> {
     fn batch_update<H: HistoryBufferData<O, A> + ?Sized>(
         &mut self,
         history: &H,
@@ -47,8 +43,8 @@ pub trait OffPolicyAgent {}
 impl<T, O, A> BatchUpdate<O, A> for T
 where
     T: OffPolicyAgent + Agent<O, A>,
-    O: Clone + 'static,
-    A: Clone + 'static,
+    O: Clone,
+    A: Clone,
 {
     fn batch_update<H: HistoryBufferData<O, A> + ?Sized>(
         &mut self,
@@ -82,9 +78,7 @@ impl<AC, OS, AS> BuildAgent<OS, AS> for BatchUpdateAgentConfig<AC>
 where
     AC: BuildBatchUpdateActor<OS, AS>,
     OS: Space,
-    OS::Element: 'static,
     AS: Space,
-    AS::Element: 'static,
 {
     type Agent = BatchUpdateAgent<AC::BatchUpdateActor, OS::Element, AS::Element>;
 
@@ -118,8 +112,6 @@ where
 impl<T, O, A> Agent<O, A> for BatchUpdateAgent<T, O, A>
 where
     T: Actor<O, A> + BatchUpdate<O, A>,
-    O: 'static,
-    A: 'static,
 {
     fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
         let full = self.history.push(step);

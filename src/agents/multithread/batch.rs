@@ -103,9 +103,7 @@ pub struct InitializeMultithreadBatchAgent<TC, OS, AS>
 where
     TC: BuildBatchUpdateActor<OS, AS>,
     OS: Space,
-    OS::Element: 'static,
     AS: Space,
-    AS::Element: 'static,
 {
     actor_config: TC,
     buffer_config: SerialBufferConfig,
@@ -191,8 +189,6 @@ where
 impl<T, O, A> Agent<O, A> for MultithreadBatchWorker<T, O, A>
 where
     T: Actor<O, A> + BatchUpdate<O, A> + SyncParams,
-    O: 'static,
-    A: 'static,
 {
     fn update(&mut self, step: Step<O, A>, _logger: &mut dyn TimeSeriesLogger) {
         let full = self.buffer.as_mut().unwrap().push(step);
@@ -225,8 +221,6 @@ pub struct MultithreadBatchManager<T, O, A> {
 impl<T, O, A> MultithreadAgentManager for MultithreadBatchManager<T, O, A>
 where
     T: BatchUpdate<O, A>,
-    O: 'static,
-    A: 'static,
 {
     fn run(&mut self, logger: &mut dyn TimeSeriesLogger) {
         loop {

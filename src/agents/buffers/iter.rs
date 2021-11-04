@@ -1,28 +1,18 @@
 //! History buffer implementation for an iterator of buffers.
 use super::super::Step;
-use super::{HistoryBufferEpisodes, HistoryBufferSteps};
+use super::{HistoryBufferEpisodes, HistoryBufferSteps, StepsIter};
 use std::iter::{self, FlatMap, FusedIterator, Repeat, Zip};
 
-// TODO: Try to use the function item rather than function pointer
-pub type StepsIterInner<'a, O, A, I, T> = SizedFlatMap<
-    Zip<<&'a I as IntoIterator>::IntoIter, Repeat<Option<usize>>>,
-    <T as HistoryBufferSteps<'a, O, A>>::StepsIter,
-    fn((&'a T, Option<usize>)) -> <T as HistoryBufferSteps<'a, O, A>>::StepsIter,
->;
-
-impl<'a, O: 'a, A: 'a, I: 'a, T: 'a> HistoryBufferSteps<'a, O, A> for I
+impl<O, A, I, T> HistoryBufferSteps<O, A> for I
 where
-    &'a I: IntoIterator<Item = &'a T>,
-    <&'a I as IntoIterator>::IntoIter: Clone,
-    T: HistoryBufferSteps<'a, O, A>,
+    for<'a> &'a I: IntoIterator<Item = &'a T>,
+    for<'a> <&'a I as IntoIterator>::IntoIter: Clone,
+    T: HistoryBufferSteps<O, A>,
 {
-    type StepsIter = StepsIterInner<'a, O, A, I, T>;
-
-    fn steps(&'a self, include_incomplete: Option<usize>) -> Self::StepsIter {
-        SizedFlatMap::new(
-            self.into_iter().zip(iter::repeat(include_incomplete)),
-            |(b, ii)| b.steps(ii),
-        )
+    fn steps<'a>(&'a self, include_incomplete: Option<usize>) -> Box<dyn StepsIter<'a, O, A> + 'a> {
+        Box::new(SizedFlatMap::new(self.into_iter(), move |b: &'a T| {
+            b.steps(include_incomplete)
+        }))
     }
 }
 

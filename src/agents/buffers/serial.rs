@@ -1,5 +1,5 @@
 use super::super::Step;
-use super::{BuildHistoryBuffer, HistoryBufferEpisodes, HistoryBufferSteps};
+use super::{BuildHistoryBuffer, HistoryBufferEpisodes, HistoryBufferSteps, StepsIter};
 use std::iter::{Chain, Cloned, ExactSizeIterator, Extend, FusedIterator};
 use std::{option, slice};
 
@@ -91,10 +91,8 @@ impl<O, A> Extend<Step<O, A>> for SerialBuffer<O, A> {
     }
 }
 
-impl<'a, O: 'a, A: 'a> HistoryBufferSteps<'a, O, A> for SerialBuffer<O, A> {
-    type StepsIter = slice::Iter<'a, Step<O, A>>;
-
-    fn steps(&'a self, include_incomplete: Option<usize>) -> Self::StepsIter {
+impl<O, A> HistoryBufferSteps<O, A> for SerialBuffer<O, A> {
+    fn steps<'a>(&'a self, include_incomplete: Option<usize>) -> Box<dyn StepsIter<'a, O, A> + 'a> {
         // Initialize end to the end of completed episodes
         let mut end: usize = self.episode_ends.last().cloned().unwrap_or(0);
         if let Some(min_incomplete_len) = include_incomplete {
@@ -105,7 +103,7 @@ impl<'a, O: 'a, A: 'a> HistoryBufferSteps<'a, O, A> for SerialBuffer<O, A> {
                 end = num_steps;
             }
         }
-        self.steps[..end].iter()
+        Box::new(self.steps[..end].iter())
     }
 }
 
