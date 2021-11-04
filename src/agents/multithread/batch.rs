@@ -28,7 +28,7 @@ where
     AS::Element: 'static,
     SerialBuffer<OS::Element, AS::Element>: Send,
 {
-    type MultithreadAgent = InitializeMultithreadBatchAgent<TC, OS, AS>;
+    type MultithreadAgent = MultithreadBatchAgentInitializer<TC, OS, AS>;
 
     fn build_multithread_agent(
         &self,
@@ -38,7 +38,7 @@ where
         let reference_actor = self.actor_config.build_batch_update_actor(env, seed)?;
         let (worker_send_buffer, manager_recv_buffer) = crossbeam_channel::bounded(0);
         let (manager_send_buffer, worker_recv_buffer) = crossbeam_channel::bounded(0);
-        Ok(InitializeMultithreadBatchAgent {
+        Ok(MultithreadBatchAgentInitializer {
             actor_config: self.actor_config.clone(),
             buffer_config: self.buffer_config,
             env_structure: env.into(),
@@ -99,7 +99,7 @@ where
 /// [`BuildMultithreadAgent::build_multithread_agent`] and then checked before use, or the barrier
 /// would need to be sent to the workers after they are created.
 #[derive(Debug)]
-pub struct InitializeMultithreadBatchAgent<TC, OS, AS>
+pub struct MultithreadBatchAgentInitializer<TC, OS, AS>
 where
     TC: BuildBatchUpdateActor<OS, AS>,
     OS: Space,
@@ -123,7 +123,7 @@ where
 }
 
 impl<TC, OS, AS> InitializeMultithreadAgent<OS::Element, AS::Element>
-    for InitializeMultithreadBatchAgent<TC, OS, AS>
+    for MultithreadBatchAgentInitializer<TC, OS, AS>
 where
     TC: BuildBatchUpdateActor<OS, AS>,
     TC::BatchUpdateActor: SyncParams + Send + Sync + 'static, // Sync required by RwLock

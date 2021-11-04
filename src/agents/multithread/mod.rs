@@ -3,7 +3,7 @@ mod batch;
 mod mutex;
 
 pub use batch::{
-    InitializeMultithreadBatchAgent, MultithreadBatchAgentConfig, MultithreadBatchManager,
+    MultithreadBatchAgentConfig, MultithreadBatchAgentInitializer, MultithreadBatchManager,
     MultithreadBatchWorker,
 };
 pub use mutex::{MutexAgentConfig, MutexAgentInitializer, MutexAgentManager, MutexAgentWorker};
