@@ -6,7 +6,7 @@ use super::{AgentDef, EnvDef, HooksDef, MultithreadAgentDef};
 use crate::envs::{BuildEnv, MetaObservationSpace};
 use crate::logging::{BuildThreadLogger, TimeSeriesLogger};
 use crate::simulation::{MultithreadSimulatorConfig, SerialSimulator, Simulator};
-use crate::spaces::FiniteSpace;
+use crate::spaces::{FiniteSpace, Space};
 
 /// Construct a boxed serial agent-environment simulator
 ///
@@ -72,8 +72,10 @@ impl VisitEnvFiniteFinite for SerialSimulatorVisitor {
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace + FiniteSpace,
+        <EC::ObservationSpace as Space>::Element: Clone,
         EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace + FiniteSpace,
+        <EC::ActionSpace as Space>::Element: Clone,
     {
         Box::new(SerialSimulator::new(
             env_config,
@@ -107,8 +109,10 @@ impl VisitEnvAnyAny for SerialSimulatorVisitor {
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace,
+        <EC::ObservationSpace as Space>::Element: Clone,
         EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace,
+        <EC::ActionSpace as Space>::Element: Clone,
     {
         Box::new(SerialSimulator::new(
             env_config,
@@ -139,8 +143,10 @@ where
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace + FiniteSpace,
+        <EC::ObservationSpace as Space>::Element: Clone,
         EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace + FiniteSpace,
+        <EC::ActionSpace as Space>::Element: Clone,
         EC::Environment: Send + 'static,
     {
         Box::new(self.sim_config.build_simulator(
@@ -186,8 +192,10 @@ where
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace,
+        <EC::ObservationSpace as Space>::Element: Clone,
         EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace,
+        <EC::ActionSpace as Space>::Element: Clone,
         EC::Environment: Send + 'static,
     {
         Box::new(self.sim_config.build_simulator(

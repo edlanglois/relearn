@@ -4,8 +4,8 @@ use crate::agents::{
     TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::defs::{
-    AgentDef, CriticDef, CriticUpdaterDef, MultithreadAgentDef, OptionalBatchAgentDef, PolicyDef,
-    PolicyUpdaterDef,
+    AgentDef, BatchActorDef, CriticDef, CriticUpdaterDef, MultithreadAgentDef,
+    OptionalBatchAgentDef, PolicyDef, PolicyUpdaterDef,
 };
 use crate::torch::agents::ActorCriticConfig;
 use clap::ArgEnum;
@@ -31,17 +31,20 @@ impl fmt::Display for ConcreteAgentType {
 }
 
 impl ConcreteAgentType {
+    pub fn optional_batch_agent_def(&self, opts: &Options) -> Option<OptionalBatchAgentDef> {
+        use ConcreteAgentType::*;
+        match self {
+            Random => Some(OptionalBatchAgentDef::Random),
+            TabularQLearning => Some(OptionalBatchAgentDef::TabularQLearning(opts.into())),
+            BetaThompsonSampling => Some(OptionalBatchAgentDef::BetaThompsonSampling(opts.into())),
+            UCB1 => Some(OptionalBatchAgentDef::UCB1(From::from(opts))),
+            _ => None,
+        }
+    }
+
     pub fn agent_def(&self, opts: &Options) -> AgentDef {
         use ConcreteAgentType::*;
         match self {
-            Random => AgentDef::NoBatch(OptionalBatchAgentDef::Random),
-            TabularQLearning => {
-                AgentDef::NoBatch(OptionalBatchAgentDef::TabularQLearning(opts.into()))
-            }
-            BetaThompsonSampling => {
-                AgentDef::NoBatch(OptionalBatchAgentDef::BetaThompsonSampling(opts.into()))
-            }
-            UCB1 => AgentDef::NoBatch(OptionalBatchAgentDef::UCB1(From::from(opts))),
             PolicyGradient => {
                 let config = ActorCriticConfig {
                     policy_updater_config: PolicyUpdaterDef::default_policy_gradient(),
@@ -66,6 +69,7 @@ impl ConcreteAgentType {
                 .with_update(opts);
                 AgentDef::ActorCritic(Box::new(config))
             }
+            _ => AgentDef::NoBatch(self.optional_batch_agent_def(opts).unwrap()),
         }
     }
 }
@@ -85,10 +89,20 @@ impl fmt::Display for AgentWrapperType {
 }
 
 impl AgentWrapperType {
-    pub fn agent_def(&self, inner: AgentDef, _opts: &Options) -> Option<AgentDef> {
+    pub fn agent_def(&self, inner: AgentDef, opts: &Options) -> Option<AgentDef> {
         use AgentWrapperType::*;
         match self {
             ResettingMeta => Some(AgentDef::ResettingMeta(Box::new(inner))),
+            Batch => {
+                if let AgentDef::NoBatch(optional_batch_agent_def) = inner {
+                    Some(AgentDef::Batch(BatchUpdateAgentConfig {
+                        actor_config: BatchActorDef::Batch(optional_batch_agent_def),
+                        history_buffer_config: opts.into(),
+                    }))
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }

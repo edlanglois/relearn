@@ -111,9 +111,7 @@ where
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::Agent, BuildAgentError> {
-        let actor = self.actor_config.build_batch_update_actor(env, seed)?;
-        let history = self.history_buffer_config.build_history_buffer();
-        Ok(BatchUpdateAgent { actor, history })
+        BatchUpdateAgent::new(&self.actor_config, &self.history_buffer_config, env, seed)
     }
 }
 
@@ -122,6 +120,24 @@ where
 pub struct BatchUpdateAgent<T, O, A> {
     actor: T,
     history: SerialBuffer<O, A>,
+}
+
+impl<T, O, A> BatchUpdateAgent<T, O, A> {
+    pub fn new<TC, OS, AS>(
+        actor_config: &TC,
+        history_buffer_config: &SerialBufferConfig,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self, BuildAgentError>
+    where
+        TC: BuildBatchUpdateActor<OS, AS, BatchUpdateActor = T> + ?Sized,
+        OS: Space<Element = O>,
+        AS: Space<Element = A>,
+    {
+        let actor = actor_config.build_batch_update_actor(env, seed)?;
+        let history = history_buffer_config.build_history_buffer();
+        Ok(Self { actor, history })
+    }
 }
 
 impl<T, O, A> Actor<O, A> for BatchUpdateAgent<T, O, A>

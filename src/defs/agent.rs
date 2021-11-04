@@ -1,9 +1,10 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyDef, PolicyUpdaterDef};
 use crate::agents::{
-    multithread::MutexAgentInitializer, Agent, BetaThompsonSamplingAgentConfig, BuildAgent,
-    BuildAgentError, BuildBatchUpdateActor, BuildMultithreadAgent, FullAgent, FullBatchUpdateActor,
-    InitializeMultithreadAgent, MultithreadAgentManager, MutexAgentConfig, RandomAgentConfig,
-    ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
+    multithread::MutexAgentInitializer, Agent, BatchUpdateAgentConfig,
+    BetaThompsonSamplingAgentConfig, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
+    BuildMultithreadAgent, FullAgent, FullBatchUpdateActor, InitializeMultithreadAgent,
+    MultithreadAgentManager, MutexAgentConfig, RandomAgentConfig, ResettingMetaAgent,
+    TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::Loggable;
@@ -37,6 +38,8 @@ pub enum OptionalBatchAgentDef {
 pub enum AgentDef {
     /// Pass-through for [`OptionalBatchAgentDef`] agents viewed as regular synchronous agents.
     NoBatch(OptionalBatchAgentDef),
+    /// [`BatchUpdateAgent`](crate::agents::BatchUpdateAgent) for [`BatchActorDef`] agents.
+    Batch(BatchUpdateAgentConfig<BatchActorDef>),
     /// Torch actor-critic agent
     ActorCritic(Box<ActorCriticConfig<PolicyDef, PolicyUpdaterDef, CriticDef, CriticUpdaterDef>>),
     /// Applies a non-meta agent to a meta environment by resetting between trials
@@ -165,7 +168,9 @@ where
 impl<OS, AS> BuildAgentFor<EnvAnyAny, OS, AS> for AgentDef
 where
     OS: RLObservationSpace,
+    OS::Element: Clone,
     AS: RLActionSpace,
+    AS::Element: Clone,
 {
     type Agent = Box<DynFullAgent<OS, AS>>;
 
@@ -179,6 +184,12 @@ where
             NoBatch(agent_def) => {
                 BuildAgentFor::<EnvAnyAny, _, _>::build_agent(agent_def, env, seed)
             }
+            Batch(config) => BatchUpdateAgentConfig::new(
+                For::<EnvAnyAny, _>::new(&config.actor_config),
+                config.history_buffer_config,
+            )
+            .build_agent(env, seed)
+            .map(|a| Box::new(a) as _),
             ActorCritic(config) => config
                 .as_ref()
                 .build_agent(env, seed)
@@ -215,7 +226,9 @@ where
 impl<OS, AS> BuildAgentFor<EnvFiniteFinite, OS, AS> for AgentDef
 where
     OS: RLObservationSpace + FiniteSpace,
+    OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace,
+    AS::Element: Clone,
 {
     type Agent = Box<DynFullAgent<OS, AS>>;
 
@@ -229,6 +242,12 @@ where
             NoBatch(agent_def) => {
                 BuildAgentFor::<EnvFiniteFinite, _, _>::build_agent(agent_def, env, seed)
             }
+            Batch(config) => BatchUpdateAgentConfig::new(
+                For::<EnvFiniteFinite, _>::new(&config.actor_config),
+                config.history_buffer_config,
+            )
+            .build_agent(env, seed)
+            .map(|a| Box::new(a) as _),
             _ => BuildAgentFor::<EnvAnyAny, _, _>::build_agent(self, env, seed),
         }
     }
@@ -265,6 +284,7 @@ where
     AS::Element: Clone,
     // I think this ought to be inferable but for some reason it isn't
     MetaObservationSpace<OS, AS>: RLObservationSpace,
+    <MetaObservationSpace<OS, AS> as Space>::Element: Clone,
 {
     type Agent = Box<DynFullAgent<MetaObservationSpace<OS, AS>, AS>>;
 
@@ -279,6 +299,12 @@ where
             NoBatch(agent_def) => {
                 BuildAgentFor::<EnvMetaFiniteFinite, _, _>::build_agent(agent_def, env, seed)
             }
+            Batch(config) => BatchUpdateAgentConfig::new(
+                For::<EnvMetaFiniteFinite, _>::new(&config.actor_config),
+                config.history_buffer_config,
+            )
+            .build_agent(env, seed)
+            .map(|a| Box::new(a) as _),
             ResettingMeta(inner_agent_def) => ResettingMetaAgent::new(
                 For::<EnvFiniteFinite, _>::new((*inner_agent_def).clone()),
                 (&InnerEnvStructure::new(env)).into(),
@@ -300,6 +326,24 @@ pub trait BuildBatchUpdateActorFor<M, OS: Space, AS: Space> {
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::BatchUpdateActor, BuildAgentError>;
+}
+
+impl<T, M, OS, AS> BuildBatchUpdateActorFor<M, OS, AS> for T
+where
+    T: Deref + ?Sized,
+    T::Target: BuildBatchUpdateActorFor<M, OS, AS>,
+    OS: Space,
+    AS: Space,
+{
+    type BatchUpdateActor = <T::Target as BuildBatchUpdateActorFor<M, OS, AS>>::BatchUpdateActor;
+
+    fn build_batch_update_actor(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
+        self.deref().build_batch_update_actor(env, seed)
+    }
 }
 
 impl<OS, AS> BuildBatchUpdateActorFor<EnvAnyAny, OS, AS> for OptionalBatchAgentDef
@@ -329,7 +373,7 @@ where
 impl<OS, AS> BuildBatchUpdateActorFor<EnvFiniteFinite, OS, AS> for OptionalBatchAgentDef
 where
     OS: RLObservationSpace + FiniteSpace,
-    OS::Element: Clone,
+    OS::Element: Clone, // From impl BatchUpdate for OffPolicyAgent
     AS: RLActionSpace + FiniteSpace,
     AS::Element: Clone,
 {
@@ -377,6 +421,29 @@ where
         seed: u64,
     ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
         BuildBatchUpdateActorFor::<EnvAnyAny, _, _>::build_batch_update_actor(self, env, seed)
+    }
+}
+
+impl<M, OS, AS> BuildBatchUpdateActorFor<M, OS, AS> for BatchActorDef
+where
+    OS: Space,
+    AS: Space,
+    OptionalBatchAgentDef: BuildBatchUpdateActorFor<M, OS, AS>,
+{
+    type BatchUpdateActor =
+        <OptionalBatchAgentDef as BuildBatchUpdateActorFor<M, OS, AS>>::BatchUpdateActor;
+
+    fn build_batch_update_actor(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
+        use BatchActorDef::*;
+        match self {
+            Batch(agent_def) => BuildBatchUpdateActorFor::<M, OS, AS>::build_batch_update_actor(
+                agent_def, env, seed,
+            ),
+        }
     }
 }
 

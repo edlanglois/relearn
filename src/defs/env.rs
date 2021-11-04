@@ -4,7 +4,7 @@ use crate::envs::{
     EnvStructure, FirstPlayerView, FruitGame, MemoryGame as MemoryGameEnv, MetaObservationSpace,
     MetaPomdp, OneHotBandits, Pomdp, UniformBernoulliBandits, WithStepLimit,
 };
-use crate::spaces::FiniteSpace;
+use crate::spaces::{FiniteSpace, Space};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use rand::distributions::Distribution;
 use std::borrow::Borrow;
@@ -129,8 +129,11 @@ pub trait VisitEnvFiniteFinite: VisitEnvBase {
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace + FiniteSpace,
+        // TODO: Compiler can't tell these are the same
+        <EC::ObservationSpace as Space>::Element: Clone,
         EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace + FiniteSpace,
+        <EC::ActionSpace as Space>::Element: Clone,
         EC::Environment: Send + 'static;
 }
 
@@ -141,6 +144,7 @@ pub trait VisitEnvMetaFinitFinite: VisitEnvBase {
         EC: BuildEnv<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + 'static,
         EC::Environment: Send + 'static,
         OS: RLObservationSpace + FiniteSpace + Clone,
+        // TODO: Compiler can't tell these are the same
         OS::Element: Clone,
         AS: RLActionSpace + FiniteSpace + Clone,
         AS::Element: Clone,
@@ -155,7 +159,10 @@ pub trait VisitEnvAnyAny: VisitEnvBase {
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace,
+        // TODO: Compiler can't tell these are the same
+        <EC::ObservationSpace as Space>::Element: Clone,
         EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace,
+        <EC::ActionSpace as Space>::Element: Clone,
         EC::Environment: Send + 'static;
 }
