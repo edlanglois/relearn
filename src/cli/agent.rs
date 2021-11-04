@@ -107,6 +107,7 @@ impl AgentWrapperType {
         }
     }
 
+    #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn multi_thread_agent_def(
         &self,
         inner: AgentDef,
