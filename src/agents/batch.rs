@@ -30,9 +30,9 @@ pub trait BuildBatchUpdateActor<OS: Space, AS: Space> {
 
 /// An agent that can update from a batch of on-policy history steps.
 pub trait BatchUpdate<O, A> {
-    fn batch_update<H: HistoryBufferData<O, A> + ?Sized>(
+    fn batch_update(
         &mut self,
-        history: &H,
+        history: &dyn HistoryBufferData<O, A>,
         logger: &mut dyn TimeSeriesLogger,
     );
 }
@@ -46,9 +46,9 @@ where
     O: Clone,
     A: Clone,
 {
-    fn batch_update<H: HistoryBufferData<O, A> + ?Sized>(
+    fn batch_update(
         &mut self,
-        history: &H,
+        history: &dyn HistoryBufferData<O, A>,
         logger: &mut dyn TimeSeriesLogger,
     ) {
         for step in history.steps(Some(0)) {

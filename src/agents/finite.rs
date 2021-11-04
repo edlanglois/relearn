@@ -117,9 +117,9 @@ where
     AS: FiniteSpace,
     AS::Element: 'static,
 {
-    fn batch_update<H: HistoryBufferData<OS::Element, AS::Element> + ?Sized>(
+    fn batch_update(
         &mut self,
-        history: &H,
+        history: &dyn HistoryBufferData<OS::Element, AS::Element>,
         logger: &mut dyn TimeSeriesLogger,
     ) {
         self.agent.batch_update_from_steps(
