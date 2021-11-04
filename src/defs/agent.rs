@@ -12,8 +12,9 @@ use crate::spaces::{
     SampleSpace, SendElementSpace, Space,
 };
 use crate::torch::agents::ActorCriticConfig;
-use std::borrow::Borrow;
 use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::ops::Deref;
 use tch::Tensor;
 
 /// Agent definition
@@ -66,25 +67,67 @@ impl<T: RLSpace + FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>> RLObservatio
 pub trait RLActionSpace: RLSpace + ParameterizedDistributionSpace<Tensor> {}
 impl<T: RLSpace + ParameterizedDistributionSpace<Tensor>> RLActionSpace for T {}
 
-/// Wrapper implementing [`BuildAgent`] for [`AgentDef`] for any observation and action space.
+/// Environment structure marker types
+pub trait EnvStructureMarker {}
+
+/// Marker for environments with any observation and action space.
 ///
 /// More specifically, any observation and action space satisfying the relatively generic
 /// [`RLObservationSpace`] and [`RLActionSpace`] traits.
 ///
-/// There is no trait specialization so this will fail for those agents that require a tighter
-/// bounds on the observation and actions paces.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ForAnyAny<T>(T);
+/// There is no trait specialization so construction will fail for those agents that require
+/// a tighter bound on the observation and action spaces.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)] // Simplify deriving trait for structs using it
+pub enum EnvAnyAny {}
+impl EnvStructureMarker for EnvAnyAny {}
 
-impl<T> ForAnyAny<T> {
-    pub const fn new(agent_def: T) -> Self {
-        Self(agent_def)
+/// Marker for environments with finite observation and action spaces.
+///
+/// There is no trait specialization so construction will fail for those agents that require
+/// a tighter bound on the observation and action spaces.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)] // Simplify deriving trait for structs using it
+pub enum EnvFiniteFinite {}
+impl EnvStructureMarker for EnvFiniteFinite {}
+
+/// Marker for meta-environments with finite inner observation and action spaces.
+///
+/// There is no trait specialization so construction will fail for those agents that require
+/// a tighter bound on the observation and action spaces.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)] // Simplify deriving trait for structs using it
+pub enum EnvMetaFiniteFinite {}
+impl EnvStructureMarker for EnvMetaFiniteFinite {}
+
+/// Build an agent for environments satisfying the marker type.
+pub trait BuildAgentFor<M, OS: Space, AS: Space> {
+    type Agent: FullAgent<OS::Element, AS::Element>;
+
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError>;
+}
+
+impl<T, M, OS, AS> BuildAgentFor<M, OS, AS> for T
+where
+    T: Deref + ?Sized,
+    T::Target: BuildAgentFor<M, OS, AS>,
+    OS: Space,
+    AS: Space,
+{
+    type Agent = <T::Target as BuildAgentFor<M, OS, AS>>::Agent;
+
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
+        self.deref().build_agent(env, seed)
     }
 }
 
-impl<T, OS, AS> BuildAgent<OS, AS> for ForAnyAny<T>
+impl<OS, AS> BuildAgentFor<EnvAnyAny, OS, AS> for AgentDef
 where
-    T: Borrow<AgentDef>,
     OS: RLObservationSpace,
     AS: RLActionSpace,
 {
@@ -96,7 +139,7 @@ where
         seed: u64,
     ) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
-        match self.0.borrow() {
+        match self {
             Random => RandomAgentConfig::new()
                 .build_agent(env, seed)
                 .map(|a| Box::new(a) as _),
@@ -108,6 +151,162 @@ where
         }
     }
 }
+
+impl<OS, AS> BuildAgentFor<EnvFiniteFinite, OS, AS> for AgentDef
+where
+    OS: RLObservationSpace + FiniteSpace,
+    AS: RLActionSpace + FiniteSpace,
+{
+    type Agent = Box<DynFullAgent<OS, AS>>;
+
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
+        use AgentDef::*;
+        match self {
+            TabularQLearning(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            BatchTabularQLearning(config) => {
+                config.build_agent(env, seed).map(|a| Box::new(a) as _)
+            }
+            BetaThompsonSampling(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            UCB1(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            _ => BuildAgentFor::<EnvAnyAny, _, _>::build_agent(self, env, seed),
+        }
+    }
+}
+
+impl<OS, AS> BuildAgentFor<EnvMetaFiniteFinite, MetaObservationSpace<OS, AS>, AS> for AgentDef
+where
+    OS: RLObservationSpace + FiniteSpace + Clone,
+    OS::Element: Clone,
+    AS: RLActionSpace + FiniteSpace + Clone,
+    AS::Element: Clone,
+    // I think this ought to be inferrable but for some reason it isn't
+    // It may have to do with SendElementSpace
+    MetaObservationSpace<OS, AS>: RLObservationSpace,
+{
+    type Agent = Box<DynFullAgent<MetaObservationSpace<OS, AS>, AS>>;
+
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
+        use AgentDef::*;
+
+        match self {
+            ResettingMeta(inner_agent_def) => ResettingMetaAgent::new(
+                For::<EnvFiniteFinite, _>::new((*inner_agent_def).clone()),
+                (&InnerEnvStructure::new(env)).into(),
+                seed,
+            )
+            .map(|a| Box::new(a) as _),
+            _ => BuildAgentFor::<EnvAnyAny, _, _>::build_agent(self, env, seed),
+        }
+    }
+}
+
+/// Build a multithread agent for enviornments satisfying the marker type.
+pub trait BuildMultithreadAgentFor<M, OS: Space, AS: Space> {
+    type MultithreadAgent: InitializeMultithreadAgent<OS::Element, AS::Element>;
+
+    fn build_multithread_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::MultithreadAgent, BuildAgentError>;
+}
+
+impl<M, OS, AS> BuildMultithreadAgentFor<M, OS, AS> for MultithreadAgentDef
+where
+    OS: RLObservationSpace,
+    AS: RLActionSpace,
+    AgentDef: BuildAgentFor<M, OS, AS, Agent = Box<dyn FullAgent<OS::Element, AS::Element> + Send>>,
+{
+    type MultithreadAgent = GenericMultithreadInitializer<OS, AS>;
+
+    fn build_multithread_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::MultithreadAgent, BuildAgentError> {
+        use MultithreadAgentDef::*;
+        Ok(match self {
+            Mutex(config) => GenericMultithreadInitializer::Mutex(
+                MutexAgentConfig::new(For::<M, _>::new(config.deref()))
+                    .build_multithread_agent(env, seed)?,
+            ),
+        })
+    }
+}
+
+/// Associate a type with a particular environment structure marker.
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct For<M, T> {
+    marker: PhantomData<fn() -> M>,
+    wrapped: T,
+}
+
+impl<M, T> For<M, T> {
+    // False positive in clippy or bug in cargo
+    // The PhantomData of a function pointer supposedly cannot be const created
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn new(wrapped: T) -> Self {
+        Self {
+            marker: PhantomData,
+            wrapped,
+        }
+    }
+}
+
+impl<M, T> From<T> for For<M, T> {
+    fn from(wrapped: T) -> Self {
+        Self::new(wrapped)
+    }
+}
+
+impl<M, T> Deref for For<M, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.wrapped
+    }
+}
+
+impl<M, T, OS: Space, AS: Space> BuildAgent<OS, AS> for For<M, T>
+where
+    T: BuildAgentFor<M, OS, AS>,
+{
+    type Agent = T::Agent;
+
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
+        self.wrapped.build_agent(env, seed)
+    }
+}
+
+impl<M, T, OS: Space, AS: Space> BuildMultithreadAgent<OS, AS> for For<M, T>
+where
+    T: BuildMultithreadAgentFor<M, OS, AS>,
+{
+    type MultithreadAgent = T::MultithreadAgent;
+
+    fn build_multithread_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::MultithreadAgent, BuildAgentError> {
+        self.wrapped.build_multithread_agent(env, seed)
+    }
+}
+
+/// Send-able [`FullAgent`] trait object for an environment structure.
+pub type DynFullAgent<OS, AS> =
+    dyn FullAgent<<OS as Space>::Element, <AS as Space>::Element> + Send;
 
 /// [`InitializeMultithreadAgent`] for the agents defined by [`MultithreadAgentDef`].
 ///
@@ -143,168 +342,3 @@ where
         }
     }
 }
-
-impl<T, OS, AS> BuildMultithreadAgent<OS, AS> for ForAnyAny<T>
-where
-    T: Borrow<MultithreadAgentDef>,
-    OS: RLObservationSpace,
-    AS: RLActionSpace,
-{
-    type MultithreadAgent = GenericMultithreadInitializer<OS, AS>;
-
-    fn build_multithread_agent(
-        &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
-        seed: u64,
-    ) -> Result<Self::MultithreadAgent, BuildAgentError> {
-        use MultithreadAgentDef::*;
-        Ok(match self.0.borrow() {
-            Mutex(config) => GenericMultithreadInitializer::Mutex(
-                MutexAgentConfig::new(ForAnyAny(config.borrow()))
-                    .build_multithread_agent(env, seed)?,
-            ),
-        })
-    }
-}
-
-/// Wrapper implementing [`BuildAgent`] for [`AgentDef`] for finite observation and action spaces.
-///
-/// There is no trait specialization so this will fail for those agents that require a tighter
-/// bounds on the observation and actions paces.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ForFiniteFinite<T>(T);
-
-impl<T> ForFiniteFinite<T> {
-    pub const fn new(agent_def: T) -> Self {
-        Self(agent_def)
-    }
-}
-
-impl<T, OS, AS> BuildAgent<OS, AS> for ForFiniteFinite<T>
-where
-    T: Borrow<AgentDef>,
-    OS: RLObservationSpace + FiniteSpace,
-    AS: RLActionSpace + FiniteSpace,
-{
-    type Agent = Box<DynFullAgent<OS, AS>>;
-
-    fn build_agent(
-        &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
-        seed: u64,
-    ) -> Result<Self::Agent, BuildAgentError> {
-        use AgentDef::*;
-        match self.0.borrow() {
-            TabularQLearning(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
-            BatchTabularQLearning(config) => {
-                config.build_agent(env, seed).map(|a| Box::new(a) as _)
-            }
-            BetaThompsonSampling(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
-            UCB1(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
-            agent_def => ForAnyAny::new(agent_def).build_agent(env, seed),
-        }
-    }
-}
-
-impl<T, OS, AS> BuildMultithreadAgent<OS, AS> for ForFiniteFinite<T>
-where
-    T: Borrow<MultithreadAgentDef>,
-    OS: RLObservationSpace + FiniteSpace,
-    AS: RLActionSpace + FiniteSpace,
-{
-    type MultithreadAgent = GenericMultithreadInitializer<OS, AS>;
-
-    fn build_multithread_agent(
-        &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
-        seed: u64,
-    ) -> Result<Self::MultithreadAgent, BuildAgentError> {
-        use MultithreadAgentDef::*;
-        Ok(match self.0.borrow() {
-            Mutex(config) => GenericMultithreadInitializer::Mutex(
-                MutexAgentConfig::new(ForFiniteFinite(config.borrow()))
-                    .build_multithread_agent(env, seed)?,
-            ),
-        })
-    }
-}
-
-/// Wrapper implementing [`BuildAgent`] for [`AgentDef`] for meta finite obs/action spaces.
-///
-/// Specifically, it is the inner observation space that must be finite.
-/// The outer observation space is not finite.
-///
-/// There is no trait specialization so this will fail for those agents that require a tighter
-/// bounds on the observation and actions paces.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ForMetaFiniteFinite<T>(T);
-
-impl<T> ForMetaFiniteFinite<T> {
-    pub const fn new(agent_def: T) -> Self {
-        Self(agent_def)
-    }
-}
-
-impl<T, OS, AS> BuildAgent<MetaObservationSpace<OS, AS>, AS> for ForMetaFiniteFinite<T>
-where
-    T: Borrow<AgentDef>,
-    OS: RLObservationSpace + FiniteSpace + Clone,
-    OS::Element: Clone,
-    AS: RLActionSpace + FiniteSpace + Clone,
-    AS::Element: Clone,
-    // I think this ought to be inferrable but for some reason it isn't
-    // It may have to do with SendElementSpace
-    MetaObservationSpace<OS, AS>: RLObservationSpace,
-{
-    type Agent = Box<DynFullAgent<MetaObservationSpace<OS, AS>, AS>>;
-
-    fn build_agent(
-        &self,
-        env: &dyn EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
-        seed: u64,
-    ) -> Result<Self::Agent, BuildAgentError> {
-        use AgentDef::*;
-
-        match self.0.borrow() {
-            ResettingMeta(inner_agent_def) => ResettingMetaAgent::new(
-                ForFiniteFinite::new(inner_agent_def.as_ref().clone()),
-                (&InnerEnvStructure::new(env)).into(),
-                seed,
-            )
-            .map(|a| Box::new(a) as _),
-            agent_def => ForAnyAny::new(agent_def).build_agent(env, seed),
-        }
-    }
-}
-
-impl<T, OS, AS> BuildMultithreadAgent<MetaObservationSpace<OS, AS>, AS> for ForMetaFiniteFinite<T>
-where
-    T: Borrow<MultithreadAgentDef>,
-    OS: RLObservationSpace + FiniteSpace + Clone,
-    OS::Element: Clone,
-    AS: RLActionSpace + FiniteSpace + Clone,
-    AS::Element: Clone,
-    // I think this ought to be inferrable but for some reason it isn't
-    // It may have to do with SendElementSpace
-    MetaObservationSpace<OS, AS>: RLObservationSpace,
-{
-    type MultithreadAgent = GenericMultithreadInitializer<MetaObservationSpace<OS, AS>, AS>;
-
-    fn build_multithread_agent(
-        &self,
-        env: &dyn EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
-        seed: u64,
-    ) -> Result<Self::MultithreadAgent, BuildAgentError> {
-        use MultithreadAgentDef::*;
-        Ok(match self.0.borrow() {
-            Mutex(config) => GenericMultithreadInitializer::Mutex(
-                MutexAgentConfig::new(ForMetaFiniteFinite(config.borrow()))
-                    .build_multithread_agent(env, seed)?,
-            ),
-        })
-    }
-}
-
-/// Send-able [`FullAgent`] trait object for an environment structure.
-pub type DynFullAgent<OS, AS> =
-    dyn FullAgent<<OS as Space>::Element, <AS as Space>::Element> + Send;

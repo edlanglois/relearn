@@ -1,5 +1,5 @@
 use super::agent::{
-    ForAnyAny, ForFiniteFinite, ForMetaFiniteFinite, RLActionSpace, RLObservationSpace,
+    EnvAnyAny, EnvFiniteFinite, EnvMetaFiniteFinite, For, RLActionSpace, RLObservationSpace,
 };
 use super::env::{VisitEnvAnyAny, VisitEnvBase, VisitEnvFiniteFinite, VisitEnvMetaFinitFinite};
 use super::{AgentDef, EnvDef, HooksDef, MultithreadAgentDef};
@@ -77,7 +77,7 @@ impl VisitEnvFiniteFinite for SerialSimulatorVisitor {
     {
         Box::new(SerialSimulator::new(
             env_config,
-            ForFiniteFinite::new(self.agent_def),
+            For::<EnvFiniteFinite, _>::new(self.agent_def),
             self.hooks_def,
         ))
     }
@@ -96,7 +96,7 @@ impl VisitEnvMetaFinitFinite for SerialSimulatorVisitor {
     {
         Box::new(SerialSimulator::new(
             env_config,
-            ForMetaFiniteFinite::new(self.agent_def),
+            For::<EnvMetaFiniteFinite, _>::new(self.agent_def),
             self.hooks_def,
         ))
     }
@@ -112,7 +112,7 @@ impl VisitEnvAnyAny for SerialSimulatorVisitor {
     {
         Box::new(SerialSimulator::new(
             env_config,
-            ForAnyAny::new(self.agent_def),
+            For::<EnvAnyAny, _>::new(self.agent_def),
             self.hooks_def,
         ))
     }
@@ -145,7 +145,7 @@ where
     {
         Box::new(self.sim_config.build_simulator(
             env_config,
-            ForFiniteFinite::new(self.agent_def),
+            For::<EnvFiniteFinite, _>::new(self.agent_def),
             self.hooks_def,
             self.worker_logger_config,
         ))
@@ -170,7 +170,7 @@ where
     {
         Box::new(self.sim_config.build_simulator(
             env_config,
-            ForMetaFiniteFinite::new(self.agent_def),
+            For::<EnvMetaFiniteFinite, _>::new(self.agent_def),
             self.hooks_def,
             self.worker_logger_config,
         ))
@@ -192,7 +192,7 @@ where
     {
         Box::new(self.sim_config.build_simulator(
             env_config,
-            ForAnyAny::new(self.agent_def),
+            For::<EnvAnyAny, _>::new(self.agent_def),
             self.hooks_def,
             self.worker_logger_config,
         ))
