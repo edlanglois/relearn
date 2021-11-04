@@ -17,7 +17,8 @@ pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
 pub use batch::{
-    BatchUpdate, BatchUpdateAgent, BatchUpdateAgentConfig, BuildBatchUpdateActor, OffPolicyAgent,
+    BatchUpdate, BatchUpdateAgent, BatchUpdateAgentConfig, BuildBatchUpdateActor,
+    FullBatchUpdateActor, OffPolicyAgent,
 };
 use finite::{BuildIndexAgent, FiniteSpaceAgent};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};

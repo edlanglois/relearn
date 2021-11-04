@@ -4,7 +4,8 @@ use crate::agents::{
     TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::defs::{
-    AgentDef, CriticDef, CriticUpdaterDef, MultithreadAgentDef, PolicyDef, PolicyUpdaterDef,
+    AgentDef, CriticDef, CriticUpdaterDef, MultithreadAgentDef, OptionalBatchAgentDef, PolicyDef,
+    PolicyUpdaterDef,
 };
 use crate::torch::agents::ActorCriticConfig;
 use clap::ArgEnum;
@@ -16,7 +17,6 @@ use std::str::FromStr;
 pub enum ConcreteAgentType {
     Random,
     TabularQLearning,
-    BatchTabularQLearning,
     BetaThompsonSampling,
     UCB1,
     PolicyGradient,
@@ -34,11 +34,14 @@ impl ConcreteAgentType {
     pub fn agent_def(&self, opts: &Options) -> AgentDef {
         use ConcreteAgentType::*;
         match self {
-            Random => AgentDef::Random,
-            TabularQLearning => AgentDef::TabularQLearning(opts.into()),
-            BatchTabularQLearning => AgentDef::BatchTabularQLearning(opts.into()),
-            BetaThompsonSampling => AgentDef::BetaThompsonSampling(opts.into()),
-            UCB1 => AgentDef::UCB1(From::from(opts)),
+            Random => AgentDef::NoBatch(OptionalBatchAgentDef::Random),
+            TabularQLearning => {
+                AgentDef::NoBatch(OptionalBatchAgentDef::TabularQLearning(opts.into()))
+            }
+            BetaThompsonSampling => {
+                AgentDef::NoBatch(OptionalBatchAgentDef::BetaThompsonSampling(opts.into()))
+            }
+            UCB1 => AgentDef::NoBatch(OptionalBatchAgentDef::UCB1(From::from(opts))),
             PolicyGradient => {
                 let config = ActorCriticConfig {
                     policy_updater_config: PolicyUpdaterDef::default_policy_gradient(),

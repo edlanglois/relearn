@@ -1,7 +1,7 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyDef, PolicyUpdaterDef};
 use crate::agents::{
-    multithread::MutexAgentInitializer, Agent, BatchUpdateAgentConfig,
-    BetaThompsonSamplingAgentConfig, BuildAgent, BuildAgentError, BuildMultithreadAgent, FullAgent,
+    multithread::MutexAgentInitializer, Agent, BetaThompsonSamplingAgentConfig, BuildAgent,
+    BuildAgentError, BuildBatchUpdateActor, BuildMultithreadAgent, FullAgent, FullBatchUpdateActor,
     InitializeMultithreadAgent, MultithreadAgentManager, MutexAgentConfig, RandomAgentConfig,
     ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
@@ -17,25 +17,36 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use tch::Tensor;
 
-/// Agent definition
+/// Agents implementing both [`Agent`] and [`BatchUpdate`](crate::agents::BatchUpdate)
 #[derive(Debug, Clone, PartialEq)]
-pub enum AgentDef {
-    /// An agent that selects actions randomly.
+pub enum OptionalBatchAgentDef {
+    /// Selects actions randomly without learning.
     Random,
     /// Epsilon-greedy tabular Q learning.
     TabularQLearning(TabularQLearningAgentConfig),
-    /// Epsilon-greedy tabular Q learning with batch updates.
-    BatchTabularQLearning(BatchUpdateAgentConfig<TabularQLearningAgentConfig>),
     /// Thompson sampling of for Bernoulli rewards using Beta priors.
     ///
     /// Assumes no relationship between states.
     BetaThompsonSampling(BetaThompsonSamplingAgentConfig),
     /// UCB1 agent from Auer 2002
     UCB1(UCB1AgentConfig),
+}
+
+/// Agent definition
+#[derive(Debug, Clone, PartialEq)]
+pub enum AgentDef {
+    /// Pass-through for [`OptionalBatchAgentDef`] agents viewed as regular synchronous agents.
+    NoBatch(OptionalBatchAgentDef),
     /// Torch actor-critic agent
     ActorCritic(Box<ActorCriticConfig<PolicyDef, PolicyUpdaterDef, CriticDef, CriticUpdaterDef>>),
     /// Applies a non-meta agent to a meta environment by resetting between trials
     ResettingMeta(Box<AgentDef>),
+}
+/// Actors implementing [`BatchUpdate`](crate::agents::BatchUpdate).
+#[derive(Debug, Clone, PartialEq)]
+pub enum BatchActorDef {
+    /// Pass-through for [`OptionalBatchAgentDef`] agents.
+    Batch(OptionalBatchAgentDef),
 }
 
 /// Multithread agent definition
@@ -49,6 +60,7 @@ pub enum MultithreadAgentDef {
 ///
 /// This includes most interfaces required by any agent, environment, or simulator
 /// excluding interfaces that can only apply to some spaces, like [`FiniteSpace`].
+// TODO: Include CloneElementSpace like SendElementSpace
 pub trait RLSpace:
     Space + SendElementSpace + SampleSpace + ElementRefInto<Loggable> + Debug + Send + 'static
 {
@@ -126,6 +138,30 @@ where
     }
 }
 
+// == EnvAnyAny ==
+
+impl<OS, AS> BuildAgentFor<EnvAnyAny, OS, AS> for OptionalBatchAgentDef
+where
+    OS: RLObservationSpace,
+    AS: RLActionSpace,
+{
+    type Agent = Box<DynFullAgent<OS, AS>>;
+
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
+        use OptionalBatchAgentDef::*;
+        match self {
+            Random => RandomAgentConfig::new()
+                .build_agent(env, seed)
+                .map(|a| Box::new(a) as _),
+            _ => Err(BuildAgentError::InvalidSpaceBounds),
+        }
+    }
+}
+
 impl<OS, AS> BuildAgentFor<EnvAnyAny, OS, AS> for AgentDef
 where
     OS: RLObservationSpace,
@@ -140,14 +176,38 @@ where
     ) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
         match self {
-            Random => RandomAgentConfig::new()
-                .build_agent(env, seed)
-                .map(|a| Box::new(a) as _),
+            NoBatch(agent_def) => {
+                BuildAgentFor::<EnvAnyAny, _, _>::build_agent(agent_def, env, seed)
+            }
             ActorCritic(config) => config
                 .as_ref()
                 .build_agent(env, seed)
                 .map(|a| Box::new(a) as _),
             _ => Err(BuildAgentError::InvalidSpaceBounds),
+        }
+    }
+}
+
+// == EnvFiniteFinite ==
+
+impl<OS, AS> BuildAgentFor<EnvFiniteFinite, OS, AS> for OptionalBatchAgentDef
+where
+    OS: RLObservationSpace + FiniteSpace,
+    AS: RLActionSpace + FiniteSpace,
+{
+    type Agent = Box<DynFullAgent<OS, AS>>;
+
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
+        use OptionalBatchAgentDef::*;
+        match self {
+            TabularQLearning(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            BetaThompsonSampling(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            UCB1(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
+            _ => BuildAgentFor::<EnvAnyAny, _, _>::build_agent(self, env, seed),
         }
     }
 }
@@ -166,14 +226,34 @@ where
     ) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
         match self {
-            TabularQLearning(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
-            BatchTabularQLearning(config) => {
-                config.build_agent(env, seed).map(|a| Box::new(a) as _)
+            NoBatch(agent_def) => {
+                BuildAgentFor::<EnvFiniteFinite, _, _>::build_agent(agent_def, env, seed)
             }
-            BetaThompsonSampling(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
-            UCB1(config) => config.build_agent(env, seed).map(|a| Box::new(a) as _),
             _ => BuildAgentFor::<EnvAnyAny, _, _>::build_agent(self, env, seed),
         }
+    }
+}
+
+// == EnvMetaFiniteFinite ==
+
+impl<OS, AS> BuildAgentFor<EnvMetaFiniteFinite, MetaObservationSpace<OS, AS>, AS>
+    for OptionalBatchAgentDef
+where
+    OS: RLObservationSpace + FiniteSpace + Clone,
+    OS::Element: Clone,
+    AS: RLActionSpace + FiniteSpace + Clone,
+    AS::Element: Clone,
+    // I think this ought to be inferable but for some reason it isn't
+    MetaObservationSpace<OS, AS>: RLObservationSpace,
+{
+    type Agent = Box<DynFullAgent<MetaObservationSpace<OS, AS>, AS>>;
+
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::Agent, BuildAgentError> {
+        BuildAgentFor::<EnvAnyAny, _, _>::build_agent(self, env, seed)
     }
 }
 
@@ -183,8 +263,7 @@ where
     OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace + Clone,
     AS::Element: Clone,
-    // I think this ought to be inferrable but for some reason it isn't
-    // It may have to do with SendElementSpace
+    // I think this ought to be inferable but for some reason it isn't
     MetaObservationSpace<OS, AS>: RLObservationSpace,
 {
     type Agent = Box<DynFullAgent<MetaObservationSpace<OS, AS>, AS>>;
@@ -197,6 +276,9 @@ where
         use AgentDef::*;
 
         match self {
+            NoBatch(agent_def) => {
+                BuildAgentFor::<EnvMetaFiniteFinite, _, _>::build_agent(agent_def, env, seed)
+            }
             ResettingMeta(inner_agent_def) => ResettingMetaAgent::new(
                 For::<EnvFiniteFinite, _>::new((*inner_agent_def).clone()),
                 (&InnerEnvStructure::new(env)).into(),
@@ -208,10 +290,101 @@ where
     }
 }
 
-/// Build a multithread agent for enviornments satisfying the marker type.
+/// Build a batch update agent for environments satisfying the marker type.
+pub trait BuildBatchUpdateActorFor<M, OS: Space, AS: Space> {
+    type BatchUpdateActor: FullBatchUpdateActor<OS::Element, AS::Element>;
+
+    /// See [`BuildBatchUpdateActor::build_batch_update_actor`].
+    fn build_batch_update_actor(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::BatchUpdateActor, BuildAgentError>;
+}
+
+impl<OS, AS> BuildBatchUpdateActorFor<EnvAnyAny, OS, AS> for OptionalBatchAgentDef
+where
+    OS: RLObservationSpace,
+    OS::Element: Clone,
+    AS: RLActionSpace,
+    AS::Element: Clone,
+{
+    type BatchUpdateActor = Box<DynFullBatchUpdateActor<OS, AS>>;
+
+    fn build_batch_update_actor(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
+        use OptionalBatchAgentDef::*;
+        match self {
+            Random => RandomAgentConfig::new()
+                .build_agent(env, seed)
+                .map(|a| Box::new(a) as _),
+            _ => Err(BuildAgentError::InvalidSpaceBounds),
+        }
+    }
+}
+
+impl<OS, AS> BuildBatchUpdateActorFor<EnvFiniteFinite, OS, AS> for OptionalBatchAgentDef
+where
+    OS: RLObservationSpace + FiniteSpace,
+    OS::Element: Clone,
+    AS: RLActionSpace + FiniteSpace,
+    AS::Element: Clone,
+{
+    type BatchUpdateActor = Box<DynFullBatchUpdateActor<OS, AS>>;
+
+    fn build_batch_update_actor(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
+        use OptionalBatchAgentDef::*;
+        match self {
+            TabularQLearning(config) => config
+                .build_batch_update_actor(env, seed)
+                .map(|a| Box::new(a) as _),
+            BetaThompsonSampling(config) => config
+                .build_batch_update_actor(env, seed)
+                .map(|a| Box::new(a) as _),
+            UCB1(config) => config
+                .build_batch_update_actor(env, seed)
+                .map(|a| Box::new(a) as _),
+            _ => BuildBatchUpdateActorFor::<EnvAnyAny, _, _>::build_batch_update_actor(
+                self, env, seed,
+            ),
+        }
+    }
+}
+
+impl<OS, AS> BuildBatchUpdateActorFor<EnvMetaFiniteFinite, MetaObservationSpace<OS, AS>, AS>
+    for OptionalBatchAgentDef
+where
+    OS: RLObservationSpace + FiniteSpace + Clone,
+    OS::Element: Clone,
+    AS: RLActionSpace + FiniteSpace + Clone,
+    AS::Element: Clone,
+    // I think this ought to be inferable but for some reason it isn't
+    MetaObservationSpace<OS, AS>: RLObservationSpace,
+    <MetaObservationSpace<OS, AS> as Space>::Element: Clone,
+{
+    type BatchUpdateActor = Box<DynFullBatchUpdateActor<MetaObservationSpace<OS, AS>, AS>>;
+
+    fn build_batch_update_actor(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
+        BuildBatchUpdateActorFor::<EnvAnyAny, _, _>::build_batch_update_actor(self, env, seed)
+    }
+}
+
+/// Build a multithread agent for environments satisfying the marker type.
 pub trait BuildMultithreadAgentFor<M, OS: Space, AS: Space> {
     type MultithreadAgent: InitializeMultithreadAgent<OS::Element, AS::Element>;
 
+    /// See [`BuildMultithreadAgent::build_multithread_agent`].
     fn build_multithread_agent(
         &self,
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
@@ -289,6 +462,21 @@ where
     }
 }
 
+impl<M, T, OS: Space, AS: Space> BuildBatchUpdateActor<OS, AS> for For<M, T>
+where
+    T: BuildBatchUpdateActorFor<M, OS, AS>,
+{
+    type BatchUpdateActor = T::BatchUpdateActor;
+
+    fn build_batch_update_actor(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
+        self.wrapped.build_batch_update_actor(env, seed)
+    }
+}
+
 impl<M, T, OS: Space, AS: Space> BuildMultithreadAgent<OS, AS> for For<M, T>
 where
     T: BuildMultithreadAgentFor<M, OS, AS>,
@@ -307,6 +495,10 @@ where
 /// Send-able [`FullAgent`] trait object for an environment structure.
 pub type DynFullAgent<OS, AS> =
     dyn FullAgent<<OS as Space>::Element, <AS as Space>::Element> + Send;
+
+/// Send-able [`FullBatchUpdateActor`] trait object for an environment structure.
+pub type DynFullBatchUpdateActor<OS, AS> =
+    dyn FullBatchUpdateActor<<OS as Space>::Element, <AS as Space>::Element> + Send;
 
 /// [`InitializeMultithreadAgent`] for the agents defined by [`MultithreadAgentDef`].
 ///

@@ -7,11 +7,15 @@ use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
 use crate::spaces::Space;
 
+pub trait FullBatchUpdateActor<O, A>: Actor<O, A> + BatchUpdate<O, A> + SetActorMode {}
+impl<O, A, T> FullBatchUpdateActor<O, A> for T where
+    T: Actor<O, A> + BatchUpdate<O, A> + SetActorMode + ?Sized
+{
+}
+
 /// Build an actor supporting batch updates ([`BatchUpdate`]).
 pub trait BuildBatchUpdateActor<OS: Space, AS: Space> {
-    type BatchUpdateActor: Actor<OS::Element, AS::Element>
-        + BatchUpdate<OS::Element, AS::Element>
-        + SetActorMode;
+    type BatchUpdateActor: FullBatchUpdateActor<OS::Element, AS::Element>;
 
     /// Build an actor for the given environment structure ([`EnvStructure`]).
     ///
@@ -37,6 +41,25 @@ pub trait BatchUpdate<O, A> {
     );
 }
 
+// A generic implementation `BatchUpdate<O, A> for Box<T>` conflicts with the
+// generic implementation below of `BatchUpdate<O, A> for T where T: OffPolicyAgent + Agent<O, A>`
+// because "downstream crates may implement trait `OffPolicyAgent` for type `Box<_>`
+
+macro_rules! box_impl_batch_update {
+    ($type:ty) => {
+        impl<O, A> BatchUpdate<O, A> for Box<$type> {
+            fn batch_update(
+                &mut self,
+                history: &dyn HistoryBufferData<O, A>,
+                logger: &mut dyn TimeSeriesLogger,
+            ) {
+                self.as_mut().batch_update(history, logger)
+            }
+        }
+    };
+}
+box_impl_batch_update!(dyn FullBatchUpdateActor<O, A> + Send);
+
 /// An agent that accepts updates at any time from any policy.
 pub trait OffPolicyAgent {}
 
@@ -53,6 +76,7 @@ where
     ) {
         for step in history.steps(Some(0)) {
             // TODO: Avoid clone. Maybe update should take &step?
+            // Or maybe add a drain_steps() method.
             self.update(step.clone(), logger)
         }
         logger.end_event(Event::AgentOptPeriod).unwrap();

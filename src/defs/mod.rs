@@ -11,7 +11,7 @@ mod seq_mod;
 mod simulator;
 mod updater;
 
-pub use agent::{AgentDef, MultithreadAgentDef};
+pub use agent::{AgentDef, MultithreadAgentDef, OptionalBatchAgentDef};
 pub use critic::CriticDef;
 pub use env::{BanditMeanRewards, EnvDef};
 pub use hook::{HookDef, HooksDef};
