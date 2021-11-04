@@ -1,10 +1,9 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyDef, PolicyUpdaterDef};
 use crate::agents::{
-    multithread::MutexAgentInitializer, Agent, BatchUpdateAgentConfig,
-    BetaThompsonSamplingAgentConfig, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
-    BuildMultithreadAgent, FullAgent, FullBatchUpdateActor, InitializeMultithreadAgent,
-    MultithreadAgentManager, MutexAgentConfig, RandomAgentConfig, ResettingMetaAgent,
-    TabularQLearningAgentConfig, UCB1AgentConfig,
+    Agent, BatchUpdateAgentConfig, BetaThompsonSamplingAgentConfig, BoxingMultithreadInitializer,
+    BuildAgent, BuildAgentError, BuildBatchUpdateActor, BuildMultithreadAgent, FullAgent,
+    FullBatchUpdateActor, InitializeMultithreadAgent, MultithreadAgentManager, MutexAgentConfig,
+    RandomAgentConfig, ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::Loggable;
@@ -465,7 +464,7 @@ where
     AS: RLActionSpace,
     AgentDef: BuildAgentFor<M, OS, AS, Agent = Box<dyn FullAgent<OS::Element, AS::Element> + Send>>,
 {
-    type MultithreadAgent = GenericMultithreadInitializer<OS, AS>;
+    type MultithreadAgent = Box<DynInitializeMultithreadAgent<OS, AS>>;
 
     fn build_multithread_agent(
         &self,
@@ -474,10 +473,10 @@ where
     ) -> Result<Self::MultithreadAgent, BuildAgentError> {
         use MultithreadAgentDef::*;
         Ok(match self {
-            Mutex(config) => GenericMultithreadInitializer::Mutex(
+            Mutex(config) => Box::new(BoxingMultithreadInitializer::new(
                 MutexAgentConfig::new(For::<M, _>::new(config))
                     .build_multithread_agent(env, seed)?,
-            ),
+            )),
         })
     }
 }
@@ -567,37 +566,10 @@ pub type DynFullAgent<OS, AS> =
 pub type DynFullBatchUpdateActor<OS, AS> =
     dyn FullBatchUpdateActor<<OS as Space>::Element, <AS as Space>::Element> + Send;
 
-/// [`InitializeMultithreadAgent`] for the agents defined by [`MultithreadAgentDef`].
-///
-/// This is used instead of `Box<dyn InitializeMultithreadAgent>`
-/// because it is not possible to implement `InitializeMultithreadAgent` for the latter
-/// because [`InitializeMultithreadAgent::into_manager`] takes the sized `self`.
-pub enum GenericMultithreadInitializer<OS: Space, AS: Space> {
-    Mutex(MutexAgentInitializer<Box<dyn FullAgent<OS::Element, AS::Element> + Send>>),
-}
-
-impl<OS, AS> InitializeMultithreadAgent<OS::Element, AS::Element>
-    for GenericMultithreadInitializer<OS, AS>
-where
-    OS: Space + 'static,
-    OS::Element: 'static,
-    AS: Space + 'static,
-    AS::Element: 'static,
-{
-    type Manager = Box<dyn MultithreadAgentManager>;
-    type Worker = Box<dyn Agent<OS::Element, AS::Element> + Send>;
-
-    fn new_worker(&mut self) -> Result<Self::Worker, BuildAgentError> {
-        use GenericMultithreadInitializer::*;
-        Ok(match self {
-            Mutex(initializer) => Box::new(initializer.new_worker()?),
-        })
-    }
-
-    fn into_manager(self) -> Self::Manager {
-        use GenericMultithreadInitializer::*;
-        match self {
-            Mutex(initializer) => Box::new(initializer.into_manager()),
-        }
-    }
-}
+/// [`InitializeMultithreadAgent`] trait object with boxed manager and workers.
+pub type DynInitializeMultithreadAgent<OS, AS> = dyn InitializeMultithreadAgent<
+    <OS as Space>::Element,
+    <AS as Space>::Element,
+    Manager = Box<dyn MultithreadAgentManager>,
+    Worker = Box<dyn Agent<<OS as Space>::Element, <AS as Space>::Element> + Send>,
+>;
