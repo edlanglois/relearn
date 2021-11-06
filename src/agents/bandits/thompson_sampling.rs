@@ -1,7 +1,7 @@
 //! Thompson sampling bandit agent
 use super::super::{
     Actor, ActorMode, Agent, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent,
-    SetActorMode, Step,
+    SetActorMode, Step, SyncParams, SyncParamsError,
 };
 use crate::logging::TimeSeriesLogger;
 use crate::utils::iter::ArgMaxBy;
@@ -180,6 +180,18 @@ impl OffPolicyAgent for BaseBetaThompsonSamplingAgent {}
 impl SetActorMode for BaseBetaThompsonSamplingAgent {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         self.mode = mode
+    }
+}
+
+impl SyncParams for BaseBetaThompsonSamplingAgent {
+    fn sync_params(&mut self, target: &Self) -> Result<(), SyncParamsError> {
+        if self.low_high_reward_counts.raw_dim() == target.low_high_reward_counts.raw_dim() {
+            self.low_high_reward_counts
+                .assign(&target.low_high_reward_counts);
+            Ok(())
+        } else {
+            Err(SyncParamsError::Incompatible)
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 //! Upper confidence bound bandit agent.
 use super::super::{
     Actor, ActorMode, Agent, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent,
-    SetActorMode, Step,
+    SetActorMode, Step, SyncParams, SyncParamsError,
 };
 use crate::logging::TimeSeriesLogger;
 use crate::utils::iter::ArgMaxBy;
@@ -181,6 +181,20 @@ impl OffPolicyAgent for BaseUCB1Agent {}
 impl SetActorMode for BaseUCB1Agent {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         self.mode = mode
+    }
+}
+
+impl SyncParams for BaseUCB1Agent {
+    fn sync_params(&mut self, target: &Self) -> Result<(), SyncParamsError> {
+        if self.state_action_mean_reward.raw_dim() == target.state_action_mean_reward.raw_dim() {
+            self.state_action_mean_reward
+                .assign(&target.state_action_mean_reward);
+            self.state_action_count.assign(&target.state_action_count);
+            self.state_visit_count.assign(&target.state_visit_count);
+            Ok(())
+        } else {
+            Err(SyncParamsError::Incompatible)
+        }
     }
 }
 
