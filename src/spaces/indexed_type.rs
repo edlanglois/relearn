@@ -23,16 +23,16 @@ use std::marker::PhantomData;
 /// }
 ///
 /// assert_eq!(Foo::SIZE, 2);
-/// assert_eq!(Foo::B.as_index(), 1);
+/// assert_eq!(Foo::B.index(), 1);
 /// ```
 pub trait Indexed {
     /// The number of possible values this type can represent.
     const SIZE: usize;
 
-    /// Convert into an index.
-    fn as_index(&self) -> usize;
+    /// The index of this element.
+    fn index(&self) -> usize;
 
-    /// Create from an index.
+    /// Construct from an index.
     fn from_index(index: usize) -> Option<Self>
     where
         Self: Sized;
@@ -131,7 +131,7 @@ impl<T: Indexed> FiniteSpace for IndexedTypeSpace<T> {
     }
 
     fn to_index(&self, element: &Self::Element) -> usize {
-        T::as_index(element)
+        T::index(element)
     }
 
     fn from_index(&self, index: usize) -> Option<Self::Element> {
@@ -144,7 +144,7 @@ impl<T: Indexed> CategoricalSpace for IndexedTypeSpace<T> {}
 impl Indexed for bool {
     const SIZE: usize = 2;
 
-    fn as_index(&self) -> usize {
+    fn index(&self) -> usize {
         *self as usize
     }
 
@@ -170,7 +170,7 @@ mod space {
 
     impl Indexed for TestEnum {
         const SIZE: usize = 3;
-        fn as_index(&self) -> usize {
+        fn index(&self) -> usize {
             match self {
                 TestEnum::A => 0,
                 TestEnum::B => 1,
@@ -324,8 +324,8 @@ mod finite_space {
 
     #[test]
     fn non_empty_enum_to_index() {
-        assert_eq!(NonEmptyEnum::A.as_index(), 0);
-        assert_eq!(NonEmptyEnum::B.as_index(), 1);
+        assert_eq!(NonEmptyEnum::A.index(), 0);
+        assert_eq!(NonEmptyEnum::B.index(), 1);
     }
 
     #[test]

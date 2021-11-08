@@ -34,7 +34,7 @@ fn impl_indexed_macro(ast: &syn::DeriveInput) -> TokenStream {
             })
             .collect();
 
-        let as_index_arms = variant_identifiers
+        let index_arms = variant_identifiers
             .iter()
             .enumerate()
             .map(|(i, ident)| quote! {Self::#ident => #i});
@@ -48,9 +48,9 @@ fn impl_indexed_macro(ast: &syn::DeriveInput) -> TokenStream {
             impl #impl_generics ::relearn::spaces::Indexed for #name #ty_generics #where_clause {
                 const SIZE: usize = #size;
 
-                fn as_index(&self) -> usize {
+                fn index(&self) -> usize {
                     match *self {
-                        #(#as_index_arms),*
+                        #(#index_arms),*
                     }
                 }
 
