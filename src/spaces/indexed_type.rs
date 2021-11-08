@@ -12,6 +12,19 @@ use std::marker::PhantomData;
 ///
 /// Can be implemented automatically for enum types with no internal data
 /// using `#[derive(Indexed)]`.
+///
+/// ```
+/// use relearn::spaces::Indexed;
+///
+/// #[derive(Indexed)]
+/// enum Foo {
+///     A,
+///     B,
+/// }
+///
+/// assert_eq!(Foo::SIZE, 2);
+/// assert_eq!(Foo::B.as_index(), 1);
+/// ```
 pub trait Indexed {
     /// The number of possible values this type can represent.
     const SIZE: usize;

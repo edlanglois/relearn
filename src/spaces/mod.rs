@@ -29,6 +29,9 @@ pub use product::ProductSpace;
 pub use singleton::SingletonSpace;
 pub use wrapper::BoxSpace;
 
+// Re-export Indexed macro from relearn_derive
+pub use relearn_derive::Indexed;
+
 use crate::utils::distributions::ArrayDistribution;
 use rand::distributions::Distribution as RandDistribution;
 use std::iter::ExactSizeIterator;

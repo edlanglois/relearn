@@ -45,7 +45,7 @@ fn impl_indexed_macro(ast: &syn::DeriveInput) -> TokenStream {
             .map(|(i, ident)| quote! {#i => Some(Self::#ident),});
 
         let gen = quote! {
-            impl #impl_generics crate::spaces::Indexed for #name #ty_generics #where_clause {
+            impl #impl_generics ::relearn::spaces::Indexed for #name #ty_generics #where_clause {
                 const SIZE: usize = #size;
 
                 fn as_index(&self) -> usize {

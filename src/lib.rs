@@ -110,6 +110,12 @@
 #![warn(clippy::needless_pass_by_value)]
 #![warn(clippy::redundant_closure_for_method_calls)]
 #![warn(clippy::use_self)] // also triggered by macro expansions
+
+/// Allow referring to this crate as `relearn` so that `relearn_derive` macros  will work both in
+/// this crate and by third-party crates that use `relearn`.
+/// See <https://stackoverflow.com/a/57049687/1267562>.
+extern crate self as relearn;
+
 pub mod agents;
 pub mod cli;
 pub mod defs;
@@ -124,3 +130,7 @@ pub use agents::{Actor, Agent, BuildAgent, Step};
 pub use defs::{AgentDef, EnvDef, MultithreadAgentDef, OptimizerDef, SeqModDef};
 pub use envs::{BuildEnv, EnvStructure, Environment, StructuredEnvironment};
 pub use simulation::{run_actor, run_agent, Simulator};
+
+#[allow(unused_imports)]
+#[macro_use]
+extern crate relearn_derive;
