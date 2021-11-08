@@ -143,10 +143,10 @@ pub trait VisitEnvMetaFinitFinite: VisitEnvBase {
     where
         EC: BuildEnv<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + 'static,
         EC::Environment: Send + 'static,
-        OS: RLObservationSpace + FiniteSpace + Clone,
+        OS: RLObservationSpace + FiniteSpace,
         // TODO: Compiler can't tell these are the same
         OS::Element: Clone,
-        AS: RLActionSpace + FiniteSpace + Clone,
+        AS: RLActionSpace + FiniteSpace,
         AS::Element: Clone,
         // See impl BuildAgent for ForMetaFiniteFinite
         EC::ObservationSpace: RLObservationSpace,

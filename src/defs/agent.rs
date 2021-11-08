@@ -64,11 +64,18 @@ pub enum MultithreadAgentDef {
 /// excluding interfaces that can only apply to some spaces, like [`FiniteSpace`].
 // TODO: Include CloneElementSpace like SendElementSpace
 pub trait RLSpace:
-    Space + SendElementSpace + SampleSpace + ElementRefInto<Loggable> + Debug + Send + 'static
+    Space + SendElementSpace + SampleSpace + ElementRefInto<Loggable> + Debug + Clone + Send + 'static
 {
 }
 impl<
-        T: Space + SendElementSpace + SampleSpace + ElementRefInto<Loggable> + Debug + Send + 'static,
+        T: Space
+            + SendElementSpace
+            + SampleSpace
+            + ElementRefInto<Loggable>
+            + Debug
+            + Clone
+            + Send
+            + 'static,
     > RLSpace for T
 {
 }
@@ -257,9 +264,9 @@ where
 impl<OS, AS> BuildAgentFor<EnvMetaFiniteFinite, MetaObservationSpace<OS, AS>, AS>
     for OptionalBatchAgentDef
 where
-    OS: RLObservationSpace + FiniteSpace + Clone,
+    OS: RLObservationSpace + FiniteSpace,
     OS::Element: Clone,
-    AS: RLActionSpace + FiniteSpace + Clone,
+    AS: RLActionSpace + FiniteSpace,
     AS::Element: Clone,
     // I think this ought to be inferable but for some reason it isn't
     MetaObservationSpace<OS, AS>: RLObservationSpace,
@@ -277,9 +284,9 @@ where
 
 impl<OS, AS> BuildAgentFor<EnvMetaFiniteFinite, MetaObservationSpace<OS, AS>, AS> for AgentDef
 where
-    OS: RLObservationSpace + FiniteSpace + Clone,
+    OS: RLObservationSpace + FiniteSpace,
     OS::Element: Clone,
-    AS: RLActionSpace + FiniteSpace + Clone,
+    AS: RLActionSpace + FiniteSpace,
     AS::Element: Clone,
     // I think this ought to be inferable but for some reason it isn't
     MetaObservationSpace<OS, AS>: RLObservationSpace,
@@ -404,9 +411,9 @@ where
 impl<OS, AS> BuildBatchUpdateActorFor<EnvMetaFiniteFinite, MetaObservationSpace<OS, AS>, AS>
     for OptionalBatchAgentDef
 where
-    OS: RLObservationSpace + FiniteSpace + Clone,
+    OS: RLObservationSpace + FiniteSpace,
     OS::Element: Clone,
-    AS: RLActionSpace + FiniteSpace + Clone,
+    AS: RLActionSpace + FiniteSpace,
     AS::Element: Clone,
     // I think this ought to be inferable but for some reason it isn't
     MetaObservationSpace<OS, AS>: RLObservationSpace,

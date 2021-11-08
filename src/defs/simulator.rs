@@ -89,9 +89,9 @@ impl VisitEnvMetaFinitFinite for SerialSimulatorVisitor {
     fn visit_env_meta_finite_finite<EC, OS, AS>(self, env_config: EC) -> Self::Out
     where
         EC: BuildEnv<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + 'static,
-        OS: RLObservationSpace + FiniteSpace + Clone,
+        OS: RLObservationSpace + FiniteSpace,
         OS::Element: Clone,
-        AS: RLActionSpace + FiniteSpace + Clone,
+        AS: RLActionSpace + FiniteSpace,
         AS::Element: Clone,
         EC::ObservationSpace: RLObservationSpace,
         EC::Observation: Clone,
@@ -167,9 +167,9 @@ where
     where
         EC: BuildEnv<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + 'static,
         EC::Environment: Send + 'static,
-        OS: RLObservationSpace + FiniteSpace + Clone,
+        OS: RLObservationSpace + FiniteSpace,
         OS::Element: Clone,
-        AS: RLActionSpace + FiniteSpace + Clone,
+        AS: RLActionSpace + FiniteSpace,
         AS::Element: Clone,
         EC::ObservationSpace: RLObservationSpace,
         EC::Observation: Clone,
