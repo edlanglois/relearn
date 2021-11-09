@@ -82,6 +82,10 @@ where
             agent: Arc::clone(&self.agent),
         }
     }
+
+    fn boxed_into_manager(self: Box<Self>) -> Self::Manager {
+        (*self).into_manager()
+    }
 }
 
 /// A mutex-based multithread agent worker.

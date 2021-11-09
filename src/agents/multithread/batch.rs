@@ -165,6 +165,10 @@ where
             recv_buffer: self.manager_recv_buffer,
         }
     }
+
+    fn boxed_into_manager(self: Box<Self>) -> Self::Manager {
+        (*self).into_manager()
+    }
 }
 
 #[derive(Debug)]

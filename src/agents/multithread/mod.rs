@@ -41,13 +41,16 @@ pub trait InitializeMultithreadAgent<O, A> {
 
     /// Convert a boxed version of self into the manager instance
     ///
-    /// This is to help with implementing [`InitializeMultithreadAgent`] for
-    /// `Box<dyn InitializeMultithreadAgent>` without [unsized r-values][1].
+    /// This is to [help with implementing][1] [`InitializeMultithreadAgent`] for
+    /// `Box<dyn InitializeMultithreadAgent>` without [unsized r-values][2].
     ///
-    /// [1]: https://rust-lang.github.io/rfcs/1909-unsized-rvalues.html
-    fn box_into_manager(self: Box<Self>) -> Self::Manager {
-        self.into_manager()
-    }
+    /// [1]: https://stackoverflow.com/a/46625787/1267562
+    /// [2]: https://rust-lang.github.io/rfcs/1909-unsized-rvalues.html
+    ///
+    /// As far as I can tell, it is not possible to provide a default implementation without
+    /// requiring `Self: Sized`, which prevents it from being used on usized Self as intended.
+    /// Implementors can define it as `(*self).into_manager()`.
+    fn boxed_into_manager(self: Box<Self>) -> Self::Manager;
 }
 
 impl<T, O, A> InitializeMultithreadAgent<O, A> for Box<T>
@@ -60,7 +63,11 @@ where
         T::new_worker(self)
     }
     fn into_manager(self) -> Self::Manager {
-        self.box_into_manager()
+        self.boxed_into_manager()
+    }
+    fn boxed_into_manager(self: Box<Self>) -> Self::Manager {
+        // Note: This is self: Box<Box<T>> so probably it shouldn't ever be called.
+        (*self).into_manager()
     }
 }
 
@@ -115,5 +122,8 @@ where
     }
     fn into_manager(self) -> Self::Manager {
         Box::new(self.inner.into_manager())
+    }
+    fn boxed_into_manager(self: Box<Self>) -> Self::Manager {
+        (*self).into_manager()
     }
 }
