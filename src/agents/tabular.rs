@@ -150,7 +150,7 @@ impl SyncParams for BaseTabularQLearningAgent {
             self.state_action_values.assign(&target.state_action_values);
             Ok(())
         } else {
-            Err(SyncParamsError::Incompatible)
+            Err(SyncParamsError::IncompatibleParams)
         }
     }
 }

@@ -1,17 +1,20 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyDef, PolicyUpdaterDef};
+use crate::agents::buffers::HistoryBufferData;
 use crate::agents::{
-    Agent, BatchUpdateAgentConfig, BetaThompsonSamplingAgentConfig, BoxingMultithreadInitializer,
-    BuildAgent, BuildAgentError, BuildBatchUpdateActor, BuildMultithreadAgent, FullAgent,
-    FullBatchUpdateActor, InitializeMultithreadAgent, MultithreadAgentManager, MutexAgentConfig,
-    RandomAgentConfig, ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
+    Actor, Agent, BatchUpdate, BatchUpdateAgentConfig, BetaThompsonSamplingAgentConfig,
+    BoxingMultithreadInitializer, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
+    BuildMultithreadAgent, FullAgent, InitializeMultithreadAgent, MultithreadAgentManager,
+    MultithreadBatchAgentConfig, MutexAgentConfig, RandomAgentConfig, ResettingMetaAgent,
+    SetActorMode, SyncParamsAny, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
-use crate::logging::Loggable;
+use crate::logging::{Loggable, TimeSeriesLogger};
 use crate::spaces::{
     BatchFeatureSpace, ElementRefInto, FeatureSpace, FiniteSpace, ParameterizedDistributionSpace,
     SampleSpace, SendElementSpace, Space,
 };
 use crate::torch::agents::ActorCriticConfig;
+use crate::utils::any::AsAny;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -44,6 +47,7 @@ pub enum AgentDef {
     /// Applies a non-meta agent to a meta environment by resetting between trials
     ResettingMeta(Box<AgentDef>),
 }
+
 /// Actors implementing [`BatchUpdate`](crate::agents::BatchUpdate).
 #[derive(Debug, Clone, PartialEq)]
 pub enum BatchActorDef {
@@ -56,6 +60,8 @@ pub enum BatchActorDef {
 pub enum MultithreadAgentDef {
     /// A mutex-based simulated multithread agent. Does not provide meaningful parallelism.
     Mutex(AgentDef),
+    /// Multithread agent with batch updates performed by the manger from data sent by workers.
+    Batch(MultithreadBatchAgentConfig<BatchActorDef>),
 }
 
 /// A comprehensive space trait for use by RL agents.
@@ -64,7 +70,15 @@ pub enum MultithreadAgentDef {
 /// excluding interfaces that can only apply to some spaces, like [`FiniteSpace`].
 // TODO: Include CloneElementSpace like SendElementSpace
 pub trait RLSpace:
-    Space + SendElementSpace + SampleSpace + ElementRefInto<Loggable> + Debug + Clone + Send + 'static
+    Space
+    + SendElementSpace
+    + SampleSpace
+    + ElementRefInto<Loggable>
+    + Debug
+    + Clone
+    + Send
+    + Sync
+    + 'static
 {
 }
 impl<
@@ -75,6 +89,7 @@ impl<
             + Debug
             + Clone
             + Send
+            + Sync
             + 'static,
     > RLSpace for T
 {
@@ -467,9 +482,16 @@ pub trait BuildMultithreadAgentFor<M, OS: Space, AS: Space> {
 
 impl<M, OS, AS> BuildMultithreadAgentFor<M, OS, AS> for MultithreadAgentDef
 where
+    M: Clone + 'static,
     OS: RLObservationSpace,
     AS: RLActionSpace,
     AgentDef: BuildAgentFor<M, OS, AS, Agent = Box<dyn FullAgent<OS::Element, AS::Element> + Send>>,
+    OptionalBatchAgentDef: BuildBatchUpdateActorFor<
+        M,
+        OS,
+        AS,
+        BatchUpdateActor = Box<DynFullBatchUpdateActor<OS, AS>>,
+    >,
 {
     type MultithreadAgent = Box<DynInitializeMultithreadAgent<OS, AS>>;
 
@@ -484,6 +506,18 @@ where
                 MutexAgentConfig::new(For::<M, _>::new(config))
                     .build_multithread_agent(env, seed)?,
             )),
+            Batch(config) => match &config.actor_config {
+                BatchActorDef::Batch(optional_batch_agent_def) => {
+                    Box::new(BoxingMultithreadInitializer::new(
+                        MultithreadBatchAgentConfig {
+                            // TODO: Is this clone necessary?
+                            actor_config: For::<M, _>::new(optional_batch_agent_def.clone()),
+                            buffer_config: config.buffer_config,
+                        }
+                        .build_multithread_agent(env, seed)?,
+                    ))
+                }
+            },
         })
     }
 }
@@ -569,9 +603,38 @@ where
 pub type DynFullAgent<OS, AS> =
     dyn FullAgent<<OS as Space>::Element, <AS as Space>::Element> + Send;
 
-/// Send-able [`FullBatchUpdateActor`] trait object for an environment structure.
+pub trait FullBatchUpdateActor<O, A>:
+    Actor<O, A> + BatchUpdate<O, A> + SyncParamsAny + AsAny + SetActorMode
+{
+}
+impl<O, A, T> FullBatchUpdateActor<O, A> for T where
+    T: Actor<O, A> + BatchUpdate<O, A> + SyncParamsAny + AsAny + SetActorMode + ?Sized
+{
+}
+
+// TODO: Move to src/agents/batch.rs? Exporting macros is a pain
+//
+// A generic implementation `BatchUpdate<O, A> for Box<T>` conflicts with the
+// generic implementation below of `BatchUpdate<O, A> for T where T: OffPolicyAgent + Agent<O, A>`
+// because "downstream crates may implement trait `OffPolicyAgent` for type `Box<_>`
+macro_rules! box_impl_batch_update {
+    ($type:ty) => {
+        impl<O, A> BatchUpdate<O, A> for Box<$type> {
+            fn batch_update(
+                &mut self,
+                history: &dyn HistoryBufferData<O, A>,
+                logger: &mut dyn TimeSeriesLogger,
+            ) {
+                self.as_mut().batch_update(history, logger)
+            }
+        }
+    };
+}
+box_impl_batch_update!(dyn FullBatchUpdateActor<O, A> + Send + Sync);
+
+/// `Send` and `Sync` [`FullBatchUpdateActor`] trait object for an environment structure.
 pub type DynFullBatchUpdateActor<OS, AS> =
-    dyn FullBatchUpdateActor<<OS as Space>::Element, <AS as Space>::Element> + Send;
+    dyn FullBatchUpdateActor<<OS as Space>::Element, <AS as Space>::Element> + Send + Sync;
 
 /// [`InitializeMultithreadAgent`] trait object with boxed manager and workers.
 pub type DynInitializeMultithreadAgent<OS, AS> = dyn InitializeMultithreadAgent<

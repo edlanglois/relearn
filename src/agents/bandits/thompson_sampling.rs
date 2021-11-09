@@ -190,7 +190,7 @@ impl SyncParams for BaseBetaThompsonSamplingAgent {
                 .assign(&target.low_high_reward_counts);
             Ok(())
         } else {
-            Err(SyncParamsError::Incompatible)
+            Err(SyncParamsError::IncompatibleParams)
         }
     }
 }

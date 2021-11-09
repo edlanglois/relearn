@@ -193,7 +193,7 @@ impl SyncParams for BaseUCB1Agent {
             self.state_visit_count.assign(&target.state_visit_count);
             Ok(())
         } else {
-            Err(SyncParamsError::Incompatible)
+            Err(SyncParamsError::IncompatibleParams)
         }
     }
 }

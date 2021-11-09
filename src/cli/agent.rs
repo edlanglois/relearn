@@ -1,7 +1,7 @@
 use super::{Options, Update, WithUpdate};
 use crate::agents::{
     buffers::SerialBufferConfig, BatchUpdateAgentConfig, BetaThompsonSamplingAgentConfig,
-    TabularQLearningAgentConfig, UCB1AgentConfig,
+    MultithreadBatchAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::defs::{
     AgentDef, BatchActorDef, CriticDef, CriticUpdaterDef, MultithreadAgentDef,
@@ -111,11 +111,21 @@ impl AgentWrapperType {
     pub fn multi_thread_agent_def(
         &self,
         inner: AgentDef,
-        _opts: &Options,
+        opts: &Options,
     ) -> Option<MultithreadAgentDef> {
         use AgentWrapperType::*;
         match self {
             Mutex => Some(MultithreadAgentDef::Mutex(inner)),
+            Batch => {
+                if let AgentDef::NoBatch(optional_batch_agent_def) = inner {
+                    Some(MultithreadAgentDef::Batch(MultithreadBatchAgentConfig {
+                        actor_config: BatchActorDef::Batch(optional_batch_agent_def),
+                        buffer_config: opts.into(),
+                    }))
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
@@ -169,14 +179,16 @@ impl AgentType {
     }
 
     pub fn multi_thread_agent_def(&self, opts: &Options) -> Option<MultithreadAgentDef> {
-        if let Some(AgentWrapperType::Mutex) = self.wrappers.first() {
+        if let Some(outer_wrapper) = self.wrappers.first() {
             let inner = Self {
                 base: self.base,
                 wrappers: self.wrappers[1..].into(),
             };
-            return Some(MultithreadAgentDef::Mutex(inner.agent_def(opts)?));
+            let inner_agent = inner.agent_def(opts)?;
+            outer_wrapper.multi_thread_agent_def(inner_agent, opts)
+        } else {
+            None
         }
-        None
     }
 }
 
