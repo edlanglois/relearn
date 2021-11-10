@@ -3,6 +3,7 @@
 //! # `PartialOrd` for Spaces
 //! Spaces have a partial order such that for two spaces of the same type,
 //! `a < b` means that `a` is a strict subset of `b`.
+mod array;
 mod boolean;
 mod categorical;
 mod index;
@@ -17,6 +18,7 @@ mod singleton;
 pub mod testing;
 mod wrapper;
 
+pub use array::ArraySpace;
 pub use boolean::BooleanSpace;
 pub use categorical::CategoricalSpace;
 pub use index::IndexSpace;
