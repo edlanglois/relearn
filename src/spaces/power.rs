@@ -57,14 +57,14 @@ impl<S: FiniteSpace, const N: usize> FiniteSpace for PowerSpace<S, N> {
 
     fn from_index(&self, mut index: usize) -> Option<Self::Element> {
         let inner_size = self.inner_space.size();
-        let result = array_init::try_array_init(|_| {
-            let result = self.inner_space.from_index(index % inner_size).ok_or(());
+        let result_elems = array_init::try_array_init(|_| {
+            let result_elem = self.inner_space.from_index(index % inner_size).ok_or(());
             index /= inner_size;
-            result
+            result_elem
         })
         .ok();
         if index == 0 {
-            result
+            result_elems
         } else {
             None
         }
@@ -96,8 +96,15 @@ impl<S: FeatureSpaceOut<Tensor>, const N: usize> FeatureSpace<Tensor> for PowerS
 
 impl<S: FeatureSpaceOut<Tensor>, const N: usize> FeatureSpaceOut<Tensor> for PowerSpace<S, N> {
     fn features_out(&self, element: &Self::Element, out: &mut Tensor, zeroed: bool) {
+        if N == 0 {
+            return;
+        } else if N == 1 {
+            self.inner_space.features_out(&element[0], out, zeroed);
+            return;
+        }
+
         let split_size = self.inner_space.num_features().try_into().unwrap();
-        for (inner_tensor, inner_elem) in out.split(split_size, -1).iter_mut().zip(element.iter()) {
+        for (inner_tensor, inner_elem) in out.split(split_size, -1).iter_mut().zip(element) {
             self.inner_space
                 .features_out(inner_elem, inner_tensor, zeroed);
         }
@@ -144,9 +151,12 @@ where
             return;
         }
         let elements_iter = elements.into_iter();
-        for (i, view) in out.tensor_split(N as i64, -1).iter_mut().enumerate() {
-            self.inner_space
-                .batch_features_out(elements_iter.clone().map(|e| &e[i]), view, zeroed)
+        for (i, inner_tensor) in out.tensor_split(N as i64, -1).iter_mut().enumerate() {
+            self.inner_space.batch_features_out(
+                elements_iter.clone().map(|e| &e[i]),
+                inner_tensor,
+                zeroed,
+            )
         }
     }
 }
@@ -380,10 +390,10 @@ mod feature_space {
         };
     }
 
-    features_tests!(d0_boolean_, BooleanSpace, 0, [], []);
-    features_tests!(d2_boolean_, BooleanSpace, 2, [true, false], [1.0, 0.0]);
+    features_tests!(d0_boolean, BooleanSpace, 0, [], []);
+    features_tests!(d2_boolean, BooleanSpace, 2, [true, false], [1.0, 0.0]);
     features_tests!(
-        d2_index2_,
+        d2_index2,
         IndexSpace::new(2),
         2,
         [1, 0],
