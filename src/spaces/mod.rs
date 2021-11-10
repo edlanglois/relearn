@@ -3,7 +3,6 @@
 //! # `PartialOrd` for Spaces
 //! Spaces have a partial order such that for two spaces of the same type,
 //! `a < b` means that `a` is a strict subset of `b`.
-mod array;
 mod boolean;
 mod categorical;
 mod index;
@@ -11,13 +10,13 @@ mod indexed_type;
 mod interval;
 mod nonempty_features;
 mod option;
+mod power;
 mod product;
 mod singleton;
 #[cfg(test)]
 pub mod testing;
 mod wrapper;
 
-pub use array::ArraySpace;
 pub use boolean::BooleanSpace;
 pub use categorical::CategoricalSpace;
 pub use index::IndexSpace;
@@ -25,6 +24,7 @@ pub use indexed_type::{Indexed, IndexedTypeSpace};
 pub use interval::IntervalSpace;
 pub use nonempty_features::NonEmptyFeatures;
 pub use option::OptionSpace;
+pub use power::PowerSpace;
 pub use product::ProductSpace;
 pub use singleton::SingletonSpace;
 pub use wrapper::BoxSpace;

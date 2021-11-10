@@ -1,7 +1,7 @@
 //! Fruit collection gridworlds.
 use crate::envs::{CloneBuild, EnvStructure, Pomdp};
 use crate::spaces::{
-    ArraySpace, BooleanSpace, BoxSpace, IndexSpace, IndexedTypeSpace, ProductSpace, Space,
+    BooleanSpace, BoxSpace, IndexSpace, IndexedTypeSpace, PowerSpace, ProductSpace, Space,
 };
 use crate::utils::vector::Vector;
 use enum_map::{enum_map, Enum, EnumMap};
@@ -159,7 +159,7 @@ impl<const W: usize, const H: usize> FruitGameState<W, H> {
 
 /// Visible region of the grid centered on an agent
 pub type VisibleGridSpace<const W: usize, const H: usize> =
-    BoxSpace<ArraySpace<ArraySpace<IndexedTypeSpace<CellView>, W>, H>>;
+    BoxSpace<PowerSpace<PowerSpace<IndexedTypeSpace<CellView>, W>, H>>;
 
 /// Grid coordinate pairs
 pub type CoordinateSpace = ProductSpace<(IndexSpace, IndexSpace)>;

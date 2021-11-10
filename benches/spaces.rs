@@ -6,8 +6,8 @@ use criterion::{
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use relearn::spaces::{
-    ArraySpace, BatchFeatureSpace, BooleanSpace, IndexSpace, IntervalSpace, NonEmptyFeatures,
-    OptionSpace, ProductSpace, SampleSpace, SingletonSpace,
+    BatchFeatureSpace, BooleanSpace, IndexSpace, IntervalSpace, NonEmptyFeatures, OptionSpace,
+    PowerSpace, ProductSpace, SampleSpace, SingletonSpace,
 };
 use tch::Tensor;
 
@@ -42,18 +42,6 @@ fn bench_batch_tensor_features(c: &mut Criterion) {
 
     let batch_sizes = [1, 100, 10_000, 1_000_000];
 
-    bench_space_batch_tensor_features(
-        &mut group,
-        "array_d0_boolean",
-        ArraySpace::<_, 0>::new(BooleanSpace),
-        &batch_sizes,
-    );
-    bench_space_batch_tensor_features(
-        &mut group,
-        "array_d3_boolean",
-        ArraySpace::<_, 3>::new(BooleanSpace),
-        &batch_sizes,
-    );
     bench_space_batch_tensor_features(&mut group, "boolean", BooleanSpace, &batch_sizes);
     bench_space_batch_tensor_features(&mut group, "index_10", IndexSpace::new(10), &batch_sizes);
     bench_space_batch_tensor_features(
@@ -84,6 +72,18 @@ fn bench_batch_tensor_features(c: &mut Criterion) {
         &mut group,
         "option_index",
         OptionSpace::new(IndexSpace::new(10)),
+        &batch_sizes,
+    );
+    bench_space_batch_tensor_features(
+        &mut group,
+        "power_d0_boolean",
+        PowerSpace::<_, 0>::new(BooleanSpace),
+        &batch_sizes,
+    );
+    bench_space_batch_tensor_features(
+        &mut group,
+        "power_d3_boolean",
+        PowerSpace::<_, 3>::new(BooleanSpace),
         &batch_sizes,
     );
     bench_space_batch_tensor_features(
