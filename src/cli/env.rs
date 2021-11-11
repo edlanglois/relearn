@@ -2,8 +2,8 @@
 use super::{Options, Update, WithUpdate};
 use crate::defs::{env::DistributionType, BanditMeanRewards, EnvDef};
 use crate::envs::{
-    Chain, DirichletRandomMdps, FirstPlayerView, FruitGame, MemoryGame, MetaPomdp, OneHotBandits,
-    StepLimit, UniformBernoulliBandits, Wrapped,
+    CartPoleConfig, Chain, DirichletRandomMdps, FirstPlayerView, FruitGame, MemoryGame, MetaPomdp,
+    OneHotBandits, StepLimit, UniformBernoulliBandits, Wrapped,
 };
 use clap::ArgEnum;
 
@@ -12,6 +12,7 @@ use clap::ArgEnum;
 pub enum EnvType {
     DeterministicBandit,
     BernoulliBandit,
+    CartPole,
     Chain,
     Fruit,
     MemoryGame,
@@ -32,6 +33,7 @@ impl From<&Options> for EnvDef {
         match opts.environment {
             DeterministicBandit => bandit_env_def(DistributionType::Deterministic, opts),
             BernoulliBandit => bandit_env_def(DistributionType::Bernoulli, opts),
+            CartPole => Self::CartPole(opts.into()),
             Chain => Self::Chain(opts.into()),
             Fruit => Self::Fruit(opts.into()),
             MemoryGame => Self::MemoryGame(opts.into()),
@@ -59,6 +61,20 @@ impl Update<&Options> for BanditMeanRewards {
     fn update(&mut self, opts: &Options) {
         if let Some(mean_rewards) = &opts.arm_rewards {
             self.mean_rewards = mean_rewards.clone()
+        }
+    }
+}
+
+impl From<&Options> for CartPoleConfig {
+    fn from(opts: &Options) -> Self {
+        Self::default().with_update(opts)
+    }
+}
+
+impl Update<&Options> for CartPoleConfig {
+    fn update(&mut self, opts: &Options) {
+        if let Some(discount_factor) = opts.discount_factor {
+            self.env_config.discount_factor = discount_factor;
         }
     }
 }

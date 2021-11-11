@@ -1,8 +1,8 @@
 use super::agent::{RLActionSpace, RLObservationSpace};
 use crate::envs::{
-    Bandit, BuildEnv, BuildEnvError, BuildPomdp, Chain as ChainEnv, DirichletRandomMdps,
-    EnvStructure, FirstPlayerView, FruitGame, MemoryGame as MemoryGameEnv, MetaObservationSpace,
-    MetaPomdp, OneHotBandits, Pomdp, UniformBernoulliBandits, WithStepLimit,
+    Bandit, BuildEnv, BuildEnvError, BuildPomdp, CartPoleConfig, Chain as ChainEnv,
+    DirichletRandomMdps, EnvStructure, FirstPlayerView, FruitGame, MemoryGame as MemoryGameEnv,
+    MetaObservationSpace, MetaPomdp, OneHotBandits, Pomdp, UniformBernoulliBandits, WithStepLimit,
 };
 use crate::spaces::{FiniteSpace, Space};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
@@ -16,9 +16,11 @@ use std::marker::PhantomData;
 pub enum EnvDef {
     /// Multi-armed bandit with fixed arm distributions.
     Bandit(DistributionType, BanditMeanRewards),
-    /// The Chain environment,
+    /// The CartPole environment.
+    CartPole(CartPoleConfig),
+    /// The Chain environment.
     Chain(ChainEnv),
-    /// Fruit game (first player with second player doing nothing),
+    /// Fruit game (first player with second player doing nothing).
     Fruit(WithStepLimit<FirstPlayerView<FruitGame<5, 5, 5, 5>>>),
     /// The Memory Game environment
     MemoryGame(MemoryGameEnv),
@@ -104,6 +106,7 @@ impl EnvDef {
                     visitor.visit_env_finite_finite(config)
                 }
             },
+            CartPole(config) => visitor.visit_env_any_any(config),
             Chain(config) => visitor.visit_env_finite_finite(config),
             Fruit(config) => visitor.visit_env_finite_finite(config),
             MemoryGame(config) => visitor.visit_env_finite_finite(config),

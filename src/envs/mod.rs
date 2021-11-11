@@ -1,6 +1,7 @@
 //! Reinforcement learning environments
 mod bandits;
 mod builders;
+mod cartpole;
 mod chain;
 mod mdps;
 mod memory;
@@ -15,6 +16,7 @@ pub use bandits::{
     Bandit, BernoulliBandit, DeterministicBandit, OneHotBandits, UniformBernoulliBandits,
 };
 pub use builders::{BuildEnv, BuildEnvDist, BuildEnvError, BuildPomdp, BuildPomdpDist, CloneBuild};
+pub use cartpole::{CartPole, CartPoleConfig};
 pub use chain::Chain;
 pub use mdps::DirichletRandomMdps;
 pub use memory::MemoryGame;
