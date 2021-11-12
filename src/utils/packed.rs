@@ -73,6 +73,10 @@ where
         U::Item: IntoIterator<IntoIter = T>,
     {
         let sequences: Vec<_> = sequences.into_iter().map(IntoIterator::into_iter).collect();
+        assert!(
+            sequences.windows(2).all(|w| w[0].len() >= w[1].len()),
+            "sequences not in monotonic decreasing order of length"
+        );
         let batch_size = sequences.len();
         Self {
             sequences,
