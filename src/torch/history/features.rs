@@ -1,6 +1,6 @@
 //! Utilities for calculating step history features.
 use crate::spaces::{BatchFeatureSpace, ReprSpace, Space};
-use crate::utils::packed::{self, PackedBatchSizes, PackingIndices};
+use crate::utils::packed::{self, PackedBatchSizes, PackedSeqIter};
 use crate::Step;
 use lazycell::LazyCell;
 use std::ops::Range;
@@ -274,7 +274,7 @@ where
 {
     let _no_grad = tch::no_grad_guard();
     observation_space
-        .batch_features(PackingIndices::from_sorted(episode_ranges).map(|i| &steps[i].observation))
+        .batch_features(PackedSeqIter::from_sorted(episode_ranges).map(|i| &steps[i].observation))
         .to(device)
 }
 
@@ -289,7 +289,7 @@ where
 {
     let _no_grad = tch::no_grad_guard();
     action_space
-        .batch_repr(PackingIndices::from_sorted(episode_ranges).map(|i| &steps[i].action))
+        .batch_repr(PackedSeqIter::from_sorted(episode_ranges).map(|i| &steps[i].action))
         .to(device)
 }
 
@@ -302,7 +302,7 @@ pub fn packed_rewards<S, A>(
     let _no_grad = tch::no_grad_guard();
     #[allow(clippy::cast_possible_truncation)]
     Tensor::of_slice(
-        &PackingIndices::from_sorted(episode_ranges)
+        &PackedSeqIter::from_sorted(episode_ranges)
             .map(|i| steps[i].reward as f32)
             .collect::<Vec<_>>(),
     )
@@ -330,7 +330,7 @@ where
 {
     // Put into Option so that we can take the action when packing.
     let mut some_actions: Vec<_> = steps.into_iter().map(|step| Some(step.action)).collect();
-    PackingIndices::from_sorted(episode_ranges)
+    PackedSeqIter::from_sorted(episode_ranges)
         .map(|i| some_actions[i].take().unwrap())
         .collect()
 }

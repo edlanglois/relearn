@@ -7,6 +7,7 @@
 //!
 //! For example, the sequences `[0, 1, 2, 3]`, `[10, 11]`, `[100, 101]` are packed as
 //! `[0, 10, 100, 1, 11, 101, 2, 3]`.
+use super::sequence::Sequence;
 use std::iter;
 use std::ops::{Index, Range};
 use tch::{IndexOp, Scalar, Tensor};
@@ -112,79 +113,105 @@ where
 
 impl<T> ExactSizeIterator for PackedIter<T> where T: ExactSizeIterator {}
 
-/// Iterator of indices that pack the specified contiguous sequences.
+/// Iterator that packs together the elements of multiple sequences.
+///
+/// Does not allocate any heap memory.
 ///
 /// # Example
 /// ```
-/// use relearn::utils::packed::PackingIndices;
+/// use relearn::utils::packed::PackedSeqIter;
 ///
-/// let data = [0, 1, 2, 3, 10, 11, 100, 101];
-/// let ranges = [0..4, 4..6, 6..8];
-/// let packed: Vec<_> = PackingIndices::from_sorted(&ranges).map(|i| data[i]).collect();
+/// let sequences = [vec![0, 1, 2, 3], vec![10, 11], vec![100, 101]];
+/// let packed: Vec<_> = PackedSeqIter::from_sorted(&sequences).map(|&x| x).collect();
 /// assert_eq!(packed, vec![0, 10, 100, 1, 11, 101, 2, 3]);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PackingIndices<'a> {
-    /// Sequence index ranges, sorted in monotonically decreasing order of sequence length.
-    sequence_ranges: &'a [Range<usize>],
+pub struct PackedSeqIter<I> {
+    /// Initial copy of the sequence iterator. Never modified.
+    sequences: I,
 
     /// Current offset within the sequences.
     offset: usize,
-    /// Current sequence index within `sequences`.
-    seq_idx: usize,
-    /// Number of sequences with length longer than the current offset.
-    batch_size: usize,
+    /// Iterator of sequences for the current offset.
+    sequences_iter: I,
 }
 
-impl<'a> PackingIndices<'a> {
-    /// Create a new [`PackingIndices`] instance from ranges sorted in decreasing order of length.
-    ///
-    /// # Args
-    /// * `sequence_ranges` - Index range for each sequence,
-    ///     sorted in monotonically decreasing order of sequence length.
-    pub fn from_sorted(sequence_ranges: &'a [Range<usize>]) -> Self {
-        let mut batch_size = sequence_ranges.len();
-        let offset = 0;
-        update_batch_size(sequence_ranges, offset, &mut batch_size);
+impl<I> PackedSeqIter<I>
+where
+    I: Iterator + Clone,
+    <I as Iterator>::Item: Sequence,
+{
+    /// Initialize from sequences sorted in monotonic decreasing order of length.
+    pub fn from_sorted<T: IntoIterator<IntoIter = I>>(into_sequences: T) -> Self {
+        let sequences = into_sequences.into_iter();
+        assert!(
+            sequences
+                .clone()
+                .zip(sequences.clone().skip(1))
+                .all(|(a, b)| a.len() >= b.len()),
+            "sequences not in monotonic decreasing order of length"
+        );
+        let sequences_iter = sequences.clone();
         Self {
-            sequence_ranges,
-            offset,
-            seq_idx: 0,
-            batch_size,
+            sequences,
+            offset: 0,
+            sequences_iter,
         }
     }
 }
 
-impl<'a> Iterator for PackingIndices<'a> {
-    type Item = usize;
+impl<I> Iterator for PackedSeqIter<I>
+where
+    I: Iterator + ExactSizeIterator + Clone,
+    <I as Iterator>::Item: Sequence,
+{
+    type Item = <I::Item as Sequence>::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.batch_size == 0 {
-            return None;
+        match self
+            .sequences_iter
+            .next()
+            .and_then(|seq| seq.get(self.offset))
+        {
+            Some(value) => Some(value), // Next value at this offset
+            None => {
+                // Increment offset and restart the loop
+                self.offset += 1;
+                self.sequences_iter = self.sequences.clone();
+                // If this fails then there are no more items left
+                self.sequences_iter
+                    .next()
+                    .and_then(|seq| seq.get(self.offset))
+            }
         }
-        let index = self.sequence_ranges[self.seq_idx].start + self.offset;
-        self.seq_idx += 1;
-        if self.seq_idx >= self.batch_size {
-            self.seq_idx = 0;
-            self.offset += 1;
-            update_batch_size(self.sequence_ranges, self.offset, &mut self.batch_size);
-        }
-        Some(index)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let size = self
-            .sequence_ranges
-            .iter()
-            .take(self.batch_size)
-            .map(|range| range.len() - self.offset)
-            .sum::<usize>()
-            - self.seq_idx;
+        // Total size of all elements at index `offset` or later.
+        let level_size: usize = self
+            .sequences
+            .clone()
+            .map(|seq| seq.len().saturating_sub(self.offset))
+            .take_while(|&size| size > 0)
+            .sum();
+        let size = if level_size == 0 {
+            // This is handled because sequences_iter ends up incorrectly indicating that one
+            // element has been emitted when the iterator has been fully exhausted.
+            0
+        } else {
+            // Subtract the number of elements emitted so far at this offset level.
+            level_size - (self.sequences.len() - self.sequences_iter.len())
+        };
         (size, Some(size))
     }
 }
 
-impl<'a> ExactSizeIterator for PackingIndices<'a> {}
+impl<I> ExactSizeIterator for PackedSeqIter<I>
+where
+    I: Iterator + ExactSizeIterator + Clone,
+    <I as Iterator>::Item: Sequence,
+{
+}
 
 /// The batch size of each offset when sequences of the given lengths are packed.
 ///
@@ -280,7 +307,7 @@ pub trait Length {
 
 impl Length for Range<usize> {
     fn length(&self) -> usize {
-        self.len()
+        ExactSizeIterator::len(self)
     }
 }
 
@@ -555,7 +582,7 @@ mod packing_indices {
     fn iter() {
         let data = [0, 1, 2, 3, 10, 11, 100, 101];
         let ranges = [0..4, 4..6, 6..8];
-        let packed: Vec<_> = PackingIndices::from_sorted(&ranges)
+        let packed: Vec<_> = PackedSeqIter::from_sorted(&ranges)
             .map(|i| data[i])
             .collect();
         let expected = vec![0, 10, 100, 1, 11, 101, 2, 3];
@@ -565,14 +592,14 @@ mod packing_indices {
     #[test]
     fn size_hint() {
         let ranges = [0..4, 4..6, 6..8];
-        let packing_indices = PackingIndices::from_sorted(&ranges);
+        let packing_indices = PackedSeqIter::from_sorted(&ranges);
         assert_eq!(packing_indices.size_hint(), (8, Some(8)));
     }
 
     #[test]
     fn size_hint_after_next() {
         let ranges = [0..4, 4..6, 6..8];
-        let mut packing_indices = PackingIndices::from_sorted(&ranges);
+        let mut packing_indices = PackedSeqIter::from_sorted(&ranges);
         let _ = packing_indices.next();
         assert_eq!(packing_indices.size_hint(), (7, Some(7)));
         let _ = packing_indices.next();
