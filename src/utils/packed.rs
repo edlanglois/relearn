@@ -9,7 +9,7 @@
 //! `[0, 10, 100, 1, 11, 101, 2, 3]`.
 use super::sequence::Sequence;
 use std::iter;
-use std::ops::{Index, Range};
+use std::ops::{Deref, Index, Range};
 use tch::{IndexOp, Scalar, Tensor};
 
 /// Iterator that packs together multiple sequences.
@@ -121,7 +121,7 @@ impl<T> ExactSizeIterator for PackedIter<T> where T: ExactSizeIterator {}
 /// ```
 /// use relearn::utils::packed::PackedSeqIter;
 ///
-/// let sequences = [vec![0, 1, 2, 3], vec![10, 11], vec![100, 101]];
+/// let sequences: [&[_]; 3] = [&[0, 1, 2, 3], &[10, 11], &[100, 101]];
 /// let packed: Vec<_> = PackedSeqIter::from_sorted(&sequences).map(|&x| x).collect();
 /// assert_eq!(packed, vec![0, 10, 100, 1, 11, 101, 2, 3]);
 /// ```
@@ -139,7 +139,8 @@ pub struct PackedSeqIter<I> {
 impl<I> PackedSeqIter<I>
 where
     I: Iterator + Clone,
-    <I as Iterator>::Item: Sequence,
+    <I as Iterator>::Item: Deref, // TODO: Try to avoid :Deref bound; use :Sequence directly
+    <<I as Iterator>::Item as Deref>::Target: Sequence,
 {
     /// Initialize from sequences sorted in monotonic decreasing order of length.
     pub fn from_sorted<T: IntoIterator<IntoIter = I>>(into_sequences: T) -> Self {
@@ -163,9 +164,10 @@ where
 impl<I> Iterator for PackedSeqIter<I>
 where
     I: Iterator + ExactSizeIterator + Clone,
-    <I as Iterator>::Item: Sequence,
+    <I as Iterator>::Item: Deref,
+    <<I as Iterator>::Item as Deref>::Target: Sequence,
 {
-    type Item = <I::Item as Sequence>::Item;
+    type Item = <<I::Item as Deref>::Target as Sequence>::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self
@@ -209,7 +211,8 @@ where
 impl<I> ExactSizeIterator for PackedSeqIter<I>
 where
     I: Iterator + ExactSizeIterator + Clone,
-    <I as Iterator>::Item: Sequence,
+    <I as Iterator>::Item: Deref,
+    <<I as Iterator>::Item as Deref>::Target: Sequence,
 {
 }
 

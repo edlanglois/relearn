@@ -54,22 +54,3 @@ impl Sequence for Range<usize> {
         }
     }
 }
-
-impl<'a> Sequence for &'a Range<usize> {
-    type Item = usize;
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        ExactSizeIterator::len(*self)
-    }
-
-    #[inline(always)]
-    fn is_empty(&self) -> bool {
-        (*self).is_empty()
-    }
-
-    #[inline(always)]
-    fn get(&self, idx: usize) -> Option<Self::Item> {
-        (*self).get(idx)
-    }
-}
