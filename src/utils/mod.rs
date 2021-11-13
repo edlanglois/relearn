@@ -7,4 +7,5 @@ pub mod iter;
 pub mod order;
 pub mod packed;
 pub mod sequence;
+pub mod tensor;
 pub mod vector;
