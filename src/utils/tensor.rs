@@ -1,5 +1,6 @@
-use ndarray::{Array, ArrayView, ArrayViewMut, Dim, Dimension, IntoDimension, Ix, IxDyn};
+use ndarray::{ArrayView, ArrayViewMut, Dim, Dimension, IntoDimension, Ix, IxDyn};
 use std::marker::PhantomData;
+use std::ptr::NonNull;
 use tch::{kind::Element, Device, Kind, Tensor};
 
 /// A unique tensor object.
@@ -19,18 +20,12 @@ where
     D: Dimension,
 {
     tensor: Tensor,
-    /// Track element type to avoid runtime checks
-    element_type: PhantomData<*const E>,
     /// Track shape to avoid runtime checks
     shape: D,
-    /// An empty array to view if `tensor` is empty.
-    ///
-    /// Necessary because `tensor.data_ptr()` is invalid (null) when `tensor` has no elements.
-    empty_fallback: Option<Array<E, D>>,
-}
-
-fn empty_array<A, D: Dimension>(shape: D) -> Array<A, D> {
-    Array::from_shape_simple_fn(shape, || panic!("array is not empty"))
+    /// Whether the tensor is empty.
+    is_empty: bool,
+    /// Track element type
+    element_type: PhantomData<E>,
 }
 
 impl<E, D> UniqueTensor<E, D>
@@ -73,20 +68,16 @@ where
         F: FnOnce(&[i64], Kind) -> Tensor,
     {
         let shape = shape.into_dimension();
-        match shape.size_checked() {
-            Some(size) if size < isize::MAX as usize => {}
+        let size = match shape.size_checked() {
+            Some(size) if size < isize::MAX as usize => size,
             _ => panic!("size must not exceed isize::MAX"),
-        }
-        let empty_fallback = if shape.size() == 0 {
-            Some(empty_array(shape.clone()))
-        } else {
-            None
         };
+        let tensor = f(shape.clone().into_torch_shape().as_ref(), E::KIND);
         Self {
-            tensor: f(shape.clone().into_torch_shape().as_ref(), E::KIND),
-            element_type: PhantomData,
+            tensor,
             shape,
-            empty_fallback,
+            is_empty: size == 0,
+            element_type: PhantomData,
         }
     }
 }
@@ -96,18 +87,28 @@ where
     E: Element,
     D: Dimension,
 {
+    /// The current tensor data pointer; may be dangling if the tensor is empty.
+    ///
+    /// This is not cached in case additional methods are added that can cause the tensor to move.
+    fn data_ptr(&self) -> NonNull<E> {
+        if self.is_empty {
+            NonNull::dangling()
+        } else {
+            NonNull::new(self.tensor.data_ptr() as _).expect("unexpected null data_ptr")
+        }
+    }
+
+    /// View as an n-dimensional array.
     pub fn array_view(&self) -> ArrayView<E, D> {
         // # Safety
         //
         // ✓ **Elements must live as long as 'a (in ArrayView<'a, E, D>).**
-        //   UniqueTensor has exclusive access to the data managed by the tensor and only allows
-        //   access that is consistent with the lifetime of self.
-        //   The data memory cannot be modified without a &mut self.
+        //   Managed by the lifetime of self, which has exclusive access to the tensor memory.
         //
         // ✓ **ptr must be non-null and aligned, and it must be safe to .offset() ptr by zero.**
         //   This is up to torch but it should be true for non-empty tensors since data is being
-        //   stored at this pointer value. In the case of empty tensors, the data pointer is null
-        //   so we view the empty fallback array instead.
+        //   stored at this pointer value.
+        //   In the case of empty tensors, the data pointer is NonNull::dangling.
         //
         // ? **It must be safe to .offset() the pointer repeatedly along all axes and calculate the
         //   counts for the .offset() calls without overflow, even if the array is empty or the
@@ -122,24 +123,14 @@ where
         // ✓ **Strides must be non-negative.**
         //   Dimension as IntoDimension as Into<StrideShape> always uses C-style strides
         //   which have a value of 0 or 1 depending on the array shape.
-
-        if let Some(ref empty_fallback) = self.empty_fallback {
-            assert_eq!(self.shape.size(), 0);
-            empty_fallback.view()
-        } else {
-            unsafe { ArrayView::from_shape_ptr(self.shape.clone(), self.tensor.data_ptr() as _) }
-        }
+        unsafe { ArrayView::from_shape_ptr(self.shape.clone(), self.data_ptr().as_ptr()) }
     }
 
+    /// View as a mutable n-dimensional array.
     pub fn array_view_mut(&mut self) -> ArrayViewMut<E, D> {
         // # Safety
         // See `Self::array_view` implementation
-        if let Some(ref mut empty_fallback) = self.empty_fallback {
-            assert_eq!(self.shape.size(), 0);
-            empty_fallback.view_mut()
-        } else {
-            unsafe { ArrayViewMut::from_shape_ptr(self.shape.clone(), self.tensor.data_ptr() as _) }
-        }
+        unsafe { ArrayViewMut::from_shape_ptr(self.shape.clone(), self.data_ptr().as_ptr()) }
     }
 }
 
@@ -237,7 +228,7 @@ impl IntoTorchShape for Dim<[Ix; 6]> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray::arr2;
+    use ndarray::{arr2, Array};
 
     #[test]
     fn zeros() {
