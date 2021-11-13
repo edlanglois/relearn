@@ -1,6 +1,7 @@
 use ndarray::{ArrayView, ArrayViewMut, Dim, Dimension, IntoDimension, Ix, IxDyn};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
+use std::{mem, slice};
 use tch::{kind::Element, Device, Kind, Tensor};
 
 /// A unique tensor object.
@@ -22,8 +23,8 @@ where
     tensor: Tensor,
     /// Track shape to avoid runtime checks
     shape: D,
-    /// Whether the tensor is empty.
-    is_empty: bool,
+    /// Number of elements in the tensor
+    num_elements: usize,
     /// Track element type
     element_type: PhantomData<E>,
 }
@@ -61,22 +62,26 @@ where
     ///     * uniquely manage its own memory (e.g. no `shallow_clone`).
     ///
     /// # Panics
-    /// If the total number of elements exceeds `isize::MAX`.
+    /// If the total size of all elements exceeds `isize::MAX`.
     unsafe fn from_tensor_fn<Sh, F>(shape: Sh, f: F) -> Self
     where
         Sh: IntoDimension<Dim = D>,
         F: FnOnce(&[i64], Kind) -> Tensor,
     {
         let shape = shape.into_dimension();
-        let size = match shape.size_checked() {
+        let num_elements = match shape.size_checked() {
             Some(size) if size < isize::MAX as usize => size,
-            _ => panic!("size must not exceed isize::MAX"),
+            _ => panic!("number of elements must not exceed isize::MAX"),
         };
+        match num_elements.checked_mul(mem::size_of::<E>()) {
+            Some(size) if size < isize::MAX as usize => {}
+            _ => panic!("size of allocated memory must not exceed isize::MAX"),
+        }
         let tensor = f(shape.clone().into_torch_shape().as_ref(), E::KIND);
         Self {
             tensor,
             shape,
-            is_empty: size == 0,
+            num_elements,
             element_type: PhantomData,
         }
     }
@@ -87,15 +92,31 @@ where
     E: Element,
     D: Dimension,
 {
-    /// The current tensor data pointer; may be dangling if the tensor is empty.
-    ///
-    /// This is not cached in case additional methods are added that can cause the tensor to move.
-    fn data_ptr(&self) -> NonNull<E> {
-        if self.is_empty {
-            NonNull::dangling()
-        } else {
-            NonNull::new(self.tensor.data_ptr() as _).expect("unexpected null data_ptr")
-        }
+    /// View the tensor data as a slice.
+    pub fn as_slice(&self) -> &[E] {
+        // # Safety
+        // ✓ **data must be valid for reads for `len * mem::size_of::<T>()` many bytes,
+        //   and it must be properly aligned.**
+        //   The tensor is storing that amount of data at the pointer, so long as the size is
+        //   non-empty. The pointer is NonNull::dangling for empty tensors.
+        //
+        // ✓ **data must point to len consecutive properly initialized values of type T.**
+        //   The tensor has been fully initialized with valid data.
+        //
+        // ✓ **The memory referenced by the returned slice must not be mutated for the duration of
+        //   lifetime 'a, except inside an UnsafeCell.**
+        //   Managed by the lifetime of self, which has exclusive access to the tensor memory.
+        //
+        // ✓ **The total size len * mem::size_of::<T>() must be no larger than isize::MAX.**
+        //   Asserted in construction and probably must hold for Tensor anyways.
+        unsafe { slice::from_raw_parts(self.data_ptr().as_ptr(), self.num_elements) }
+    }
+
+    /// View the tensor data as a mutable slice.
+    pub fn as_slice_mut(&mut self) -> &mut [E] {
+        // # Safety
+        // See `Self::as_slice` implementation
+        unsafe { slice::from_raw_parts_mut(self.data_ptr().as_ptr(), self.num_elements) }
     }
 
     /// View as an n-dimensional array.
@@ -131,6 +152,18 @@ where
         // # Safety
         // See `Self::array_view` implementation
         unsafe { ArrayViewMut::from_shape_ptr(self.shape.clone(), self.data_ptr().as_ptr()) }
+    }
+
+    /// The current tensor data pointer; may be dangling if the tensor is empty.
+    ///
+    /// This is not cached in case additional methods are added that can cause the tensor to
+    /// re-allocate.
+    fn data_ptr(&self) -> NonNull<E> {
+        if self.num_elements == 0 {
+            NonNull::dangling()
+        } else {
+            NonNull::new(self.tensor.data_ptr() as _).expect("unexpected null data_ptr")
+        }
     }
 }
 
@@ -254,7 +287,30 @@ mod tests {
     }
 
     #[test]
-    fn test_array_view_f32() {
+    #[allow(clippy::float_cmp)]
+    fn slice_f64() {
+        let u = UniqueTensor::<f64, _>::ones([3, 1, 2]);
+        assert_eq!(u.as_slice().len(), 6);
+        assert_eq!(u.as_slice(), &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]);
+    }
+
+    #[test]
+    fn slice_mut_i16() {
+        let mut u = UniqueTensor::<i16, _>::ones([3, 1, 2]);
+        assert_eq!(u.as_slice_mut().len(), 6);
+        for (i, x) in u.as_slice_mut().iter_mut().enumerate() {
+            *x = i.try_into().unwrap()
+        }
+        assert_eq!(u.as_slice(), &[0, 1, 2, 3, 4, 5]);
+        let tensor: Tensor = u.into();
+        assert_eq!(
+            tensor,
+            Tensor::of_slice(&[0, 1, 2, 3, 4, 5]).reshape(&[3, 1, 2])
+        );
+    }
+
+    #[test]
+    fn array_view_f32() {
         let u = UniqueTensor::<f32, _>::ones([2, 4, 3]);
         let view = u.array_view();
         assert_eq!(view.dim(), (2, 4, 3));
@@ -263,7 +319,7 @@ mod tests {
 
     #[test]
     #[allow(clippy::unit_cmp)]
-    fn test_array_view_i64_scalar() {
+    fn array_view_i64_scalar() {
         let u = UniqueTensor::<i64, _>::ones([]);
         let view = u.array_view();
         assert_eq!(view.dim(), ());
@@ -271,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn test_array_view_f32_empty() {
+    fn array_view_f32_empty() {
         let u = UniqueTensor::<f32, _>::ones([0]);
         let view = u.array_view();
         assert_eq!(view.dim(), 0);
@@ -279,7 +335,7 @@ mod tests {
     }
 
     #[test]
-    fn test_array_view_mut() {
+    fn array_view_mut() {
         let mut u = UniqueTensor::<i32, _>::ones([3, 4]);
         let mut view = u.array_view_mut();
         for (i, mut row) in view.rows_mut().into_iter().enumerate() {
@@ -295,7 +351,7 @@ mod tests {
     }
 
     #[test]
-    fn test_array_view_mut_empty() {
+    fn array_view_mut_empty() {
         let mut u = UniqueTensor::<f32, _>::ones([2, 0, 3]);
         let mut view = u.array_view_mut();
         assert!(view.as_slice_mut().unwrap().is_empty());
