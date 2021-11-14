@@ -5,6 +5,7 @@ use super::{
 };
 use crate::logging::Loggable;
 use crate::torch::distributions::DeterministicEmptyVec;
+use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -93,6 +94,20 @@ impl EncoderFeatureSpace for SingletonSpace {
         _zeroed: bool,
         _encoder: &Self::Encoder,
     ) {
+    }
+
+    fn encoder_batch_features_out<'a, I, A>(
+        &self,
+        _elements: I,
+        _out: &mut ArrayBase<A, Ix2>,
+        _zeroed: bool,
+        _encoder: &Self::Encoder,
+    ) where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+        A: DataMut,
+        A::Elem: Float,
+    {
     }
 }
 
