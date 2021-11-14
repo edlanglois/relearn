@@ -30,7 +30,7 @@ fn bench_space_batch_tensor_features<S, M>(
             .take(batch_size as usize)
             .collect();
         group.bench_with_input(BenchmarkId::new(name, batch_size), &data, |b, data| {
-            b.iter_with_large_drop(|| space.batch_features::<_, Tensor>(data))
+            b.iter(|| space.batch_features::<_, Tensor>(data))
         });
     }
 }
