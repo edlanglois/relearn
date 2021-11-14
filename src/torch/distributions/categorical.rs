@@ -82,7 +82,7 @@ mod tests {
     fn batch_shape_0d() {
         let logits = Tensor::of_slice(&[0.0_f32, 1.0, 0.0]).log();
         let d = Categorical::new(&logits);
-        assert_eq!(d.batch_shape(), vec![]);
+        assert_eq!(d.batch_shape(), [] as [usize; 0]);
     }
 
     #[test]
@@ -94,7 +94,7 @@ mod tests {
         .reshape(&[2, 3])
         .log();
         let d = Categorical::new(&logits);
-        assert_eq!(d.batch_shape(), vec![2]);
+        assert_eq!(d.batch_shape(), [2]);
     }
 
     #[test]
@@ -106,7 +106,7 @@ mod tests {
         .reshape(&[2, 3])
         .log();
         let d = Categorical::new(&logits);
-        assert_eq!(d.element_shape(), vec![]);
+        assert_eq!(d.element_shape(), [] as [usize; 0]);
     }
 
     #[test]
@@ -121,7 +121,7 @@ mod tests {
         .log();
         let d = Categorical::new(&logits);
         let samples = d.sample();
-        assert_eq!(samples.size(), vec![4]);
+        assert_eq!(samples.size(), [4]);
         assert_eq!(samples.i(..3), Tensor::of_slice(&[0_i64, 1, 2]));
         assert!((0..3).contains(&i64::from(samples.i(3))));
     }
