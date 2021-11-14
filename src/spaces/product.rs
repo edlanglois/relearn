@@ -609,107 +609,72 @@ mod base_feature_space {
 
 #[cfg(test)]
 mod feature_space {
-    use super::super::{FeatureSpace, IndexSpace, SingletonSpace};
+    use super::super::{IndexSpace, SingletonSpace};
     use super::*;
-    use crate::utils::tensor::UniqueTensor;
-    use tch::Tensor;
 
-    macro_rules! features_tests {
-        ($label:ident, $inner:expr, $elem:expr, $expected:expr) => {
-            mod $label {
-                use super::*;
+    mod unit {
+        use super::*;
+        const fn space() -> ProductSpace<()> {
+            ProductSpace::new(())
+        }
 
-                #[test]
-                fn tensor_features() {
-                    let space = ProductSpace::new($inner);
-                    let actual: Tensor = space.features(&$elem);
-                    let expected_vec: &[f32] = &$expected;
-                    assert_eq!(actual, Tensor::of_slice(expected_vec));
-                }
+        #[test]
+        fn num_features() {
+            let space = space();
+            assert_eq!(space.num_features(), 0);
+        }
 
-                #[test]
-                fn tensor_features_out() {
-                    let space = ProductSpace::new($inner);
-                    let expected_vec: &[f32] = &$expected;
-                    let expected = Tensor::of_slice(&expected_vec);
-                    let mut out = UniqueTensor::<f32, _>::zeros(expected_vec.len());
-                    space.features_out(&$elem, out.as_slice_mut(), false);
-                    assert_eq!(out.into_tensor(), expected);
-                }
-            }
-        };
+        features_tests!(f, space(), (), []);
+        batch_features_tests!(b, space(), [(), (), ()], [[], [], []]);
     }
 
-    features_tests!(unit, (), (), []);
-    features_tests!(
-        index_triple,
-        (IndexSpace::new(3), IndexSpace::new(1), IndexSpace::new(4)),
-        (1, 0, 2),
-        [0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
-    );
-    features_tests!(
-        mixed,
-        (IndexSpace::new(3), SingletonSpace::new()),
-        (0, ()),
-        [1.0, 0.0, 0.0]
-    );
-}
+    mod index_triple {
+        use super::*;
+        const fn space() -> ProductSpace<(IndexSpace, IndexSpace, IndexSpace)> {
+            ProductSpace::new((IndexSpace::new(3), IndexSpace::new(1), IndexSpace::new(4)))
+        }
 
-#[cfg(test)]
-mod batch_feature_space {
-    use super::super::{FeatureSpace, IndexSpace, SingletonSpace};
-    use super::*;
-    use crate::utils::tensor::UniqueTensor;
-    use tch::Tensor;
+        #[test]
+        fn num_features() {
+            let space = space();
+            assert_eq!(space.num_features(), 8);
+        }
 
-    fn tensor_from_arrays<const N: usize, const M: usize>(data: [[f32; M]; N]) -> Tensor {
-        let flat_data: Vec<f32> = data
-            .into_iter()
-            .map(IntoIterator::into_iter)
-            .flatten()
-            .collect();
-        Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
-    }
-
-    macro_rules! batch_features_tests {
-        ($label:ident, $inner:expr, $elems:expr, $expected:expr) => {
-            mod $label {
-                use super::*;
-
-                #[test]
-                fn tensor_batch_features() {
-                    let space = ProductSpace::new($inner);
-                    let actual: Tensor = space.batch_features(&$elems);
-                    assert_eq!(actual, tensor_from_arrays($expected));
-                }
-
-                #[test]
-                fn tensor_batch_features_out() {
-                    let space = ProductSpace::new($inner);
-                    let expected = tensor_from_arrays($expected);
-                    let (a, b) = expected.size2().unwrap();
-                    let mut out = UniqueTensor::<f32, _>::zeros((a as _, b as _));
-                    space.batch_features_out(&$elems, &mut out.array_view_mut(), false);
-                    assert_eq!(out.into_tensor(), expected);
-                }
-            }
-        };
-    }
-
-    batch_features_tests!(unit, (), [(), (), ()], [[], [], []]);
-    batch_features_tests!(
-        index_triple,
-        (IndexSpace::new(3), IndexSpace::new(1), IndexSpace::new(4)),
-        [(0, 0, 0), (1, 0, 2)],
-        [
-            [1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+        features_tests!(
+            f,
+            space(),
+            (1, 0, 2),
             [0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
-        ]
-    );
-    batch_features_tests!(
-        mixed,
-        (IndexSpace::new(3), SingletonSpace::new()),
-        [(0, ()), (2, ())],
-        [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
-    );
+        );
+        batch_features_tests!(
+            b,
+            space(),
+            [(0, 0, 0), (1, 0, 2)],
+            [
+                [1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
+            ]
+        );
+    }
+
+    mod mixed {
+        use super::*;
+        const fn space() -> ProductSpace<(IndexSpace, SingletonSpace)> {
+            ProductSpace::new((IndexSpace::new(3), SingletonSpace::new()))
+        }
+
+        #[test]
+        fn num_features() {
+            let space = space();
+            assert_eq!(space.num_features(), 3);
+        }
+
+        features_tests!(f, space(), (0, ()), [1.0, 0.0, 0.0]);
+        batch_features_tests!(
+            b,
+            space(),
+            [(0, ()), (2, ())],
+            [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
+        );
+    }
 }

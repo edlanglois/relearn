@@ -306,12 +306,9 @@ mod finite_space {
 }
 
 #[cfg(test)]
-#[allow(clippy::cast_possible_truncation)]
 mod feature_space {
-    use super::super::{BooleanSpace, FeatureSpace, IndexSpace};
+    use super::super::{BooleanSpace, IndexSpace};
     use super::*;
-    use crate::utils::tensor::UniqueTensor;
-    use tch::Tensor;
 
     #[test]
     fn d3_boolean_num_features() {
@@ -325,94 +322,34 @@ mod feature_space {
         assert_eq!(space.num_features(), 6);
     }
 
-    macro_rules! features_tests {
-        ($label:ident, $inner:expr, $n:literal, $elem:expr, $expected:expr) => {
-            mod $label {
-                use super::*;
-
-                #[test]
-                fn tensor_features() {
-                    let space = PowerSpace::<_, $n>::new($inner);
-                    let actual: Tensor = space.features(&$elem);
-                    let expected_vec: &[f32] = &$expected;
-                    assert_eq!(actual, Tensor::of_slice(expected_vec));
-                }
-
-                #[test]
-                fn tensor_features_out() {
-                    let space = PowerSpace::<_, $n>::new($inner);
-                    let expected_vec: &[f32] = &$expected;
-                    let expected = Tensor::of_slice(&expected_vec);
-                    let mut out = UniqueTensor::<f32, _>::zeros(expected_vec.len());
-                    space.features_out(&$elem, out.as_slice_mut(), true);
-                    assert_eq!(out.into_tensor(), expected);
-                }
-            }
-        };
-    }
-
-    features_tests!(d0_boolean, BooleanSpace, 0, [], []);
-    features_tests!(d2_boolean, BooleanSpace, 2, [true, false], [1.0, 0.0]);
+    features_tests!(d0_boolean, PowerSpace::<_, 0>::new(BooleanSpace), [], []);
+    features_tests!(
+        d2_boolean,
+        PowerSpace::<_, 2>::new(BooleanSpace),
+        [true, false],
+        [1.0, 0.0]
+    );
     features_tests!(
         d2_index2,
-        IndexSpace::new(2),
-        2,
+        PowerSpace::<_, 2>::new(IndexSpace::new(2)),
         [1, 0],
         [0.0, 1.0, 1.0, 0.0]
     );
 
-    fn tensor_from_arrays<const N: usize, const M: usize>(data: [[f32; M]; N]) -> Tensor {
-        let flat_data: Vec<f32> = data
-            .into_iter()
-            .map(IntoIterator::into_iter)
-            .flatten()
-            .collect();
-        Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
-    }
-
-    #[test]
-    fn d2_index2_tensor_batch_features() {
-        let space = PowerSpace::<_, 2>::new(IndexSpace::new(2));
-        let actual: Tensor = space.batch_features(&[[0, 0], [1, 1], [1, 0]]);
-        let expected = tensor_from_arrays([
+    batch_features_tests!(
+        batch_d0_index2,
+        PowerSpace::<_, 0>::new(IndexSpace::new(2)),
+        [[], []],
+        [[], []]
+    );
+    batch_features_tests!(
+        batch_d2_index2,
+        PowerSpace::<_, 2>::new(IndexSpace::new(2)),
+        [[0, 0], [1, 1], [1, 0]],
+        [
             [1.0, 0.0, 1.0, 0.0],
             [0.0, 1.0, 0.0, 1.0],
             [0.0, 1.0, 1.0, 0.0],
-        ]);
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn d0_index2_tensor_batch_features_out() {
-        let space = PowerSpace::<_, 0>::new(IndexSpace::new(2));
-        let expected = tensor_from_arrays([[], []]);
-        let (a, b) = expected.size2().unwrap();
-        let mut out = UniqueTensor::<f32, _>::zeros((a as _, b as _));
-        space.batch_features_out(&[[], []], &mut out.array_view_mut(), false);
-        assert_eq!(out.into_tensor(), expected);
-    }
-
-    #[test]
-    fn d1_index2_tensor_batch_features_out() {
-        let space = PowerSpace::<_, 1>::new(IndexSpace::new(2));
-        let expected = tensor_from_arrays([[1.0, 0.0], [0.0, 1.0], [0.0, 1.0]]);
-        let (a, b) = expected.size2().unwrap();
-        let mut out = UniqueTensor::<f32, _>::zeros((a as _, b as _));
-        space.batch_features_out(&[[0], [1], [1]], &mut out.array_view_mut(), false);
-        assert_eq!(out.into_tensor(), expected);
-    }
-
-    #[test]
-    fn d2_index2_tensor_batch_features_out() {
-        let space = PowerSpace::<_, 2>::new(IndexSpace::new(2));
-        let expected = tensor_from_arrays([
-            [1.0, 0.0, 1.0, 0.0],
-            [0.0, 1.0, 0.0, 1.0],
-            [0.0, 1.0, 1.0, 0.0],
-        ]);
-        let (a, b) = expected.size2().unwrap();
-        let mut out = UniqueTensor::<f32, _>::zeros((a as _, b as _));
-        space.batch_features_out(&[[0, 0], [1, 1], [1, 0]], &mut out.array_view_mut(), false);
-        assert_eq!(out.into_tensor(), expected);
-    }
+        ]
+    );
 }

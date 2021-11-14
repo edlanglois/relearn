@@ -402,15 +402,23 @@ mod finite_space {
 
 #[cfg(test)]
 mod feature_space {
-    use super::super::{FeatureSpace, IndexSpace};
+    use super::super::IndexSpace;
     use super::*;
-    use crate::utils::tensor::UniqueTensor;
-    use tch::Tensor;
 
-    #[test]
-    fn empty_num_features() {
-        let space = ArraySpace::<IndexSpace, 0>::new([]);
-        assert_eq!(space.num_features(), 0);
+    mod empty {
+        use super::*;
+
+        const fn space() -> ArraySpace<IndexSpace, 0> {
+            ArraySpace::new([])
+        }
+
+        #[test]
+        fn num_features() {
+            let space = space();
+            assert_eq!(space.num_features(), 0);
+        }
+        features_tests!(f, space(), [], []);
+        batch_features_tests!(b, space(), [[], [], []], [[], [], []]);
     }
 
     #[test]
@@ -425,33 +433,6 @@ mod feature_space {
         assert_eq!(space.num_features(), 7);
     }
 
-    macro_rules! features_tests {
-        ($label:ident, $space:expr, $elem:expr, $expected:expr) => {
-            mod $label {
-                use super::*;
-
-                #[test]
-                fn tensor_features() {
-                    let space = $space;
-                    let actual: Tensor = space.features(&$elem);
-                    let expected_vec: &[f32] = &$expected;
-                    assert_eq!(actual, Tensor::of_slice(expected_vec));
-                }
-
-                #[test]
-                fn tensor_features_out() {
-                    let space = $space;
-                    let expected_vec: &[f32] = &$expected;
-                    let expected = Tensor::of_slice(&expected_vec);
-                    let mut out = UniqueTensor::<f32, _>::zeros(expected_vec.len());
-                    space.features_out(&$elem, out.as_slice_mut(), true);
-                    assert_eq!(out.into_tensor(), expected);
-                }
-            }
-        };
-    }
-
-    features_tests!(empty, ArraySpace::<IndexSpace, 0>::new([]), [], []);
     features_tests!(
         i3i4,
         ArraySpace::new([IndexSpace::new(3), IndexSpace::new(4)]),
@@ -465,46 +446,10 @@ mod feature_space {
         [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
     );
 
-    fn tensor_from_arrays<const N: usize, const M: usize>(data: [[f32; M]; N]) -> Tensor {
-        let flat_data: Vec<f32> = data
-            .into_iter()
-            .map(IntoIterator::into_iter)
-            .flatten()
-            .collect();
-        Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
-    }
-
-    #[test]
-    fn empty_tensor_batch_features() {
-        let space = ArraySpace::<IndexSpace, 0>::new([]);
-        let actual: Tensor = space.batch_features(&[[], [], []]);
-        let expected = tensor_from_arrays([[], [], []]);
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn empty_tensor_batch_features_out() {
-        let space = ArraySpace::<IndexSpace, 0>::new([]);
-        let expected = tensor_from_arrays([[], [], []]);
-        let mut out = UniqueTensor::<f32, _>::zeros((3, 0));
-        space.batch_features_out(&[[], [], []], &mut out.array_view_mut(), true);
-        assert_eq!(out.into_tensor(), expected);
-    }
-
-    #[test]
-    fn i2i3_tensor_batch_features() {
-        let space = ArraySpace::new([IndexSpace::new(2), IndexSpace::new(3)]);
-        let actual: Tensor = space.batch_features(&[[0, 0], [1, 2]]);
-        let expected = tensor_from_arrays([[1.0, 0.0, 1.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0, 1.0]]);
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn i3i4_tensor_batch_features_out() {
-        let space = ArraySpace::new([IndexSpace::new(2), IndexSpace::new(3)]);
-        let expected = tensor_from_arrays([[1.0, 0.0, 1.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0, 1.0]]);
-        let mut out = UniqueTensor::<f32, _>::zeros((2, 5));
-        space.batch_features_out(&[[0, 0], [1, 2]], &mut out.array_view_mut(), true);
-        assert_eq!(out.into_tensor(), expected);
-    }
+    batch_features_tests!(
+        batch_i2i3,
+        ArraySpace::new([IndexSpace::new(2), IndexSpace::new(3)]),
+        [[0, 0], [1, 2]],
+        [[1.0, 0.0, 1.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0, 1.0]]
+    );
 }

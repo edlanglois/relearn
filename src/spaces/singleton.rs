@@ -216,11 +216,7 @@ mod finite_space {
 
 #[cfg(test)]
 mod feature_space {
-    use super::super::FeatureSpace;
     use super::*;
-    use crate::utils::tensor::UniqueTensor;
-    use ndarray::Array;
-    use tch::Tensor;
 
     #[test]
     fn num_features() {
@@ -228,89 +224,6 @@ mod feature_space {
         assert_eq!(space.num_features(), 0);
     }
 
-    #[test]
-    fn features_tensor() {
-        let space = SingletonSpace::new();
-        let actual: Tensor = space.features(&());
-        assert_eq!(actual, Tensor::zeros(&[0], (Kind::Float, Device::Cpu)));
-    }
-
-    #[test]
-    fn features_array() {
-        let space = SingletonSpace::new();
-        let actual: Array<f32, _> = space.features(&());
-        assert_eq!(actual, Array::<f32, _>::zeros([0]));
-    }
-
-    #[test]
-    fn batch_features_tensor() {
-        let space = SingletonSpace::new();
-        let actual: Tensor = space.batch_features(&[(), (), ()]);
-        assert_eq!(actual, Tensor::zeros(&[3, 0], (Kind::Float, Device::Cpu)));
-    }
-
-    #[test]
-    fn batch_features_array() {
-        let space = SingletonSpace::new();
-        let actual: Array<f32, _> = space.batch_features(&[(), (), ()]);
-        assert_eq!(actual, Array::<f32, _>::zeros([3, 0]));
-    }
-
-    // The _out tests really just check that it doesn't panic since the array is empty.
-    #[test]
-    fn features_out_zeros_tensor() {
-        let space = SingletonSpace::new();
-        let mut out = UniqueTensor::<f32, _>::zeros([0]);
-        space.features_out(&(), out.as_slice_mut(), true);
-        assert_eq!(
-            out.into_tensor(),
-            Tensor::zeros(&[0], (Kind::Float, Device::Cpu))
-        );
-    }
-
-    #[test]
-    fn features_out_ones_tensor() {
-        let space = SingletonSpace::new();
-        let mut out = UniqueTensor::<f32, _>::zeros([0]);
-        space.features_out(&(), out.as_slice_mut(), false);
-        assert_eq!(
-            out.into_tensor(),
-            Tensor::zeros(&[0], (Kind::Float, Device::Cpu))
-        );
-    }
-
-    #[test]
-    fn features_out_array() {
-        let space = SingletonSpace::new();
-        let mut out = Array::from_elem([0], f32::NAN);
-        space.features_out(&(), out.as_slice_mut().unwrap(), false);
-        assert_eq!(out, Array::zeros([0]));
-    }
-
-    #[test]
-    fn features_out_zeroed_array() {
-        let space = SingletonSpace::new();
-        let mut out: Array<f32, _> = Array::zeros([0]);
-        space.features_out(&(), out.as_slice_mut().unwrap(), false);
-        assert_eq!(out, Array::zeros([0]));
-    }
-
-    #[test]
-    fn batch_features_out_tensor() {
-        let space = SingletonSpace::new();
-        let mut out = UniqueTensor::<f32, _>::zeros((3, 0));
-        space.batch_features_out(&[(), (), ()], &mut out.array_view_mut(), false);
-        assert_eq!(
-            out.into_tensor(),
-            Tensor::zeros(&[3, 0], (Kind::Float, Device::Cpu))
-        );
-    }
-
-    #[test]
-    fn batch_features_out_array() {
-        let space = SingletonSpace::new();
-        let mut out = Array::from_elem([3, 0], f32::NAN);
-        space.batch_features_out(&[(), (), ()], &mut out, false);
-        assert_eq!(out, Array::zeros([3, 0]));
-    }
+    features_tests!(f, SingletonSpace::new(), (), []);
+    batch_features_tests!(b, SingletonSpace::new(), [(), (), ()], [[], [], []]);
 }

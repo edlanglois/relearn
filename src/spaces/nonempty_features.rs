@@ -187,199 +187,58 @@ mod base_feature_space {
 
 #[cfg(test)]
 mod feature_space {
-    use super::super::{FeatureSpace, IndexSpace, SingletonSpace};
+    use super::super::{IndexSpace, SingletonSpace};
     use super::*;
 
-    macro_rules! tests {
-        ($array:ty, $zeros:expr, $empty:expr) => {
-            #[test]
-            fn features_wrap_0() {
-                let space = NonEmptyFeatures::new(SingletonSpace::new());
-                let actual: $array = space.features(&());
-                assert_eq!(actual, $zeros([1]));
-            }
-
-            #[test]
-            fn features_wrap_1() {
-                let inner = IndexSpace::new(1);
-                let space = NonEmptyFeatures::new(inner.clone());
-                let actual: $array = space.features(&0);
-                let expected: $array = inner.features(&0);
-                assert_eq!(actual, expected);
-            }
-
-            #[test]
-            fn features_wrap_2() {
-                let inner = IndexSpace::new(2);
-                let space = NonEmptyFeatures::new(inner.clone());
-                let actual: $array = space.features(&1);
-                let expected: $array = inner.features(&1);
-                assert_eq!(actual, expected);
-            }
-
-            /* TODO: Restore
-            #[test]
-            fn features_out_wrap_0() {
-                let space = NonEmptyFeatures::new(SingletonSpace::new());
-                let mut out = $empty([1]);
-                space.features_out(&(), &mut out, false);
-                assert_eq!(out, $zeros([1]));
-            }
-
-            #[test]
-            fn features_out_wrap_1() {
-                let inner = IndexSpace::new(1);
-                let space = NonEmptyFeatures::new(inner.clone());
-                let mut out = $empty([1]);
-                space.features_out(&0, &mut out, false);
-                let expected: $array = inner.features(&0);
-                assert_eq!(out, expected);
-            }
-
-            #[test]
-            fn features_out_wrap_1_zeroed() {
-                let inner = IndexSpace::new(1);
-                let space = NonEmptyFeatures::new(inner.clone());
-                let mut out: $array = $zeros([1]);
-                space.features_out(&0, &mut out, true);
-                let expected: $array = inner.features(&0);
-                assert_eq!(out, expected);
-            }
-
-            #[test]
-            fn features_out_wrap_2() {
-                let inner = IndexSpace::new(2);
-                let space = NonEmptyFeatures::new(inner.clone());
-                let mut out = $empty([2]);
-                space.features_out(&1, &mut out, false);
-                let expected: $array = inner.features(&1);
-                assert_eq!(out, expected);
-            }
-            */
-        };
-    }
-
-    mod tensor {
+    mod wrap_singleton {
         use super::*;
-        use tch::{Device, Kind, Tensor};
 
-        tests!(
-            Tensor,
-            |s: [i64; 1]| Tensor::zeros(&s, (Kind::Float, Device::Cpu)),
-            |s: [i64; 1]| Tensor::empty(&s, (Kind::Float, Device::Cpu))
-        );
+        const fn space() -> NonEmptyFeatures<SingletonSpace> {
+            NonEmptyFeatures::new(SingletonSpace::new())
+        }
+
+        #[test]
+        fn num_features() {
+            let space = space();
+            assert_eq!(space.num_features(), 1);
+        }
+
+        features_tests!(f, space(), (), [0.0]);
+        batch_features_tests!(b, space(), [(), (), ()], [[0.0], [0.0], [0.0]]);
     }
 
-    mod array {
+    mod wrap_index_1 {
         use super::*;
-        use ndarray::{Array, Ix1};
 
-        tests!(
-            Array<f32, Ix1>,
-            |s: [usize; 1]| Array::<f32, _>::zeros(s),
-            |s: [usize; 1]| Array::from_elem(s, f32::NAN) // Use NAN to detect any unset elements
-        );
-    }
-}
+        const fn space() -> NonEmptyFeatures<IndexSpace> {
+            NonEmptyFeatures::new(IndexSpace::new(1))
+        }
 
-#[cfg(test)]
-mod batch_feature_space {
-    use super::super::{FeatureSpace, IndexSpace, SingletonSpace};
-    use super::*;
+        #[test]
+        fn num_features() {
+            let space = space();
+            assert_eq!(space.num_features(), 1);
+        }
 
-    macro_rules! tests {
-        ($array:ty, $zeros:expr, $empty:expr) => {
-            #[test]
-            fn batch_features_wrap_0() {
-                let space = NonEmptyFeatures::new(SingletonSpace::new());
-                let actual: $array = space.batch_features(&[(), (), ()]);
-                assert_eq!(actual, $zeros([3, 1]));
-            }
-
-            #[test]
-            fn batch_features_wrap_1() {
-                let inner = IndexSpace::new(1);
-                let space = NonEmptyFeatures::new(inner.clone());
-                let elements = [0, 0, 0];
-                let actual: $array = space.batch_features(&elements);
-                let expected: $array = inner.batch_features(&elements);
-                assert_eq!(actual, expected);
-            }
-
-            #[test]
-            fn batch_features_wrap_2() {
-                let inner = IndexSpace::new(2);
-                let space = NonEmptyFeatures::new(inner.clone());
-                let elements = [1, 0, 1];
-                let actual: $array = space.batch_features(&elements);
-                let expected: $array = inner.batch_features(&elements);
-                assert_eq!(actual, expected);
-            }
-
-            /* TODO: Restore
-            #[test]
-            fn batch_features_out_wrap_0() {
-                let space = NonEmptyFeatures::new(SingletonSpace::new());
-                let mut out = $empty([3, 1]);
-                space.batch_features_out(&[(), (), ()], &mut out, false);
-                assert_eq!(out, $zeros([3, 1]));
-            }
-
-            #[test]
-            fn batch_features_out_wrap_1() {
-                let inner = IndexSpace::new(1);
-                let space = NonEmptyFeatures::new(inner.clone());
-                let mut out = $empty([3, 1]);
-                let elements = [0, 0, 0];
-                space.batch_features_out(&elements, &mut out, false);
-                let expected: $array = inner.batch_features(&elements);
-                assert_eq!(out, expected);
-            }
-
-            #[test]
-            fn batch_features_out_wrap_1_zeroed() {
-                let inner = IndexSpace::new(1);
-                let space = NonEmptyFeatures::new(inner.clone());
-                let mut out: $array = $zeros([3, 1]);
-                let elements = [0, 0, 0];
-                space.batch_features_out(&elements, &mut out, true);
-                let expected: $array = inner.batch_features(&elements);
-                assert_eq!(out, expected);
-            }
-
-            #[test]
-            fn batch_features_out_wrap_2() {
-                let inner = IndexSpace::new(2);
-                let space = NonEmptyFeatures::new(inner.clone());
-                let mut out = $empty([3, 2]);
-                let elements = [1, 0, 1];
-                space.batch_features_out(&elements, &mut out, false);
-                let expected: $array = inner.batch_features(&elements);
-                assert_eq!(out, expected);
-            }
-            */
-        };
+        features_tests!(f, space(), 0, [1.0]);
+        batch_features_tests!(b, space(), [0, 0, 0], [[1.0], [1.0], [1.0]]);
     }
 
-    mod tensor {
+    mod wrap_index_2 {
         use super::*;
-        use tch::{Device, Kind, Tensor};
 
-        tests!(
-            Tensor,
-            |s: [i64; 2]| Tensor::zeros(&s, (Kind::Float, Device::Cpu)),
-            |s: [i64; 2]| Tensor::empty(&s, (Kind::Float, Device::Cpu))
-        );
-    }
+        const fn space() -> NonEmptyFeatures<IndexSpace> {
+            NonEmptyFeatures::new(IndexSpace::new(2))
+        }
 
-    mod array {
-        use super::*;
-        use ndarray::{Array, Ix2};
+        #[test]
+        fn num_features() {
+            let space = space();
+            assert_eq!(space.num_features(), 2);
+        }
 
-        tests!(
-            Array<f32, Ix2>,
-            |s: [usize; 2]| Array::zeros(s),
-            |s: [usize; 2]| Array::from_elem(s, f32::NAN) // Use NAN to detect any unset elements
-        );
+        features_tests!(f0, space(), 0, [1.0, 0.0]);
+        features_tests!(f1, space(), 1, [0.0, 1.0]);
+        batch_features_tests!(b, space(), [1, 0, 1], [[0.0, 1.0], [1.0, 0.0], [0.0, 1.0]]);
     }
 }

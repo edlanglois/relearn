@@ -307,71 +307,7 @@ mod partial_ord {
 
 #[cfg(test)]
 mod feature_space {
-    use super::super::FeatureSpace;
     use super::*;
-    use crate::utils::tensor::UniqueTensor;
-
-    fn tensor_from_arrays<T: tch::kind::Element, const N: usize, const M: usize>(
-        data: [[T; M]; N],
-    ) -> Tensor {
-        let flat_data: Vec<T> = data
-            .into_iter()
-            .map(IntoIterator::into_iter)
-            .flatten()
-            .collect();
-        Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
-    }
-
-    macro_rules! features_tests {
-        ($label:ident, $space:expr, $elem:expr, $expected:expr) => {
-            mod $label {
-                use super::*;
-
-                #[test]
-                fn tensor_features() {
-                    let space = $space;
-                    let actual: Tensor = space.features(&$elem);
-                    let expected_vec: &[f32] = &$expected;
-                    assert_eq!(actual, Tensor::of_slice(expected_vec));
-                }
-
-                #[test]
-                fn tensor_features_out() {
-                    let space = $space;
-                    let expected_vec: &[f32] = &$expected;
-                    let expected = Tensor::of_slice(&expected_vec);
-                    let mut out = UniqueTensor::<f32, _>::zeros(expected_vec.len());
-                    space.features_out(&$elem, out.as_slice_mut(), true);
-                    assert_eq!(out.into_tensor(), expected);
-                }
-            }
-        };
-    }
-
-    macro_rules! batch_features_tests {
-        ($label:ident, $space:expr, $elems:expr, $expected:expr) => {
-            mod $label {
-                use super::*;
-
-                #[test]
-                fn tensor_batch_features() {
-                    let space = $space;
-                    let actual: Tensor = space.batch_features(&$elems);
-                    assert_eq!(actual, tensor_from_arrays($expected));
-                }
-
-                #[test]
-                fn tensor_batch_features_out() {
-                    let space = $space;
-                    let expected = tensor_from_arrays($expected);
-                    let (a, b) = expected.size2().unwrap();
-                    let mut out = UniqueTensor::<f32, _>::zeros((a as _, b as _));
-                    space.batch_features_out(&$elems, &mut out.array_view_mut(), false);
-                    assert_eq!(out.into_tensor(), expected);
-                }
-            }
-        };
-    }
 
     mod unit {
         use super::*;

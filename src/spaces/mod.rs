@@ -3,6 +3,10 @@
 //! # `PartialOrd` for Spaces
 //! Spaces have a partial order such that for two spaces of the same type,
 //! `a < b` means that `a` is a strict subset of `b`.
+#[cfg(test)]
+#[macro_use]
+pub mod testing;
+
 mod array;
 mod boolean;
 mod categorical;
@@ -14,8 +18,6 @@ mod option;
 mod power;
 mod product;
 mod singleton;
-#[cfg(test)]
-pub mod testing;
 mod wrapper;
 
 pub use array::ArraySpace;

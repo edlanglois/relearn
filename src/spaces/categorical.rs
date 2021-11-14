@@ -166,82 +166,35 @@ mod repr_space_tensor {
 }
 
 #[cfg(test)]
-mod feature_space_tensor {
-    use super::super::{FeatureSpace, IndexedTypeSpace};
+mod feature_space {
+    use super::super::IndexedTypeSpace;
     use super::trit::Trit;
     use super::*;
 
+    fn space() -> IndexedTypeSpace<Trit> {
+        IndexedTypeSpace::new()
+    }
+
     #[test]
     fn num_features() {
-        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        let space = space();
         assert_eq!(3, space.num_features());
     }
 
-    #[test]
-    fn features() {
-        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
-        assert_eq!(
-            Tensor::of_slice(&[1.0, 0.0, 0.0]),
-            space.features(&Trit::Zero)
-        );
-        assert_eq!(
-            Tensor::of_slice(&[0.0, 1.0, 0.0]),
-            space.features(&Trit::One)
-        );
-        assert_eq!(
-            Tensor::of_slice(&[0.0, 0.0, 1.0]),
-            space.features(&Trit::Two)
-        );
-    }
-
-    #[test]
-    fn batch_features() {
-        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
-        assert_eq!(
-            Tensor::of_slice(&[
-                0.0, 0.0, 1.0, // Two
-                1.0, 0.0, 0.0, // Zero
-                0.0, 1.0, 0.0, // One
-                1.0, 0.0, 0.0 // Zero
-            ])
-            .reshape(&[4, 3]),
-            space.batch_features(&[Trit::Two, Trit::Zero, Trit::One, Trit::Zero])
-        );
-    }
-}
-
-#[cfg(test)]
-mod feature_space_array {
-    use super::super::{FeatureSpace, IndexedTypeSpace};
-    use super::trit::Trit;
-    use ndarray::Array;
-
-    #[test]
-    fn features() {
-        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
-        let result: Array<f32, _> = space.features(&Trit::Zero);
-        assert_eq!(Array::from_vec(vec![1.0, 0.0, 0.0]), result);
-        let result: Array<f32, _> = space.features(&Trit::One);
-        assert_eq!(Array::from_vec(vec![0.0, 1.0, 0.0]), result);
-        let result: Array<f32, _> = space.features(&Trit::Two);
-        assert_eq!(Array::from_vec(vec![0.0, 0.0, 1.0]), result);
-    }
-
-    #[test]
-    fn batch_features() {
-        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
-        let result: Array<f32, _> =
-            space.batch_features(&[Trit::Two, Trit::Zero, Trit::One, Trit::Zero]);
-        let expected = Array::from_vec(vec![
-            0.0, 0.0, 1.0, // Two
-            1.0, 0.0, 0.0, // Zero
-            0.0, 1.0, 0.0, // One
-            1.0, 0.0, 0.0, // Zero
-        ])
-        .into_shape((4, 3))
-        .unwrap();
-        assert_eq!(expected, result);
-    }
+    features_tests!(trit_zero, space(), Trit::Zero, [1.0, 0.0, 0.0]);
+    features_tests!(trit_one, space(), Trit::One, [0.0, 1.0, 0.0]);
+    features_tests!(trit_two, space(), Trit::Two, [0.0, 0.0, 1.0]);
+    batch_features_tests!(
+        trit_batch,
+        space(),
+        [Trit::Two, Trit::Zero, Trit::One, Trit::Zero],
+        [
+            [0.0, 0.0, 1.0], // Two
+            [1.0, 0.0, 0.0], // Zero
+            [0.0, 1.0, 0.0], // One
+            [1.0, 0.0, 0.0]  // Zero
+        ]
+    );
 }
 
 #[cfg(test)]

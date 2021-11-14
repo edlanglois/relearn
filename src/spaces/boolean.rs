@@ -208,71 +208,24 @@ mod finite_space {
 
 #[cfg(test)]
 mod feature_space {
-    use super::super::FeatureSpace;
     use super::*;
-    use crate::utils::tensor::UniqueTensor;
+
+    const fn space() -> BooleanSpace {
+        BooleanSpace::new()
+    }
 
     #[test]
     fn num_features() {
-        let space = BooleanSpace::new();
+        let space = space();
         assert_eq!(space.num_features(), 1);
     }
 
-    macro_rules! features_tests {
-        ($label:ident, $elem:expr, $expected:expr) => {
-            mod $label {
-                use super::*;
-
-                #[test]
-                fn tensor_features() {
-                    let space = BooleanSpace::new();
-                    let actual: Tensor = space.features(&$elem);
-                    let expected_vec: &[f32] = &$expected;
-                    assert_eq!(actual, Tensor::of_slice(expected_vec));
-                }
-
-                #[test]
-                fn tensor_features_out() {
-                    let space = BooleanSpace::new();
-                    let expected_vec: &[f32] = &$expected;
-                    let expected = Tensor::of_slice(&expected_vec);
-                    let mut out = UniqueTensor::<f32, _>::zeros(expected_vec.len());
-                    space.features_out(&$elem, out.as_slice_mut(), true);
-                    assert_eq!(out.into_tensor(), expected);
-                }
-            }
-        };
-    }
-
-    features_tests!(false_, false, [0.0]);
-    features_tests!(true_, true, [1.0]);
-
-    fn tensor_from_arrays<const N: usize, const M: usize>(data: [[f32; M]; N]) -> Tensor {
-        let flat_data: Vec<f32> = data
-            .into_iter()
-            .map(IntoIterator::into_iter)
-            .flatten()
-            .collect();
-        Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
-    }
-
-    #[test]
-    fn tensor_batch_features() {
-        let space = BooleanSpace::new();
-        let actual: Tensor = space.batch_features(&[false, true, true, false]);
-        assert_eq!(actual, tensor_from_arrays([[0.0], [1.0], [1.0], [0.0]]));
-    }
-
-    #[test]
-    fn tensor_batch_features_out() {
-        let space = BooleanSpace::new();
-        let expected = tensor_from_arrays([[0.0], [1.0], [1.0], [0.0]]);
-        let mut out = UniqueTensor::<f32, _>::zeros((4, 1));
-        space.batch_features_out(
-            &[false, true, true, false],
-            &mut out.array_view_mut(),
-            false,
-        );
-        assert_eq!(out.into_tensor(), expected);
-    }
+    features_tests!(false_, space(), false, [0.0]);
+    features_tests!(true_, space(), true, [1.0]);
+    batch_features_tests!(
+        batch,
+        space(),
+        [false, true, true, false],
+        [[0.0], [1.0], [1.0], [0.0]]
+    );
 }

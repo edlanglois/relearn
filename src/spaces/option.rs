@@ -191,165 +191,66 @@ mod finite_space {
 }
 
 #[cfg(test)]
-mod base_feature_space {
+mod feature_space {
     use super::super::{IndexSpace, SingletonSpace};
     use super::*;
 
-    #[test]
-    fn num_features_singleton() {
-        let space = OptionSpace::new(SingletonSpace::new());
-        assert_eq!(space.num_features(), 1);
+    mod singleton {
+        use super::*;
+
+        #[test]
+        fn num_features() {
+            let space = OptionSpace::new(SingletonSpace::new());
+            assert_eq!(space.num_features(), 1);
+        }
+
+        features_tests!(none, OptionSpace::new(SingletonSpace::new()), None, [1.0]);
+        features_tests!(
+            some,
+            OptionSpace::new(SingletonSpace::new()),
+            Some(()),
+            [0.0]
+        );
+        batch_features_tests!(
+            batch,
+            OptionSpace::new(SingletonSpace::new()),
+            [Some(()), None, Some(())],
+            [[0.0], [1.0], [0.0]]
+        );
     }
 
-    #[test]
-    fn num_features_index() {
-        let space = OptionSpace::new(IndexSpace::new(3));
-        assert_eq!(space.num_features(), 4);
+    mod index {
+        use super::*;
+
+        #[test]
+        fn num_features() {
+            let space = OptionSpace::new(IndexSpace::new(3));
+            assert_eq!(space.num_features(), 4);
+        }
+
+        features_tests!(
+            none,
+            OptionSpace::new(IndexSpace::new(3)),
+            None,
+            [1.0, 0.0, 0.0, 0.0]
+        );
+        features_tests!(
+            some,
+            OptionSpace::new(IndexSpace::new(3)),
+            Some(1),
+            [0.0, 0.0, 1.0, 0.0]
+        );
+        batch_features_tests!(
+            batch,
+            OptionSpace::new(IndexSpace::new(3)),
+            [Some(1), None, Some(0), Some(2), None],
+            [
+                [0.0, 0.0, 1.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+                [1.0, 0.0, 0.0, 0.0]
+            ]
+        );
     }
-}
-
-#[cfg(test)]
-mod feature_space {
-    use super::super::{FeatureSpace, IndexSpace, SingletonSpace};
-    use super::*;
-    use crate::utils::tensor::UniqueTensor;
-    use ndarray::{arr1, Array};
-    use tch::Tensor;
-
-    macro_rules! features_tests {
-        ($label:ident, $inner:expr, $elem:expr, $expected:expr) => {
-            mod $label {
-                use super::*;
-
-                #[test]
-                fn tensor_features() {
-                    let space = OptionSpace::new($inner);
-                    let actual: Tensor = space.features(&$elem);
-                    assert_eq!(actual, Tensor::of_slice(&$expected));
-                }
-
-                #[test]
-                fn tensor_features_out() {
-                    let space = OptionSpace::new($inner);
-                    let expected = Tensor::of_slice(&$expected);
-                    let mut out = UniqueTensor::<f32, _>::zeros(expected.numel());
-                    space.features_out(&$elem, out.as_slice_mut(), false);
-                    assert_eq!(out.into_tensor(), expected);
-                }
-
-                #[test]
-                fn array_features() {
-                    let space = OptionSpace::new($inner);
-                    let actual: Array<f32, _> = space.features(&$elem);
-                    let expected: Array<f32, _> = arr1(&$expected);
-                    assert_eq!(actual, expected);
-                }
-
-                #[test]
-                fn array_features_out() {
-                    let space = OptionSpace::new($inner);
-                    let expected: Array<f32, _> = arr1(&$expected);
-                    let mut out = Array::from_elem(expected.raw_dim(), f32::NAN);
-                    space.features_out(&$elem, out.as_slice_mut().unwrap(), false);
-                    assert_eq!(out, expected);
-                }
-            }
-        };
-    }
-
-    features_tests!(singleton_none, SingletonSpace::new(), None, [1.0_f32]);
-    features_tests!(singleton_some, SingletonSpace::new(), Some(()), [0.0_f32]);
-    features_tests!(
-        index_none,
-        IndexSpace::new(3),
-        None,
-        [1.0, 0.0, 0.0, 0.0_f32]
-    );
-    features_tests!(
-        index_some,
-        IndexSpace::new(3),
-        Some(1),
-        [0.0, 0.0, 1.0, 0.0_f32]
-    );
-}
-
-#[cfg(test)]
-mod batch_feature_space {
-    use super::super::{FeatureSpace, IndexSpace, SingletonSpace};
-    use super::*;
-    use crate::utils::tensor::UniqueTensor;
-    use ndarray::{arr2, Array};
-    use tch::Tensor;
-
-    fn tensor_from_arrays<T: tch::kind::Element, const N: usize, const M: usize>(
-        data: [[T; M]; N],
-    ) -> Tensor {
-        let flat_data: Vec<T> = data
-            .into_iter()
-            .map(IntoIterator::into_iter)
-            .flatten()
-            .collect();
-        Tensor::of_slice(&flat_data).reshape(&[N as i64, M as i64])
-    }
-
-    macro_rules! batch_features_tests {
-        ($label:ident, $inner:expr, $elems:expr, $expected:expr) => {
-            mod $label {
-                use super::*;
-
-                #[test]
-                fn tensor_batch_features() {
-                    let space = OptionSpace::new($inner);
-                    let actual: Tensor = space.batch_features(&$elems);
-                    assert_eq!(actual, tensor_from_arrays($expected));
-                }
-
-                #[test]
-                fn tensor_batch_features_out() {
-                    let space = OptionSpace::new($inner);
-                    let expected = tensor_from_arrays($expected);
-                    let (a, b) = expected.size2().unwrap();
-                    let mut out = UniqueTensor::<f32, _>::zeros((a as _, b as _));
-                    space.batch_features_out(&$elems, &mut out.array_view_mut(), false);
-                    assert_eq!(out.into_tensor(), expected);
-                }
-
-                #[test]
-                fn array_batch_features() {
-                    let space = OptionSpace::new($inner);
-                    let actual: Array<f32, _> = space.batch_features(&$elems);
-                    let expected: Array<f32, _> = arr2(&$expected);
-                    assert_eq!(actual, expected);
-                }
-
-                #[test]
-                fn array_batch_features_out() {
-                    let space = OptionSpace::new($inner);
-                    let expected: Array<f32, _> = arr2(&$expected);
-                    let mut out = Array::from_elem(expected.raw_dim(), f32::NAN);
-                    space.batch_features_out(&$elems, &mut out, false);
-                    assert_eq!(out, expected);
-                }
-            }
-        };
-    }
-
-    batch_features_tests!(
-        singleton,
-        SingletonSpace::new(),
-        [Some(()), None, Some(())],
-        [[0.0], [1.0], [0.0_f32]]
-    );
-    batch_features_tests!(
-        index,
-        IndexSpace::new(3),
-        [Some(1), None, Some(0), Some(2), None],
-        [
-            [0.0, 0.0, 1.0, 0.0],
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-            [1.0, 0.0, 0.0, 0.0_f32]
-        ]
-    );
 }
