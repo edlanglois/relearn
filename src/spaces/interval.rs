@@ -1,11 +1,7 @@
 //! `IntervalSpace` definition
-use super::{
-    BaseFeatureSpace, BatchFeatureSpace, BatchFeatureSpaceOut, ElementRefInto, FeatureSpace,
-    FeatureSpaceOut, ReprSpace, Space,
-};
+use super::{ElementRefInto, EncoderFeatureSpace, NumFeatures, ReprSpace, Space};
 use crate::logging::Loggable;
-use crate::utils::cast::CastInto;
-use num_traits::Float;
+use num_traits::{Float, ToPrimitive};
 use rand::distributions::Distribution;
 use rand::Rng;
 use rand_distr::{Gamma, StandardNormal};
@@ -43,7 +39,7 @@ impl<T: fmt::Display> fmt::Display for IntervalSpace<T> {
     }
 }
 
-impl<T: Float + PartialOrd> Space for IntervalSpace<T> {
+impl<T: Float> Space for IntervalSpace<T> {
     type Element = T;
 
     fn contains(&self, value: &Self::Element) -> bool {
@@ -69,7 +65,7 @@ impl<T: PartialOrd> PartialOrd for IntervalSpace<T> {
 impl<T> ReprSpace<Tensor> for IntervalSpace<T>
 where
     // NOTE: Remove copy if ever changing batch_repr to take a slice
-    T: Copy + Float + PartialOrd + tch::kind::Element,
+    T: Copy + Float + tch::kind::Element,
 {
     fn repr(&self, element: &Self::Element) -> Tensor {
         Tensor::of_slice(slice::from_ref(element)).squeeze_dim_(0)
@@ -86,59 +82,23 @@ where
     }
 }
 
-/// Features are the same as the representation.
-impl<T> BaseFeatureSpace for IntervalSpace<T> {
+impl<T: Float> NumFeatures for IntervalSpace<T> {
     fn num_features(&self) -> usize {
         1
     }
 }
 
-impl<T> FeatureSpace<Tensor> for IntervalSpace<T>
-where
-    T: Copy + Float + PartialOrd + CastInto<f32>,
-{
-    fn features(&self, element: &Self::Element) -> Tensor {
-        let value: f32 = (*element).cast_into();
-        Tensor::of_slice(&[value])
-    }
-}
-
-impl<T> FeatureSpaceOut<Tensor> for IntervalSpace<T>
-where
-    T: Copy + Float + PartialOrd + CastInto<f64>,
-{
-    fn features_out(&self, element: &Self::Element, out: &mut Tensor, _zeroed: bool) {
-        let value: f64 = (*element).cast_into();
-        let _ = out.fill_(value); // feature vectors are f32 but fill_ requires f64
-    }
-}
-
-impl<T> BatchFeatureSpace<Tensor> for IntervalSpace<T>
-where
-    T: Copy + Float + PartialOrd + CastInto<f32>,
-{
-    fn batch_features<'a, I>(&self, elements: I) -> Tensor
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-    {
-        let elements: Vec<f32> = elements.into_iter().map(|&x| x.cast_into()).collect();
-        Tensor::of_slice(&elements).unsqueeze_(-1)
-    }
-}
-
-impl<T> BatchFeatureSpaceOut<Tensor> for IntervalSpace<T>
-where
-    T: Copy + Float + PartialOrd + CastInto<f32>,
-{
-    fn batch_features_out<'a, I>(&self, elements: I, out: &mut Tensor, _zeroed: bool)
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-    {
-        let elements: Vec<f32> = elements.into_iter().map(|&x| x.cast_into()).collect();
-        // TODO: Avoid double copy
-        let _ = out.copy_(&Tensor::of_slice(&elements).unsqueeze_(-1));
+impl<T: Float + ToPrimitive> EncoderFeatureSpace for IntervalSpace<T> {
+    type Encoder = ();
+    fn encoder(&self) -> Self::Encoder {}
+    fn encoder_features_out<F: Float>(
+        &self,
+        element: &Self::Element,
+        out: &mut [F],
+        _zeroed: bool,
+        _encoder: &Self::Encoder,
+    ) {
+        out[0] = F::from(*element).expect("could not convert element to float")
     }
 }
 
@@ -347,7 +307,9 @@ mod partial_ord {
 
 #[cfg(test)]
 mod feature_space {
+    use super::super::FeatureSpace;
     use super::*;
+    use crate::utils::tensor::UniqueTensor;
 
     fn tensor_from_arrays<T: tch::kind::Element, const N: usize, const M: usize>(
         data: [[T; M]; N],
@@ -378,9 +340,9 @@ mod feature_space {
                     let space = $space;
                     let expected_vec: &[f32] = &$expected;
                     let expected = Tensor::of_slice(&expected_vec);
-                    let mut out = expected.empty_like();
-                    space.features_out(&$elem, &mut out, false);
-                    assert_eq!(out, expected);
+                    let mut out = UniqueTensor::<f32, _>::zeros(expected_vec.len());
+                    space.features_out(&$elem, out.as_slice_mut(), true);
+                    assert_eq!(out.into_tensor(), expected);
                 }
             }
         };
@@ -402,9 +364,10 @@ mod feature_space {
                 fn tensor_batch_features_out() {
                     let space = $space;
                     let expected = tensor_from_arrays($expected);
-                    let mut out = expected.empty_like();
-                    space.batch_features_out(&$elems, &mut out, false);
-                    assert_eq!(out, expected);
+                    let (a, b) = expected.size2().unwrap();
+                    let mut out = UniqueTensor::<f32, _>::zeros((a as _, b as _));
+                    space.batch_features_out(&$elems, &mut out.array_view_mut(), false);
+                    assert_eq!(out.into_tensor(), expected);
                 }
             }
         };

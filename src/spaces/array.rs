@@ -1,13 +1,11 @@
 //! Array space
-use super::{
-    BaseFeatureSpace, BatchFeatureSpace, BatchFeatureSpaceOut, ElementRefInto, FeatureSpace,
-    FeatureSpaceOut, FiniteSpace, Space,
-};
+use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space};
 use crate::logging::Loggable;
+use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::cmp::Ordering;
-use tch::{Device, Kind, Tensor};
+use std::ops::Range;
 
 /// A Cartesian product of `N` spaces of the same type (but not necessarily the same space).
 ///
@@ -16,7 +14,7 @@ use tch::{Device, Kind, Tensor};
 /// a [`ProductSpace`](super::ProductSpace) because the inner spaces must have the same type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ArraySpace<S, const N: usize> {
-    pub inner_spaces: [S; N],
+    inner_spaces: [S; N],
 }
 
 impl<S, const N: usize> ArraySpace<S, N> {
@@ -115,106 +113,66 @@ where
     }
 }
 
-impl<S: BaseFeatureSpace, const N: usize> BaseFeatureSpace for ArraySpace<S, N> {
+impl<S: NumFeatures, const N: usize> NumFeatures for ArraySpace<S, N> {
     fn num_features(&self) -> usize {
         self.inner_spaces
             .iter()
-            .map(BaseFeatureSpace::num_features)
+            .map(NumFeatures::num_features)
             .sum()
     }
 }
 
-impl<S: FeatureSpaceOut<Tensor>, const N: usize> FeatureSpace<Tensor> for ArraySpace<S, N> {
-    fn features(&self, element: &Self::Element) -> Tensor {
-        let mut out = Tensor::empty(&[self.num_features() as i64], (Kind::Float, Device::Cpu));
-        self.features_out(element, &mut out, false);
-        out
+/// Feature encoder for [`ArraySpace`]
+#[derive(Debug)]
+pub struct ArraySpaceEncoder<T, const N: usize> {
+    inner_encoders: [T; N],
+    /// Ending offsets for the feature vector of each inner space.
+    end_offsets: [usize; N],
+}
+impl<T, const N: usize> ArraySpaceEncoder<T, N> {
+    /// Iterator over index ranges for each inner space.
+    fn ranges(&self) -> impl Iterator<Item = Range<usize>> + '_ {
+        self.end_offsets
+            .first()
+            .map(|&i| 0..i)
+            .into_iter()
+            .chain(self.end_offsets.windows(2).map(|w| w[0]..w[1]))
     }
 }
 
-impl<S: FeatureSpaceOut<Tensor>, const N: usize> FeatureSpaceOut<Tensor> for ArraySpace<S, N> {
-    fn features_out(&self, element: &Self::Element, out: &mut Tensor, zeroed: bool) {
-        if N == 0 {
-            return;
-        } else if N == 1 {
-            self.inner_spaces[0].features_out(&element[0], out, zeroed);
-            return;
-        }
+impl<S: EncoderFeatureSpace, const N: usize> EncoderFeatureSpace for ArraySpace<S, N> {
+    type Encoder = ArraySpaceEncoder<S::Encoder, N>;
 
-        let split_sizes: Vec<i64> = self
-            .inner_spaces
-            .iter()
-            .map(|s| s.num_features().try_into().unwrap())
-            .collect();
-        for (inner_tensor, (inner_space, inner_elem)) in out
-            .split_with_sizes(&split_sizes, -1)
-            .iter_mut()
-            .zip(self.inner_spaces.iter().zip(element))
-        {
-            inner_space.features_out(inner_elem, inner_tensor, zeroed);
+    fn encoder(&self) -> Self::Encoder {
+        let inner_encoders =
+            array_init::from_iter(self.inner_spaces.iter().map(|space| space.encoder())).unwrap();
+
+        let mut offset = 0;
+        let end_offsets = array_init::from_iter(self.inner_spaces.iter().map(|space| {
+            offset += space.num_features();
+            offset
+        }))
+        .unwrap();
+
+        ArraySpaceEncoder {
+            inner_encoders,
+            end_offsets,
         }
     }
-}
-
-impl<S, const N: usize> BatchFeatureSpace<Tensor> for ArraySpace<S, N>
-where
-    S: BatchFeatureSpaceOut<Tensor>,
-    S::Element: 'static,
-{
-    fn batch_features<'a, I>(&self, elements: I) -> Tensor
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator + Clone,
-        Self::Element: 'a,
-    {
-        let elements_iter = elements.into_iter();
-        let mut out = Tensor::empty(
-            &[elements_iter.len() as i64, self.num_features() as i64],
-            (Kind::Float, Device::Cpu),
-        );
-        self.batch_features_out(elements_iter, &mut out, false);
-        out
-    }
-}
-
-impl<S, const N: usize> BatchFeatureSpaceOut<Tensor> for ArraySpace<S, N>
-where
-    S: BatchFeatureSpaceOut<Tensor>,
-    S::Element: 'static,
-{
-    fn batch_features_out<'a, I>(&self, elements: I, out: &mut Tensor, zeroed: bool)
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: Clone,
-        Self::Element: 'a,
-    {
-        if N == 0 {
-            return;
-        } else if N == 1 {
-            self.inner_spaces[0].batch_features_out(
-                elements.into_iter().map(|e| &e[0]),
-                out,
-                zeroed,
-            );
-            return;
-        }
-        let elements_iter = elements.into_iter();
-        let split_sizes: Vec<i64> = self
-            .inner_spaces
-            .iter()
-            .map(|s| s.num_features().try_into().unwrap())
-            .collect();
-        for (i, (inner_tensor, inner_space)) in out
-            .split_with_sizes(&split_sizes, -1)
-            .iter_mut()
+    fn encoder_features_out<F: Float>(
+        &self,
+        element: &Self::Element,
+        out: &mut [F],
+        zeroed: bool,
+        encoder: &Self::Encoder,
+    ) {
+        for (((range, inner_space), inner_encoder), inner_elem) in encoder
+            .ranges()
             .zip(&self.inner_spaces)
-            .enumerate()
+            .zip(&encoder.inner_encoders)
+            .zip(element)
         {
-            inner_space.batch_features_out(
-                elements_iter.clone().map(|e| &e[i]),
-                inner_tensor,
-                zeroed,
-            )
+            inner_space.encoder_features_out(inner_elem, &mut out[range], zeroed, inner_encoder);
         }
     }
 }
@@ -444,8 +402,10 @@ mod finite_space {
 
 #[cfg(test)]
 mod feature_space {
-    use super::super::IndexSpace;
+    use super::super::{FeatureSpace, IndexSpace};
     use super::*;
+    use crate::utils::tensor::UniqueTensor;
+    use tch::Tensor;
 
     #[test]
     fn empty_num_features() {
@@ -483,9 +443,9 @@ mod feature_space {
                     let space = $space;
                     let expected_vec: &[f32] = &$expected;
                     let expected = Tensor::of_slice(&expected_vec);
-                    let mut out = expected.empty_like();
-                    space.features_out(&$elem, &mut out, false);
-                    assert_eq!(out, expected);
+                    let mut out = UniqueTensor::<f32, _>::zeros(expected_vec.len());
+                    space.features_out(&$elem, out.as_slice_mut(), true);
+                    assert_eq!(out.into_tensor(), expected);
                 }
             }
         };
@@ -526,9 +486,9 @@ mod feature_space {
     fn empty_tensor_batch_features_out() {
         let space = ArraySpace::<IndexSpace, 0>::new([]);
         let expected = tensor_from_arrays([[], [], []]);
-        let mut out = expected.empty_like();
-        space.batch_features_out(&[[], [], []], &mut out, false);
-        assert_eq!(out, expected);
+        let mut out = UniqueTensor::<f32, _>::zeros((3, 0));
+        space.batch_features_out(&[[], [], []], &mut out.array_view_mut(), true);
+        assert_eq!(out.into_tensor(), expected);
     }
 
     #[test]
@@ -543,8 +503,8 @@ mod feature_space {
     fn i3i4_tensor_batch_features_out() {
         let space = ArraySpace::new([IndexSpace::new(2), IndexSpace::new(3)]);
         let expected = tensor_from_arrays([[1.0, 0.0, 1.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0, 1.0]]);
-        let mut out = expected.empty_like();
-        space.batch_features_out(&[[0, 0], [1, 2]], &mut out, false);
-        assert_eq!(out, expected);
+        let mut out = UniqueTensor::<f32, _>::zeros((2, 5));
+        space.batch_features_out(&[[0, 0], [1, 2]], &mut out.array_view_mut(), true);
+        assert_eq!(out.into_tensor(), expected);
     }
 }

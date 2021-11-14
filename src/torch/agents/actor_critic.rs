@@ -9,7 +9,7 @@ use crate::agents::{Actor, Agent, BuildAgent, BuildAgentError, SetActorMode, Ste
 use crate::envs::EnvStructure;
 use crate::logging::{Event, Logger, LoggerHelper, TimeSeriesLogger, TimeSeriesLoggerHelper};
 use crate::spaces::{
-    BaseFeatureSpace, BatchFeatureSpace, FeatureSpace, NonEmptyFeatures,
+    EncoderFeatureSpace, FeatureSpace, NonEmptyFeatures, NumFeatures,
     ParameterizedDistributionSpace, ReprSpace, Space,
 };
 use std::num::NonZeroUsize;
@@ -53,7 +53,7 @@ where
     PUB: BuildPolicyUpdater<AS>,
     CB: BuildCritic,
     CUB: BuildCriticUpdater,
-    OS: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
+    OS: EncoderFeatureSpace,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
 {
     #[allow(clippy::type_complexity)]
@@ -137,7 +137,7 @@ where
 
 impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
-    OS: Space + BaseFeatureSpace,
+    OS: Space + NumFeatures,
     AS: ParameterizedDistributionSpace<Tensor>,
 {
     fn new<E, PB, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
@@ -212,7 +212,7 @@ where
 impl<OS, AS, P, PU, C, CU> Actor<OS::Element, AS::Element>
     for ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
-    OS: FeatureSpace<Tensor>,
+    OS: EncoderFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
     P: StatefulIterativeModule,
 {
@@ -233,7 +233,7 @@ where
 impl<OS, AS, P, PU, C, CU> Agent<OS::Element, AS::Element>
     for ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
-    OS: FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>,
+    OS: EncoderFeatureSpace,
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
     P: Policy,
     PU: UpdatePolicy<AS>,
@@ -255,7 +255,7 @@ where
 
 impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
-    OS: BatchFeatureSpace<Tensor>,
+    OS: EncoderFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
     P: Policy,
     PU: UpdatePolicy<AS>,

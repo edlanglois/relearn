@@ -87,6 +87,13 @@ where
     }
 }
 
+impl<E, D: Dimension> UniqueTensor<E, D> {
+    /// Convert into the inner tensor.
+    pub fn into_tensor(self) -> Tensor {
+        self.tensor
+    }
+}
+
 impl<E, D> UniqueTensor<E, D>
 where
     E: Element,
@@ -169,7 +176,7 @@ where
 
 impl<E, D: Dimension> From<UniqueTensor<E, D>> for Tensor {
     fn from(unique: UniqueTensor<E, D>) -> Self {
-        unique.tensor
+        unique.into_tensor()
     }
 }
 

@@ -10,8 +10,8 @@ use crate::agents::{
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::{Loggable, TimeSeriesLogger};
 use crate::spaces::{
-    BatchFeatureSpace, ElementRefInto, FeatureSpace, FiniteSpace, ParameterizedDistributionSpace,
-    SampleSpace, SendElementSpace, Space,
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, ParameterizedDistributionSpace, SampleSpace,
+    SendElementSpace, Space,
 };
 use crate::torch::agents::ActorCriticConfig;
 use crate::utils::any::AsAny;
@@ -96,8 +96,8 @@ impl<
 }
 
 /// Comprehensive observation space for use in reinforcement learning
-pub trait RLObservationSpace: RLSpace + FeatureSpace<Tensor> + BatchFeatureSpace<Tensor> {}
-impl<T: RLSpace + FeatureSpace<Tensor> + BatchFeatureSpace<Tensor>> RLObservationSpace for T {}
+pub trait RLObservationSpace: RLSpace + EncoderFeatureSpace {}
+impl<T: RLSpace + EncoderFeatureSpace> RLObservationSpace for T {}
 
 /// Comprehensive action space for use in reinforcement learning
 pub trait RLActionSpace: RLSpace + ParameterizedDistributionSpace<Tensor> {}

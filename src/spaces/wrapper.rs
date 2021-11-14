@@ -1,8 +1,8 @@
 //! Generic wrapper spaces
-use super::{
-    BaseFeatureSpace, BatchFeatureSpace, BatchFeatureSpaceOut, ElementRefInto, FeatureSpace,
-    FeatureSpaceOut, FiniteSpace, ReprSpace, Space,
-};
+use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ReprSpace, Space};
+use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
+use ndarray::{ArrayBase, DataMut, Ix2};
+use num_traits::Float;
 use rand::{distributions::Distribution, Rng};
 use std::any;
 use std::cmp::Ordering;
@@ -191,9 +191,9 @@ where
     }
 }
 
-impl<S, W> BaseFeatureSpace for WrapperSpace<S, W>
+impl<S, W> NumFeatures for WrapperSpace<S, W>
 where
-    S: Space + BaseFeatureSpace,
+    S: Space + NumFeatures,
     W: Wrapper<Inner = S::Element>,
 {
     fn num_features(&self) -> usize {
@@ -201,61 +201,68 @@ where
     }
 }
 
-impl<S, W, T> FeatureSpace<T> for WrapperSpace<S, W>
+impl<S, W> EncoderFeatureSpace for WrapperSpace<S, W>
 where
-    S: FeatureSpace<T>,
-    W: Wrapper<Inner = S::Element>,
-{
-    fn features(&self, element: &Self::Element) -> T {
-        self.inner_space.features(element.inner_ref())
-    }
-}
-
-impl<S, W, T> FeatureSpaceOut<T> for WrapperSpace<S, W>
-where
-    S: FeatureSpaceOut<T>,
-    W: Wrapper<Inner = S::Element>,
-{
-    fn features_out(&self, element: &Self::Element, out: &mut T, zeroed: bool) {
-        self.inner_space
-            .features_out(element.inner_ref(), out, zeroed);
-    }
-}
-
-impl<S, W, T2> BatchFeatureSpace<T2> for WrapperSpace<S, W>
-where
-    S: BatchFeatureSpace<T2>,
+    S: Space + EncoderFeatureSpace,
     S::Element: 'static,
     W: Wrapper<Inner = S::Element>,
 {
-    fn batch_features<'a, I>(&self, elements: I) -> T2
+    type Encoder = S::Encoder;
+
+    fn encoder(&self) -> Self::Encoder {
+        self.inner_space.encoder()
+    }
+
+    fn encoder_features_out<F: Float>(
+        &self,
+        element: &Self::Element,
+        out: &mut [F],
+        zeroed: bool,
+        encoder: &Self::Encoder,
+    ) {
+        self.inner_space
+            .encoder_features_out(element.inner_ref(), out, zeroed, encoder)
+    }
+
+    fn encoder_features<T>(&self, element: &Self::Element, encoder: &Self::Encoder) -> T
     where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator + Clone,
-        Self::Element: 'a,
+        T: BuildFromArray1D,
+        <T::Array as NumArray1D>::Elem: Float,
     {
         self.inner_space
-            .batch_features(elements.into_iter().map(Wrapper::inner_ref))
+            .encoder_features(element.inner_ref(), encoder)
     }
-}
 
-impl<S, W, T2> BatchFeatureSpaceOut<T2> for WrapperSpace<S, W>
-where
-    S: BatchFeatureSpaceOut<T2>,
-    S::Element: 'static,
-    W: Wrapper<Inner = S::Element>,
-{
-    fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2, zeroed: bool)
-    where
+    fn encoder_batch_features_out<'a, I, A>(
+        &self,
+        elements: I,
+        out: &mut ArrayBase<A, Ix2>,
+        zeroed: bool,
+        encoder: &Self::Encoder,
+    ) where
         I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: Clone,
         Self::Element: 'a,
+        A: DataMut,
+        A::Elem: Float,
     {
-        self.inner_space.batch_features_out(
+        self.inner_space.encoder_batch_features_out(
             elements.into_iter().map(Wrapper::inner_ref),
             out,
             zeroed,
-        );
+            encoder,
+        )
+    }
+
+    fn encoder_batch_features<'a, I, T>(&self, elements: I, encoder: &Self::Encoder) -> T
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: ExactSizeIterator,
+        Self::Element: 'a,
+        T: BuildFromArray2D,
+        <T::Array as NumArray2D>::Elem: Float,
+    {
+        self.inner_space
+            .encoder_batch_features(elements.into_iter().map(Wrapper::inner_ref), encoder)
     }
 }
 

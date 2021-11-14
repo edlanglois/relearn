@@ -1,22 +1,16 @@
 //! Option space definition.
-use super::{
-    BaseFeatureSpace, BatchFeatureSpace, BatchFeatureSpaceOut, ElementRefInto, FeatureSpace,
-    FeatureSpaceOut, FiniteSpace, Space,
-};
+use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space};
 use crate::logging::Loggable;
-use ndarray::{s, Array, ArrayBase, ArrayViewMut, DataMut, Ix1, Ix2};
-use num_traits::{One, Zero};
+use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::fmt;
-use std::marker::PhantomData;
-use tch::{Device, Kind, Tensor};
 
 /// A space whose elements are either `None` or `Some(inner_elem)`.
 ///
 /// The feature vectors are
-/// * `1, 0, ..., 0` for `None`
-/// * `0, inner_feature_vector(x)` for `Some(x)`.
+/// * `[1, 0, ..., 0]` for `None`
+/// * `[0, inner_feature_vector(x)]` for `Some(x)`.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct OptionSpace<S> {
     pub inner: S,
@@ -66,187 +60,39 @@ impl<S: FiniteSpace> FiniteSpace for OptionSpace<S> {
     }
 }
 
-impl<S: BaseFeatureSpace> BaseFeatureSpace for OptionSpace<S> {
+impl<S: NumFeatures> NumFeatures for OptionSpace<S> {
     fn num_features(&self) -> usize {
         1 + self.inner.num_features()
     }
 }
 
-// Feature vectors are:
-// * `1, 0, ..., 0` for `None`
-// * `0, feature_vector(x)` for `Some(x)`.
-impl<S, T> FeatureSpace<Array<T, Ix1>> for OptionSpace<S>
-where
-    S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, T, Ix1>>,
-    T: Clone + Zero + One,
-{
-    fn features(&self, element: &Self::Element) -> Array<T, Ix1> {
-        let mut out = Array::zeros(self.num_features());
-        self.features_out(element, &mut out, true);
-        out
-    }
-}
+impl<S: EncoderFeatureSpace> EncoderFeatureSpace for OptionSpace<S> {
+    type Encoder = S::Encoder;
 
-impl<S, T> FeatureSpaceOut<ArrayBase<T, Ix1>> for OptionSpace<S>
-where
-    S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, T::Elem, Ix1>>,
-    T: DataMut,
-    T::Elem: Clone + Zero + One,
-{
-    fn features_out(&self, element: &Self::Element, out: &mut ArrayBase<T, Ix1>, zeroed: bool) {
-        if let Some(inner_elem) = element {
-            self.inner
-                .features_out(inner_elem, &mut out.slice_mut(s![1..]), zeroed);
-            if !zeroed {
-                out[0] = Zero::zero()
-            }
-        } else {
-            if !zeroed {
-                out.slice_mut(s![1..]).fill(Zero::zero());
-            }
-            out[0] = One::one();
-        }
+    fn encoder(&self) -> Self::Encoder {
+        self.inner.encoder()
     }
-}
 
-impl<S, T> PhantomBatchFeatureSpace<Array<T, Ix2>> for OptionSpace<S>
-where
-    S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, T, Ix1>>,
-    T: Clone + Zero + One,
-{
-    fn phantom_batch_features<'a, I>(
+    fn encoder_features_out<F: Float>(
         &self,
-        elements: I,
-        marker: PhantomData<&'a Self::Element>,
-    ) -> Array<T, Ix2>
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator + Clone,
-        Self::Element: 'a,
-    {
-        let elements = elements.into_iter();
-        let mut out = Array::zeros([elements.len(), self.num_features()]);
-        self.phantom_batch_features_out(elements, &mut out, true, marker);
-        out
-    }
-}
-
-impl<S, T> PhantomBatchFeatureSpaceOut<ArrayBase<T, Ix2>> for OptionSpace<S>
-where
-    S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, T::Elem, Ix1>>,
-    T: DataMut,
-    T::Elem: Clone + Zero + One,
-{
-    fn phantom_batch_features_out<'a, I>(
-        &self,
-        elements: I,
-        out: &mut ArrayBase<T, Ix2>,
+        element: &Self::Element,
+        out: &mut [F],
         zeroed: bool,
-        _marker: PhantomData<&'a Self::Element>,
-    ) where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-    {
-        for (mut row, element) in out.outer_iter_mut().zip(elements) {
-            self.features_out(element, &mut row, zeroed);
-        }
-    }
-}
-
-impl<S: FeatureSpaceOut<Tensor>> FeatureSpace<Tensor> for OptionSpace<S> {
-    fn features(&self, element: &Self::Element) -> Tensor {
-        let mut out = Tensor::empty(&[self.num_features() as i64], (Kind::Float, Device::Cpu));
-        self.features_out(element, &mut out, false);
-        out
-    }
-}
-
-impl<S: FeatureSpaceOut<Tensor>> FeatureSpaceOut<Tensor> for OptionSpace<S> {
-    fn features_out(&self, element: &Self::Element, out: &mut Tensor, zeroed: bool) {
-        let rest_size = self.inner.num_features();
-        let [mut first, mut rest]: [Tensor; 2] = out
-            .split_with_sizes(&[1, rest_size as i64], -1)
-            .try_into()
-            .unwrap();
-        if let Some(inner_elem) = element {
-            if !zeroed {
-                let _ = first.zero_();
+        encoder: &Self::Encoder,
+    ) {
+        match element {
+            None => {
+                out[0] = F::one();
+                if !zeroed {
+                    out[1..].fill(F::zero())
+                }
             }
-            self.inner.features_out(inner_elem, &mut rest, zeroed);
-        } else {
-            let _ = first.fill_(1.0);
-            if !zeroed {
-                let _ = rest.zero_();
+            Some(inner_elem) => {
+                out[0] = F::zero();
+                self.inner
+                    .encoder_features_out(inner_elem, &mut out[1..], zeroed, encoder)
             }
         }
-    }
-}
-
-impl<S> PhantomBatchFeatureSpace<Tensor> for OptionSpace<S>
-where
-    S: for<'a> FeatureSpaceOut<ArrayViewMut<'a, f32, Ix1>>,
-{
-    fn phantom_batch_features<'a, I>(
-        &self,
-        elements: I,
-        _marker: PhantomData<&'a Self::Element>,
-    ) -> Tensor
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator + Clone,
-        Self::Element: 'a,
-    {
-        // NOTE:
-        // Constructing an array of features then copying to a tensor is nearly as fast as the
-        // fastest direct-to-torch implementation (using a more complex batch_features interface)
-        // while being considerably simpler and less error-prone.
-        // It is very difficult construct torch tensors with complex inner data layouts
-        // and many methods are orders of magnitude slower than constructing into an Array
-        // and copying.
-        let features: Array<f32, _> = self.batch_features(elements);
-        features.try_into().unwrap()
-    }
-}
-
-impl<S: BatchFeatureSpace<Tensor>> PhantomBatchFeatureSpaceOut<Tensor> for OptionSpace<S> {
-    fn phantom_batch_features_out<'a, I>(
-        &self,
-        elements: I,
-        out: &mut Tensor,
-        zeroed: bool,
-        _: PhantomData<&'a Self::Element>,
-    ) where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-    {
-        let mut none_indices = Vec::new();
-        let mut some_elements = Vec::new();
-        let mut some_indices = Vec::new();
-        for (i, element) in elements.into_iter().enumerate() {
-            if let Some(x) = element {
-                some_elements.push(x);
-                some_indices.push(i as i64);
-            } else {
-                none_indices.push(i as i64);
-            }
-        }
-        let rest_size = self.inner.num_features();
-        let [mut first, mut rest]: [Tensor; 2] = out
-            .split_with_sizes(&[1, rest_size as i64], -1)
-            .try_into()
-            .unwrap();
-
-        if !zeroed {
-            let _ = out.zero_();
-        }
-        let _ = first.index_fill_(-2, &Tensor::of_slice(&none_indices), 1.0);
-
-        // As far as I can tell, you can't make a view that irregularly includes just some rows.
-        // Acting row-by-row is extremely slow for torch tensors
-        // So create a new tensor containg just the inner features densely packed,
-        // then copy rows into the output tensor at the correct spots.
-        let some_features = self.inner.batch_features(some_elements);
-        let _ = rest.index_copy_(-2, &Tensor::of_slice(&some_indices), &some_features);
     }
 }
 
@@ -269,80 +115,6 @@ impl<S: Space> ElementRefInto<Loggable> for OptionSpace<S> {
     fn elem_ref_into(&self, _element: &Self::Element) -> Loggable {
         // No clear way to convert structured elements into Loggable
         Loggable::Nothing
-    }
-}
-
-/// Hack to allow implementing [`FeatureSpace`] for [`OptionSpace`].
-///
-/// Uses an alternative definition of `batch_features` that takes `PhantomData`,
-/// which apparently helps the compiler reason about lifetimes.
-///
-/// Then in the `BatchFeatureSpace` implementation we use `Self: PhantomBatchFeatureSpace`
-/// which hides the fact that `Self::Element` is an `Option`.
-/// The compiler accepts lifetime bounds for an arbitrary `S::Element`
-/// but not for `Option<S::Element>`...
-///
-/// # References
-/// * <https://users.rust-lang.org/t/lifetime/59967>
-/// * <https://github.com/rust-lang/rust/issues/85451>
-pub trait PhantomBatchFeatureSpace<T2>: Space {
-    fn phantom_batch_features<'a, I>(
-        &self,
-        elements: I,
-        _marker: PhantomData<&'a Self::Element>,
-    ) -> T2
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator + Clone,
-        Self::Element: 'a;
-}
-
-/// Hack to allow implementing [`BatchFeatureSpaceOut`] for [`OptionSpace`].
-///
-/// See [`PhantomBatchFeatureSpace`] for more details.
-pub trait PhantomBatchFeatureSpaceOut<T2>: Space {
-    fn phantom_batch_features_out<'a, I>(
-        &self,
-        elements: I,
-        out: &mut T2,
-        zeroed: bool,
-        _marker: PhantomData<&'a Self::Element>,
-    ) where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: Clone,
-        Self::Element: 'a;
-}
-
-/// Feature vectors are:
-/// * `1, 0, ..., 0` for `None`
-/// * `0, feature_vector(x)` for `Some(x)`.
-impl<S, T2> BatchFeatureSpace<T2> for OptionSpace<S>
-where
-    S: BaseFeatureSpace,
-    Self: PhantomBatchFeatureSpace<T2>,
-{
-    fn batch_features<'a, I>(&self, elements: I) -> T2
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator + Clone,
-        Self::Element: 'a,
-    {
-        self.phantom_batch_features(elements, PhantomData)
-    }
-}
-
-impl<S, T2> BatchFeatureSpaceOut<T2> for OptionSpace<S>
-where
-    S: BaseFeatureSpace,
-    Self: PhantomBatchFeatureSpaceOut<T2>,
-{
-    fn batch_features_out<'a, I>(&self, elements: I, out: &mut T2, zeroed: bool)
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: Clone,
-        Self::Element: 'a,
-    {
-        self.phantom_batch_features_out(elements, out, zeroed, PhantomData)
     }
 }
 
@@ -438,9 +210,11 @@ mod base_feature_space {
 
 #[cfg(test)]
 mod feature_space {
-    use super::super::{IndexSpace, SingletonSpace};
+    use super::super::{FeatureSpace, IndexSpace, SingletonSpace};
     use super::*;
-    use ndarray::arr1;
+    use crate::utils::tensor::UniqueTensor;
+    use ndarray::{arr1, Array};
+    use tch::Tensor;
 
     macro_rules! features_tests {
         ($label:ident, $inner:expr, $elem:expr, $expected:expr) => {
@@ -458,9 +232,9 @@ mod feature_space {
                 fn tensor_features_out() {
                     let space = OptionSpace::new($inner);
                     let expected = Tensor::of_slice(&$expected);
-                    let mut out = expected.empty_like();
-                    space.features_out(&$elem, &mut out, false);
-                    assert_eq!(out, expected);
+                    let mut out = UniqueTensor::<f32, _>::zeros(expected.numel());
+                    space.features_out(&$elem, out.as_slice_mut(), false);
+                    assert_eq!(out.into_tensor(), expected);
                 }
 
                 #[test]
@@ -476,7 +250,7 @@ mod feature_space {
                     let space = OptionSpace::new($inner);
                     let expected: Array<f32, _> = arr1(&$expected);
                     let mut out = Array::from_elem(expected.raw_dim(), f32::NAN);
-                    space.features_out(&$elem, &mut out, false);
+                    space.features_out(&$elem, out.as_slice_mut().unwrap(), false);
                     assert_eq!(out, expected);
                 }
             }
@@ -501,9 +275,11 @@ mod feature_space {
 
 #[cfg(test)]
 mod batch_feature_space {
-    use super::super::{IndexSpace, SingletonSpace};
+    use super::super::{FeatureSpace, IndexSpace, SingletonSpace};
     use super::*;
-    use ndarray::arr2;
+    use crate::utils::tensor::UniqueTensor;
+    use ndarray::{arr2, Array};
+    use tch::Tensor;
 
     fn tensor_from_arrays<T: tch::kind::Element, const N: usize, const M: usize>(
         data: [[T; M]; N],
@@ -532,9 +308,10 @@ mod batch_feature_space {
                 fn tensor_batch_features_out() {
                     let space = OptionSpace::new($inner);
                     let expected = tensor_from_arrays($expected);
-                    let mut out = expected.empty_like();
-                    space.batch_features_out(&$elems, &mut out, false);
-                    assert_eq!(out, expected);
+                    let (a, b) = expected.size2().unwrap();
+                    let mut out = UniqueTensor::<f32, _>::zeros((a as _, b as _));
+                    space.batch_features_out(&$elems, &mut out.array_view_mut(), false);
+                    assert_eq!(out.into_tensor(), expected);
                 }
 
                 #[test]

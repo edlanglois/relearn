@@ -1,9 +1,8 @@
 //! General-purpose utilities
 pub mod any;
-pub mod array;
-pub mod cast;
 pub mod distributions;
 pub mod iter;
+pub mod num_array;
 pub mod order;
 pub mod packed;
 pub mod sequence;

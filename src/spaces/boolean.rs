@@ -1,10 +1,8 @@
 //! `BooleanSpace` definition
-use super::{
-    BaseFeatureSpace, BatchFeatureSpace, BatchFeatureSpaceOut, ElementRefInto, FeatureSpace,
-    FeatureSpaceOut, FiniteSpace, ReprSpace, Space,
-};
+use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ReprSpace, Space};
 use crate::logging::Loggable;
-use crate::utils::array::BasicArray;
+use crate::utils::num_array::{BuildFromArray1D, NumArray1D};
+use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::cmp::Ordering;
@@ -86,55 +84,35 @@ impl ReprSpace<Tensor> for BooleanSpace {
     }
 }
 
-impl BaseFeatureSpace for BooleanSpace {
+impl NumFeatures for BooleanSpace {
     fn num_features(&self) -> usize {
         1
     }
 }
 
-impl<T> FeatureSpace<T> for BooleanSpace
-where
-    T: BasicArray<1>,
-{
-    fn features(&self, element: &Self::Element) -> T {
+impl EncoderFeatureSpace for BooleanSpace {
+    type Encoder = ();
+    fn encoder(&self) -> Self::Encoder {}
+    fn encoder_features_out<F: Float>(
+        &self,
+        element: &Self::Element,
+        out: &mut [F],
+        _zeroed: bool,
+        _encoder: &Self::Encoder,
+    ) {
+        out[0] = if *element { F::one() } else { F::zero() };
+    }
+
+    fn encoder_features<T>(&self, element: &Self::Element, _encoder: &Self::Encoder) -> T
+    where
+        T: BuildFromArray1D,
+        <T::Array as NumArray1D>::Elem: Float,
+    {
         if *element {
-            T::ones([1])
+            T::Array::ones(1).into()
         } else {
-            T::zeros([1])
+            T::Array::zeros(1).into()
         }
-    }
-}
-
-impl FeatureSpaceOut<Tensor> for BooleanSpace {
-    fn features_out(&self, element: &Self::Element, out: &mut Tensor, zeroed: bool) {
-        if *element {
-            let _ = out.fill_(1.0);
-        } else if !zeroed {
-            let _ = out.zero_();
-        }
-    }
-}
-
-impl BatchFeatureSpace<Tensor> for BooleanSpace {
-    fn batch_features<'a, I>(&self, elements: I) -> Tensor
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-    {
-        let elements: Vec<f64> = elements.into_iter().map(|&x| f64::from(x as u8)).collect();
-        Tensor::of_slice(&elements).unsqueeze_(-1)
-    }
-}
-
-impl BatchFeatureSpaceOut<Tensor> for BooleanSpace {
-    fn batch_features_out<'a, I>(&self, elements: I, out: &mut Tensor, _zeroed: bool)
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-    {
-        let elements: Vec<f64> = elements.into_iter().map(|&x| f64::from(x as u8)).collect();
-        // TODO: Avoid double copy
-        let _ = out.copy_(&Tensor::of_slice(&elements).unsqueeze_(-1));
     }
 }
 
@@ -230,7 +208,9 @@ mod finite_space {
 
 #[cfg(test)]
 mod feature_space {
+    use super::super::FeatureSpace;
     use super::*;
+    use crate::utils::tensor::UniqueTensor;
 
     #[test]
     fn num_features() {
@@ -256,9 +236,9 @@ mod feature_space {
                     let space = BooleanSpace::new();
                     let expected_vec: &[f32] = &$expected;
                     let expected = Tensor::of_slice(&expected_vec);
-                    let mut out = expected.empty_like();
-                    space.features_out(&$elem, &mut out, false);
-                    assert_eq!(out, expected);
+                    let mut out = UniqueTensor::<f32, _>::zeros(expected_vec.len());
+                    space.features_out(&$elem, out.as_slice_mut(), true);
+                    assert_eq!(out.into_tensor(), expected);
                 }
             }
         };
@@ -287,8 +267,12 @@ mod feature_space {
     fn tensor_batch_features_out() {
         let space = BooleanSpace::new();
         let expected = tensor_from_arrays([[0.0], [1.0], [1.0], [0.0]]);
-        let mut out = expected.empty_like();
-        space.batch_features_out(&[false, true, true, false], &mut out, false);
-        assert_eq!(out, expected);
+        let mut out = UniqueTensor::<f32, _>::zeros((4, 1));
+        space.batch_features_out(
+            &[false, true, true, false],
+            &mut out.array_view_mut(),
+            false,
+        );
+        assert_eq!(out.into_tensor(), expected);
     }
 }

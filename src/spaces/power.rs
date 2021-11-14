@@ -1,13 +1,10 @@
 //! Cartesian power space.
-use super::{
-    BaseFeatureSpace, BatchFeatureSpace, BatchFeatureSpaceOut, ElementRefInto, FeatureSpace,
-    FeatureSpaceOut, FiniteSpace, Space,
-};
+use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space};
 use crate::logging::Loggable;
+use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::cmp::Ordering;
-use tch::{Device, Kind, Tensor};
 
 /// A Cartesian power of a space: a Cartesian product of `N` copies of the same space.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -80,83 +77,44 @@ where
     }
 }
 
-impl<S: BaseFeatureSpace, const N: usize> BaseFeatureSpace for PowerSpace<S, N> {
+impl<S: NumFeatures, const N: usize> NumFeatures for PowerSpace<S, N> {
     fn num_features(&self) -> usize {
         self.inner_space.num_features() * N
     }
 }
 
-impl<S: FeatureSpaceOut<Tensor>, const N: usize> FeatureSpace<Tensor> for PowerSpace<S, N> {
-    fn features(&self, element: &Self::Element) -> Tensor {
-        let mut out = Tensor::empty(&[self.num_features() as i64], (Kind::Float, Device::Cpu));
-        self.features_out(element, &mut out, false);
-        out
-    }
+/// Feature encoder for [`PowerSpace`].
+pub struct PowerSpaceEncoder<T> {
+    inner_encoder: T,
+    inner_num_features: usize,
 }
 
-impl<S: FeatureSpaceOut<Tensor>, const N: usize> FeatureSpaceOut<Tensor> for PowerSpace<S, N> {
-    fn features_out(&self, element: &Self::Element, out: &mut Tensor, zeroed: bool) {
-        if N == 0 {
-            return;
-        } else if N == 1 {
-            self.inner_space.features_out(&element[0], out, zeroed);
-            return;
-        }
+impl<S: EncoderFeatureSpace, const N: usize> EncoderFeatureSpace for PowerSpace<S, N> {
+    type Encoder = PowerSpaceEncoder<S::Encoder>;
 
-        let split_size = self.inner_space.num_features().try_into().unwrap();
-        for (inner_tensor, inner_elem) in out.split(split_size, -1).iter_mut().zip(element) {
-            self.inner_space
-                .features_out(inner_elem, inner_tensor, zeroed);
+    fn encoder(&self) -> Self::Encoder {
+        PowerSpaceEncoder {
+            inner_encoder: self.inner_space.encoder(),
+            inner_num_features: self.inner_space.num_features(),
         }
     }
-}
 
-impl<S, const N: usize> BatchFeatureSpace<Tensor> for PowerSpace<S, N>
-where
-    S: BatchFeatureSpaceOut<Tensor>,
-    S::Element: 'static,
-{
-    fn batch_features<'a, I>(&self, elements: I) -> Tensor
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator + Clone,
-        Self::Element: 'a,
-    {
-        let elements_iter = elements.into_iter();
-        let mut out = Tensor::empty(
-            &[elements_iter.len() as i64, self.num_features() as i64],
-            (Kind::Float, Device::Cpu),
-        );
-        self.batch_features_out(elements_iter, &mut out, false);
-        out
-    }
-}
-
-impl<S, const N: usize> BatchFeatureSpaceOut<Tensor> for PowerSpace<S, N>
-where
-    S: BatchFeatureSpaceOut<Tensor>,
-    S::Element: 'static,
-{
-    fn batch_features_out<'a, I>(&self, elements: I, out: &mut Tensor, zeroed: bool)
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: Clone,
-        Self::Element: 'a,
-    {
-        if N == 0 {
-            return;
-        } else if N == 1 {
-            self.inner_space
-                .batch_features_out(elements.into_iter().map(|e| &e[0]), out, zeroed);
-            return;
-        }
-        let elements_iter = elements.into_iter();
-        for (i, inner_tensor) in out.tensor_split(N as i64, -1).iter_mut().enumerate() {
-            self.inner_space.batch_features_out(
-                elements_iter.clone().map(|e| &e[i]),
-                inner_tensor,
+    fn encoder_features_out<F: Float>(
+        &self,
+        element: &Self::Element,
+        out: &mut [F],
+        zeroed: bool,
+        encoder: &Self::Encoder,
+    ) {
+        let mut chunks = out.chunks_exact_mut(encoder.inner_num_features);
+        for inner_elem in element {
+            let chunk = chunks.next().expect("output slice is too small");
+            self.inner_space.encoder_features_out(
+                inner_elem,
+                chunk,
                 zeroed,
-            )
+                &encoder.inner_encoder,
+            );
         }
     }
 }
@@ -348,9 +306,12 @@ mod finite_space {
 }
 
 #[cfg(test)]
+#[allow(clippy::cast_possible_truncation)]
 mod feature_space {
-    use super::super::{BooleanSpace, IndexSpace};
+    use super::super::{BooleanSpace, FeatureSpace, IndexSpace};
     use super::*;
+    use crate::utils::tensor::UniqueTensor;
+    use tch::Tensor;
 
     #[test]
     fn d3_boolean_num_features() {
@@ -382,9 +343,9 @@ mod feature_space {
                     let space = PowerSpace::<_, $n>::new($inner);
                     let expected_vec: &[f32] = &$expected;
                     let expected = Tensor::of_slice(&expected_vec);
-                    let mut out = expected.empty_like();
-                    space.features_out(&$elem, &mut out, false);
-                    assert_eq!(out, expected);
+                    let mut out = UniqueTensor::<f32, _>::zeros(expected_vec.len());
+                    space.features_out(&$elem, out.as_slice_mut(), true);
+                    assert_eq!(out.into_tensor(), expected);
                 }
             }
         };
@@ -425,18 +386,20 @@ mod feature_space {
     fn d0_index2_tensor_batch_features_out() {
         let space = PowerSpace::<_, 0>::new(IndexSpace::new(2));
         let expected = tensor_from_arrays([[], []]);
-        let mut out = expected.empty_like();
-        space.batch_features_out(&[[], []], &mut out, false);
-        assert_eq!(out, expected);
+        let (a, b) = expected.size2().unwrap();
+        let mut out = UniqueTensor::<f32, _>::zeros((a as _, b as _));
+        space.batch_features_out(&[[], []], &mut out.array_view_mut(), false);
+        assert_eq!(out.into_tensor(), expected);
     }
 
     #[test]
     fn d1_index2_tensor_batch_features_out() {
         let space = PowerSpace::<_, 1>::new(IndexSpace::new(2));
         let expected = tensor_from_arrays([[1.0, 0.0], [0.0, 1.0], [0.0, 1.0]]);
-        let mut out = expected.empty_like();
-        space.batch_features_out(&[[0], [1], [1]], &mut out, false);
-        assert_eq!(out, expected);
+        let (a, b) = expected.size2().unwrap();
+        let mut out = UniqueTensor::<f32, _>::zeros((a as _, b as _));
+        space.batch_features_out(&[[0], [1], [1]], &mut out.array_view_mut(), false);
+        assert_eq!(out.into_tensor(), expected);
     }
 
     #[test]
@@ -447,8 +410,9 @@ mod feature_space {
             [0.0, 1.0, 0.0, 1.0],
             [0.0, 1.0, 1.0, 0.0],
         ]);
-        let mut out = expected.empty_like();
-        space.batch_features_out(&[[0, 0], [1, 1], [1, 0]], &mut out, false);
-        assert_eq!(out, expected);
+        let (a, b) = expected.size2().unwrap();
+        let mut out = UniqueTensor::<f32, _>::zeros((a as _, b as _));
+        space.batch_features_out(&[[0, 0], [1, 1], [1, 0]], &mut out.array_view_mut(), false);
+        assert_eq!(out.into_tensor(), expected);
     }
 }

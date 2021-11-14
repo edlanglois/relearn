@@ -6,7 +6,7 @@ use criterion::{
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use relearn::spaces::{
-    BatchFeatureSpace, BooleanSpace, IndexSpace, IntervalSpace, NonEmptyFeatures, OptionSpace,
+    BooleanSpace, FeatureSpace, IndexSpace, IntervalSpace, NonEmptyFeatures, OptionSpace,
     PowerSpace, ProductSpace, SampleSpace, SingletonSpace,
 };
 use tch::Tensor;
@@ -17,7 +17,7 @@ fn bench_space_batch_tensor_features<S, M>(
     space: S,
     batch_sizes: &[u64],
 ) where
-    S: SampleSpace + BatchFeatureSpace<Tensor>,
+    S: SampleSpace + FeatureSpace,
     M: Measurement,
 {
     let mut rng = StdRng::seed_from_u64(0);
@@ -30,7 +30,7 @@ fn bench_space_batch_tensor_features<S, M>(
             .take(batch_size as usize)
             .collect();
         group.bench_with_input(BenchmarkId::new(name, batch_size), &data, |b, data| {
-            b.iter_with_large_drop(|| space.batch_features(data))
+            b.iter_with_large_drop(|| space.batch_features::<_, Tensor>(data))
         });
     }
 }

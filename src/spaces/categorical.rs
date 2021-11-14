@@ -1,13 +1,13 @@
 //! Categorical subtype of [`FiniteSpace`]
 use super::{
-    BaseFeatureSpace, BatchFeatureSpace, BatchFeatureSpaceOut, ElementRefInto, FeatureSpace,
-    FeatureSpaceOut, FiniteSpace, ParameterizedDistributionSpace, ReprSpace,
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ParameterizedDistributionSpace,
+    ReprSpace,
 };
 use crate::logging::Loggable;
 use crate::torch;
 use crate::utils::distributions::ArrayDistribution;
-use ndarray::{Array, ArrayBase, DataMut, Ix1, Ix2};
-use num_traits::{One, Zero};
+use ndarray::{ArrayBase, DataMut, Ix2};
+use num_traits::{Float, One, Zero};
 use tch::{Device, Kind, Tensor};
 
 /// A space consisting of `N` distinct elements treated as distinct and unrelated.
@@ -40,132 +40,48 @@ impl<S: CategoricalSpace> ReprSpace<Tensor> for S {
     }
 }
 
-impl<S: CategoricalSpace> BaseFeatureSpace for S {
+impl<S: CategoricalSpace> NumFeatures for S {
     fn num_features(&self) -> usize {
         self.size()
     }
 }
 
-/// Represents elements with one-hot feature vectors.
-impl<S: CategoricalSpace> FeatureSpace<Tensor> for S {
-    fn features(&self, element: &Self::Element) -> Tensor {
-        torch::utils::one_hot(
-            &Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu)),
-            self.num_features(),
-            Kind::Float,
-        )
-    }
-}
+impl<S: CategoricalSpace> EncoderFeatureSpace for S {
+    type Encoder = ();
+    fn encoder(&self) -> Self::Encoder {}
 
-impl<S: CategoricalSpace> BatchFeatureSpace<Tensor> for S {
-    fn batch_features<'a, I>(&self, elements: I) -> Tensor
-    where
+    fn encoder_features_out<F: Float>(
+        &self,
+        element: &Self::Element,
+        out: &mut [F],
+        zeroed: bool,
+        _encoder: &Self::Encoder,
+    ) {
+        if !zeroed {
+            out.fill(F::zero())
+        }
+        out[self.to_index(element)] = F::one()
+    }
+    fn encoder_batch_features_out<'a, I, A>(
+        &self,
+        elements: I,
+        out: &mut ArrayBase<A, Ix2>,
+        zeroed: bool,
+        _encoder: &Self::Encoder,
+    ) where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a,
-    {
-        let indices: Vec<_> = elements
-            .into_iter()
-            .map(|element| self.to_index(element) as i64)
-            .collect();
-        torch::utils::one_hot(
-            &Tensor::of_slice(&indices),
-            self.num_features(),
-            Kind::Float,
-        )
-    }
-}
-
-impl<S: CategoricalSpace> FeatureSpaceOut<Tensor> for S {
-    fn features_out(&self, element: &Self::Element, out: &mut Tensor, zeroed: bool) {
-        if !zeroed {
-            let _ = out.zero_();
-        }
-        let _ = out.scatter_value_(
-            -1,
-            &Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu)),
-            1,
-        );
-    }
-}
-
-impl<S: CategoricalSpace> BatchFeatureSpaceOut<Tensor> for S {
-    fn batch_features_out<'a, I>(&self, elements: I, out: &mut Tensor, zeroed: bool)
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
+        A: DataMut,
+        A::Elem: Float,
     {
         if !zeroed {
-            let _ = out.zero_();
+            out.fill(A::Elem::zero())
         }
-        let indices: Vec<_> = elements
-            .into_iter()
-            .map(|element| self.to_index(element) as i64)
-            .collect();
-        let _ = out.scatter_value_(-1, &Tensor::of_slice(&indices).unsqueeze(-1), 1);
-    }
-}
-
-impl<S, T> FeatureSpace<Array<T, Ix1>> for S
-where
-    S: CategoricalSpace,
-    T: Clone + Zero + One,
-{
-    fn features(&self, element: &Self::Element) -> Array<T, Ix1> {
-        let mut out = Array::zeros(self.num_features());
-        self.features_out(element, &mut out, true);
-        out
-    }
-}
-
-impl<S, T> BatchFeatureSpace<Array<T, Ix2>> for S
-where
-    S: CategoricalSpace,
-    T: Clone + Zero + One,
-{
-    fn batch_features<'a, I>(&self, elements: I) -> Array<T, Ix2>
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator + Clone,
-        Self::Element: 'a,
-    {
-        let elements = elements.into_iter();
-        let mut out = Array::zeros((elements.len(), self.num_features()));
-        self.batch_features_out(elements, &mut out, true);
-        out
-    }
-}
-
-impl<S, T> FeatureSpaceOut<ArrayBase<T, Ix1>> for S
-where
-    S: CategoricalSpace,
-    T: DataMut,
-    T::Elem: Clone + Zero + One,
-{
-    fn features_out(&self, element: &Self::Element, out: &mut ArrayBase<T, Ix1>, zeroed: bool) {
-        if !zeroed {
-            out.fill(Zero::zero());
-        }
-        out[self.to_index(element)] = One::one();
-    }
-}
-
-impl<S, T> BatchFeatureSpaceOut<ArrayBase<T, Ix2>> for S
-where
-    S: CategoricalSpace,
-    T: DataMut,
-    T::Elem: Clone + Zero + One,
-{
-    fn batch_features_out<'a, I>(&self, elements: I, out: &mut ArrayBase<T, Ix2>, zeroed: bool)
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-    {
-        if !zeroed {
-            out.fill(Zero::zero())
-        }
-        let one = T::Elem::one();
-        for (mut row, element) in out.outer_iter_mut().zip(elements) {
-            row[self.to_index(element)] = one.clone();
+        // Don't zip rows so that we can check whether there are too few rows.
+        let mut rows = out.rows_mut().into_iter();
+        for element in elements {
+            let mut row = rows.next().expect("fewer rows than elements");
+            row[self.to_index(element)] = A::Elem::one();
         }
     }
 }
@@ -251,7 +167,7 @@ mod repr_space_tensor {
 
 #[cfg(test)]
 mod feature_space_tensor {
-    use super::super::IndexedTypeSpace;
+    use super::super::{FeatureSpace, IndexedTypeSpace};
     use super::trit::Trit;
     use super::*;
 
@@ -296,9 +212,9 @@ mod feature_space_tensor {
 
 #[cfg(test)]
 mod feature_space_array {
-    use super::super::IndexedTypeSpace;
+    use super::super::{FeatureSpace, IndexedTypeSpace};
     use super::trit::Trit;
-    use super::*;
+    use ndarray::Array;
 
     #[test]
     fn features() {
