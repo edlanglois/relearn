@@ -3,7 +3,8 @@ use super::{
     BuildHistoryBuffer, EpisodesIter, HistoryBufferBoxedEpisodes, HistoryBufferBoxedSteps,
     HistoryBufferEpisodes, HistoryBufferSteps, StepsIter,
 };
-use std::iter::{Chain, Cloned, ExactSizeIterator, Extend, FusedIterator};
+use crate::utils::iter::SizedChain;
+use std::iter::{Cloned, ExactSizeIterator, Extend, FusedIterator};
 use std::{option, slice};
 
 /// Configuration for [`SerialBuffer`].
@@ -123,6 +124,45 @@ impl<O, A> HistoryBufferBoxedSteps<O, A> for SerialBuffer<O, A> {
     }
 }
 
+pub type EpisodeStepsIter<'a, O, A> = SliceChunksAtIter<
+    'a,
+    Step<O, A>,
+    SizedChain<Cloned<slice::Iter<'a, usize>>, option::IntoIter<usize>>,
+>;
+
+impl<'a, O: 'a, A: 'a> HistoryBufferEpisodes<'a, O, A> for SerialBuffer<O, A> {
+    type EpisodesIter = EpisodeStepsIter<'a, O, A>;
+
+    fn episodes_(&'a self, include_incomplete: Option<usize>) -> Self::EpisodesIter {
+        // Check for a partial episode at the end to include
+        let mut incomplete_end = None;
+        if let Some(min_incomplete_len) = include_incomplete {
+            let last_complete_end: usize = self.episode_ends.last().cloned().unwrap_or(0);
+            let num_steps = self.steps.len();
+            if (num_steps - last_complete_end) >= min_incomplete_len {
+                incomplete_end = Some(num_steps)
+            }
+        }
+
+        let ends_iter: SizedChain<_, _> = self
+            .episode_ends
+            .iter()
+            .cloned()
+            .chain(incomplete_end)
+            .into();
+        SliceChunksAtIter::new(&self.steps, ends_iter)
+    }
+}
+impl<O, A> HistoryBufferBoxedEpisodes<O, A> for SerialBuffer<O, A> {
+    fn episodes<'a>(&'a self, include_incomplete: Option<usize>) -> Box<dyn EpisodesIter<O, A> + 'a>
+    where
+        O: 'a,
+        A: 'a,
+    {
+        Box::new(HistoryBufferEpisodes::episodes_(self, include_incomplete))
+    }
+}
+
 /// Iterator that partitions a data into chunks based on an iterator of end indices.
 ///
 /// Does not include any data past the last end index.
@@ -184,42 +224,6 @@ where
 }
 
 impl<'a, T, I> FusedIterator for SliceChunksAtIter<'a, T, I> where I: FusedIterator<Item = usize> {}
-
-pub type EpisodeStepsIter<'a, O, A> = SliceChunksAtIter<
-    'a,
-    Step<O, A>,
-    Chain<Cloned<slice::Iter<'a, usize>>, option::IntoIter<usize>>,
->;
-
-impl<'a, O: 'a, A: 'a> HistoryBufferEpisodes<'a, O, A> for SerialBuffer<O, A> {
-    type EpisodesIter = EpisodeStepsIter<'a, O, A>;
-
-    fn episodes_(&'a self, include_incomplete: Option<usize>) -> Self::EpisodesIter {
-        // Check for a partial episode at the end to include
-        let mut incomplete_end = None;
-        if let Some(min_incomplete_len) = include_incomplete {
-            let last_complete_end: usize = self.episode_ends.last().cloned().unwrap_or(0);
-            let num_steps = self.steps.len();
-            if (num_steps - last_complete_end) >= min_incomplete_len {
-                incomplete_end = Some(num_steps)
-            }
-        }
-
-        SliceChunksAtIter::new(
-            &self.steps,
-            self.episode_ends.iter().cloned().chain(incomplete_end),
-        )
-    }
-}
-impl<O, A> HistoryBufferBoxedEpisodes<O, A> for SerialBuffer<O, A> {
-    fn episodes<'a>(&'a self, include_incomplete: Option<usize>) -> Box<dyn EpisodesIter<O, A> + 'a>
-    where
-        O: 'a,
-        A: 'a,
-    {
-        Box::new(HistoryBufferEpisodes::episodes_(self, include_incomplete))
-    }
-}
 
 #[allow(clippy::needless_pass_by_value)]
 #[cfg(test)]

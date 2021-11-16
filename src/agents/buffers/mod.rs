@@ -38,10 +38,12 @@ pub trait HistoryBufferBoxedSteps<O, A> {
         A: 'a;
 }
 
-// TODO: Add ExactSizeIterator?
-pub trait EpisodesIter<'a, O: 'a, A: 'a>: Iterator<Item = &'a [Step<O, A>]> {}
+pub trait EpisodesIter<'a, O: 'a, A: 'a>:
+    Iterator<Item = &'a [Step<O, A>]> + ExactSizeIterator
+{
+}
 impl<'a, O: 'a, A: 'a, T: ?Sized> EpisodesIter<'a, O, A> for T where
-    T: Iterator<Item = &'a [Step<O, A>]>
+    T: Iterator<Item = &'a [Step<O, A>]> + ExactSizeIterator
 {
 }
 
