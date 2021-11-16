@@ -1,4 +1,3 @@
-//! Iterator utilities.
 use std::cmp::{Ordering, PartialOrd};
 use std::error::Error;
 use std::fmt;
