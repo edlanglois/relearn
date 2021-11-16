@@ -1,4 +1,4 @@
-use super::buffers::HistoryBufferData;
+use super::buffers::HistoryBuffer;
 use super::{
     Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
     OffPolicyAgent, SetActorMode, Step, SyncParams, SyncParamsError,
@@ -75,8 +75,8 @@ where
 /// Perform a batch update from a in iterator of steps by value.
 ///
 /// Used for finite spaces to help implement [`BatchUpdate`] for [`FiniteSpaceAgent`].
-/// The [`HistoryBufferData`] interface only returns iterators of references which makes it
-/// inconvenient to wrap a `HistoryBufferData<O, A>` as a `HistoryBufferData<usize, usize>`.
+/// The [`HistoryBuffer`] interface only returns iterators of references which makes it
+/// inconvenient to wrap a `HistoryBuffer<O, A>` as a `HistoryBuffer<usize, usize>`.
 ///
 /// One approach could be to allow [`BatchUpdateAgent`] to use a history buffer with a different
 /// type from the external interface, along with a function `Fn(Step<O, A>) -> Step<O2, A2>`
@@ -113,13 +113,11 @@ impl<T, OS, AS> BatchUpdate<OS::Element, AS::Element> for FiniteSpaceAgent<T, OS
 where
     T: BatchUpdateFromSteps<usize, usize>,
     OS: FiniteSpace,
-    OS::Element: 'static,
     AS: FiniteSpace,
-    AS::Element: 'static,
 {
     fn batch_update(
         &mut self,
-        history: &dyn HistoryBufferData<OS::Element, AS::Element>,
+        history: &dyn HistoryBuffer<OS::Element, AS::Element>,
         logger: &mut dyn TimeSeriesLogger,
     ) {
         self.agent.batch_update_from_steps(

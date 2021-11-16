@@ -1,22 +1,52 @@
 //! History buffer implementation for an iterator of buffers.
-use super::super::Step;
-use super::{HistoryBufferEpisodes, HistoryBufferSteps, StepsIter};
-use std::iter::{self, FlatMap, FusedIterator, Repeat, Zip};
+use super::{
+    EpisodesIter, HistoryBufferBoxedEpisodes, HistoryBufferBoxedSteps, HistoryBufferEpisodes,
+    HistoryBufferSteps, StepsIter,
+};
+use std::iter::{self, FusedIterator, Repeat, Zip};
 
-impl<O, A, I, T> HistoryBufferSteps<O, A> for I
+pub type StepsIter_<'a, O, A, I, T> = SizedFlatMap<
+    Zip<<&'a I as IntoIterator>::IntoIter, Repeat<Option<usize>>>,
+    <T as HistoryBufferSteps<'a, O, A>>::StepsIter,
+    fn((&'a T, Option<usize>)) -> <T as HistoryBufferSteps<'a, O, A>>::StepsIter,
+>;
+
+impl<'a, O: 'a, A: 'a, I: 'a, T: 'a> HistoryBufferSteps<'a, O, A> for I
+where
+    &'a I: IntoIterator<Item = &'a T>,
+    <&'a I as IntoIterator>::IntoIter: Clone,
+    T: HistoryBufferSteps<'a, O, A>,
+{
+    type StepsIter = StepsIter_<'a, O, A, I, T>;
+
+    fn steps_(&'a self, include_incomplete: Option<usize>) -> Self::StepsIter {
+        SizedFlatMap::new(
+            self.into_iter().zip(iter::repeat(include_incomplete)),
+            |(b, ii)| b.steps_(ii),
+        )
+    }
+}
+// Would be implemented with a generic impl on HistoryBufferSteps
+// except that requires O: 'static and A: 'static
+impl<O, A, I, T> HistoryBufferBoxedSteps<O, A> for I
 where
     for<'a> &'a I: IntoIterator<Item = &'a T>,
     for<'a> <&'a I as IntoIterator>::IntoIter: Clone,
-    T: HistoryBufferSteps<O, A>,
+    T: HistoryBufferBoxedSteps<O, A>,
 {
-    fn steps<'a>(&'a self, include_incomplete: Option<usize>) -> Box<dyn StepsIter<'a, O, A> + 'a> {
-        Box::new(SizedFlatMap::new(self.into_iter(), move |b: &'a T| {
-            b.steps(include_incomplete)
-        }))
+    fn steps<'a>(&'a self, include_incomplete: Option<usize>) -> Box<dyn StepsIter<O, A> + 'a>
+    where
+        O: 'a,
+        A: 'a,
+    {
+        Box::new(SizedFlatMap::new(
+            self.into_iter().zip(iter::repeat(include_incomplete)),
+            |(b, ii): (&'a T, _)| b.steps(ii),
+        ))
     }
 }
 
-pub type EpisodesIter<'a, O, A, I, T> = FlatMap<
+pub type EpisodesIter_<'a, O, A, I, T> = SizedFlatMap<
     Zip<<&'a I as IntoIterator>::IntoIter, Repeat<Option<usize>>>,
     <T as HistoryBufferEpisodes<'a, O, A>>::EpisodesIter,
     fn((&'a T, Option<usize>)) -> <T as HistoryBufferEpisodes<'a, O, A>>::EpisodesIter,
@@ -27,14 +57,31 @@ where
     &'a I: IntoIterator<Item = &'a T>,
     <&'a I as IntoIterator>::IntoIter: Clone,
     T: HistoryBufferEpisodes<'a, O, A>,
-    <T::EpisodesIter as Iterator>::Item: IntoIterator<Item = &'a Step<O, A>>,
 {
-    type EpisodesIter = EpisodesIter<'a, O, A, I, T>;
+    type EpisodesIter = EpisodesIter_<'a, O, A, I, T>;
 
-    fn episodes(&'a self, include_incomplete: Option<usize>) -> Self::EpisodesIter {
-        self.into_iter()
-            .zip(iter::repeat(include_incomplete))
-            .flat_map(|(b, ii)| b.episodes(ii))
+    fn episodes_(&'a self, include_incomplete: Option<usize>) -> Self::EpisodesIter {
+        SizedFlatMap::new(
+            self.into_iter().zip(iter::repeat(include_incomplete)),
+            |(b, ii)| b.episodes_(ii),
+        )
+    }
+}
+impl<O, A, I, T> HistoryBufferBoxedEpisodes<O, A> for I
+where
+    for<'a> &'a I: IntoIterator<Item = &'a T>,
+    for<'a> <&'a I as IntoIterator>::IntoIter: Clone,
+    T: HistoryBufferBoxedEpisodes<O, A>,
+{
+    fn episodes<'a>(&'a self, include_incomplete: Option<usize>) -> Box<dyn EpisodesIter<O, A> + 'a>
+    where
+        O: 'a,
+        A: 'a,
+    {
+        Box::new(SizedFlatMap::new(
+            self.into_iter().zip(iter::repeat(include_incomplete)),
+            |(b, ii): (&'a T, _)| b.episodes(ii),
+        ))
     }
 }
 
@@ -141,6 +188,7 @@ where
 mod tests {
     use super::super::{BuildHistoryBuffer, SerialBuffer, SerialBufferConfig};
     use super::*;
+    use crate::agents::Step;
     use rstest::{fixture, rstest};
 
     /// Make a step that either continues or is terminal.
@@ -180,7 +228,7 @@ mod tests {
 
     #[rstest]
     fn steps_all_incomplete(buffers: [SerialBuffer<usize, bool>; 2]) {
-        let mut steps_iter = buffers.steps(Some(0));
+        let mut steps_iter = buffers.steps_(Some(0));
         assert_eq!(steps_iter.next(), Some(&step(0, Some(1))));
         assert_eq!(steps_iter.next(), Some(&step(1, Some(2))));
         assert_eq!(steps_iter.next(), Some(&step(2, None)));
@@ -194,7 +242,7 @@ mod tests {
 
     #[rstest]
     fn steps_only_complete(buffers: [SerialBuffer<usize, bool>; 2]) {
-        let mut steps_iter = buffers.steps(None);
+        let mut steps_iter = buffers.steps_(None);
         assert_eq!(steps_iter.next(), Some(&step(0, Some(1))));
         assert_eq!(steps_iter.next(), Some(&step(1, Some(2))));
         assert_eq!(steps_iter.next(), Some(&step(2, None)));
@@ -205,17 +253,17 @@ mod tests {
 
     #[rstest]
     fn steps_all_incomplete_len(buffers: [SerialBuffer<usize, bool>; 2]) {
-        assert_eq!(buffers.steps(Some(0)).len(), 8);
+        assert_eq!(buffers.steps_(Some(0)).len(), 8);
     }
 
     #[rstest]
     fn steps_only_complete_len(buffers: [SerialBuffer<usize, bool>; 2]) {
-        assert_eq!(buffers.steps(None).len(), 5);
+        assert_eq!(buffers.steps_(None).len(), 5);
     }
 
     #[rstest]
     fn steps_is_fused(buffers: [SerialBuffer<usize, bool>; 2]) {
-        let mut steps_iter = buffers.steps(None);
+        let mut steps_iter = buffers.steps_(None);
         for _ in 0..5 {
             assert!(steps_iter.next().is_some());
         }
@@ -225,7 +273,7 @@ mod tests {
 
     #[rstest]
     fn episodes_all_incomplete(buffers: [SerialBuffer<usize, bool>; 2]) {
-        let mut episodes_iter = buffers.episodes(Some(0));
+        let mut episodes_iter = buffers.episodes_(Some(0));
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
             vec![&step(0, Some(1)), &step(1, Some(2)), &step(2, None)]
@@ -247,7 +295,7 @@ mod tests {
 
     #[rstest]
     fn episodes_only_complete(buffers: [SerialBuffer<usize, bool>; 2]) {
-        let mut episodes_iter = buffers.episodes(None);
+        let mut episodes_iter = buffers.episodes_(None);
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
             vec![&step(0, Some(1)), &step(1, Some(2)), &step(2, None)]
@@ -261,7 +309,7 @@ mod tests {
 
     #[rstest]
     fn episodes_is_fused(buffers: [SerialBuffer<usize, bool>; 2]) {
-        let mut episodes_iter = buffers.episodes(None);
+        let mut episodes_iter = buffers.episodes_(None);
         assert!(episodes_iter.next().is_some());
         assert!(episodes_iter.next().is_some());
         assert!(episodes_iter.next().is_none());

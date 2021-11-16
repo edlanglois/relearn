@@ -1,4 +1,4 @@
-use super::buffers::{BuildHistoryBuffer, HistoryBufferData, SerialBuffer, SerialBufferConfig};
+use super::buffers::{BuildHistoryBuffer, HistoryBuffer, SerialBuffer, SerialBufferConfig};
 use super::{
     Actor, ActorMode, Agent, BuildAgent, BuildAgentError, SetActorMode, Step, SyncParams,
     SyncParamsError,
@@ -32,7 +32,7 @@ pub trait BuildBatchUpdateActor<OS: Space, AS: Space> {
 pub trait BatchUpdate<O, A> {
     fn batch_update(
         &mut self,
-        history: &dyn HistoryBufferData<O, A>,
+        history: &dyn HistoryBuffer<O, A>,
         logger: &mut dyn TimeSeriesLogger,
     );
 }
@@ -48,7 +48,7 @@ where
 {
     fn batch_update(
         &mut self,
-        history: &dyn HistoryBufferData<O, A>,
+        history: &dyn HistoryBuffer<O, A>,
         logger: &mut dyn TimeSeriesLogger,
     ) {
         for step in history.steps(Some(0)) {

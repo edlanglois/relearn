@@ -1,5 +1,5 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyDef, PolicyUpdaterDef};
-use crate::agents::buffers::HistoryBufferData;
+use crate::agents::buffers::HistoryBuffer;
 use crate::agents::{
     Actor, Agent, BatchUpdate, BatchUpdateAgentConfig, BetaThompsonSamplingAgentConfig,
     BoxingMultithreadInitializer, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
@@ -622,7 +622,7 @@ macro_rules! box_impl_batch_update {
         impl<O, A> BatchUpdate<O, A> for Box<$type> {
             fn batch_update(
                 &mut self,
-                history: &dyn HistoryBufferData<O, A>,
+                history: &dyn HistoryBuffer<O, A>,
                 logger: &mut dyn TimeSeriesLogger,
             ) {
                 self.as_mut().batch_update(history, logger)
