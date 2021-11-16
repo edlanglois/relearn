@@ -11,9 +11,6 @@ pub trait PackedHistoryFeaturesView {
     /// Discount factor for calculating returns.
     fn discount_factor(&self) -> f64;
 
-    /// Episode index ranges sorted in decreasing order of episode length.
-    fn episode_ranges(&self) -> &[Range<usize>];
-
     /// Batch sizes in the packing.
     ///
     /// Note: Batch sizes are always >= 0 but the [tch] API uses i64.
@@ -115,10 +112,6 @@ where
         self.discount_factor
     }
 
-    fn episode_ranges(&self) -> &[Range<usize>] {
-        &self.episode_ranges
-    }
-
     fn batch_sizes(&self) -> &[i64] {
         self.cached_batch_sizes.borrow_with(|| {
             packing_batch_sizes(&self.episode_ranges)
@@ -197,10 +190,6 @@ pub struct PackedHistoryFeatures {
 impl PackedHistoryFeaturesView for PackedHistoryFeatures {
     fn discount_factor(&self) -> f64 {
         self.discount_factor
-    }
-
-    fn episode_ranges(&self) -> &[Range<usize>] {
-        &self.episode_ranges
     }
 
     fn batch_sizes(&self) -> &[i64] {
