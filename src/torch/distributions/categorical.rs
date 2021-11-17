@@ -23,7 +23,7 @@ impl Categorical {
     }
 }
 
-/// Clap float values to be >= the smallest finite float value.
+/// Clamp float values to be >= the smallest finite float value.
 fn clamp_float_min(x: &Tensor) -> Result<Tensor, Kind> {
     match x.kind() {
         Kind::Float => Ok(x.clamp_min(f64::from(f32::MIN))),
