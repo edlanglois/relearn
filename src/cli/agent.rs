@@ -30,6 +30,16 @@ impl fmt::Display for ConcreteAgentType {
     }
 }
 
+fn batch_agent_config(
+    actor_config: BatchActorDef,
+    opts: &Options,
+) -> BatchUpdateAgentConfig<BatchActorDef> {
+    BatchUpdateAgentConfig {
+        actor_config,
+        history_buffer_config: opts.into(),
+    }
+}
+
 impl ConcreteAgentType {
     pub fn optional_batch_agent_def(&self, opts: &Options) -> Option<OptionalBatchAgentDef> {
         use ConcreteAgentType::*;
@@ -51,7 +61,10 @@ impl ConcreteAgentType {
                     ..ActorCriticConfig::default()
                 }
                 .with_update(opts);
-                AgentDef::ActorCritic(Box::new(config))
+                AgentDef::Batch(batch_agent_config(
+                    BatchActorDef::ActorCritic(Box::new(config)),
+                    opts,
+                ))
             }
             Trpo => {
                 let config = ActorCriticConfig {
@@ -59,7 +72,10 @@ impl ConcreteAgentType {
                     ..ActorCriticConfig::default()
                 }
                 .with_update(opts);
-                AgentDef::ActorCritic(Box::new(config))
+                AgentDef::Batch(batch_agent_config(
+                    BatchActorDef::ActorCritic(Box::new(config)),
+                    opts,
+                ))
             }
             Ppo => {
                 let config = ActorCriticConfig {
@@ -67,9 +83,12 @@ impl ConcreteAgentType {
                     ..ActorCriticConfig::default()
                 }
                 .with_update(opts);
-                AgentDef::ActorCritic(Box::new(config))
+                AgentDef::Batch(batch_agent_config(
+                    BatchActorDef::ActorCritic(Box::new(config)),
+                    opts,
+                ))
             }
-            _ => AgentDef::NoBatch(self.optional_batch_agent_def(opts).unwrap()),
+            _ => AgentDef::AsSync(self.optional_batch_agent_def(opts).unwrap()),
         }
     }
 }
@@ -94,11 +113,11 @@ impl AgentWrapperType {
         match self {
             ResettingMeta => Some(AgentDef::ResettingMeta(Box::new(inner))),
             Batch => {
-                if let AgentDef::NoBatch(optional_batch_agent_def) = inner {
-                    Some(AgentDef::Batch(BatchUpdateAgentConfig {
-                        actor_config: BatchActorDef::Batch(optional_batch_agent_def),
-                        history_buffer_config: opts.into(),
-                    }))
+                if let AgentDef::AsSync(optional_batch_agent_def) = inner {
+                    Some(AgentDef::Batch(batch_agent_config(
+                        BatchActorDef::AsBatch(optional_batch_agent_def),
+                        opts,
+                    )))
                 } else {
                     None
                 }
@@ -117,9 +136,9 @@ impl AgentWrapperType {
         match self {
             Mutex => Some(MultithreadAgentDef::Mutex(inner)),
             Batch => {
-                if let AgentDef::NoBatch(optional_batch_agent_def) = inner {
+                if let AgentDef::AsSync(optional_batch_agent_def) = inner {
                     Some(MultithreadAgentDef::Batch(MultithreadBatchAgentConfig {
-                        actor_config: BatchActorDef::Batch(optional_batch_agent_def),
+                        actor_config: BatchActorDef::AsBatch(optional_batch_agent_def),
                         buffer_config: opts.into(),
                     }))
                 } else {
@@ -247,8 +266,14 @@ impl From<&Options> for SerialBufferConfig {
 }
 
 impl Update<&Options> for SerialBufferConfig {
-    fn update(&mut self, _opts: &Options) {
-        // TODO: Allow setting thresholds
+    fn update(&mut self, opts: &Options) {
+        if let Some(mut steps_per_epoch) = opts.steps_per_epoch {
+            if let Some(parallel_threads) = opts.parallel_threads {
+                steps_per_epoch /= parallel_threads;
+            }
+            self.soft_threshold = steps_per_epoch;
+            self.hard_threshold = steps_per_epoch + steps_per_epoch / 10;
+        }
     }
 }
 
@@ -288,9 +313,6 @@ impl Update<&Options>
         self.policy_updater_config.update(opts);
         self.critic_config.update(opts);
         self.critic_updater_config.update(opts);
-        if let Some(steps_per_epoch) = opts.steps_per_epoch {
-            self.steps_per_epoch = steps_per_epoch;
-        }
         if let Some(device) = opts.device {
             self.device = device.into();
         }

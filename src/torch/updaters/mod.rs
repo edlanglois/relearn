@@ -21,7 +21,7 @@ pub use trpo::TrpoPolicyUpdateRule;
 pub use with_optimizer::WithOptimizer;
 
 use super::critic::Critic;
-use super::history::PackedHistoryFeaturesView;
+use super::features::PackedHistoryFeaturesView;
 use super::policy::Policy;
 use crate::logging::TimeSeriesLogger;
 use tch::nn::VarStore;

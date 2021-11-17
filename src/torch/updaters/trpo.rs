@@ -1,7 +1,7 @@
 use super::super::{
     backends::WithCudnnEnabled,
     critic::Critic,
-    history::PackedHistoryFeaturesView,
+    features::PackedHistoryFeaturesView,
     optimizers::{OptimizerStepError, TrustRegionOptimizer},
     policy::Policy,
 };

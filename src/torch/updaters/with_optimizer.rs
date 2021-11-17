@@ -1,5 +1,5 @@
 use super::super::{
-    critic::Critic, history::PackedHistoryFeaturesView, optimizers::BuildOptimizer, policy::Policy,
+    critic::Critic, features::PackedHistoryFeaturesView, optimizers::BuildOptimizer, policy::Policy,
 };
 use super::{
     BuildCriticUpdater, BuildPolicyUpdater, PolicyStats, UpdateCritic, UpdateCriticWithOptimizer,

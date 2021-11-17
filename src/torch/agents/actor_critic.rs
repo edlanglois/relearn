@@ -1,25 +1,26 @@
 use super::super::{
     critic::{BuildCritic, Critic},
-    history::{HistoryBuffer, LazyPackedHistoryFeatures},
+    features::LazyPackedHistoryFeatures,
     policy::{BuildPolicy, Policy},
     seq_modules::StatefulIterativeModule,
     updaters::{BuildCriticUpdater, BuildPolicyUpdater, UpdateCritic, UpdatePolicy},
 };
-use crate::agents::{Actor, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
+use crate::agents::{
+    buffers::HistoryBuffer, Actor, BatchUpdate, BuildAgentError, BuildBatchUpdateActor,
+    SetActorMode, SyncParams, SyncParamsError,
+};
 use crate::envs::EnvStructure;
 use crate::logging::{Event, Logger, LoggerHelper, TimeSeriesLogger, TimeSeriesLoggerHelper};
 use crate::spaces::{
     EncoderFeatureSpace, FeatureSpace, NonEmptyFeatures, NumFeatures,
     ParameterizedDistributionSpace, ReprSpace, Space,
 };
-use std::num::NonZeroUsize;
 use tch::{nn::VarStore, Device, Tensor};
 
 /// Configuration for [`ActorCriticAgent`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ActorCriticConfig<PB, PUB, CB, CUB> {
-    pub steps_per_epoch: usize,
-    pub include_incomplete_episode_len: Option<NonZeroUsize>,
+    pub include_incomplete_episode_len: Option<usize>,
     pub policy_config: PB,
     pub policy_updater_config: PUB,
     pub critic_config: CB,
@@ -36,8 +37,7 @@ where
 {
     fn default() -> Self {
         Self {
-            steps_per_epoch: 1000,
-            include_incomplete_episode_len: Some(NonZeroUsize::new(10).unwrap()),
+            include_incomplete_episode_len: Some(10),
             policy_config: Default::default(),
             policy_updater_config: Default::default(),
             critic_config: Default::default(),
@@ -47,7 +47,7 @@ where
     }
 }
 
-impl<PB, PUB, CB, CUB, OS, AS> BuildAgent<OS, AS> for ActorCriticConfig<PB, PUB, CB, CUB>
+impl<PB, PUB, CB, CUB, OS, AS> BuildBatchUpdateActor<OS, AS> for ActorCriticConfig<PB, PUB, CB, CUB>
 where
     PB: BuildPolicy,
     PUB: BuildPolicyUpdater<AS>,
@@ -57,13 +57,14 @@ where
     AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
 {
     #[allow(clippy::type_complexity)]
-    type Agent = ActorCriticAgent<OS, AS, PB::Policy, PUB::Updater, CB::Critic, CUB::Updater>;
+    type BatchUpdateActor =
+        ActorCriticAgent<OS, AS, PB::Policy, PUB::Updater, CB::Critic, CUB::Updater>;
 
-    fn build_agent(
+    fn build_batch_update_actor(
         &self,
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         _seed: u64,
-    ) -> Result<Self::Agent, BuildAgentError> {
+    ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
         Ok(ActorCriticAgent::new(env, self))
     }
 }
@@ -84,21 +85,11 @@ where
     /// Amount by which future rewards are discounted
     pub discount_factor: f64,
 
-    /// Minimum number of steps to collect per epoch.
-    ///
-    /// This value is exceeded by search for the next episode boundary,
-    /// up to a maximum of `max_steps_per_epoch`.
-    pub steps_per_epoch: usize,
-
-    /// Maximum number of steps per epoch.
-    ///
-    /// The actual number of steps is the first episode end
-    /// between `steps_per_epoch` and `max_steps_per_epoch`,
-    /// or `max_steps_per_epoch` if no episode end is found.
-    pub max_steps_per_epoch: usize,
-
     /// Device on which model variables are stored.
     pub device: Device,
+
+    /// Include incomplete episodes that are at least this long.
+    pub include_incomplete_episode_len: Option<usize>,
 
     /// The policy module (the "actor").
     pub policy: P,
@@ -130,9 +121,6 @@ where
     ///
     /// Performs a critic update given history data.
     pub critic_updater: CU,
-
-    /// The recorded step history.
-    history: HistoryBuffer<OS::Element, AS::Element>,
 }
 
 impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
@@ -151,7 +139,6 @@ where
     {
         let observation_space = NonEmptyFeatures::new(env.observation_space());
         let action_space = env.action_space();
-        let max_steps_per_epoch = config.steps_per_epoch + config.steps_per_epoch / 10;
 
         let policy_variables = VarStore::new(config.device);
         let policy = config.policy_config.build_policy(
@@ -186,17 +173,12 @@ where
             .critic_updater_config
             .build_critic_updater(&critic_variables);
 
-        let history = HistoryBuffer::new(
-            Some(max_steps_per_epoch),
-            config.include_incomplete_episode_len,
-        );
         Self {
             observation_space,
             action_space,
             discount_factor,
-            steps_per_epoch: config.steps_per_epoch,
-            max_steps_per_epoch,
             device: config.device,
+            include_incomplete_episode_len: config.include_incomplete_episode_len,
             policy,
             policy_updater,
             policy_variables,
@@ -204,7 +186,6 @@ where
             cpu_policy_variables,
             critic,
             critic_updater,
-            history,
         }
     }
 }
@@ -230,30 +211,8 @@ where
     }
 }
 
-impl<OS, AS, P, PU, C, CU> Agent<OS::Element, AS::Element>
+impl<OS, AS, P, PU, C, CU> BatchUpdate<OS::Element, AS::Element>
     for ActorCriticAgent<OS, AS, P, PU, C, CU>
-where
-    OS: EncoderFeatureSpace,
-    AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
-    P: Policy,
-    PU: UpdatePolicy<AS>,
-    C: Critic,
-    CU: UpdateCritic,
-{
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn TimeSeriesLogger) {
-        let episode_done = step.episode_done;
-        self.history.push(step);
-
-        let history_len = self.history.len();
-        if history_len >= self.max_steps_per_epoch
-            || (history_len >= self.steps_per_epoch && episode_done)
-        {
-            self.model_update(logger);
-        }
-    }
-}
-
-impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
     OS: EncoderFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
@@ -262,26 +221,25 @@ where
     C: Critic,
     CU: UpdateCritic,
 {
-    /// Update the actor and critic using the stored history buffer.
-    ///
-    /// Clears the history afterwards.
-    fn model_update(&mut self, logger: &mut dyn TimeSeriesLogger) {
+    fn batch_update(
+        &mut self,
+        history: &dyn HistoryBuffer<OS::Element, AS::Element>,
+        logger: &mut dyn TimeSeriesLogger,
+    ) {
         let features = LazyPackedHistoryFeatures::new(
-            self.history.steps(),
-            self.history.episode_ranges(),
+            history.episodes(self.include_incomplete_episode_len),
             &self.observation_space,
             &self.action_space,
             self.discount_factor,
             self.device,
         );
+
         let mut update_logger = logger.event_logger(Event::AgentOptPeriod);
         let mut history_logger = update_logger.scope("history");
-        let episode_ranges = self.history.episode_ranges();
-        let num_steps = episode_ranges.num_steps();
 
-        history_logger.unwrap_log_scalar("num_steps", num_steps as f64);
-        history_logger.unwrap_log_scalar("num_episodes", episode_ranges.len() as f64);
-        if num_steps == 0 {
+        history_logger.unwrap_log_scalar("num_steps", features.num_steps() as f64);
+        history_logger.unwrap_log_scalar("num_episodes", features.num_episodes() as f64);
+        if features.is_empty() {
             history_logger.unwrap_log("no_model_update", "Skipping update; empty history");
             return;
         }
@@ -309,8 +267,13 @@ where
                 .expect("Variable mismatch between main policy and CPU policy");
         }
 
-        self.history.clear();
         logger.end_event(Event::AgentOptPeriod).unwrap();
+    }
+}
+
+impl<OS: Space, AS: Space, P, PU, C, CU> SyncParams for ActorCriticAgent<OS, AS, P, PU, C, CU> {
+    fn sync_params(&mut self, _target: &Self) -> Result<(), SyncParamsError> {
+        todo!()
     }
 }
 

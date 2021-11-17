@@ -1,6 +1,6 @@
 //! Policy-gradient policy updater.
 use super::super::{
-    critic::Critic, history::PackedHistoryFeaturesView, optimizers::Optimizer, policy::Policy,
+    critic::Critic, features::PackedHistoryFeaturesView, optimizers::Optimizer, policy::Policy,
 };
 use super::{PolicyStats, UpdatePolicyWithOptimizer};
 use crate::logging::{Event, TimeSeriesLogger};

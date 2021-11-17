@@ -1,5 +1,5 @@
 //! Generalized Advantage Estimation
-use super::super::history::PackedHistoryFeaturesView;
+use super::super::features::PackedHistoryFeaturesView;
 use super::{BuildCritic, Critic};
 use crate::torch::{seq_modules::SequenceModule, BuildModule};
 use crate::utils::packed;

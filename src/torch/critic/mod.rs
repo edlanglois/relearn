@@ -3,7 +3,7 @@ mod gae;
 
 pub use gae::{Gae, GaeConfig};
 
-use super::history::PackedHistoryFeaturesView;
+use super::features::PackedHistoryFeaturesView;
 use tch::{nn::Path, Tensor};
 
 /// Critic for a reinforcement learning environment.

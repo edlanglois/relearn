@@ -39,11 +39,9 @@ pub enum OptionalBatchAgentDef {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AgentDef {
     /// Pass-through for [`OptionalBatchAgentDef`] agents viewed as regular synchronous agents.
-    NoBatch(OptionalBatchAgentDef),
+    AsSync(OptionalBatchAgentDef),
     /// [`BatchUpdateAgent`](crate::agents::BatchUpdateAgent) for [`BatchActorDef`] agents.
     Batch(BatchUpdateAgentConfig<BatchActorDef>),
-    /// Torch actor-critic agent
-    ActorCritic(Box<ActorCriticConfig<PolicyDef, PolicyUpdaterDef, CriticDef, CriticUpdaterDef>>),
     /// Applies a non-meta agent to a meta environment by resetting between trials
     ResettingMeta(Box<AgentDef>),
 }
@@ -52,7 +50,9 @@ pub enum AgentDef {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BatchActorDef {
     /// Pass-through for [`OptionalBatchAgentDef`] agents.
-    Batch(OptionalBatchAgentDef),
+    AsBatch(OptionalBatchAgentDef),
+    /// Torch actor-critic agent
+    ActorCritic(Box<ActorCriticConfig<PolicyDef, PolicyUpdaterDef, CriticDef, CriticUpdaterDef>>),
 }
 
 /// Multithread agent definition
@@ -202,7 +202,7 @@ where
     ) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
         match self {
-            NoBatch(agent_def) => {
+            AsSync(agent_def) => {
                 BuildAgentFor::<EnvAnyAny, _, _>::build_agent(agent_def, env, seed)
             }
             Batch(config) => BatchUpdateAgentConfig::new(
@@ -211,10 +211,6 @@ where
             )
             .build_agent(env, seed)
             .map(|a| Box::new(a) as _),
-            ActorCritic(config) => config
-                .as_ref()
-                .build_agent(env, seed)
-                .map(|a| Box::new(a) as _),
             _ => Err(BuildAgentError::InvalidSpaceBounds),
         }
     }
@@ -260,7 +256,7 @@ where
     ) -> Result<Self::Agent, BuildAgentError> {
         use AgentDef::*;
         match self {
-            NoBatch(agent_def) => {
+            AsSync(agent_def) => {
                 BuildAgentFor::<EnvFiniteFinite, _, _>::build_agent(agent_def, env, seed)
             }
             Batch(config) => BatchUpdateAgentConfig::new(
@@ -317,7 +313,7 @@ where
         use AgentDef::*;
 
         match self {
-            NoBatch(agent_def) => {
+            AsSync(agent_def) => {
                 BuildAgentFor::<EnvMetaFiniteFinite, _, _>::build_agent(agent_def, env, seed)
             }
             Batch(config) => BatchUpdateAgentConfig::new(
@@ -332,7 +328,7 @@ where
                 seed,
             )
             .map(|a| Box::new(a) as _),
-            _ => BuildAgentFor::<EnvAnyAny, _, _>::build_agent(self, env, seed),
+            // _ => BuildAgentFor::<EnvAnyAny, _, _>::build_agent(self, env, seed),
         }
     }
 }
@@ -447,12 +443,16 @@ where
 
 impl<M, OS, AS> BuildBatchUpdateActorFor<M, OS, AS> for BatchActorDef
 where
-    OS: Space,
-    AS: Space,
-    OptionalBatchAgentDef: BuildBatchUpdateActorFor<M, OS, AS>,
+    OS: RLObservationSpace,
+    AS: RLActionSpace,
+    OptionalBatchAgentDef: BuildBatchUpdateActorFor<
+        M,
+        OS,
+        AS,
+        BatchUpdateActor = Box<DynFullBatchUpdateActor<OS, AS>>,
+    >,
 {
-    type BatchUpdateActor =
-        <OptionalBatchAgentDef as BuildBatchUpdateActorFor<M, OS, AS>>::BatchUpdateActor;
+    type BatchUpdateActor = Box<DynFullBatchUpdateActor<OS, AS>>;
 
     fn build_batch_update_actor(
         &self,
@@ -461,9 +461,13 @@ where
     ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
         use BatchActorDef::*;
         match self {
-            Batch(agent_def) => BuildBatchUpdateActorFor::<M, OS, AS>::build_batch_update_actor(
+            AsBatch(agent_def) => BuildBatchUpdateActorFor::<M, OS, AS>::build_batch_update_actor(
                 agent_def, env, seed,
             ),
+            ActorCritic(config) => config
+                .as_ref()
+                .build_batch_update_actor(env, seed)
+                .map(|a| Box::new(a) as _),
         }
     }
 }
@@ -507,7 +511,7 @@ where
                     .build_multithread_agent(env, seed)?,
             )),
             Batch(config) => match &config.actor_config {
-                BatchActorDef::Batch(optional_batch_agent_def) => {
+                BatchActorDef::AsBatch(optional_batch_agent_def) => {
                     Box::new(BoxingMultithreadInitializer::new(
                         MultithreadBatchAgentConfig {
                             // TODO: Is this clone necessary?
@@ -517,6 +521,7 @@ where
                         .build_multithread_agent(env, seed)?,
                     ))
                 }
+                BatchActorDef::ActorCritic(_) => todo!(),
             },
         })
     }

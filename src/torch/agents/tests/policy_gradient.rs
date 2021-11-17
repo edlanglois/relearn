@@ -1,5 +1,5 @@
 //! Policy-gradient actor critic agent tests.
-use crate::agents::{testing, BuildAgent};
+use crate::agents::{buffers::SerialBufferConfig, testing, BatchUpdateAgentConfig, BuildAgent};
 use crate::torch::{
     agents::ActorCriticConfig,
     critic::{BuildCritic, GaeConfig, Return},
@@ -12,7 +12,7 @@ use crate::torch::{
 use tch::Device;
 
 fn test_train_policy_gradient<PB, CB>(
-    mut config: ActorCriticConfig<
+    mut actor_config: ActorCriticConfig<
         PB,
         WithOptimizer<PolicyGradientUpdateRule, AdamConfig>,
         CB,
@@ -24,9 +24,15 @@ fn test_train_policy_gradient<PB, CB>(
     CB: BuildCritic,
 {
     // Speed up learning for this simple environment
-    config.steps_per_epoch = 25;
-    config.policy_updater_config.optimizer.learning_rate = 0.1;
-    config.critic_updater_config.optimizer.learning_rate = 0.1;
+    actor_config.policy_updater_config.optimizer.learning_rate = 0.1;
+    actor_config.critic_updater_config.optimizer.learning_rate = 0.1;
+    let config = BatchUpdateAgentConfig {
+        actor_config,
+        history_buffer_config: SerialBufferConfig {
+            soft_threshold: 25,
+            hard_threshold: 30,
+        },
+    };
     testing::train_deterministic_bandit(|env| config.build_agent(env, 0).unwrap(), 1_000, 0.9);
 }
 

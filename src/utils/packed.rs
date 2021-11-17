@@ -9,7 +9,7 @@
 //! `[0, 10, 100, 1, 11, 101, 2, 3]`.
 use super::sequence::Sequence;
 use std::iter;
-use std::ops::{Deref, Index, Range};
+use std::ops::Deref;
 use tch::{IndexOp, Scalar, Tensor};
 
 /// Iterator that packs together multiple sequences.
@@ -218,111 +218,6 @@ where
     <I as Iterator>::Item: Deref,
     <<I as Iterator>::Item as Deref>::Target: Sequence,
 {
-}
-
-/// The batch size of each offset when sequences of the given lengths are packed.
-///
-/// # Example
-/// ```
-/// use relearn::utils::packed::PackedBatchSizes;
-///
-/// let sequence_lengths = [4, 2, 2];
-/// let batch_sizes: Vec<_> = PackedBatchSizes::from_sorted_lengths(&sequence_lengths).collect();
-/// assert_eq!(batch_sizes, vec![3, 3, 1, 1]);
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PackedBatchSizes<'a, T> {
-    /// Sequences lengths sorted in monotonically decreasing order.
-    sequence_lengths: &'a [T],
-    /// Current offset within the sequences.
-    offset: usize,
-    /// Number of sequences with length > offset
-    batch_size: usize,
-}
-
-impl<'a> PackedBatchSizes<'a, usize> {
-    /// Create a [`PackedBatchSizes`] instance from monotonically decreasing sequence lengths.
-    pub fn from_sorted_lengths(sequence_lengths: &'a [usize]) -> Self {
-        let offset = 0;
-        let mut batch_size = sequence_lengths.len();
-        update_batch_size(sequence_lengths, offset, &mut batch_size);
-        Self {
-            sequence_lengths,
-            offset,
-            batch_size,
-        }
-    }
-}
-
-impl<'a> PackedBatchSizes<'a, Range<usize>> {
-    /// Create a [`PackedBatchSizes`] instance from ranges with monotonically decreasing lengths.
-    pub fn from_sorted_ranges(sequence_ranges: &'a [Range<usize>]) -> Self {
-        let offset = 0;
-        let mut batch_size = sequence_ranges.len();
-        update_batch_size(sequence_ranges, offset, &mut batch_size);
-        Self {
-            sequence_lengths: sequence_ranges,
-            offset,
-            batch_size,
-        }
-    }
-}
-
-impl<'a, T> Iterator for PackedBatchSizes<'a, T>
-where
-    T: Length,
-{
-    type Item = usize;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.batch_size == 0 {
-            None
-        } else {
-            let current_batch_size = self.batch_size;
-            self.offset += 1;
-            update_batch_size(self.sequence_lengths, self.offset, &mut self.batch_size);
-            Some(current_batch_size)
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let length = match self.sequence_lengths.first() {
-            Some(v) => v.length() - self.offset,
-            None => 0,
-        };
-        (length, Some(length))
-    }
-}
-
-impl<'a, T> ExactSizeIterator for PackedBatchSizes<'a, T> where T: Length {}
-
-/// Decrement batch size until it is the batch size of the given offset.
-fn update_batch_size<T>(sorted_sequence_ranges: &T, offset: usize, batch_size: &mut usize)
-where
-    T: Index<usize> + ?Sized,
-    <T as Index<usize>>::Output: Length,
-{
-    while *batch_size > 0 && sorted_sequence_ranges[*batch_size - 1].length() <= offset {
-        *batch_size -= 1;
-    }
-}
-
-/// Has a length
-pub trait Length {
-    fn length(&self) -> usize;
-}
-
-impl Length for Range<usize> {
-    fn length(&self) -> usize {
-        ExactSizeIterator::len(self)
-    }
-}
-
-/// Directly stores a length
-impl Length for usize {
-    fn length(&self) -> usize {
-        *self
-    }
 }
 
 /// View each batched offset of a packed tensor.
@@ -611,44 +506,6 @@ mod packing_indices {
         assert_eq!(packing_indices.size_hint(), (7, Some(7)));
         let _ = packing_indices.next();
         assert_eq!(packing_indices.size_hint(), (6, Some(6)));
-    }
-}
-
-#[cfg(test)]
-mod packed_batch_sizes {
-    use super::*;
-
-    #[test]
-    fn iter_from_lengths() {
-        let sequence_lengths = [4, 2, 2];
-        let packed: Vec<_> = PackedBatchSizes::from_sorted_lengths(&sequence_lengths).collect();
-        let expected = vec![3, 3, 1, 1];
-        assert_eq!(packed, expected);
-    }
-
-    #[test]
-    fn iter_from_ranges() {
-        let ranges = [0..4, 4..6, 6..8];
-        let packed: Vec<_> = PackedBatchSizes::from_sorted_ranges(&ranges).collect();
-        let expected = vec![3, 3, 1, 1];
-        assert_eq!(packed, expected);
-    }
-
-    #[test]
-    fn size_hint() {
-        let sequence_lengths = [4, 2, 2];
-        let packed_batch_sizes = PackedBatchSizes::from_sorted_lengths(&sequence_lengths);
-        assert_eq!(packed_batch_sizes.size_hint(), (4, Some(4)));
-    }
-
-    #[test]
-    fn size_hint_after_next() {
-        let sequence_lengths = [4, 2, 2];
-        let mut packed_batch_sizes = PackedBatchSizes::from_sorted_lengths(&sequence_lengths);
-        let _ = packed_batch_sizes.next();
-        assert_eq!(packed_batch_sizes.size_hint(), (3, Some(3)));
-        let _ = packed_batch_sizes.next();
-        assert_eq!(packed_batch_sizes.size_hint(), (2, Some(2)));
     }
 }
 

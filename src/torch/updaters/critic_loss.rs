@@ -1,4 +1,4 @@
-use super::super::{critic::Critic, history::PackedHistoryFeaturesView, optimizers::Optimizer};
+use super::super::{critic::Critic, features::PackedHistoryFeaturesView, optimizers::Optimizer};
 use super::UpdateCriticWithOptimizer;
 use crate::logging::{Event, TimeSeriesLogger, TimeSeriesLoggerHelper};
 
