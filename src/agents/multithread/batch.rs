@@ -9,7 +9,7 @@ use crate::logging::TimeSeriesLogger;
 use crate::spaces::Space;
 use crossbeam_channel::{self, Receiver, Sender};
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 
 /// Multithread agent based on an inner [`BatchUpdate`] actor.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
@@ -21,7 +21,7 @@ pub struct MultithreadBatchAgentConfig<TC> {
 impl<TC, OS, AS> BuildMultithreadAgent<OS, AS> for MultithreadBatchAgentConfig<TC>
 where
     TC: BuildBatchUpdateActor<OS, AS> + Clone,
-    TC::BatchUpdateActor: SyncParams + Send + Sync + 'static,
+    TC::BatchUpdateActor: SyncParams + Send + 'static,
     OS: Space + Clone,
     OS::Element: 'static,
     AS: Space + Clone,
@@ -42,7 +42,7 @@ where
             actor_config: self.actor_config.clone(),
             buffer_config: self.buffer_config,
             env_structure: env.into(),
-            reference_actor: Arc::new(RwLock::new(reference_actor)),
+            reference_actor: Arc::new(Mutex::new(reference_actor)),
             worker_seed_rng: StdRng::seed_from_u64(seed),
             num_workers: 0,
             worker_send_buffer,
@@ -109,7 +109,7 @@ where
     buffer_config: SerialBufferConfig,
 
     env_structure: StoredEnvStructure<OS, AS>,
-    reference_actor: Arc<RwLock<TC::BatchUpdateActor>>,
+    reference_actor: Arc<Mutex<TC::BatchUpdateActor>>, // TODO: Change back to RwLock
     worker_seed_rng: StdRng,
     num_workers: usize,
 
@@ -126,7 +126,7 @@ impl<TC, OS, AS> InitializeMultithreadAgent<OS::Element, AS::Element>
     for MultithreadBatchAgentInitializer<TC, OS, AS>
 where
     TC: BuildBatchUpdateActor<OS, AS>,
-    TC::BatchUpdateActor: SyncParams + Send + Sync + 'static, // Sync required by RwLock
+    TC::BatchUpdateActor: SyncParams + Send + 'static,
     OS: Space + Clone,
     OS::Element: 'static,
     AS: Space + Clone,
@@ -145,7 +145,7 @@ where
         // Would also have to be careful to avoid a deadlock if the manager immediately acquires
         // a write lock on the reference actor.
         actor
-            .sync_params(&self.reference_actor.read().unwrap())
+            .sync_params(&self.reference_actor.lock().unwrap())
             .expect("Failed to synchronize model parameters");
         self.num_workers += 1;
         Ok(MultithreadBatchWorker {
@@ -174,7 +174,7 @@ where
 #[derive(Debug)]
 pub struct MultithreadBatchWorker<T, O, A> {
     actor: T,
-    reference_actor: Arc<RwLock<T>>,
+    reference_actor: Arc<Mutex<T>>, // TODO: Change back to RwLock
     buffer: Option<SerialBuffer<O, A>>,
 
     send_buffer: Sender<SerialBuffer<O, A>>,
@@ -204,7 +204,7 @@ where
             // because the manager will acquire a write lock on the reference actor before
             // accepting buffers from the workers.
             self.actor
-                .sync_params(&self.reference_actor.read().unwrap())
+                .sync_params(&self.reference_actor.lock().unwrap())
                 .expect("Failed to synchronize model parameters");
 
             // Get a buffer back from the manger
@@ -215,7 +215,7 @@ where
 
 #[derive(Debug)]
 pub struct MultithreadBatchManager<T, O, A> {
-    actor: Arc<RwLock<T>>,
+    actor: Arc<Mutex<T>>,
     num_workers: usize,
 
     send_buffer: Sender<SerialBuffer<O, A>>,
@@ -229,7 +229,7 @@ where
     fn run(&mut self, logger: &mut dyn TimeSeriesLogger) {
         loop {
             // Acquire a write lock on the reference actor
-            let mut actor = self.actor.write().unwrap();
+            let mut actor = self.actor.lock().unwrap();
 
             // Get full buffers from the worker threads.
             let buffers: Vec<_> = self.recv_buffer.iter().take(self.num_workers).collect();

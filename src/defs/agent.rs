@@ -630,11 +630,11 @@ macro_rules! box_impl_batch_update {
         }
     };
 }
-box_impl_batch_update!(dyn FullBatchUpdateActor<O, A> + Send + Sync);
+box_impl_batch_update!(dyn FullBatchUpdateActor<O, A> + Send); // TODO: + Sync
 
 /// `Send` and `Sync` [`FullBatchUpdateActor`] trait object for an environment structure.
 pub type DynFullBatchUpdateActor<OS, AS> =
-    dyn FullBatchUpdateActor<<OS as Space>::Element, <AS as Space>::Element> + Send + Sync;
+    dyn FullBatchUpdateActor<<OS as Space>::Element, <AS as Space>::Element> + Send; // TODO: +Sync
 
 /// [`InitializeMultithreadAgent`] trait object with boxed manager and workers.
 pub type DynInitializeMultithreadAgent<OS, AS> = dyn InitializeMultithreadAgent<
