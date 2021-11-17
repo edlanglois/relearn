@@ -1,4 +1,5 @@
 use super::{BuildEnvError, BuildPomdp, EnvStructure, Pomdp};
+use crate::logging::Logger;
 use crate::spaces::{Indexed, IndexedTypeSpace, IntervalSpace, ProductSpace};
 use rand::{
     distributions::{Distribution, Uniform},
@@ -132,6 +133,7 @@ impl Pomdp for CartPole {
         state: Self::State,
         action: &Self::Action,
         _rng: &mut StdRng,
+        _logger: &mut dyn Logger,
     ) -> (Option<Self::State>, f64, bool) {
         let applied_force = match action {
             Push::Left => -self.env.action_force,

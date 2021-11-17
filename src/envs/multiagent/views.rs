@@ -1,4 +1,5 @@
 use crate::envs::{BuildEnvError, BuildPomdp, EnvStructure, Environment, Pomdp};
+use crate::logging::Logger;
 use crate::spaces::{ProductSpace, Space};
 use rand::rngs::StdRng;
 
@@ -95,9 +96,10 @@ where
         state: Self::State,
         action: &Self::Action,
         rng: &mut StdRng,
+        logger: &mut dyn Logger,
     ) -> (Option<Self::State>, f64, bool) {
         let joint_action = (action.clone(), Default::default());
-        self.inner.step(state, &joint_action, rng)
+        self.inner.step(state, &joint_action, rng, logger)
     }
 }
 
@@ -110,9 +112,13 @@ where
     type Observation = O1;
     type Action = A1;
 
-    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f64, bool) {
+    fn step(
+        &mut self,
+        action: &Self::Action,
+        logger: &mut dyn Logger,
+    ) -> (Option<Self::Observation>, f64, bool) {
         let joint_action = (action.clone(), Default::default());
-        let (joint_observation, reward, episode_done) = self.inner.step(&joint_action);
+        let (joint_observation, reward, episode_done) = self.inner.step(&joint_action, logger);
         let observation = joint_observation.map(|o| o.0);
         (observation, reward, episode_done)
     }

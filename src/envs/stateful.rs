@@ -1,6 +1,7 @@
 //! Converting a `Pomdp` into an `Environment`
 use super::{Environment, Pomdp};
 use crate::envs::EnvStructure;
+use crate::logging::Logger;
 use rand::{rngs::StdRng, SeedableRng};
 
 /// Wraps a [`Pomdp`] as a [`Environment`].
@@ -46,12 +47,17 @@ impl<E: Pomdp> Environment for PomdpEnv<E> {
     type Observation = E::Observation;
     type Action = E::Action;
 
-    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f64, bool) {
+    fn step(
+        &mut self,
+        action: &Self::Action,
+        logger: &mut dyn Logger,
+    ) -> (Option<Self::Observation>, f64, bool) {
         let state = self
             .state
             .take()
             .expect("Must call reset() before the start of each episode");
-        let (next_state, reward, episode_done) = self.env.step(state, action, &mut self.rng);
+        let (next_state, reward, episode_done) =
+            self.env.step(state, action, &mut self.rng, logger);
         self.state = next_state;
         let observation = match self.state.as_ref() {
             Some(s) => Some(self.env.observe(s, &mut self.rng)),

@@ -1,5 +1,6 @@
 //! Fruit collection gridworlds.
 use crate::envs::{CloneBuild, EnvStructure, Pomdp};
+use crate::logging::Logger;
 use crate::spaces::{
     BooleanSpace, BoxSpace, IndexSpace, IndexedTypeSpace, PowerSpace, ProductSpace, Space,
 };
@@ -334,11 +335,19 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Pomdp
         mut state: Self::State,
         action: &Self::Action,
         _rng: &mut StdRng,
+        logger: &mut dyn Logger,
     ) -> (Option<Self::State>, f64, bool) {
         let (principal_action, assistant_action) = *action;
 
-        let mut reward = state.step(principal_action, Player::Principal);
-        reward += state.step(assistant_action, Player::Assistant);
+        let reward_principal = state.step(principal_action, Player::Principal);
+        let reward_assistant = state.step(assistant_action, Player::Assistant);
+        logger
+            .log("reward_principal", reward_principal.into())
+            .unwrap();
+        logger
+            .log("reward_assistant", reward_assistant.into())
+            .unwrap();
+        let reward = reward_principal + reward_assistant;
         if state.is_terminal() {
             (None, reward, true)
         } else {

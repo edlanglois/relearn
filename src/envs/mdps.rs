@@ -1,5 +1,6 @@
 //! Generic Markov Decision Processes
 use super::{CloneBuild, EnvStructure, Mdp, PomdpDistribution};
+use crate::logging::Logger;
 use crate::spaces::IndexSpace;
 use ndarray::{Array2, Axis};
 use rand::{distributions::Distribution, rngs::StdRng};
@@ -64,6 +65,7 @@ where
         state: Self::State,
         action: &Self::Action,
         rng: &mut StdRng,
+        _logger: &mut dyn Logger,
     ) -> (Option<Self::State>, f64, bool) {
         let (successor_distribution, reward_distribution) = &self.transitions[(state, *action)];
         let next_state = successor_distribution.sample(rng);

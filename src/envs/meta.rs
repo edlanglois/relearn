@@ -3,6 +3,7 @@ use super::{
     BuildEnv, BuildEnvDist, BuildEnvError, BuildPomdp, BuildPomdpDist, EnvDistribution,
     EnvStructure, Environment, Pomdp, PomdpDistribution,
 };
+use crate::logging::Logger;
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -157,6 +158,7 @@ where
         state: Self::State,
         action: &Self::Action,
         rng: &mut StdRng,
+        logger: &mut dyn Logger,
     ) -> (Option<Self::State>, f64, bool) {
         if state.inner_episode_done {
             // Ignore the action and start a new inner episode
@@ -175,7 +177,7 @@ where
                 .inner_state
                 .expect("inner env has terminal state without ending the episode");
             let (inner_state, inner_step_reward, inner_episode_done) =
-                state.inner_env.step(prev_inner_state, action, rng);
+                state.inner_env.step(prev_inner_state, action, rng, logger);
 
             let mut episode_index = state.episode_index;
             let mut trial_done = false;
@@ -316,7 +318,11 @@ where
     >;
     type Action = <E::Environment as Environment>::Action;
 
-    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f64, bool) {
+    fn step(
+        &mut self,
+        action: &Self::Action,
+        logger: &mut dyn Logger,
+    ) -> (Option<Self::Observation>, f64, bool) {
         let env = self.env.as_mut().expect("Must call reset() first");
         if self.inner_episode_done {
             // Ignore the action and start a new inner episode
@@ -326,7 +332,7 @@ where
             (Some(observation), 0.0, false)
         } else {
             // Take a step in the inner episode
-            let (inner_observation, reward, inner_episode_done) = env.step(action);
+            let (inner_observation, reward, inner_episode_done) = env.step(action, logger);
             self.inner_episode_done = inner_episode_done;
             let observation = (
                 inner_observation,
@@ -495,7 +501,7 @@ mod meta_env_bandits {
         // Trial 0; Ep 0; Step 0
         // Take action 0 and get 1 reward
         // Inner state is terminal.
-        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng);
+        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 1.0);
         assert!(!trial_done);
         let state = maybe_state.unwrap();
@@ -503,7 +509,7 @@ mod meta_env_bandits {
 
         // Trial 0; Ep 1; Init.
         // The action is ignored and a new inner episode is started.
-        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng);
+        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         let state = maybe_state.unwrap();
@@ -512,7 +518,7 @@ mod meta_env_bandits {
         // Trial 0; Ep 1; Step 0
         // Take action 1 and get 0 reward
         // Inner state is terminal
-        let (maybe_state, reward, trial_done) = env.step(state, &1, &mut rng);
+        let (maybe_state, reward, trial_done) = env.step(state, &1, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         let state = maybe_state.unwrap();
@@ -520,7 +526,7 @@ mod meta_env_bandits {
 
         // Trial 0; Ep 2; Init.
         // The action is ignored and a new inner episode is started.
-        let (maybe_state, reward, trial_done) = env.step(state, &1, &mut rng);
+        let (maybe_state, reward, trial_done) = env.step(state, &1, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         let state = maybe_state.unwrap();
@@ -530,7 +536,7 @@ mod meta_env_bandits {
         // Take action 0 and get 1 reward
         // The inner state is terminal.
         // This inner episode was the last in the trial so the trial is done.
-        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng);
+        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 1.0);
         assert!(trial_done);
         let state = maybe_state.unwrap();
@@ -543,7 +549,7 @@ mod meta_env_bandits {
         // Trial 1; Ep 0; Step 0
         // Take action 0 and get 0 reward, since now 1 is the target action
         // Inner state is terminal.
-        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng);
+        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         let state = maybe_state.unwrap();
@@ -561,14 +567,14 @@ mod meta_env_bandits {
         // Trial 0; Ep 0; Step 0
         // Take action 0 and get 1 reward
         // Inner state is terminal.
-        let (observation, reward, trial_done) = env.step(&0);
+        let (observation, reward, trial_done) = env.step(&0, &mut ());
         assert_eq!(reward, 1.0);
         assert!(!trial_done);
         assert_eq!(observation, Some((None, Some((0, 1.0)), true)));
 
         // Trial 0; Ep 1; Init.
         // The action is ignored and a new inner episode is started.
-        let (observation, reward, trial_done) = env.step(&0);
+        let (observation, reward, trial_done) = env.step(&0, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         assert_eq!(observation, Some((Some(()), None, false)));
@@ -576,14 +582,14 @@ mod meta_env_bandits {
         // Trial 0; Ep 1; Step 0
         // Take action 1 and get 0 reward
         // Inner state is terminal
-        let (observation, reward, trial_done) = env.step(&1);
+        let (observation, reward, trial_done) = env.step(&1, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         assert_eq!(observation, Some((None, Some((1, 0.0)), true)));
 
         // Trial 0; Ep 2; Init.
         // The action is ignored and a new inner episode is started.
-        let (observation, reward, trial_done) = env.step(&1);
+        let (observation, reward, trial_done) = env.step(&1, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         assert_eq!(observation, Some((Some(()), None, false)));
@@ -592,7 +598,7 @@ mod meta_env_bandits {
         // Take action 0 and get 1 reward
         // The inner state is terminal.
         // This inner episode was the last in the trial so the trial is done.
-        let (observation, reward, trial_done) = env.step(&0);
+        let (observation, reward, trial_done) = env.step(&0, &mut ());
         assert_eq!(reward, 1.0);
         assert!(trial_done);
         assert_eq!(observation, Some((None, Some((0, 1.0)), true)));
@@ -604,7 +610,7 @@ mod meta_env_bandits {
         // Trial 1; Ep 0; Step 0
         // Take action 0 and get 0 reward, since now 1 is the target action
         // Inner state is terminal.
-        let (observation, reward, trial_done) = env.step(&0);
+        let (observation, reward, trial_done) = env.step(&0, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         assert_eq!(observation, Some((None, Some((0, 0.0)), true)));

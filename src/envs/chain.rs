@@ -1,5 +1,6 @@
 //! Chain environment
 use super::{CloneBuild, EnvStructure, Mdp};
+use crate::logging::Logger;
 use crate::spaces::{IndexSpace, IndexedTypeSpace};
 use rand::prelude::*;
 use relearn_derive::Indexed;
@@ -73,6 +74,7 @@ impl Mdp for Chain {
         state: Self::State,
         action: &Self::Action,
         rng: &mut StdRng,
+        _logger: &mut dyn Logger,
     ) -> (Option<Self::State>, f64, bool) {
         let mut action = *action;
         if rng.gen::<f64>() < 0.2 {

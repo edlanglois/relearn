@@ -28,6 +28,7 @@ pub use multiagent::views::FirstPlayerView;
 pub use stateful::{IntoEnv, PomdpEnv};
 pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 
+use crate::logging::Logger;
 use crate::spaces::Space;
 use rand::{rngs::StdRng, Rng};
 use std::f64;
@@ -136,12 +137,18 @@ pub trait Mdp {
 
     /// Sample a state transition.
     ///
+    /// # Args
+    /// * `state`  - The initial state.
+    /// * `action` - The action to take at this state.
+    /// * `rng`    - Random number generator for any stochasticity in the transition.
+    /// * `logger` - Logger for any auxiliary information.
+    ///
     /// # Returns
-    /// * `state`: The resulting state.
-    ///     Is `None` if the resulting state is terminal.
-    ///     All trajectories from terminal states yield 0 reward on each step.
-    /// * `reward`: The reward value for this transition.
-    /// * `episode_done`: Whether this step ends the current episode.
+    /// * `state`  - The resulting state.
+    ///              Is `None` if the resulting state is terminal.
+    ///              All trajectories from terminal states yield 0 reward on each step.
+    /// * `reward` - The reward value for this transition.
+    /// * `episode_done` - Whether this step ends the current episode.
     ///     - If `observation` is `None` then `episode_done` must be true.
     ///     - An episode may be done for other reasons, like a step limit.
     fn step(
@@ -149,6 +156,7 @@ pub trait Mdp {
         state: Self::State,
         action: &Self::Action,
         rng: &mut StdRng,
+        logger: &mut dyn Logger,
     ) -> (Option<Self::State>, f64, bool);
 }
 
@@ -169,6 +177,12 @@ pub trait Pomdp {
 
     /// Sample a state transition.
     ///
+    /// # Args
+    /// * `state`  - The initial state.
+    /// * `action` - The action to take at this state.
+    /// * `rng`    - Random number generator for any stochasticity in the transition.
+    /// * `logger` - Logger for any auxiliary information.
+    ///
     /// # Returns
     /// * `state`: The resulting state.
     ///     Is `None` if the resulting state is terminal.
@@ -182,6 +196,7 @@ pub trait Pomdp {
         state: Self::State,
         action: &Self::Action,
         rng: &mut StdRng,
+        logger: &mut dyn Logger,
     ) -> (Option<Self::State>, f64, bool);
 }
 
@@ -206,8 +221,9 @@ where
         state: Self::State,
         action: &Self::Action,
         rng: &mut StdRng,
+        logger: &mut dyn Logger,
     ) -> (Option<Self::State>, f64, bool) {
-        Mdp::step(self, state, action, rng)
+        Mdp::step(self, state, action, rng, logger)
     }
 }
 
@@ -232,7 +248,11 @@ pub trait Environment {
     /// * `episode_done`: Whether this step ends the episode.
     ///     - If `observation` is `None` then `episode_done` must be true.
     ///     - An episode may be done for other reasons, like a step limit.
-    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f64, bool);
+    fn step(
+        &mut self,
+        action: &Self::Action,
+        logger: &mut dyn Logger,
+    ) -> (Option<Self::Observation>, f64, bool);
 
     /// Reset the environment to an initial state.
     ///
@@ -247,8 +267,12 @@ impl<E: Environment + ?Sized> Environment for Box<E> {
     type Observation = E::Observation;
     type Action = E::Action;
 
-    fn step(&mut self, action: &Self::Action) -> (Option<Self::Observation>, f64, bool) {
-        E::step(self, action)
+    fn step(
+        &mut self,
+        action: &Self::Action,
+        logger: &mut dyn Logger,
+    ) -> (Option<Self::Observation>, f64, bool) {
+        E::step(self, action, logger)
     }
 
     fn reset(&mut self) -> Self::Observation {

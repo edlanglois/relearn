@@ -1,5 +1,6 @@
 use super::super::Pomdp;
 use super::Wrapped;
+use crate::logging::Logger;
 use rand::rngs::StdRng;
 
 /// Environment wrapper that cuts off episodes after a set number of steps.
@@ -47,10 +48,11 @@ impl<E: Pomdp> Pomdp for Wrapped<E, StepLimit> {
         state: Self::State,
         action: &Self::Action,
         rng: &mut StdRng,
+        logger: &mut dyn Logger,
     ) -> (Option<Self::State>, f64, bool) {
         let (inner_state, mut current_steps) = state;
         let (next_inner_state, reward, mut episode_done) =
-            self.inner.step(inner_state, action, rng);
+            self.inner.step(inner_state, action, rng, logger);
         current_steps += 1;
 
         // Attach the new current step count to the state
@@ -89,12 +91,12 @@ mod tests {
         let state = env.initial_state(&mut rng);
 
         // Step 1
-        let (opt_state, _, episode_done) = env.step(state, &Move::Left, &mut rng);
+        let (opt_state, _, episode_done) = env.step(state, &Move::Left, &mut rng, &mut ());
         assert!(!episode_done);
         let state = opt_state.unwrap();
 
         // Step 2
-        let (state, _, episode_done) = env.step(state, &Move::Left, &mut rng);
+        let (state, _, episode_done) = env.step(state, &Move::Left, &mut rng, &mut ());
         assert!(episode_done);
         assert!(state.is_some());
     }
