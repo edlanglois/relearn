@@ -24,7 +24,7 @@ pub use meta::{
     InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaObservationSpace, MetaPomdp, MetaState,
 };
 pub use multiagent::fruit::FruitGame;
-pub use multiagent::views::FirstPlayerView;
+pub use multiagent::views::{FirstPlayerView, SecondPlayerView};
 pub use stateful::{IntoEnv, PomdpEnv};
 pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 
@@ -61,6 +61,24 @@ pub trait EnvStructure {
 }
 
 impl<E: EnvStructure + ?Sized> EnvStructure for Box<E> {
+    type ObservationSpace = E::ObservationSpace;
+    type ActionSpace = E::ActionSpace;
+
+    fn observation_space(&self) -> Self::ObservationSpace {
+        E::observation_space(self)
+    }
+    fn action_space(&self) -> Self::ActionSpace {
+        E::action_space(self)
+    }
+    fn reward_range(&self) -> (f64, f64) {
+        E::reward_range(self)
+    }
+    fn discount_factor(&self) -> f64 {
+        E::discount_factor(self)
+    }
+}
+
+impl<E: EnvStructure + ?Sized> EnvStructure for &'_ E {
     type ObservationSpace = E::ObservationSpace;
     type ActionSpace = E::ActionSpace;
 
