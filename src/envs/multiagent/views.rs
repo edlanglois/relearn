@@ -20,6 +20,10 @@ impl<E> FirstPlayerView<E> {
 impl<E, OS1, OS2, AS1, AS2> BuildPomdp for FirstPlayerView<E>
 where
     E: BuildPomdp<
+        // Observation and Action values are implied {Observation,Action}Space
+        // values but are not inferred automatically.
+        Observation = (OS1::Element, OS2::Element),
+        Action = (AS1::Element, AS2::Element),
         ObservationSpace = ProductSpace<(OS1, OS2)>,
         ActionSpace = ProductSpace<(AS1, AS2)>,
     >,
@@ -29,9 +33,6 @@ where
     AS1::Element: Clone,
     AS2: Space,
     AS2::Element: Default,
-    // Implied by E: BuildPomdp<...> but not inferred automatically
-    E::Pomdp:
-        Pomdp<Observation = (OS1::Element, OS2::Element), Action = (AS1::Element, AS2::Element)>,
 {
     type State = E::State;
     type Observation = OS1::Element;
@@ -145,6 +146,10 @@ impl<E> SecondPlayerView<E> {
 impl<E, OS1, OS2, AS1, AS2> BuildPomdp for SecondPlayerView<E>
 where
     E: BuildPomdp<
+        // Observation and Action values are implied {Observation,Action}Space
+        // values but are not inferred automatically.
+        Observation = (OS1::Element, OS2::Element),
+        Action = (AS1::Element, AS2::Element),
         ObservationSpace = ProductSpace<(OS1, OS2)>,
         ActionSpace = ProductSpace<(AS1, AS2)>,
     >,
@@ -154,9 +159,6 @@ where
     AS1::Element: Default,
     AS2: Space,
     AS2::Element: Clone,
-    // Implied by E: BuildPomdp<...> but not inferred automatically
-    E::Pomdp:
-        Pomdp<Observation = (OS1::Element, OS2::Element), Action = (AS1::Element, AS2::Element)>,
 {
     type State = E::State;
     type Observation = OS2::Element;
