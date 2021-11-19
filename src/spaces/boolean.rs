@@ -1,5 +1,7 @@
 //! `BooleanSpace` definition
-use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ReprSpace, Space};
+use super::{
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ReprSpace, Space, SubsetOrd,
+};
 use crate::logging::Loggable;
 use crate::utils::num_array::{BuildFromArray1D, NumArray1D};
 use num_traits::Float;
@@ -33,15 +35,9 @@ impl Space for BooleanSpace {
     }
 }
 
-impl PartialOrd for BooleanSpace {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for BooleanSpace {
-    fn cmp(&self, _other: &Self) -> Ordering {
-        Ordering::Equal
+impl SubsetOrd for BooleanSpace {
+    fn subset_cmp(&self, _other: &Self) -> Option<Ordering> {
+        Some(Ordering::Equal)
     }
 }
 
@@ -153,7 +149,7 @@ mod space {
 }
 
 #[cfg(test)]
-mod partial_ord {
+mod subset_ord {
     use super::*;
 
     #[test]
@@ -164,15 +160,14 @@ mod partial_ord {
     #[test]
     fn cmp_equal() {
         assert_eq!(
-            BooleanSpace::new().cmp(&BooleanSpace::new()),
-            Ordering::Equal
+            BooleanSpace::new().subset_cmp(&BooleanSpace::new()),
+            Some(Ordering::Equal)
         );
     }
 
     #[test]
-    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     fn not_less() {
-        assert!(!(BooleanSpace::new() < BooleanSpace::new()));
+        assert!(!BooleanSpace::new().strict_subset_of(&BooleanSpace::new()));
     }
 }
 

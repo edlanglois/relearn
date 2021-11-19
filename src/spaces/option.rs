@@ -1,9 +1,10 @@
 //! Option space definition.
-use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space};
+use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space, SubsetOrd};
 use crate::logging::Loggable;
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
+use std::cmp::Ordering;
 use std::fmt;
 
 /// A space whose elements are either `None` or `Some(inner_elem)`.
@@ -36,6 +37,12 @@ impl<S: Space> Space for OptionSpace<S> {
             None => true,
             Some(inner_value) => self.inner.contains(inner_value),
         }
+    }
+}
+
+impl<S: SubsetOrd> SubsetOrd for OptionSpace<S> {
+    fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.inner.subset_cmp(&other.inner)
     }
 }
 

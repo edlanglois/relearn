@@ -6,7 +6,7 @@ use super::{
 use crate::agents::{RandomAgent, Step};
 use crate::simulation;
 use crate::simulation::hooks::{ClosureHook, StepLimit};
-use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space};
+use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space, SubsetOrd};
 use rand::{rngs::StdRng, SeedableRng};
 use std::cell::Cell;
 use std::fmt::Debug;
@@ -75,8 +75,8 @@ where
 pub fn check_env_distribution_structure<D>(env_dist: &D, num_samples: usize)
 where
     D: EnvDistribution + ?Sized,
-    D::ObservationSpace: PartialOrd + Debug,
-    D::ActionSpace: PartialOrd + Debug,
+    D::ObservationSpace: SubsetOrd + Debug,
+    D::ActionSpace: SubsetOrd + Debug,
 {
     let env_structure = StoredEnvStructure::from(env_dist);
     let (dist_reward_min, dist_reward_max) = env_structure.reward_range;
@@ -85,14 +85,15 @@ where
     for _ in 0..num_samples {
         let env = env_dist.sample_environment(&mut rng);
         assert!(
-            env.observation_space() <= env_structure.observation_space,
-            "{:?} </= {:?}",
+            env.observation_space()
+                .subset_of(&env_structure.observation_space),
+            "{:?} ⊄ {:?}",
             env.observation_space(),
             env_structure.observation_space,
         );
         assert!(
-            env.action_space() <= env_structure.action_space,
-            "{:?} </= {:?}",
+            env.action_space().subset_of(&env_structure.action_space),
+            "{:?} ⊄ {:?}",
             env.action_space(),
             env_structure.action_space,
         );

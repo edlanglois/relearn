@@ -1,10 +1,11 @@
 //! Wrap spaces to have non-empty feature vectors.
-use super::{EncoderFeatureSpace, FiniteSpace, NumFeatures, Space};
+use super::{EncoderFeatureSpace, FiniteSpace, NumFeatures, Space, SubsetOrd};
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
 use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::{Float, Zero};
 use rand::distributions::Distribution;
 use rand::Rng;
+use std::cmp::Ordering;
 use std::fmt;
 
 // Note: This could be renamed to something like TorchSpace if other helper changes end up being
@@ -35,6 +36,12 @@ impl<S: Space> Space for NonEmptyFeatures<S> {
 
     fn contains(&self, value: &Self::Element) -> bool {
         self.inner.contains(value)
+    }
+}
+
+impl<S: SubsetOrd> SubsetOrd for NonEmptyFeatures<S> {
+    fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.inner.subset_cmp(&other.inner)
     }
 }
 

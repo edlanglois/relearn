@@ -1,5 +1,5 @@
 //! `IntervalSpace` definition
-use super::{ElementRefInto, EncoderFeatureSpace, NumFeatures, ReprSpace, Space};
+use super::{ElementRefInto, EncoderFeatureSpace, NumFeatures, ReprSpace, Space, SubsetOrd};
 use crate::logging::Loggable;
 use num_traits::{Float, ToPrimitive};
 use rand::distributions::Distribution;
@@ -47,16 +47,17 @@ impl<T: Float> Space for IntervalSpace<T> {
     }
 }
 
-impl<T: PartialOrd> PartialOrd for IntervalSpace<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.low == other.low && self.high == other.high {
-            Some(Ordering::Equal)
-        } else if self.low >= other.low && self.high <= other.high {
-            Some(Ordering::Less)
-        } else if self.low <= other.low && self.high >= other.high {
-            Some(Ordering::Greater)
-        } else {
-            None
+impl<T: PartialOrd> SubsetOrd for IntervalSpace<T> {
+    fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
+        use Ordering::*;
+        match (
+            self.low.partial_cmp(&other.low),
+            self.high.partial_cmp(&other.high),
+        ) {
+            (Some(Equal), Some(Equal)) => Some(Equal),
+            (Some(Equal | Greater), Some(Equal | Less)) => Some(Less),
+            (Some(Equal | Less), Some(Equal | Greater)) => Some(Greater),
+            _ => None,
         }
     }
 }
@@ -252,7 +253,7 @@ mod space {
 }
 
 #[cfg(test)]
-mod partial_ord {
+mod subset_ord {
     use super::*;
 
     #[test]
@@ -263,7 +264,7 @@ mod partial_ord {
     #[test]
     fn same_cmp_equal() {
         assert_eq!(
-            IntervalSpace::new(0.0, 1.0).partial_cmp(&IntervalSpace::new(0.0, 1.0)),
+            IntervalSpace::new(0.0, 1.0).subset_cmp(&IntervalSpace::new(0.0, 1.0)),
             Some(Ordering::Equal)
         );
     }
@@ -274,24 +275,24 @@ mod partial_ord {
     }
 
     #[test]
-    fn subset_lt() {
-        assert!(IntervalSpace::new(0.0, 1.0) < IntervalSpace::new(-1.0, 1.0));
+    fn strict_subset() {
+        assert!(IntervalSpace::new(0.0, 1.0).strict_subset_of(&IntervalSpace::new(-1.0, 1.0)));
     }
 
     #[test]
-    fn same_le() {
-        assert!(IntervalSpace::new(0.0, 1.0) <= IntervalSpace::new(0.0, 1.0));
+    fn same_subset() {
+        assert!(IntervalSpace::new(0.0, 1.0).subset_of(&IntervalSpace::new(0.0, 1.0)));
     }
 
     #[test]
-    fn superset_lt() {
-        assert!(IntervalSpace::new(0.0, 1.0) > IntervalSpace::new(0.2, 0.8));
+    fn strict_superset() {
+        assert!(IntervalSpace::new(0.0, 1.0).strict_superset_of(&IntervalSpace::new(0.2, 0.8)));
     }
 
     #[test]
     fn disjoint_incomparable() {
         assert_eq!(
-            IntervalSpace::new(0.0, 1.0).partial_cmp(&IntervalSpace::new(2.0, 3.0)),
+            IntervalSpace::new(0.0, 1.0).subset_cmp(&IntervalSpace::new(2.0, 3.0)),
             None
         );
     }
@@ -299,7 +300,7 @@ mod partial_ord {
     #[test]
     fn intersecting_incomparable() {
         assert_eq!(
-            IntervalSpace::new(0.0, 2.0).partial_cmp(&IntervalSpace::new(1.0, 3.0)),
+            IntervalSpace::new(0.0, 2.0).subset_cmp(&IntervalSpace::new(1.0, 3.0)),
             None
         );
     }

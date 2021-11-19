@@ -1,5 +1,8 @@
 //! Array space
-use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space};
+use super::{
+    iter_product_subset_ord, ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space,
+    SubsetOrd,
+};
 use crate::logging::Loggable;
 use num_traits::Float;
 use rand::distributions::Distribution;
@@ -34,30 +37,14 @@ impl<S: Space, const N: usize> Space for ArraySpace<S, N> {
     }
 }
 
-impl<S: Space + PartialOrd, const N: usize> PartialOrd for ArraySpace<S, N> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.inner_spaces
-            .iter()
-            .zip(&other.inner_spaces)
-            .map(|(s, o)| s.partial_cmp(o))
-            .try_fold(Ordering::Equal, |state, cmp| match cmp {
-                None => None,
-                Some(Ordering::Equal) => Some(state),
-                Some(Ordering::Less) => {
-                    if state == Ordering::Greater {
-                        None
-                    } else {
-                        Some(Ordering::Less)
-                    }
-                }
-                Some(Ordering::Greater) => {
-                    if state == Ordering::Less {
-                        None
-                    } else {
-                        Some(Ordering::Greater)
-                    }
-                }
-            })
+impl<S: Space + SubsetOrd, const N: usize> SubsetOrd for ArraySpace<S, N> {
+    fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
+        iter_product_subset_ord(
+            self.inner_spaces
+                .iter()
+                .zip(&other.inner_spaces)
+                .map(|(s, o)| s.subset_cmp(o)),
+        )
     }
 }
 
@@ -239,7 +226,7 @@ mod space {
 }
 
 #[cfg(test)]
-mod partial_ord {
+mod subset_ord {
     use super::super::IndexSpace;
     use super::*;
 
@@ -247,42 +234,69 @@ mod partial_ord {
     fn i3i4_eq_i3i4() {
         let s1 = ArraySpace::new([IndexSpace::new(3), IndexSpace::new(4)]);
         let s2 = ArraySpace::new([IndexSpace::new(3), IndexSpace::new(4)]);
+        assert_eq!(s1.subset_cmp(&s2), Some(Ordering::Equal));
         assert_eq!(s1, s2);
+        assert!(s1.subset_of(&s2));
+        assert!(!s1.strict_subset_of(&s2));
+        assert!(s1.superset_of(&s2));
+        assert!(!s1.strict_superset_of(&s2));
     }
 
     #[test]
     fn i3i4_ne_i4i3() {
         let s1 = ArraySpace::new([IndexSpace::new(3), IndexSpace::new(4)]);
         let s2 = ArraySpace::new([IndexSpace::new(4), IndexSpace::new(3)]);
+        assert!(s1.subset_cmp(&s2).is_none());
         assert_ne!(s1, s2);
+        assert!(!s1.subset_of(&s2));
+        assert!(!s1.strict_subset_of(&s2));
+        assert!(!s1.superset_of(&s2));
+        assert!(!s1.strict_superset_of(&s2));
     }
 
     #[test]
     fn i2i4_lt_i3i4() {
         let s1 = ArraySpace::new([IndexSpace::new(2), IndexSpace::new(4)]);
         let s2 = ArraySpace::new([IndexSpace::new(3), IndexSpace::new(4)]);
-        assert!(s1 < s2);
+        assert_eq!(s1.subset_cmp(&s2), Some(Ordering::Less));
+        assert!(s1.subset_of(&s2));
+        assert!(s1.strict_subset_of(&s2));
+        assert!(!s1.superset_of(&s2));
+        assert!(!s1.strict_superset_of(&s2));
     }
 
     #[test]
     fn i3i3_lt_i3i4() {
         let s1 = ArraySpace::new([IndexSpace::new(3), IndexSpace::new(3)]);
         let s2 = ArraySpace::new([IndexSpace::new(3), IndexSpace::new(4)]);
-        assert!(s1 < s2);
+        assert_eq!(s1.subset_cmp(&s2), Some(Ordering::Less));
+        assert!(s1.subset_of(&s2));
+        assert!(s1.strict_subset_of(&s2));
+        assert!(!s1.superset_of(&s2));
+        assert!(!s1.strict_superset_of(&s2));
     }
 
     #[test]
     fn i5i4_gt_i3i4() {
         let s1 = ArraySpace::new([IndexSpace::new(5), IndexSpace::new(4)]);
         let s2 = ArraySpace::new([IndexSpace::new(3), IndexSpace::new(4)]);
-        assert!(s1 > s2);
+        assert_eq!(s1.subset_cmp(&s2), Some(Ordering::Greater));
+        assert!(!s1.subset_of(&s2));
+        assert!(!s1.strict_subset_of(&s2));
+        assert!(s1.superset_of(&s2));
+        assert!(s1.strict_superset_of(&s2));
     }
 
     #[test]
     fn i2i4_incomp_i3i3() {
         let s1 = ArraySpace::new([IndexSpace::new(2), IndexSpace::new(4)]);
         let s2 = ArraySpace::new([IndexSpace::new(3), IndexSpace::new(3)]);
-        assert!(s1.partial_cmp(&s2).is_none());
+        assert!(s1.subset_cmp(&s2).is_none());
+        assert_ne!(s1, s2);
+        assert!(!s1.subset_of(&s2));
+        assert!(!s1.strict_subset_of(&s2));
+        assert!(!s1.superset_of(&s2));
+        assert!(!s1.strict_superset_of(&s2));
     }
 }
 

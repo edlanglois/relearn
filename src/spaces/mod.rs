@@ -41,6 +41,7 @@ use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, Nu
 use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::Float;
 use rand::distributions::Distribution as RandDistribution;
+use std::cmp::Ordering;
 use std::iter::ExactSizeIterator;
 
 /// A space: a set of values with some added structure.
@@ -51,6 +52,84 @@ pub trait Space {
 
     /// Check whether a particular value is contained in the space.
     fn contains(&self, value: &Self::Element) -> bool;
+}
+
+/// Compare this space to another in terms of the subset relation.
+///
+/// This is a partial order and the rules for implementing this are the same as for
+/// [`PartialOrd`](std::cmp::PartialOrd). In particular,
+/// the comparision must return `Some(Ordering::Equal)` if and only if `self == other`.
+///
+/// This is distinct from [`PartialOrd`](std::cmp::PartialOrd) so that `SubsetOrd` can be defined
+/// on types that already implement `PartialOrd` in a different way (e.g. lexicographically).
+/// It also avoids the confusion that might arise from using comparison operators (`<`, `>`, etc.)
+/// since it is not obvious that "subset" is the relationship being used.
+pub trait SubsetOrd: PartialEq<Self> {
+    /// Compare using the subset relationship. This is a partial order.
+    fn subset_cmp(&self, other: &Self) -> Option<Ordering>;
+
+    /// Check if this is a strict subset of `other`.
+    fn strict_subset_of(&self, other: &Self) -> bool {
+        matches!(self.subset_cmp(other), Some(Ordering::Less))
+    }
+
+    /// Check if this is a subset (strict or equal) of `other`.
+    fn subset_of(&self, other: &Self) -> bool {
+        matches!(
+            self.subset_cmp(other),
+            Some(Ordering::Less | Ordering::Equal)
+        )
+    }
+
+    /// Check if this is a strict superset of `other`.
+    fn strict_superset_of(&self, other: &Self) -> bool {
+        matches!(self.subset_cmp(other), Some(Ordering::Greater))
+    }
+
+    /// Check if this is a superset (strict or equal) of `other`.
+    fn superset_of(&self, other: &Self) -> bool {
+        matches!(
+            self.subset_cmp(other),
+            Some(Ordering::Greater | Ordering::Equal)
+        )
+    }
+}
+
+/// Helper function to determine the subset ordering of a product of two spaces.
+///
+/// Given the orderings for each of the factors, the ordering is:
+/// * `Equal` if both factors are `Equal`,
+/// * `Less` if both factors are `Equal` or `Less` and at least one is `Less`,
+/// * `Greater` if both factors are `Equal` or `Greater` and at least one is `Greater`,
+/// * `None` otherwise.
+#[inline]
+pub const fn product_subset_ord(a: Option<Ordering>, b: Option<Ordering>) -> Option<Ordering> {
+    use Ordering::*;
+    match (a, b) {
+        (Some(Equal), x) => x,
+        (x, Some(Equal)) => x,
+        (Some(Less), Some(Less)) => Some(Less),
+        (Some(Greater), Some(Greater)) => Some(Greater),
+        _ => None,
+    }
+}
+
+/// Helper function to determine the subset ordering of a product space with any number of factors.
+///
+/// Given the orderings for each of the factors, the ordering is:
+/// * `Equal` if all factors are `Equal`,
+/// * `Less` if all factors are `Equal` or `Less` and at least one is `Less`,
+/// * `Greater` if all factors are `Equal` or `Greater` and at least one is `Greater`,
+/// * `None` otherwise.
+#[inline]
+pub fn iter_product_subset_ord<I: IntoIterator<Item = Option<Ordering>>>(
+    ord_factors: I,
+) -> Option<Ordering> {
+    ord_factors
+        .into_iter()
+        .try_fold(Ordering::Equal, |prev, cmp| {
+            product_subset_ord(Some(prev), cmp)
+        })
 }
 
 /// A space containing finitely many elements.

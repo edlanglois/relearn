@@ -1,5 +1,7 @@
 //! Generic wrapper spaces
-use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ReprSpace, Space};
+use super::{
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ReprSpace, Space, SubsetOrd,
+};
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
 use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::Float;
@@ -121,6 +123,12 @@ impl<S: PartialOrd, W> PartialOrd for WrappedElementSpace<S, W> {
 impl<S: Ord, W> Ord for WrappedElementSpace<S, W> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.inner_space.cmp(&other.inner_space)
+    }
+}
+
+impl<S: SubsetOrd, W> SubsetOrd for WrappedElementSpace<S, W> {
+    fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.inner_space.subset_cmp(&other.inner_space)
     }
 }
 

@@ -1,13 +1,14 @@
 //! Categorical subtype of [`FiniteSpace`]
 use super::{
     ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ParameterizedDistributionSpace,
-    ReprSpace,
+    ReprSpace, SubsetOrd,
 };
 use crate::logging::Loggable;
 use crate::torch;
 use crate::utils::distributions::ArrayDistribution;
 use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::{Float, One, Zero};
+use std::cmp::Ordering;
 use tch::{Device, Kind, Tensor};
 
 /// A space consisting of `N` distinct elements treated as distinct and unrelated.
@@ -20,6 +21,12 @@ use tch::{Device, Kind, Tensor};
 /// * [`ParameterizedDistributionSpace<Tensor>`] as a categorical distribution
 /// * [`ElementRefInto<Loggable>`] as [`Loggable::IndexSample`]
 pub trait CategoricalSpace: FiniteSpace {}
+
+impl<S: CategoricalSpace + PartialEq> SubsetOrd for S {
+    fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.size().partial_cmp(&other.size())
+    }
+}
 
 /// Represents elements as integer tensors.
 impl<S: CategoricalSpace> ReprSpace<Tensor> for S {

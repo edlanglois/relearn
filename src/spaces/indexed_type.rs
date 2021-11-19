@@ -3,7 +3,6 @@ use super::{CategoricalSpace, FiniteSpace, Space};
 use rand::distributions::Distribution;
 use rand::Rng;
 use std::any;
-use std::cmp::Ordering;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
@@ -101,18 +100,6 @@ impl<T> PartialEq for IndexedTypeSpace<T> {
 }
 
 impl<T> Eq for IndexedTypeSpace<T> {}
-
-impl<T> PartialOrd for IndexedTypeSpace<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T> Ord for IndexedTypeSpace<T> {
-    fn cmp(&self, _other: &Self) -> Ordering {
-        Ordering::Equal
-    }
-}
 
 impl<T> Hash for IndexedTypeSpace<T> {
     fn hash<H: Hasher>(&self, _state: &mut H) {}
@@ -250,9 +237,11 @@ mod space {
 }
 
 #[cfg(test)]
-mod partial_ord {
+mod subset_ord {
+    use super::super::SubsetOrd;
     use super::*;
     use relearn_derive::Indexed;
+    use std::cmp::Ordering;
 
     #[derive(Debug, Indexed)]
     enum TestEnum {
@@ -272,15 +261,17 @@ mod partial_ord {
     #[test]
     fn cmp_equal() {
         assert_eq!(
-            IndexedTypeSpace::<TestEnum>::new().cmp(&IndexedTypeSpace::<TestEnum>::new()),
-            Ordering::Equal
+            IndexedTypeSpace::<TestEnum>::new().subset_cmp(&IndexedTypeSpace::<TestEnum>::new()),
+            Some(Ordering::Equal)
         );
     }
 
     #[test]
-    #[allow(clippy::neg_cmp_op_on_partial_ord)]
-    fn not_less() {
-        assert!(!(IndexedTypeSpace::<TestEnum>::new() < IndexedTypeSpace::<TestEnum>::new()));
+    fn not_strict_subset() {
+        assert!(
+            !(IndexedTypeSpace::<TestEnum>::new()
+                .strict_subset_of(&IndexedTypeSpace::<TestEnum>::new()))
+        );
     }
 }
 

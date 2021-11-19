@@ -1,7 +1,7 @@
 //! Singleton space definition.
 use super::{
     ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ParameterizedDistributionSpace,
-    ReprSpace, Space,
+    ReprSpace, Space, SubsetOrd,
 };
 use crate::logging::Loggable;
 use crate::torch::distributions::DeterministicEmptyVec;
@@ -9,6 +9,7 @@ use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
+use std::cmp::Ordering;
 use std::fmt;
 use tch::{Device, Kind, Tensor};
 
@@ -33,6 +34,12 @@ impl Space for SingletonSpace {
 
     fn contains(&self, _value: &Self::Element) -> bool {
         true
+    }
+}
+
+impl SubsetOrd for SingletonSpace {
+    fn subset_cmp(&self, _other: &Self) -> Option<Ordering> {
+        Some(Ordering::Equal)
     }
 }
 
@@ -160,7 +167,7 @@ mod space {
 }
 
 #[cfg(test)]
-mod partial_ord {
+mod subset_ord {
     use super::*;
     use std::cmp::Ordering;
 
@@ -172,15 +179,14 @@ mod partial_ord {
     #[test]
     fn cmp_equal() {
         assert_eq!(
-            SingletonSpace::new().cmp(&SingletonSpace::new()),
-            Ordering::Equal
+            SingletonSpace::new().subset_cmp(&SingletonSpace::new()),
+            Some(Ordering::Equal)
         );
     }
 
     #[test]
-    #[allow(clippy::neg_cmp_op_on_partial_ord)]
-    fn not_less() {
-        assert!(!(SingletonSpace::new() < SingletonSpace::new()));
+    fn not_strict_subset() {
+        assert!(!SingletonSpace::new().strict_subset_of(&SingletonSpace::new()));
     }
 }
 

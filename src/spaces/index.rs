@@ -2,7 +2,6 @@
 use super::{CategoricalSpace, FiniteSpace, Space};
 use rand::distributions::Distribution;
 use rand::Rng;
-use std::cmp::Ordering;
 use std::fmt;
 
 /// An index space; consists of the integers `0` to `size - 1`
@@ -28,18 +27,6 @@ impl Space for IndexSpace {
 
     fn contains(&self, value: &Self::Element) -> bool {
         value < &self.size
-    }
-}
-
-impl PartialOrd for IndexSpace {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for IndexSpace {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.size.cmp(&other.size)
     }
 }
 
@@ -106,38 +93,42 @@ mod space {
 }
 
 #[cfg(test)]
-mod partial_ord {
+mod subset_ord {
+    use super::super::SubsetOrd;
     use super::*;
+    use std::cmp::Ordering;
 
     #[test]
     fn same_eq() {
         assert_eq!(IndexSpace::new(2), IndexSpace::new(2));
-    }
-
-    #[test]
-    fn same_cmp_equal() {
-        assert_eq!(IndexSpace::new(2).cmp(&IndexSpace::new(2)), Ordering::Equal);
+        assert_eq!(
+            IndexSpace::new(2).subset_cmp(&IndexSpace::new(2)),
+            Some(Ordering::Equal)
+        );
     }
 
     #[test]
     fn different_not_eq() {
         assert!(IndexSpace::new(2) != IndexSpace::new(1));
+        assert_ne!(
+            IndexSpace::new(2).subset_cmp(&IndexSpace::new(1)),
+            Some(Ordering::Equal)
+        );
     }
 
     #[test]
-    fn same_le() {
-        assert!(IndexSpace::new(2) <= IndexSpace::new(2));
+    fn same_subset_of() {
+        assert!(IndexSpace::new(2).subset_of(&IndexSpace::new(2)));
     }
 
     #[test]
-    fn smaller_lt() {
-        assert!(IndexSpace::new(1) < IndexSpace::new(2));
+    fn smaller_strict_subset_of() {
+        assert!(IndexSpace::new(1).strict_subset_of(&IndexSpace::new(2)));
     }
 
     #[test]
-    #[allow(clippy::neg_cmp_op_on_partial_ord)]
-    fn larger_not_lt() {
-        assert!(!(IndexSpace::new(3) < IndexSpace::new(1)));
+    fn larger_not_subset_of() {
+        assert!(!IndexSpace::new(3).subset_of(&IndexSpace::new(1)));
     }
 }
 

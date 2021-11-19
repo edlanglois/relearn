@@ -1,5 +1,5 @@
 //! Cartesian power space.
-use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space};
+use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space, SubsetOrd};
 use crate::logging::Loggable;
 use num_traits::Float;
 use rand::distributions::Distribution;
@@ -26,9 +26,9 @@ impl<S: Space, const N: usize> Space for PowerSpace<S, N> {
     }
 }
 
-impl<S: Space + PartialOrd, const N: usize> PartialOrd for PowerSpace<S, N> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.inner_space.partial_cmp(&other.inner_space)
+impl<S: SubsetOrd, const N: usize> SubsetOrd for PowerSpace<S, N> {
+    fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.inner_space.subset_cmp(&other.inner_space)
     }
 }
 
@@ -187,7 +187,7 @@ mod space {
 }
 
 #[cfg(test)]
-mod partial_ord {
+mod subset_cmp {
     use super::super::IntervalSpace;
     use super::*;
 
@@ -219,17 +219,15 @@ mod partial_ord {
     fn d2_interval_cmp_equal() {
         assert_eq!(
             PowerSpace::<_, 2>::new(IntervalSpace::<f64>::default())
-                .partial_cmp(&PowerSpace::new(IntervalSpace::default())),
+                .subset_cmp(&PowerSpace::new(IntervalSpace::default())),
             Some(Ordering::Equal)
         );
     }
 
     #[test]
-    fn d2_interval_lt() {
-        assert!(
-            PowerSpace::<_, 2>::new(IntervalSpace::new(0.0, 1.0))
-                < PowerSpace::<_, 2>::new(IntervalSpace::default())
-        );
+    fn d2_interval_strict_subset() {
+        assert!(PowerSpace::<_, 2>::new(IntervalSpace::new(0.0, 1.0))
+            .strict_subset_of(&PowerSpace::<_, 2>::new(IntervalSpace::default())));
     }
 }
 
