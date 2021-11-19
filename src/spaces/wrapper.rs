@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 
 /// A wrapper space that boxes the elements of an inner space.
-pub type BoxSpace<S> = WrapperSpace<S, Box<<S as Space>::Element>>;
+pub type BoxSpace<S> = WrappedElementSpace<S, Box<<S as Space>::Element>>;
 
 impl<S: Space + fmt::Display> fmt::Display for BoxSpace<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -46,13 +46,13 @@ where
     }
 }
 
-/// Wrapper space that wraps the elements of an inner space without changing semantics.
-pub struct WrapperSpace<S, W> {
+/// Space that wraps the elements of an inner space without changing semantics.
+pub struct WrappedElementSpace<S, W> {
     inner_space: S,
     wrapper: PhantomData<fn() -> W>,
 }
 
-impl<S, W> WrapperSpace<S, W> {
+impl<S, W> WrappedElementSpace<S, W> {
     pub fn new(inner_space: S) -> Self {
         Self {
             inner_space,
@@ -61,24 +61,24 @@ impl<S, W> WrapperSpace<S, W> {
     }
 }
 
-impl<S, W> From<S> for WrapperSpace<S, W> {
+impl<S, W> From<S> for WrappedElementSpace<S, W> {
     fn from(inner_space: S) -> Self {
         Self::new(inner_space)
     }
 }
 
-impl<S: fmt::Debug, W> fmt::Debug for WrapperSpace<S, W> {
+impl<S: fmt::Debug, W> fmt::Debug for WrappedElementSpace<S, W> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "WrapperSpace<{}>({:?})",
+            "WrappedElementSpace<{}>({:?})",
             any::type_name::<W>(),
             self.inner_space
         )
     }
 }
 
-impl<S: Default, W> Default for WrapperSpace<S, W> {
+impl<S: Default, W> Default for WrappedElementSpace<S, W> {
     fn default() -> Self {
         Self {
             inner_space: Default::default(),
@@ -87,7 +87,7 @@ impl<S: Default, W> Default for WrapperSpace<S, W> {
     }
 }
 
-impl<S: Clone, W> Clone for WrapperSpace<S, W> {
+impl<S: Clone, W> Clone for WrappedElementSpace<S, W> {
     fn clone(&self) -> Self {
         Self {
             inner_space: self.inner_space.clone(),
@@ -96,35 +96,35 @@ impl<S: Clone, W> Clone for WrapperSpace<S, W> {
     }
 }
 
-impl<S: Copy, W> Copy for WrapperSpace<S, W> {}
+impl<S: Copy, W> Copy for WrappedElementSpace<S, W> {}
 
-impl<S: PartialEq, W> PartialEq for WrapperSpace<S, W> {
+impl<S: PartialEq, W> PartialEq for WrappedElementSpace<S, W> {
     fn eq(&self, other: &Self) -> bool {
         self.inner_space.eq(&other.inner_space)
     }
 }
 
-impl<S: Eq, W> Eq for WrapperSpace<S, W> {}
+impl<S: Eq, W> Eq for WrappedElementSpace<S, W> {}
 
-impl<S: Hash, W> Hash for WrapperSpace<S, W> {
+impl<S: Hash, W> Hash for WrappedElementSpace<S, W> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.inner_space.hash(state)
     }
 }
 
-impl<S: PartialOrd, W> PartialOrd for WrapperSpace<S, W> {
+impl<S: PartialOrd, W> PartialOrd for WrappedElementSpace<S, W> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.inner_space.partial_cmp(&other.inner_space)
     }
 }
 
-impl<S: Ord, W> Ord for WrapperSpace<S, W> {
+impl<S: Ord, W> Ord for WrappedElementSpace<S, W> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.inner_space.cmp(&other.inner_space)
     }
 }
 
-impl<S, W> Space for WrapperSpace<S, W>
+impl<S, W> Space for WrappedElementSpace<S, W>
 where
     S: Space,
     W: Wrapper<Inner = S::Element>,
@@ -136,7 +136,7 @@ where
     }
 }
 
-impl<S, W> FiniteSpace for WrapperSpace<S, W>
+impl<S, W> FiniteSpace for WrappedElementSpace<S, W>
 where
     S: FiniteSpace,
     W: Wrapper<Inner = S::Element>,
@@ -160,7 +160,7 @@ where
     }
 }
 
-impl<S, W> Distribution<<Self as Space>::Element> for WrapperSpace<S, W>
+impl<S, W> Distribution<<Self as Space>::Element> for WrappedElementSpace<S, W>
 where
     S: Space + Distribution<S::Element>,
     W: Wrapper<Inner = S::Element>,
@@ -170,7 +170,7 @@ where
     }
 }
 
-impl<S, W, T, T0> ReprSpace<T, T0> for WrapperSpace<S, W>
+impl<S, W, T, T0> ReprSpace<T, T0> for WrappedElementSpace<S, W>
 where
     S: ReprSpace<T, T0>,
     S::Element: 'static,
@@ -191,7 +191,7 @@ where
     }
 }
 
-impl<S, W> NumFeatures for WrapperSpace<S, W>
+impl<S, W> NumFeatures for WrappedElementSpace<S, W>
 where
     S: Space + NumFeatures,
     W: Wrapper<Inner = S::Element>,
@@ -201,7 +201,7 @@ where
     }
 }
 
-impl<S, W> EncoderFeatureSpace for WrapperSpace<S, W>
+impl<S, W> EncoderFeatureSpace for WrappedElementSpace<S, W>
 where
     S: Space + EncoderFeatureSpace,
     S::Element: 'static,
@@ -266,7 +266,7 @@ where
     }
 }
 
-impl<S, W, T> ElementRefInto<T> for WrapperSpace<S, W>
+impl<S, W, T> ElementRefInto<T> for WrappedElementSpace<S, W>
 where
     S: ElementRefInto<T>,
     W: Wrapper<Inner = S::Element>,
