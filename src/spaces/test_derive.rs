@@ -1,6 +1,8 @@
 use super::{
-    testing, BooleanSpace, FiniteSpace, IndexSpace, IntervalSpace, NumFeatures, Space, SubsetOrd,
+    testing, BooleanSpace, ElementRefInto, FiniteSpace, IndexSpace, IntervalSpace, NumFeatures,
+    Space, SubsetOrd,
 };
+use crate::logging::Loggable;
 use std::cmp::Ordering;
 
 mod unit {
@@ -15,6 +17,7 @@ mod unit {
         SampleSpace,
         NumFeatures,
         EncoderFeatureSpace,
+        LogElementSpace,
     )]
     struct UnitSpace;
 
@@ -94,6 +97,15 @@ mod unit {
             assert_eq!(UnitSpace.num_features(), 0);
         }
     }
+
+    mod log_element_space {
+        use super::*;
+
+        #[test]
+        fn log_element() {
+            assert_eq!(UnitSpace.elem_ref_into(&()), Loggable::Nothing);
+        }
+    }
 }
 
 mod named {
@@ -120,6 +132,7 @@ mod named {
         SampleSpace,
         NumFeatures,
         EncoderFeatureSpace,
+        LogElementSpace,
     )]
     #[element(NamedStruct)]
     struct NamedStructSpace {
@@ -243,6 +256,18 @@ mod named {
             [[0.0, 1.0, 0.0, 0.0], [1.0, 0.0, 0.0, 1.0]]
         );
     }
+
+    mod log_element_space {
+        use super::*;
+
+        #[test]
+        fn log_element() {
+            assert_eq!(
+                space().elem_ref_into(&NamedStruct::new(true, 1)),
+                Loggable::Nothing
+            );
+        }
+    }
 }
 
 mod named_generic {
@@ -268,6 +293,7 @@ mod named_generic {
         SampleSpace,
         NumFeatures,
         EncoderFeatureSpace,
+        LogElementSpace,
     )]
     #[element(NamedGeneric<T::Element>)]
     struct NamedGenericSpace<T> {
@@ -392,6 +418,18 @@ mod named_generic {
             [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
         );
     }
+
+    mod log_element_space {
+        use super::*;
+
+        #[test]
+        fn log_element() {
+            assert_eq!(
+                space().elem_ref_into(&NamedGeneric::new(1)),
+                Loggable::Nothing
+            );
+        }
+    }
 }
 
 mod unnamed {
@@ -406,6 +444,7 @@ mod unnamed {
         SampleSpace,
         NumFeatures,
         EncoderFeatureSpace,
+        LogElementSpace,
     )]
     struct UnnamedStructSpace(BooleanSpace, IndexSpace);
 
@@ -512,6 +551,15 @@ mod unnamed {
             [[0.0, 1.0, 0.0, 0.0], [1.0, 0.0, 0.0, 1.0]]
         );
     }
+
+    mod log_element_space {
+        use super::*;
+
+        #[test]
+        fn log_element() {
+            assert_eq!(space().elem_ref_into(&(true, 1)), Loggable::Nothing);
+        }
+    }
 }
 
 mod unnamed_generic {
@@ -526,6 +574,7 @@ mod unnamed_generic {
         SampleSpace,
         NumFeatures,
         EncoderFeatureSpace,
+        LogElementSpace,
     )]
     struct GenericTriple<T, U>(T, U, U);
 
@@ -717,6 +766,15 @@ mod unnamed_generic {
             [[0.0, 1.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0, 0.0]]
         );
     }
+
+    mod log_element_space {
+        use super::*;
+
+        #[test]
+        fn log_element() {
+            assert_eq!(space().elem_ref_into(&(1, true, false)), Loggable::Nothing);
+        }
+    }
 }
 
 /// No runtime tests, just make sure everything compiles
@@ -733,6 +791,7 @@ mod unnamed_one {
         SampleSpace,
         NumFeatures,
         EncoderFeatureSpace,
+        LogElementSpace,
     )]
     struct UnnamedOne<T>(T);
 }

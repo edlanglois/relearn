@@ -33,7 +33,8 @@ pub use wrapper::BoxSpace;
 
 // Re-export space macros from relearn_derive
 pub use relearn_derive::{
-    EncoderFeatureSpace, FiniteSpace, Indexed, NumFeatures, SampleSpace, Space, SubsetOrd,
+    EncoderFeatureSpace, FiniteSpace, Indexed, LogElementSpace, NumFeatures, SampleSpace, Space,
+    SubsetOrd,
 };
 
 use crate::utils::distributions::ArrayDistribution;

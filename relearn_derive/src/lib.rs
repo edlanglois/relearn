@@ -107,6 +107,16 @@ pub fn encoder_feature_space_macro_derive(input: TokenStream) -> TokenStream {
     space::impl_space_trait_macro::<space::EncoderFeatureSpaceImpl>(ast)
 }
 
+/// Derive trivial `relearn::spaces::ElementRefInto<Loggable>` for a struct.
+///
+/// Always just returns `Loggable` since the elements will in general be too complex
+/// for the loggable types.
+#[proc_macro_derive(LogElementSpace)]
+pub fn log_element_space_macro_derive(input: TokenStream) -> TokenStream {
+    let ast = syn::parse(input).unwrap();
+    space::impl_space_trait_macro::<space::LogElementSpaceImpl>(ast)
+}
+
 fn add_trait_bounds(mut generics: Generics, bound: &TypeParamBound) -> Generics {
     for param in &mut generics.params {
         if let GenericParam::Type(ref mut type_param) = *param {
