@@ -4,7 +4,7 @@ use super::{
     EnvStructure, Environment, Pomdp, PomdpDistribution,
 };
 use crate::logging::Logger;
-use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, Space, TupleSpace2, TupleSpace3};
+use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
@@ -20,15 +20,7 @@ use rand::SeedableRng;
 /// The step metadata from the inner environment are embedded as observations.
 ///
 /// # Observations
-/// An observation is a tuple consisting of:
-/// * `inner_observation` - The current inner observation on which the next step will act.
-///                             Is `None` if this is a terminal state,
-///                             in which case `episode_done` must be `True`.
-/// * `step_action`       - The action selected by the agent on the previous step.
-///                             Is `None` if this is the first step of an inner episode.
-/// * `step_reward`       - The reward earned on the previous step.
-///                             Is `None` if this is the first step of an inner episode.
-/// * `episode_done`      - Whether the previous step ended the inner episode.
+/// A [`MetaObservation`].
 ///
 /// # Actions
 /// The action space is the same as the action space of the inner environments.
@@ -107,7 +99,7 @@ where
     type ActionSpace = E::ActionSpace;
 
     fn observation_space(&self) -> Self::ObservationSpace {
-        meta_observation_space(&self.env_distribution)
+        MetaObservationSpace::from_inner_env(&self.env_distribution)
     }
     fn action_space(&self) -> Self::ActionSpace {
         self.env_distribution.action_space()
@@ -138,7 +130,7 @@ where
             inner_env,
             inner_state: Some(inner_state),
             episode_index: 0,
-            prev_step_info: None,
+            prev_step_obs: None,
             inner_episode_done: false,
         }
     }
@@ -148,9 +140,11 @@ where
             .inner_state
             .as_ref()
             .map(|s| state.inner_env.observe(s, rng));
-        let step_info = state.prev_step_info;
-        let episode_done = state.inner_episode_done;
-        (inner_observation, step_info, episode_done)
+        MetaObservation {
+            inner_observation,
+            prev_step: state.prev_step_obs,
+            episode_done: state.inner_episode_done,
+        }
     }
 
     fn step(
@@ -167,7 +161,7 @@ where
                 inner_env: state.inner_env,
                 inner_state: Some(inner_state),
                 episode_index: state.episode_index,
-                prev_step_info: None,
+                prev_step_obs: None,
                 inner_episode_done: false,
             };
             (Some(state), 0.0, false)
@@ -195,7 +189,10 @@ where
                 inner_env: state.inner_env,
                 inner_state,
                 episode_index,
-                prev_step_info: Some((*action, inner_step_reward)),
+                prev_step_obs: Some(InnerStepObs {
+                    action: *action,
+                    reward: inner_step_reward,
+                }),
                 inner_episode_done,
             };
             (Some(state), inner_step_reward, trial_done)
@@ -294,7 +291,7 @@ impl<E: EnvDistribution + EnvStructure> EnvStructure for MetaEnv<E> {
     type ActionSpace = E::ActionSpace;
 
     fn observation_space(&self) -> Self::ObservationSpace {
-        meta_observation_space(&self.env_distribution)
+        MetaObservationSpace::from_inner_env(&self.env_distribution)
     }
     fn action_space(&self) -> Self::ActionSpace {
         self.env_distribution.action_space()
@@ -328,17 +325,24 @@ where
             // Ignore the action and start a new inner episode
             let inner_observation = env.reset();
             self.inner_episode_done = false;
-            let observation = (Some(inner_observation), None, false);
+            let observation = MetaObservation {
+                inner_observation: Some(inner_observation),
+                prev_step: None,
+                episode_done: false,
+            };
             (Some(observation), 0.0, false)
         } else {
             // Take a step in the inner episode
             let (inner_observation, reward, inner_episode_done) = env.step(action, logger);
             self.inner_episode_done = inner_episode_done;
-            let observation = (
+            let observation = MetaObservation {
                 inner_observation,
-                Some((*action, reward)),
-                inner_episode_done,
-            );
+                prev_step: Some(InnerStepObs {
+                    action: *action,
+                    reward,
+                }),
+                episode_done: inner_episode_done,
+            };
 
             let mut trial_done = false;
             if inner_episode_done {
@@ -363,34 +367,85 @@ where
         self.env = Some(env);
         self.episode_index = 0;
         self.inner_episode_done = false;
-        (Some(inner_observation), None, false)
+        MetaObservation {
+            inner_observation: Some(inner_observation),
+            prev_step: None,
+            episode_done: false,
+        }
     }
 }
 
 // # Meta Environment Types
 
-/// Observation type for [`MetaPomdp`] and [`MetaEnv`].
-///
-/// See [`MetaPomdp`] and [`MetaObservationSpace`] for details.
-pub type MetaObservation<O, A> = (Option<O>, Option<(A, f64)>, bool);
+/// Observation of a completed inner step in a meta environment.
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct InnerStepObs<A> {
+    /// Action selected by the agent on the step.
+    pub action: A,
+    /// Reward earned on the step.
+    pub reward: f64,
+}
 
-/// Meta-environment observation space. See [`MetaPomdp`] for details.
-pub type MetaObservationSpace<OS, AS> =
-    TupleSpace3<OptionSpace<OS>, OptionSpace<TupleSpace2<AS, IntervalSpace<f64>>>, BooleanSpace>;
+/// Observation space for [`InnerStepObs`].
+#[derive(Debug, Copy, Clone, PartialEq, ProductSpace)]
+#[element(InnerStepObs<AS::Element>)]
+pub struct InnerStepObsSpace<AS> {
+    pub action: AS,
+    pub reward: IntervalSpace<f64>,
+}
 
-/// Construct the meta observation space for an inner environment structure.
-fn meta_observation_space<E: EnvStructure + ?Sized>(
-    env: &E,
-) -> MetaObservationSpace<E::ObservationSpace, E::ActionSpace> {
-    let (min_reward, max_reward) = env.reward_range();
-    TupleSpace3(
-        OptionSpace::new(env.observation_space()),
-        OptionSpace::new(TupleSpace2(
-            env.action_space(),
-            IntervalSpace::new(min_reward, max_reward),
-        )),
-        BooleanSpace::new(),
-    )
+impl<AS> InnerStepObsSpace<AS> {
+    /// Construct a step observation space from an inner environment structure
+    fn from_inner_env<E>(env: &E) -> Self
+    where
+        E: EnvStructure<ActionSpace = AS> + ?Sized,
+    {
+        let (min_reward, max_reward) = env.reward_range();
+        Self {
+            action: env.action_space(),
+            reward: IntervalSpace::new(min_reward, max_reward),
+        }
+    }
+}
+
+/// An observation from a meta enviornment.
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct MetaObservation<O, A> {
+    /// The current inner observation on which the next step will act.
+    ///
+    /// Is `None` if this is a terminal state, in which case `episode_done` must be `True`.
+    pub inner_observation: Option<O>,
+
+    /// Observation of the previous inner step.
+    ///
+    /// Is `None` if this is the first step of an inner episode.
+    pub prev_step: Option<InnerStepObs<A>>,
+
+    /// Whether the previous step ended the inner episode.
+    pub episode_done: bool,
+}
+
+/// [`MetaPomdp`] observation space for element [`MetaObservation`].
+#[derive(Debug, Copy, Clone, PartialEq, ProductSpace)]
+#[element(MetaObservation<OS::Element, AS::Element>)]
+pub struct MetaObservationSpace<OS, AS> {
+    pub inner_observation: OptionSpace<OS>,
+    pub prev_step: OptionSpace<InnerStepObsSpace<AS>>,
+    pub episode_done: BooleanSpace,
+}
+
+impl<OS, AS> MetaObservationSpace<OS, AS> {
+    /// Construct a meta observation space from an inner environment structure
+    fn from_inner_env<E>(env: &E) -> Self
+    where
+        E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
+    {
+        Self {
+            inner_observation: OptionSpace::new(env.observation_space()),
+            prev_step: OptionSpace::new(InnerStepObsSpace::from_inner_env(env)),
+            episode_done: BooleanSpace,
+        }
+    }
 }
 
 /// The state of a [`MetaPomdp`].
@@ -402,8 +457,8 @@ pub struct MetaState<E: Pomdp> {
     inner_state: Option<E::State>,
     /// The inner episode index within the current trial.
     episode_index: usize,
-    /// Details of the previous step of this inner episode. A copy of the action and the reward.
-    prev_step_info: Option<(E::Action, f64)>,
+    /// Observation of the previous step of this inner episode.
+    prev_step_obs: Option<InnerStepObs<E::Action>>,
     /// Whether the previous step ended the inner episode.
     inner_episode_done: bool,
 }
@@ -443,7 +498,7 @@ where
     type ActionSpace = AS;
 
     fn observation_space(&self) -> Self::ObservationSpace {
-        self.0.observation_space().0.inner
+        self.0.observation_space().inner_observation.inner
     }
     fn action_space(&self) -> Self::ActionSpace {
         self.0.action_space()
@@ -493,7 +548,14 @@ mod meta_env_bandits {
 
         // Trial 0; Ep 0; Init
         let state = env.initial_state(&mut rng);
-        assert_eq!(env.observe(&state, &mut rng), (Some(()), None, false));
+        assert_eq!(
+            env.observe(&state, &mut rng),
+            MetaObservation {
+                inner_observation: Some(()),
+                prev_step: None,
+                episode_done: false
+            }
+        );
 
         // Trial 0; Ep 0; Step 0
         // Take action 0 and get 1 reward
@@ -502,7 +564,17 @@ mod meta_env_bandits {
         assert_eq!(reward, 1.0);
         assert!(!trial_done);
         let state = maybe_state.unwrap();
-        assert_eq!(env.observe(&state, &mut rng), (None, Some((0, 1.0)), true));
+        assert_eq!(
+            env.observe(&state, &mut rng),
+            MetaObservation {
+                inner_observation: None,
+                prev_step: Some(InnerStepObs {
+                    action: 0,
+                    reward: 1.0
+                }),
+                episode_done: true
+            }
+        );
 
         // Trial 0; Ep 1; Init.
         // The action is ignored and a new inner episode is started.
@@ -510,7 +582,14 @@ mod meta_env_bandits {
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         let state = maybe_state.unwrap();
-        assert_eq!(env.observe(&state, &mut rng), (Some(()), None, false));
+        assert_eq!(
+            env.observe(&state, &mut rng),
+            MetaObservation {
+                inner_observation: Some(()),
+                prev_step: None,
+                episode_done: false
+            }
+        );
 
         // Trial 0; Ep 1; Step 0
         // Take action 1 and get 0 reward
@@ -519,7 +598,17 @@ mod meta_env_bandits {
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         let state = maybe_state.unwrap();
-        assert_eq!(env.observe(&state, &mut rng), (None, Some((1, 0.0)), true));
+        assert_eq!(
+            env.observe(&state, &mut rng),
+            MetaObservation {
+                inner_observation: None,
+                prev_step: Some(InnerStepObs {
+                    action: 1,
+                    reward: 0.0
+                }),
+                episode_done: true
+            }
+        );
 
         // Trial 0; Ep 2; Init.
         // The action is ignored and a new inner episode is started.
@@ -527,7 +616,14 @@ mod meta_env_bandits {
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         let state = maybe_state.unwrap();
-        assert_eq!(env.observe(&state, &mut rng), (Some(()), None, false));
+        assert_eq!(
+            env.observe(&state, &mut rng),
+            MetaObservation {
+                inner_observation: Some(()),
+                prev_step: None,
+                episode_done: false
+            }
+        );
 
         // Trial 0; Ep 2; Step 0
         // Take action 0 and get 1 reward
@@ -537,11 +633,28 @@ mod meta_env_bandits {
         assert_eq!(reward, 1.0);
         assert!(trial_done);
         let state = maybe_state.unwrap();
-        assert_eq!(env.observe(&state, &mut rng), (None, Some((0, 1.0)), true));
+        assert_eq!(
+            env.observe(&state, &mut rng),
+            MetaObservation {
+                inner_observation: None,
+                prev_step: Some(InnerStepObs {
+                    action: 0,
+                    reward: 1.0
+                }),
+                episode_done: true
+            }
+        );
 
         // Trial 1; Ep 1; Init.
         let state = env.initial_state(&mut rng);
-        assert_eq!(env.observe(&state, &mut rng), (Some(()), None, false));
+        assert_eq!(
+            env.observe(&state, &mut rng),
+            MetaObservation {
+                inner_observation: Some(()),
+                prev_step: None,
+                episode_done: false
+            }
+        );
 
         // Trial 1; Ep 0; Step 0
         // Take action 0 and get 0 reward, since now 1 is the target action
@@ -550,7 +663,17 @@ mod meta_env_bandits {
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
         let state = maybe_state.unwrap();
-        assert_eq!(env.observe(&state, &mut rng), (None, Some((0, 0.0)), true));
+        assert_eq!(
+            env.observe(&state, &mut rng),
+            MetaObservation {
+                inner_observation: None,
+                prev_step: Some(InnerStepObs {
+                    action: 0,
+                    reward: 0.0
+                }),
+                episode_done: true
+            }
+        );
     }
 
     #[test]
@@ -559,7 +682,14 @@ mod meta_env_bandits {
 
         // Trial 0; Ep 0; Init
         let observation = env.reset();
-        assert_eq!(observation, (Some(()), None, false));
+        assert_eq!(
+            observation,
+            MetaObservation {
+                inner_observation: Some(()),
+                prev_step: None,
+                episode_done: false
+            }
+        );
 
         // Trial 0; Ep 0; Step 0
         // Take action 0 and get 1 reward
@@ -567,14 +697,31 @@ mod meta_env_bandits {
         let (observation, reward, trial_done) = env.step(&0, &mut ());
         assert_eq!(reward, 1.0);
         assert!(!trial_done);
-        assert_eq!(observation, Some((None, Some((0, 1.0)), true)));
+        assert_eq!(
+            observation,
+            Some(MetaObservation {
+                inner_observation: None,
+                prev_step: Some(InnerStepObs {
+                    action: 0,
+                    reward: 1.0
+                }),
+                episode_done: true
+            })
+        );
 
         // Trial 0; Ep 1; Init.
         // The action is ignored and a new inner episode is started.
         let (observation, reward, trial_done) = env.step(&0, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
-        assert_eq!(observation, Some((Some(()), None, false)));
+        assert_eq!(
+            observation,
+            Some(MetaObservation {
+                inner_observation: Some(()),
+                prev_step: None,
+                episode_done: false
+            })
+        );
 
         // Trial 0; Ep 1; Step 0
         // Take action 1 and get 0 reward
@@ -582,14 +729,31 @@ mod meta_env_bandits {
         let (observation, reward, trial_done) = env.step(&1, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
-        assert_eq!(observation, Some((None, Some((1, 0.0)), true)));
+        assert_eq!(
+            observation,
+            Some(MetaObservation {
+                inner_observation: None,
+                prev_step: Some(InnerStepObs {
+                    action: 1,
+                    reward: 0.0
+                }),
+                episode_done: true
+            })
+        );
 
         // Trial 0; Ep 2; Init.
         // The action is ignored and a new inner episode is started.
         let (observation, reward, trial_done) = env.step(&1, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
-        assert_eq!(observation, Some((Some(()), None, false)));
+        assert_eq!(
+            observation,
+            Some(MetaObservation {
+                inner_observation: Some(()),
+                prev_step: None,
+                episode_done: false
+            })
+        );
 
         // Trial 0; Ep 2; Step 0
         // Take action 0 and get 1 reward
@@ -598,11 +762,28 @@ mod meta_env_bandits {
         let (observation, reward, trial_done) = env.step(&0, &mut ());
         assert_eq!(reward, 1.0);
         assert!(trial_done);
-        assert_eq!(observation, Some((None, Some((0, 1.0)), true)));
+        assert_eq!(
+            observation,
+            Some(MetaObservation {
+                inner_observation: None,
+                prev_step: Some(InnerStepObs {
+                    action: 0,
+                    reward: 1.0
+                }),
+                episode_done: true
+            })
+        );
 
         // Trial 1; Ep 1; Init.
         let observation = env.reset();
-        assert_eq!(observation, (Some(()), None, false));
+        assert_eq!(
+            observation,
+            MetaObservation {
+                inner_observation: Some(()),
+                prev_step: None,
+                episode_done: false
+            }
+        );
 
         // Trial 1; Ep 0; Step 0
         // Take action 0 and get 0 reward, since now 1 is the target action
@@ -610,6 +791,16 @@ mod meta_env_bandits {
         let (observation, reward, trial_done) = env.step(&0, &mut ());
         assert_eq!(reward, 0.0);
         assert!(!trial_done);
-        assert_eq!(observation, Some((None, Some((0, 0.0)), true)));
+        assert_eq!(
+            observation,
+            Some(MetaObservation {
+                inner_observation: None,
+                prev_step: Some(InnerStepObs {
+                    action: 0,
+                    reward: 0.0
+                }),
+                episode_done: true
+            })
+        );
     }
 }

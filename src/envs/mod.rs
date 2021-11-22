@@ -21,7 +21,8 @@ pub use chain::Chain;
 pub use mdps::DirichletRandomMdps;
 pub use memory::MemoryGame;
 pub use meta::{
-    InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaObservationSpace, MetaPomdp, MetaState,
+    InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaObservation, MetaObservationSpace, MetaPomdp,
+    MetaState,
 };
 pub use multiagent::fruit::FruitGame;
 pub use multiagent::views::{FirstPlayerView, SecondPlayerView};

@@ -1,6 +1,8 @@
 //! Meta agents
 use super::{Actor, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
-use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace, StoredEnvStructure};
+use crate::envs::{
+    EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
+};
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::{SampleSpace, Space};
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -93,11 +95,10 @@ where
 {
     fn act(
         &mut self,
-        observation: &<MetaObservationSpace<OS, AS> as Space>::Element,
+        // obs: &<MetaObservationSpace<OS, AS> as Space>::Element, // XXX
+        obs: &MetaObservation<OS::Element, AS::Element>,
         new_episode: bool,
     ) -> AS::Element {
-        let (inner_observation, step_info, episode_done) = observation;
-
         if new_episode {
             // Reset the agent
             self.agent = self
@@ -106,36 +107,36 @@ where
                 .expect("Failed to build inner agent");
             self.prev_observation = None;
             self.prev_episode_done = true;
-        } else if let Some((action, reward)) = step_info {
+        } else if let Some(ref step_obs) = &obs.prev_step {
             // Update the agent based on the most recent step result
             // Only relevant if the agent has not been reset.
             let step = Step {
                 observation: self.prev_observation.take().expect(
                     "Meta observation follows a previous step but no previous observation stored",
                 ),
-                action: action.clone(),
-                reward: *reward,
-                next_observation: inner_observation.as_ref().cloned(),
-                episode_done: *episode_done,
+                action: step_obs.action.clone(),
+                reward: step_obs.reward,
+                next_observation: obs.inner_observation.as_ref().cloned(),
+                episode_done: obs.episode_done,
             };
             self.agent.update(step, &mut ());
         }
 
-        let action = if let Some(inner_observation) = inner_observation {
+        let action = if let Some(ref inner_observation) = &obs.inner_observation {
             self.agent.act(inner_observation, self.prev_episode_done)
         } else {
             // If there is no inner observation then the current state is terminal
             // and the inner episode is done so whatever this action is, it will be ignored.
             assert!(
-                *episode_done,
+                obs.episode_done,
                 "Expecting episode_done if inner_observation is None"
             );
             // TODO: Replace with a non-random some_element() method
             self.inner_env_structure.action_space.sample(&mut self.rng)
         };
 
-        self.prev_observation = inner_observation.as_ref().cloned();
-        self.prev_episode_done = *episode_done;
+        self.prev_observation = obs.inner_observation.as_ref().cloned();
+        self.prev_episode_done = obs.episode_done;
 
         action
     }
