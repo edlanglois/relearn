@@ -188,7 +188,7 @@ impl SubsetOrdForTuples for Tuple {
     fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
         let mut state = Ordering::Equal;
         for_tuples!( #(
-            state = product_subset_ord(Some(state), self.Tuple.subset_cmp(&other.Tuple))?;
+            state = product_subset_ord(state, self.Tuple.subset_cmp(&other.Tuple))?;
         )* );
         Some(state)
     }

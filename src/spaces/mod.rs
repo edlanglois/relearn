@@ -18,6 +18,8 @@ mod option;
 mod power;
 mod product;
 mod singleton;
+#[cfg(test)]
+mod test_derive;
 mod wrapper;
 
 pub use array::ArraySpace;
@@ -33,8 +35,10 @@ pub use product::ProductSpace;
 pub use singleton::SingletonSpace;
 pub use wrapper::BoxSpace;
 
-// Re-export Indexed macro from relearn_derive
-pub use relearn_derive::Indexed;
+// Re-export space macros from relearn_derive
+pub use relearn_derive::{
+    EncoderFeatureSpace, FiniteSpace, Indexed, NumFeatures, SampleSpace, Space, SubsetOrd,
+};
 
 use crate::utils::distributions::ArrayDistribution;
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
@@ -103,13 +107,13 @@ pub trait SubsetOrd: PartialEq<Self> {
 /// * `Greater` if both factors are `Equal` or `Greater` and at least one is `Greater`,
 /// * `None` otherwise.
 #[inline]
-pub const fn product_subset_ord(a: Option<Ordering>, b: Option<Ordering>) -> Option<Ordering> {
+pub const fn product_subset_ord(a: Ordering, b: Option<Ordering>) -> Option<Ordering> {
     use Ordering::*;
     match (a, b) {
-        (Some(Equal), x) => x,
-        (x, Some(Equal)) => x,
-        (Some(Less), Some(Less)) => Some(Less),
-        (Some(Greater), Some(Greater)) => Some(Greater),
+        (Equal, Some(x)) => Some(x),
+        (x, Some(Equal)) => Some(x),
+        (Less, Some(Less)) => Some(Less),
+        (Greater, Some(Greater)) => Some(Greater),
         _ => None,
     }
 }
@@ -127,9 +131,7 @@ pub fn iter_product_subset_ord<I: IntoIterator<Item = Option<Ordering>>>(
 ) -> Option<Ordering> {
     ord_factors
         .into_iter()
-        .try_fold(Ordering::Equal, |prev, cmp| {
-            product_subset_ord(Some(prev), cmp)
-        })
+        .try_fold(Ordering::Equal, product_subset_ord)
 }
 
 /// A space containing finitely many elements.
