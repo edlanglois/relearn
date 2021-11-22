@@ -1,4 +1,8 @@
 //! Spaces: runtime-defined types
+//!
+//! In addition to the spaces defined here,
+//! a product space can be derived on structures containing inner spaces with
+//! [`#[derive(ProductSpace)]`](ProductSpace).
 #[cfg(test)]
 #[macro_use]
 pub mod testing;
@@ -33,8 +37,8 @@ pub use wrapper::BoxSpace;
 
 // Re-export space macros from relearn_derive
 pub use relearn_derive::{
-    EncoderFeatureSpace, FiniteSpace, Indexed, LogElementSpace, NumFeatures, SampleSpace, Space,
-    SubsetOrd,
+    EncoderFeatureSpace, FiniteSpace, Indexed, LogElementSpace, NumFeatures, ProductSpace,
+    SampleSpace, Space, SubsetOrd,
 };
 
 use crate::utils::distributions::ArrayDistribution;

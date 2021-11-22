@@ -16,10 +16,10 @@ pub(crate) fn impl_space_trait_macro<T: SpaceTraitImpl>(input: DeriveInput) -> T
         // Each field is expected to be a space.
         Data::Struct(data) => match data.fields {
             Fields::Named(ref fields) => {
-                T::impl_trait(input.ident, input.generics, (fields, &input.attrs as &[_]))
+                T::impl_trait(&input.ident, input.generics, (fields, &input.attrs as &[_]))
             }
-            Fields::Unnamed(ref fields) => T::impl_trait(input.ident, input.generics, fields),
-            Fields::Unit => T::impl_trait(input.ident, input.generics, ()),
+            Fields::Unnamed(ref fields) => T::impl_trait(&input.ident, input.generics, fields),
+            Fields::Unit => T::impl_trait(&input.ident, input.generics, ()),
         },
         _ => unimplemented!("only supports structs"),
     }
@@ -173,12 +173,16 @@ pub(crate) trait SpaceTraitImpl {
     /// * `name`     - Name of the struct
     /// * `generics` - Generics in the struct definition
     /// * `struct_`  - Space struct fields / element.
-    fn impl_trait<T: SpaceStruct>(name: Ident, generics: Generics, struct_: T) -> TokenStream2;
+    fn impl_trait<T: SpaceStruct + Copy>(
+        name: &Ident,
+        generics: Generics,
+        struct_: T,
+    ) -> TokenStream2;
 }
 
 pub(crate) struct SpaceImpl;
 impl SpaceTraitImpl for SpaceImpl {
-    fn impl_trait<T: SpaceStruct>(name: Ident, generics: Generics, struct_: T) -> TokenStream2 {
+    fn impl_trait<T: SpaceStruct>(name: &Ident, generics: Generics, struct_: T) -> TokenStream2 {
         let generics = add_trait_bounds(generics, &parse_quote!(::relearn::spaces::Space));
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -206,7 +210,7 @@ impl SpaceTraitImpl for SpaceImpl {
 
 pub(crate) struct SubsetOrdImpl;
 impl SpaceTraitImpl for SubsetOrdImpl {
-    fn impl_trait<T: SpaceStruct>(name: Ident, generics: Generics, struct_: T) -> TokenStream2 {
+    fn impl_trait<T: SpaceStruct>(name: &Ident, generics: Generics, struct_: T) -> TokenStream2 {
         let generics = add_trait_bounds(generics, &parse_quote!(::relearn::spaces::SubsetOrd));
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -229,7 +233,7 @@ impl SpaceTraitImpl for SubsetOrdImpl {
 
 pub(crate) struct FiniteSpaceImpl;
 impl SpaceTraitImpl for FiniteSpaceImpl {
-    fn impl_trait<T: SpaceStruct>(name: Ident, generics: Generics, struct_: T) -> TokenStream2 {
+    fn impl_trait<T: SpaceStruct>(name: &Ident, generics: Generics, struct_: T) -> TokenStream2 {
         let generics = add_trait_bounds(generics, &parse_quote!(::relearn::spaces::FiniteSpace));
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -296,7 +300,11 @@ impl SpaceTraitImpl for FiniteSpaceImpl {
 
 pub(crate) struct SampleSpaceImpl;
 impl SpaceTraitImpl for SampleSpaceImpl {
-    fn impl_trait<T: SpaceStruct>(name: Ident, mut generics: Generics, struct_: T) -> TokenStream2 {
+    fn impl_trait<T: SpaceStruct>(
+        name: &Ident,
+        mut generics: Generics,
+        struct_: T,
+    ) -> TokenStream2 {
         // Add distribution trait bounds
         for param in &mut generics.params {
             if let GenericParam::Type(ref mut type_param) = *param {
@@ -336,7 +344,7 @@ impl SpaceTraitImpl for SampleSpaceImpl {
 
 pub(crate) struct NumFeaturesImpl;
 impl SpaceTraitImpl for NumFeaturesImpl {
-    fn impl_trait<T: SpaceStruct>(name: Ident, generics: Generics, struct_: T) -> TokenStream2 {
+    fn impl_trait<T: SpaceStruct>(name: &Ident, generics: Generics, struct_: T) -> TokenStream2 {
         let generics = add_trait_bounds(generics, &parse_quote!(::relearn::spaces::NumFeatures));
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -358,7 +366,7 @@ impl SpaceTraitImpl for NumFeaturesImpl {
 
 pub(crate) struct EncoderFeatureSpaceImpl;
 impl SpaceTraitImpl for EncoderFeatureSpaceImpl {
-    fn impl_trait<T: SpaceStruct>(name: Ident, generics: Generics, struct_: T) -> TokenStream2 {
+    fn impl_trait<T: SpaceStruct>(name: &Ident, generics: Generics, struct_: T) -> TokenStream2 {
         let generics = add_trait_bounds(
             generics,
             &parse_quote!(::relearn::spaces::EncoderFeatureSpace),
@@ -441,7 +449,7 @@ impl SpaceTraitImpl for EncoderFeatureSpaceImpl {
 
 pub(crate) struct LogElementSpaceImpl;
 impl SpaceTraitImpl for LogElementSpaceImpl {
-    fn impl_trait<T: SpaceStruct>(name: Ident, generics: Generics, _struct: T) -> TokenStream2 {
+    fn impl_trait<T: SpaceStruct>(name: &Ident, generics: Generics, _struct: T) -> TokenStream2 {
         let generics = add_trait_bounds(generics, &parse_quote!(::relearn::spaces::Space));
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -452,5 +460,26 @@ impl SpaceTraitImpl for LogElementSpaceImpl {
                 }
             }
         }
+    }
+}
+
+/// Derives [`Space`] and all other common space traits for a struct as a product space.
+pub(crate) struct ProductSpaceImpl;
+impl SpaceTraitImpl for ProductSpaceImpl {
+    fn impl_trait<T>(name: &Ident, generics: Generics, struct_: T) -> TokenStream2
+    where
+        T: SpaceStruct + Copy,
+    {
+        let impls = vec![
+            SpaceImpl::impl_trait(name, generics.clone(), struct_),
+            SubsetOrdImpl::impl_trait(name, generics.clone(), struct_),
+            FiniteSpaceImpl::impl_trait(name, generics.clone(), struct_),
+            SampleSpaceImpl::impl_trait(name, generics.clone(), struct_),
+            NumFeaturesImpl::impl_trait(name, generics.clone(), struct_),
+            EncoderFeatureSpaceImpl::impl_trait(name, generics.clone(), struct_),
+            LogElementSpaceImpl::impl_trait(name, generics, struct_),
+        ];
+
+        impls.into_iter().collect()
     }
 }
