@@ -1,6 +1,6 @@
 use crate::envs::{BuildEnvError, BuildPomdp, EnvStructure, Environment, Pomdp};
 use crate::logging::Logger;
-use crate::spaces::{ProductSpace, Space};
+use crate::spaces::{Space, TupleSpace2};
 use rand::rngs::StdRng;
 
 /// Wraps a two-player game as a one-player game for the first player.
@@ -24,8 +24,8 @@ where
         // values but are not inferred automatically.
         Observation = (OS1::Element, OS2::Element),
         Action = (AS1::Element, AS2::Element),
-        ObservationSpace = ProductSpace<(OS1, OS2)>,
-        ActionSpace = ProductSpace<(AS1, AS2)>,
+        ObservationSpace = TupleSpace2<OS1, OS2>,
+        ActionSpace = TupleSpace2<AS1, AS2>,
     >,
     OS1: Space,
     OS2: Space,
@@ -50,10 +50,7 @@ where
 
 impl<E, OS1, OS2, AS1, AS2> EnvStructure for FirstPlayerView<E>
 where
-    E: EnvStructure<
-        ObservationSpace = ProductSpace<(OS1, OS2)>,
-        ActionSpace = ProductSpace<(AS1, AS2)>,
-    >,
+    E: EnvStructure<ObservationSpace = TupleSpace2<OS1, OS2>, ActionSpace = TupleSpace2<AS1, AS2>>,
     OS1: Space,
     AS1: Space,
 {
@@ -61,10 +58,10 @@ where
     type ActionSpace = AS1;
 
     fn observation_space(&self) -> Self::ObservationSpace {
-        self.inner.observation_space().inner_spaces.0
+        self.inner.observation_space().0
     }
     fn action_space(&self) -> Self::ActionSpace {
-        self.inner.action_space().inner_spaces.0
+        self.inner.action_space().0
     }
     fn reward_range(&self) -> (f64, f64) {
         self.inner.reward_range()
@@ -150,8 +147,8 @@ where
         // values but are not inferred automatically.
         Observation = (OS1::Element, OS2::Element),
         Action = (AS1::Element, AS2::Element),
-        ObservationSpace = ProductSpace<(OS1, OS2)>,
-        ActionSpace = ProductSpace<(AS1, AS2)>,
+        ObservationSpace = TupleSpace2<OS1, OS2>,
+        ActionSpace = TupleSpace2<AS1, AS2>,
     >,
     OS1: Space,
     OS2: Space,
@@ -176,10 +173,7 @@ where
 
 impl<E, OS1, OS2, AS1, AS2> EnvStructure for SecondPlayerView<E>
 where
-    E: EnvStructure<
-        ObservationSpace = ProductSpace<(OS1, OS2)>,
-        ActionSpace = ProductSpace<(AS1, AS2)>,
-    >,
+    E: EnvStructure<ObservationSpace = TupleSpace2<OS1, OS2>, ActionSpace = TupleSpace2<AS1, AS2>>,
     OS2: Space,
     AS2: Space,
 {
@@ -187,10 +181,10 @@ where
     type ActionSpace = AS2;
 
     fn observation_space(&self) -> Self::ObservationSpace {
-        self.inner.observation_space().inner_spaces.1
+        self.inner.observation_space().1
     }
     fn action_space(&self) -> Self::ActionSpace {
-        self.inner.action_space().inner_spaces.1
+        self.inner.action_space().1
     }
     fn reward_range(&self) -> (f64, f64) {
         self.inner.reward_range()

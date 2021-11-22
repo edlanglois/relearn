@@ -14,7 +14,7 @@ use std::ops::Range;
 ///
 /// An `ArraySpace` is more general than a [`PowerSpace`](super::PowerSpace) because the inner
 /// spaces do not all have to be the same, but less general than
-/// a [`ProductSpace`](super::ProductSpace) because the inner spaces must have the same type.
+/// a [tuple space](super::TupleSpace2) because the inner spaces must have the same type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ArraySpace<S, const N: usize> {
     inner_spaces: [S; N],

@@ -1,6 +1,6 @@
 use super::{BuildEnvError, BuildPomdp, EnvStructure, Pomdp};
 use crate::logging::Logger;
-use crate::spaces::{Indexed, IndexedTypeSpace, IntervalSpace, ProductSpace};
+use crate::spaces::{Indexed, IndexedTypeSpace, IntervalSpace, TupleSpace4};
 use rand::{
     distributions::{Distribution, Uniform},
     rngs::StdRng,
@@ -19,8 +19,7 @@ impl BuildPomdp for CartPoleConfig {
     type State = CartPoleState;
     type Observation = (f64, f64, f64, f64);
     type Action = Push;
-    type ObservationSpace =
-        ProductSpace<(IntervalSpace, IntervalSpace, IntervalSpace, IntervalSpace)>;
+    type ObservationSpace = TupleSpace4<IntervalSpace, IntervalSpace, IntervalSpace, IntervalSpace>;
     type ActionSpace = IndexedTypeSpace<Push>;
     type Pomdp = CartPole;
 
@@ -66,19 +65,18 @@ pub enum Push {
 
 impl EnvStructure for CartPole {
     /// `(cart_position, cart_velocity, pole_angle, pole_angular_velocity)`
-    type ObservationSpace =
-        ProductSpace<(IntervalSpace, IntervalSpace, IntervalSpace, IntervalSpace)>;
+    type ObservationSpace = TupleSpace4<IntervalSpace, IntervalSpace, IntervalSpace, IntervalSpace>;
     type ActionSpace = IndexedTypeSpace<Push>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         let max_pos = self.env.max_pos;
         let max_angle = self.env.max_angle;
-        ProductSpace::new((
+        TupleSpace4(
             IntervalSpace::new(-max_pos, max_pos),     // cart_position
             IntervalSpace::default(),                  // cart_velocity
             IntervalSpace::new(-max_angle, max_angle), // pole_angle
             IntervalSpace::default(),                  // pole_angular_velocity
-        ))
+        )
     }
 
     fn action_space(&self) -> Self::ActionSpace {

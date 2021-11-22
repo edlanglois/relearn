@@ -4,7 +4,7 @@ use super::{
     EnvStructure, Environment, Pomdp, PomdpDistribution,
 };
 use crate::logging::Logger;
-use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
+use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, Space, TupleSpace2, TupleSpace3};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
@@ -375,25 +375,22 @@ where
 pub type MetaObservation<O, A> = (Option<O>, Option<(A, f64)>, bool);
 
 /// Meta-environment observation space. See [`MetaPomdp`] for details.
-pub type MetaObservationSpace<OS, AS> = ProductSpace<(
-    OptionSpace<OS>,
-    OptionSpace<ProductSpace<(AS, IntervalSpace<f64>)>>,
-    BooleanSpace,
-)>;
+pub type MetaObservationSpace<OS, AS> =
+    TupleSpace3<OptionSpace<OS>, OptionSpace<TupleSpace2<AS, IntervalSpace<f64>>>, BooleanSpace>;
 
 /// Construct the meta observation space for an inner environment structure.
 fn meta_observation_space<E: EnvStructure + ?Sized>(
     env: &E,
 ) -> MetaObservationSpace<E::ObservationSpace, E::ActionSpace> {
     let (min_reward, max_reward) = env.reward_range();
-    ProductSpace::new((
+    TupleSpace3(
         OptionSpace::new(env.observation_space()),
-        OptionSpace::new(ProductSpace::new((
+        OptionSpace::new(TupleSpace2(
             env.action_space(),
             IntervalSpace::new(min_reward, max_reward),
-        ))),
+        )),
         BooleanSpace::new(),
-    ))
+    )
 }
 
 /// The state of a [`MetaPomdp`].
@@ -446,7 +443,7 @@ where
     type ActionSpace = AS;
 
     fn observation_space(&self) -> Self::ObservationSpace {
-        self.0.observation_space().inner_spaces.0.inner
+        self.0.observation_space().0.inner
     }
     fn action_space(&self) -> Self::ActionSpace {
         self.0.action_space()

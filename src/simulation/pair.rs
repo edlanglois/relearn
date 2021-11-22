@@ -3,7 +3,7 @@ use super::{run_agent, Simulator, SimulatorError};
 use crate::agents::{Actor, Agent, BuildAgent, Step};
 use crate::envs::{BuildEnv, FirstPlayerView, SecondPlayerView};
 use crate::logging::TimeSeriesLogger;
-use crate::spaces::{ProductSpace, Space};
+use crate::spaces::{Space, TupleSpace2};
 use crossbeam_channel::{Receiver, Sender};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::thread;
@@ -39,8 +39,8 @@ where
     EC: BuildEnv<
         Observation = (OS1::Element, OS2::Element),
         Action = (AS1::Element, AS2::Element),
-        ObservationSpace = ProductSpace<(OS1, OS2)>,
-        ActionSpace = ProductSpace<(AS1, AS2)>,
+        ObservationSpace = TupleSpace2<OS1, OS2>,
+        ActionSpace = TupleSpace2<AS1, AS2>,
     >,
     EC::Observation: Clone,
     AC1: BuildAgent<OS1, AS1>,

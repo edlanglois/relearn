@@ -7,7 +7,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use relearn::spaces::{
     BooleanSpace, FeatureSpace, IndexSpace, IntervalSpace, NonEmptyFeatures, OptionSpace,
-    PowerSpace, ProductSpace, SampleSpace, SingletonSpace,
+    PowerSpace, SampleSpace, SingletonSpace, TupleSpace3,
 };
 use tch::Tensor;
 
@@ -88,8 +88,8 @@ fn bench_batch_tensor_features(c: &mut Criterion) {
     );
     bench_space_batch_tensor_features(
         &mut group,
-        "product_boolean_index_singleton",
-        ProductSpace::new((BooleanSpace, IndexSpace::new(10), SingletonSpace)),
+        "tuple_boolean_index_singleton",
+        TupleSpace3(BooleanSpace, IndexSpace::new(10), SingletonSpace),
         &batch_sizes,
     );
     bench_space_batch_tensor_features(&mut group, "singleton", SingletonSpace, &batch_sizes);

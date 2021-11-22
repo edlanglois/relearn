@@ -12,10 +12,10 @@ mod interval;
 mod nonempty_features;
 mod option;
 mod power;
-mod product;
 mod singleton;
 #[cfg(test)]
 mod test_derive;
+mod tuple;
 mod wrapper;
 
 pub use array::ArraySpace;
@@ -27,8 +27,8 @@ pub use interval::IntervalSpace;
 pub use nonempty_features::NonEmptyFeatures;
 pub use option::OptionSpace;
 pub use power::PowerSpace;
-pub use product::ProductSpace;
 pub use singleton::SingletonSpace;
+pub use tuple::{TupleSpace2, TupleSpace3, TupleSpace4, TupleSpace5};
 pub use wrapper::BoxSpace;
 
 // Re-export space macros from relearn_derive

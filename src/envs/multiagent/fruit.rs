@@ -2,7 +2,8 @@
 use crate::envs::{CloneBuild, EnvStructure, Pomdp};
 use crate::logging::Logger;
 use crate::spaces::{
-    BooleanSpace, BoxSpace, IndexSpace, IndexedTypeSpace, PowerSpace, ProductSpace, Space,
+    BooleanSpace, BoxSpace, IndexSpace, IndexedTypeSpace, PowerSpace, Space, TupleSpace2,
+    TupleSpace3,
 };
 use crate::utils::vector::Vector;
 use enum_map::{enum_map, Enum, EnumMap};
@@ -163,21 +164,21 @@ pub type VisibleGridSpace<const W: usize, const H: usize> =
     BoxSpace<PowerSpace<PowerSpace<IndexedTypeSpace<CellView>, W>, H>>;
 
 /// Grid coordinate pairs
-pub type CoordinateSpace = ProductSpace<(IndexSpace, IndexSpace)>;
+pub type CoordinateSpace = TupleSpace2<IndexSpace, IndexSpace>;
 
 /// Observation space for the principal
-pub type PrincipalObsSpace<const W: usize, const H: usize> = ProductSpace<(
+pub type PrincipalObsSpace<const W: usize, const H: usize> = TupleSpace3<
     VisibleGridSpace<W, H>,
     CoordinateSpace, // Own position (absolute)
     BooleanSpace,    // Whether goal is apple (true) or cherry (false).
-)>;
+>;
 
 /// Observation space for the assistant
 pub type AssistantObsSpace<const W: usize, const H: usize> =
-    ProductSpace<(VisibleGridSpace<W, H>, CoordinateSpace)>;
+    TupleSpace2<VisibleGridSpace<W, H>, CoordinateSpace>;
 
 pub type JointObsSpace<const VW: usize, const VH: usize> =
-    ProductSpace<(PrincipalObsSpace<VW, VH>, AssistantObsSpace<VW, VH>)>;
+    TupleSpace2<PrincipalObsSpace<VW, VH>, AssistantObsSpace<VW, VH>>;
 
 /// Grid cell movement
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Indexed)]
@@ -260,15 +261,15 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> EnvStruct
     /// An observation for each agent
     type ObservationSpace = JointObsSpace<VW, VH>;
     /// An action for each agent
-    type ActionSpace = ProductSpace<(IndexedTypeSpace<Move>, IndexedTypeSpace<Move>)>;
+    type ActionSpace = TupleSpace2<IndexedTypeSpace<Move>, IndexedTypeSpace<Move>>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         let visible_grid_space = VisibleGridSpace::default(); // No dynamic structure
-        let coordinate_space = ProductSpace::new((IndexSpace::new(H), IndexSpace::new(W)));
+        let coordinate_space = TupleSpace2(IndexSpace::new(H), IndexSpace::new(W));
         let principal_obs_space =
-            ProductSpace::new((visible_grid_space, coordinate_space, BooleanSpace::new()));
-        let assistant_obs_space = ProductSpace::new((visible_grid_space, coordinate_space));
-        ProductSpace::new((principal_obs_space, assistant_obs_space))
+            TupleSpace3(visible_grid_space, coordinate_space, BooleanSpace::new());
+        let assistant_obs_space = TupleSpace2(visible_grid_space, coordinate_space);
+        TupleSpace2(principal_obs_space, assistant_obs_space)
     }
 
     fn action_space(&self) -> Self::ActionSpace {
