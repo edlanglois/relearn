@@ -9,7 +9,6 @@ pub mod testing;
 
 mod array;
 mod boolean;
-mod categorical;
 mod index;
 mod indexed_type;
 mod interval;
@@ -24,7 +23,6 @@ mod wrapper;
 
 pub use array::ArraySpace;
 pub use boolean::BooleanSpace;
-pub use categorical::CategoricalSpace;
 pub use index::IndexSpace;
 pub use indexed_type::{Indexed, IndexedTypeSpace};
 pub use interval::IntervalSpace;

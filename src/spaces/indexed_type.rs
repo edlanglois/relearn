@@ -1,11 +1,20 @@
 //! `IndexedTypeSpace` and `Indexed` trait
-use super::{CategoricalSpace, FiniteSpace, Space};
+use super::{
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ParameterizedDistributionSpace,
+    ReprSpace, Space, SubsetOrd,
+};
+use crate::logging::Loggable;
+use crate::torch::distributions::Categorical;
+use crate::utils::distributions::ArrayDistribution;
+use ndarray::{ArrayBase, DataMut, Ix2};
+use num_traits::{Float, One, Zero};
 use rand::distributions::Distribution;
 use rand::Rng;
-use std::any;
-use std::fmt;
+use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
+use std::{any, fmt};
+use tch::{Device, Kind, Tensor};
 
 /// An indexed set of finitely many possibilities.
 ///
@@ -105,7 +114,12 @@ impl<T> Hash for IndexedTypeSpace<T> {
     fn hash<H: Hasher>(&self, _state: &mut H) {}
 }
 
-// Subspaces
+impl<T> SubsetOrd for IndexedTypeSpace<T> {
+    fn subset_cmp(&self, _other: &Self) -> Option<Ordering> {
+        Some(Ordering::Equal)
+    }
+}
+
 impl<T: Indexed> Distribution<T> for IndexedTypeSpace<T> {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
         T::from_index(rng.gen_range(0..T::SIZE)).unwrap()
@@ -126,7 +140,103 @@ impl<T: Indexed> FiniteSpace for IndexedTypeSpace<T> {
     }
 }
 
-impl<T: Indexed> CategoricalSpace for IndexedTypeSpace<T> {}
+impl<T: Indexed> NumFeatures for IndexedTypeSpace<T> {
+    fn num_features(&self) -> usize {
+        T::SIZE
+    }
+}
+
+impl<T: Indexed> EncoderFeatureSpace for IndexedTypeSpace<T> {
+    type Encoder = ();
+    fn encoder(&self) -> Self::Encoder {}
+
+    fn encoder_features_out<F: Float>(
+        &self,
+        element: &Self::Element,
+        out: &mut [F],
+        zeroed: bool,
+        _encoder: &Self::Encoder,
+    ) {
+        if !zeroed {
+            out.fill(F::zero())
+        }
+        out[self.to_index(element)] = F::one()
+    }
+    fn encoder_batch_features_out<'a, I, A>(
+        &self,
+        elements: I,
+        out: &mut ArrayBase<A, Ix2>,
+        zeroed: bool,
+        _encoder: &Self::Encoder,
+    ) where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+        A: DataMut,
+        A::Elem: Float,
+    {
+        if !zeroed {
+            out.fill(A::Elem::zero())
+        }
+        // Don't zip rows so that we can check whether there are too few rows.
+        let mut rows = out.rows_mut().into_iter();
+        for element in elements {
+            let mut row = rows.next().expect("fewer rows than elements");
+            row[self.to_index(element)] = A::Elem::one();
+        }
+    }
+}
+
+/// Represents elements as integer tensors.
+impl<T: Indexed> ReprSpace<Tensor> for IndexedTypeSpace<T> {
+    fn repr(&self, element: &Self::Element) -> Tensor {
+        Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu))
+    }
+
+    fn batch_repr<'a, I>(&self, elements: I) -> Tensor
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+    {
+        let indices: Vec<_> = elements
+            .into_iter()
+            .map(|elem| self.to_index(elem) as i64)
+            .collect();
+        Tensor::of_slice(&indices)
+    }
+}
+
+impl<T: Indexed> ParameterizedDistributionSpace<Tensor> for IndexedTypeSpace<T> {
+    type Distribution = Categorical;
+
+    fn num_distribution_params(&self) -> usize {
+        T::SIZE
+    }
+
+    fn sample_element(&self, params: &Tensor) -> Self::Element {
+        self.from_index(
+            self.distribution(params)
+                .sample()
+                .int64_value(&[])
+                .try_into()
+                .unwrap(),
+        )
+        .unwrap()
+    }
+
+    fn distribution(&self, params: &Tensor) -> Self::Distribution {
+        Self::Distribution::new(params)
+    }
+}
+
+/// Log the index as a sample from `0..N`
+impl<T: Indexed> ElementRefInto<Loggable> for IndexedTypeSpace<T> {
+    fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
+        Loggable::IndexSample {
+            value: self.to_index(element),
+            size: T::SIZE,
+        }
+    }
+}
 
 impl Indexed for bool {
     const SIZE: usize = 2;
@@ -145,35 +255,22 @@ impl Indexed for bool {
 }
 
 #[cfg(test)]
+mod trit {
+    use relearn_derive::Indexed;
+
+    #[derive(Debug, Indexed, PartialEq, Eq)]
+    pub enum Trit {
+        Zero,
+        One,
+        Two,
+    }
+}
+
+#[cfg(test)]
 mod space {
     use super::super::testing;
+    use super::trit::Trit;
     use super::*;
-
-    enum TestEnum {
-        A,
-        B,
-        C,
-    }
-
-    impl Indexed for TestEnum {
-        const SIZE: usize = 3;
-        fn index(&self) -> usize {
-            match self {
-                TestEnum::A => 0,
-                TestEnum::B => 1,
-                TestEnum::C => 2,
-            }
-        }
-
-        fn from_index(index: usize) -> Option<Self> {
-            match index {
-                0 => Some(Self::A),
-                1 => Some(Self::B),
-                2 => Some(Self::C),
-                _ => None,
-            }
-        }
-    }
 
     fn check_contains_samples<T: Indexed>() {
         let space = IndexedTypeSpace::<T>::new();
@@ -187,7 +284,7 @@ mod space {
 
     #[test]
     fn contains_samples_enum() {
-        check_contains_samples::<TestEnum>();
+        check_contains_samples::<Trit>();
     }
 
     fn check_from_to_index_iter_size<T: Indexed>() {
@@ -202,12 +299,12 @@ mod space {
 
     #[test]
     fn from_to_index_iter_size_enum() {
-        check_from_to_index_iter_size::<TestEnum>();
+        check_from_to_index_iter_size::<Trit>();
     }
 
     fn check_from_index_sampled<T: Indexed>() {
         let space = IndexedTypeSpace::<T>::new();
-        testing::check_from_index_sampled(&space, 100);
+        testing::check_from_index_sampled(&space, 20);
     }
 
     #[test]
@@ -217,7 +314,7 @@ mod space {
 
     #[test]
     fn from_index_sampled_enum() {
-        check_from_index_sampled::<TestEnum>();
+        check_from_index_sampled::<Trit>();
     }
 
     fn check_from_index_invalid<T: Indexed>() {
@@ -232,36 +329,29 @@ mod space {
 
     #[test]
     fn from_index_invalid_enum() {
-        check_from_index_invalid::<TestEnum>();
+        check_from_index_invalid::<Trit>();
     }
 }
 
 #[cfg(test)]
 mod subset_ord {
     use super::super::SubsetOrd;
+    use super::trit::Trit;
     use super::*;
-    use relearn_derive::Indexed;
     use std::cmp::Ordering;
-
-    #[derive(Debug, Indexed)]
-    enum TestEnum {
-        A,
-        B,
-        C,
-    }
 
     #[test]
     fn eq() {
         assert_eq!(
-            IndexedTypeSpace::<TestEnum>::new(),
-            IndexedTypeSpace::<TestEnum>::new()
+            IndexedTypeSpace::<Trit>::new(),
+            IndexedTypeSpace::<Trit>::new()
         );
     }
 
     #[test]
     fn cmp_equal() {
         assert_eq!(
-            IndexedTypeSpace::<TestEnum>::new().subset_cmp(&IndexedTypeSpace::<TestEnum>::new()),
+            IndexedTypeSpace::<Trit>::new().subset_cmp(&IndexedTypeSpace::<Trit>::new()),
             Some(Ordering::Equal)
         );
     }
@@ -269,16 +359,14 @@ mod subset_ord {
     #[test]
     fn not_strict_subset() {
         assert!(
-            !(IndexedTypeSpace::<TestEnum>::new()
-                .strict_subset_of(&IndexedTypeSpace::<TestEnum>::new()))
+            !(IndexedTypeSpace::<Trit>::new().strict_subset_of(&IndexedTypeSpace::<Trit>::new()))
         );
     }
 }
 
 #[cfg(test)]
-#[allow(clippy::missing_const_for_fn)]
-/// Test the derive(Indexed) macro
-mod finite_space {
+/// Test the `#[derive(Indexed)]` macro
+mod derive_indexed_macro {
     use super::*;
     use relearn_derive::Indexed;
 
@@ -341,5 +429,120 @@ mod finite_space {
     fn non_empty_enum_from_index_invalid_2() {
         let result = NonEmptyEnum::from_index(2);
         assert!(result.is_none(), "Expected `None`, got {:?}", result);
+    }
+}
+
+#[cfg(test)]
+mod feature_space {
+    use super::trit::Trit;
+    use super::*;
+
+    fn space() -> IndexedTypeSpace<Trit> {
+        IndexedTypeSpace::new()
+    }
+
+    #[test]
+    fn num_features() {
+        let space = space();
+        assert_eq!(3, space.num_features());
+    }
+
+    features_tests!(trit_zero, space(), Trit::Zero, [1.0, 0.0, 0.0]);
+    features_tests!(trit_one, space(), Trit::One, [0.0, 1.0, 0.0]);
+    features_tests!(trit_two, space(), Trit::Two, [0.0, 0.0, 1.0]);
+    batch_features_tests!(
+        trit_batch,
+        space(),
+        [Trit::Two, Trit::Zero, Trit::One, Trit::Zero],
+        [
+            [0.0, 0.0, 1.0], // Two
+            [1.0, 0.0, 0.0], // Zero
+            [0.0, 1.0, 0.0], // One
+            [1.0, 0.0, 0.0]  // Zero
+        ]
+    );
+}
+
+#[cfg(test)]
+mod repr_space_tensor {
+    use super::trit::Trit;
+    use super::*;
+
+    #[test]
+    fn repr() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        assert_eq!(
+            space.repr(&Trit::Zero),
+            Tensor::scalar_tensor(0, (Kind::Int64, Device::Cpu))
+        );
+        assert_eq!(
+            space.repr(&Trit::One),
+            Tensor::scalar_tensor(1, (Kind::Int64, Device::Cpu))
+        );
+        assert_eq!(
+            space.repr(&Trit::Two),
+            Tensor::scalar_tensor(2, (Kind::Int64, Device::Cpu))
+        );
+    }
+
+    #[test]
+    fn batch_repr() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        let elements = [Trit::Zero, Trit::One, Trit::Two, Trit::One];
+        let actual = space.batch_repr(&elements);
+        let expected = Tensor::of_slice(&[0_i64, 1, 2, 1]);
+        assert_eq!(actual, expected);
+    }
+}
+
+#[cfg(test)]
+mod parameterized_sample_space_tensor {
+    use super::super::IndexedTypeSpace;
+    use super::trit::Trit;
+    use super::*;
+
+    #[test]
+    fn num_sample_params() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        assert_eq!(3, space.num_distribution_params());
+    }
+
+    #[test]
+    fn sample_element_deterministic() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        let params = Tensor::of_slice(&[f32::NEG_INFINITY, 0.0, f32::NEG_INFINITY]);
+        for _ in 0..10 {
+            assert_eq!(Trit::One, space.sample_element(&params));
+        }
+    }
+
+    #[test]
+    fn sample_element_two_of_three() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        let params = Tensor::of_slice(&[f32::NEG_INFINITY, 0.0, 0.0]);
+        for _ in 0..10 {
+            assert!(Trit::Zero != space.sample_element(&params));
+        }
+    }
+
+    #[test]
+    fn sample_element_check_distribution() {
+        let space: IndexedTypeSpace<Trit> = IndexedTypeSpace::new();
+        // Probabilities: [0.09, 0.24, 0.67]
+        let params = Tensor::of_slice(&[-1.0, 0.0, 1.0]);
+        let mut one_count = 0;
+        let mut two_count = 0;
+        let mut three_count = 0;
+        for _ in 0..1000 {
+            match space.sample_element(&params) {
+                Trit::Zero => one_count += 1,
+                Trit::One => two_count += 1,
+                Trit::Two => three_count += 1,
+            }
+        }
+        // Check that the counts are within 3.5 standard deviations of the mean
+        assert!((58..=121).contains(&one_count));
+        assert!((197..=292).contains(&two_count));
+        assert!((613..=717).contains(&three_count));
     }
 }
