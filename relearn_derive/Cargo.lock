@@ -590,6 +590,7 @@ dependencies = [
 name = "relearn_derive"
 version = "0.1.0"
 dependencies = [
+ "ndarray",
  "num-traits",
  "proc-macro2",
  "quote",

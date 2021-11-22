@@ -408,6 +408,27 @@ impl SpaceTraitImpl for EncoderFeatureSpaceImpl {
         });
         let num_fields = struct_.fields().len();
 
+        let option_encoder_batch_features_out = if num_fields == 0 {
+            // Custom implementation when there are no fields to avoid iterating over elements
+            Some(quote! {
+                fn encoder_batch_features_out<'a, I, A>(
+                    &self,
+                    elements: I,
+                    out: &mut ::ndarray::ArrayBase<A, ::ndarray::Ix2>,
+                    zeroed: bool,
+                    encoder: &Self::Encoder,
+                ) where
+                    I: IntoIterator<Item = &'a Self::Element>,
+                    Self::Element: 'a,
+                    A: ::ndarray::DataMut,
+                    A::Elem: ::num_traits::Float,
+                {
+                }
+            })
+        } else {
+            None
+        };
+
         quote! {
             impl #impl_generics ::relearn::spaces::EncoderFeatureSpace for #name #ty_generics #where_clause {
                 /// Encoder type
@@ -442,6 +463,8 @@ impl SpaceTraitImpl for EncoderFeatureSpaceImpl {
                 ) {
                     #( #field_encoder_features_out; )*
                 }
+
+                #option_encoder_batch_features_out
             }
         }
     }
