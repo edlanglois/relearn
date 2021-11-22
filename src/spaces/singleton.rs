@@ -5,7 +5,9 @@ use std::fmt;
 use tch::{Device, Kind, Tensor};
 
 /// A space containing a single element.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, ProductSpace)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, ProductSpace, FiniteSpace,
+)]
 pub struct SingletonSpace;
 
 impl SingletonSpace {

@@ -496,7 +496,6 @@ impl SpaceTraitImpl for ProductSpaceImpl {
         let impls = vec![
             SpaceImpl::impl_trait(name, generics.clone(), struct_),
             SubsetOrdImpl::impl_trait(name, generics.clone(), struct_),
-            FiniteSpaceImpl::impl_trait(name, generics.clone(), struct_),
             SampleSpaceImpl::impl_trait(name, generics.clone(), struct_),
             NumFeaturesImpl::impl_trait(name, generics.clone(), struct_),
             EncoderFeatureSpaceImpl::impl_trait(name, generics.clone(), struct_),

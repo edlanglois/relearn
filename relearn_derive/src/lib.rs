@@ -122,8 +122,10 @@ pub fn log_element_space_macro_derive(input: TokenStream) -> TokenStream {
 /// Derive `Space` and other space traits for a struct as a Cartesian product space of its fields.
 ///
 /// Derives the following traits:
-/// [`Space`], [`SubsetOrd`], [`FiniteSpace`], [`SampleSpace`], [`NumFeatures`],
+/// [`Space`], [`SubsetOrd`], [`SampleSpace`], [`NumFeatures`],
 /// [`EncoderFeatureSpace`], and [`LogElementSpace`] (`ElementRefInto<Loggable>`).
+///
+/// Does not derive [`FiniteSpace`].
 ///
 /// Each of the struct fields must also implement `Space`
 /// (when all generic params are bounded as `Space`).

@@ -123,7 +123,7 @@ mod named {
         }
     }
 
-    #[derive(Debug, PartialEq, ProductSpace)]
+    #[derive(Debug, PartialEq, ProductSpace, FiniteSpace)]
     #[element(NamedStruct)]
     struct NamedStructSpace {
         a: BooleanSpace,
