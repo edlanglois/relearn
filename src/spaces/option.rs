@@ -1,5 +1,7 @@
 //! Option space definition.
-use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space, SubsetOrd};
+use super::{
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures, Space, SubsetOrd,
+};
 use crate::logging::Loggable;
 use num_traits::Float;
 use rand::distributions::Distribution;
@@ -64,6 +66,12 @@ impl<S: FiniteSpace> FiniteSpace for OptionSpace<S> {
         } else {
             Some(Some(self.inner.from_index(index - 1)?))
         }
+    }
+}
+
+impl<S: Space> NonEmptySpace for OptionSpace<S> {
+    fn some_element(&self) -> Self::Element {
+        None
     }
 }
 

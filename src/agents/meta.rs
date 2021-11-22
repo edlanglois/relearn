@@ -4,7 +4,7 @@ use crate::envs::{
     EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
 };
 use crate::logging::TimeSeriesLogger;
-use crate::spaces::{SampleSpace, Space};
+use crate::spaces::{NonEmptySpace, Space};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 /// Configuration for a [`ResettingMetaAgent`].
@@ -24,7 +24,7 @@ where
     T: BuildAgent<OS, AS> + Clone,
     OS: Space + Clone,
     OS::Element: Clone,
-    AS: SampleSpace + Clone,
+    AS: NonEmptySpace + Clone,
     AS::Element: Clone,
 {
     type Agent = ResettingMetaAgent<T, OS, AS>;
@@ -90,7 +90,7 @@ where
     AC: BuildAgent<OS, AS>,
     OS: Space + Clone,
     OS::Element: Clone,
-    AS: SampleSpace + Clone,
+    AS: NonEmptySpace + Clone,
     AS::Element: Clone,
 {
     fn act(
@@ -131,8 +131,7 @@ where
                 obs.episode_done,
                 "Expecting episode_done if inner_observation is None"
             );
-            // TODO: Replace with a non-random some_element() method
-            self.inner_env_structure.action_space.sample(&mut self.rng)
+            self.inner_env_structure.action_space.some_element()
         };
 
         self.prev_observation = obs.inner_observation.as_ref().cloned();
@@ -148,7 +147,7 @@ where
     AC: BuildAgent<OS, AS>,
     OS: Space + Clone,
     OS::Element: Clone,
-    AS: SampleSpace + Clone,
+    AS: NonEmptySpace + Clone,
     AS::Element: Clone,
 {
     fn update(

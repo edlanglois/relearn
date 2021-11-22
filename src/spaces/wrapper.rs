@@ -1,6 +1,7 @@
 //! Generic wrapper spaces
 use super::{
-    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ReprSpace, Space, SubsetOrd,
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures, ReprSpace, Space,
+    SubsetOrd,
 };
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
 use ndarray::{ArrayBase, DataMut, Ix2};
@@ -165,6 +166,16 @@ where
         self.inner_space
             .from_index_unchecked(index)
             .map(Wrapper::wrap)
+    }
+}
+
+impl<S, W> NonEmptySpace for WrappedElementSpace<S, W>
+where
+    S: NonEmptySpace,
+    W: Wrapper<Inner = S::Element>,
+{
+    fn some_element(&self) -> Self::Element {
+        W::wrap(self.inner_space.some_element())
     }
 }
 

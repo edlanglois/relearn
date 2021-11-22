@@ -1,6 +1,7 @@
 //! `BooleanSpace` definition
 use super::{
-    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ReprSpace, Space, SubsetOrd,
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures, ReprSpace, Space,
+    SubsetOrd,
 };
 use crate::logging::Loggable;
 use crate::utils::num_array::{BuildFromArray1D, NumArray1D};
@@ -60,6 +61,12 @@ impl FiniteSpace for BooleanSpace {
 
     fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
         Some(index != 0)
+    }
+}
+
+impl NonEmptySpace for BooleanSpace {
+    fn some_element(&self) -> Self::Element {
+        false
     }
 }
 

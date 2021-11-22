@@ -298,6 +298,27 @@ impl SpaceTraitImpl for FiniteSpaceImpl {
     }
 }
 
+pub(crate) struct NonEmptySpaceImpl;
+impl SpaceTraitImpl for NonEmptySpaceImpl {
+    fn impl_trait<T: SpaceStruct>(name: &Ident, generics: Generics, struct_: T) -> TokenStream2 {
+        let generics = add_trait_bounds(generics, &parse_quote!(::relearn::spaces::NonEmptySpace));
+        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+        let some_element = struct_.new_element(struct_.fields().map(|(id, _, span)| {
+            quote_spanned! {span=>
+                ::relearn::spaces::NonEmptySpace::some_element(&self.#id)
+            }
+        }));
+
+        quote! {
+            impl #impl_generics ::relearn::spaces::NonEmptySpace for #name #ty_generics #where_clause {
+                fn some_element(&self) -> <Self as ::relearn::spaces::Space>::Element {
+                    #some_element
+                }
+            }
+        }
+    }
+}
+
 pub(crate) struct SampleSpaceImpl;
 impl SpaceTraitImpl for SampleSpaceImpl {
     fn impl_trait<T: SpaceStruct>(
@@ -496,6 +517,7 @@ impl SpaceTraitImpl for ProductSpaceImpl {
         let impls = vec![
             SpaceImpl::impl_trait(name, generics.clone(), struct_),
             SubsetOrdImpl::impl_trait(name, generics.clone(), struct_),
+            NonEmptySpaceImpl::impl_trait(name, generics.clone(), struct_),
             SampleSpaceImpl::impl_trait(name, generics.clone(), struct_),
             NumFeaturesImpl::impl_trait(name, generics.clone(), struct_),
             EncoderFeatureSpaceImpl::impl_trait(name, generics.clone(), struct_),

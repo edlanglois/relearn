@@ -1,5 +1,7 @@
 //! `IntervalSpace` definition
-use super::{ElementRefInto, EncoderFeatureSpace, NumFeatures, ReprSpace, Space, SubsetOrd};
+use super::{
+    ElementRefInto, EncoderFeatureSpace, NonEmptySpace, NumFeatures, ReprSpace, Space, SubsetOrd,
+};
 use crate::logging::Loggable;
 use num_traits::{Float, ToPrimitive};
 use rand::distributions::Distribution;
@@ -59,6 +61,12 @@ impl<T: PartialOrd> SubsetOrd for IntervalSpace<T> {
             (Some(Equal | Less), Some(Equal | Greater)) => Some(Greater),
             _ => None,
         }
+    }
+}
+
+impl<T: Float> NonEmptySpace for IntervalSpace<T> {
+    fn some_element(&self) -> Self::Element {
+        self.low
     }
 }
 

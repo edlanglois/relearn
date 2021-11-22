@@ -1,5 +1,7 @@
 //! Cartesian power space.
-use super::{ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space, SubsetOrd};
+use super::{
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures, Space, SubsetOrd,
+};
 use crate::logging::Loggable;
 use num_traits::Float;
 use rand::distributions::Distribution;
@@ -65,6 +67,15 @@ impl<S: FiniteSpace, const N: usize> FiniteSpace for PowerSpace<S, N> {
         } else {
             None
         }
+    }
+}
+
+impl<S, const N: usize> NonEmptySpace for PowerSpace<S, N>
+where
+    S: NonEmptySpace + Distribution<S::Element>,
+{
+    fn some_element(&self) -> Self::Element {
+        array_init::array_init(|_| self.inner_space.some_element())
     }
 }
 

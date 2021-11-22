@@ -1,7 +1,7 @@
 //! Array space
 use super::{
-    iter_product_subset_ord, ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, Space,
-    SubsetOrd,
+    iter_product_subset_ord, ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace,
+    NumFeatures, Space, SubsetOrd,
 };
 use crate::logging::Loggable;
 use num_traits::Float;
@@ -88,6 +88,12 @@ impl<S: FiniteSpace, const N: usize> FiniteSpace for ArraySpace<S, N> {
         } else {
             None
         }
+    }
+}
+
+impl<S: NonEmptySpace, const N: usize> NonEmptySpace for ArraySpace<S, N> {
+    fn some_element(&self) -> <Self as Space>::Element {
+        array_init::from_iter(self.inner_spaces.iter().map(NonEmptySpace::some_element)).unwrap()
     }
 }
 

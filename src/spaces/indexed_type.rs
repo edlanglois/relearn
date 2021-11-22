@@ -1,7 +1,7 @@
 //! `IndexedTypeSpace` and `Indexed` trait
 use super::{
-    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ParameterizedDistributionSpace,
-    ReprSpace, Space, SubsetOrd,
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures,
+    ParameterizedDistributionSpace, ReprSpace, Space, SubsetOrd,
 };
 use crate::logging::Loggable;
 use crate::torch::distributions::Categorical;
@@ -117,6 +117,12 @@ impl<T> Hash for IndexedTypeSpace<T> {
 impl<T> SubsetOrd for IndexedTypeSpace<T> {
     fn subset_cmp(&self, _other: &Self) -> Option<Ordering> {
         Some(Ordering::Equal)
+    }
+}
+
+impl<T: Indexed> NonEmptySpace for IndexedTypeSpace<T> {
+    fn some_element(&self) -> Self::Element {
+        T::from_index(0).expect("space is empty")
     }
 }
 

@@ -157,6 +157,12 @@ pub trait FiniteSpace: Space {
     }
 }
 
+/// A space containing at least one element.
+pub trait NonEmptySpace: Space {
+    /// An arbitrary deterministic element from the space.
+    fn some_element(&self) -> Self::Element;
+}
+
 /// A space from which samples can be drawn.
 ///
 /// No particular distribution is specified but the distribution:

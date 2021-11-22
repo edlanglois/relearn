@@ -1,7 +1,7 @@
 //! `IndexSpace` definition
 use super::{
-    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NumFeatures, ParameterizedDistributionSpace,
-    ReprSpace, Space, SubsetOrd,
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures,
+    ParameterizedDistributionSpace, ReprSpace, Space, SubsetOrd,
 };
 use crate::logging::Loggable;
 use crate::torch::distributions::Categorical;
@@ -43,6 +43,13 @@ impl Space for IndexSpace {
 impl SubsetOrd for IndexSpace {
     fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
         self.size.partial_cmp(&other.size)
+    }
+}
+
+impl NonEmptySpace for IndexSpace {
+    fn some_element(&self) -> <Self as Space>::Element {
+        assert_ne!(self.size, 0, "space is empty");
+        0
     }
 }
 

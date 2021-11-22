@@ -10,8 +10,8 @@ use crate::agents::{
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::{Loggable, TimeSeriesLogger};
 use crate::spaces::{
-    ElementRefInto, EncoderFeatureSpace, FiniteSpace, ParameterizedDistributionSpace, SampleSpace,
-    SendElementSpace, Space,
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace,
+    ParameterizedDistributionSpace, SampleSpace, SendElementSpace, Space,
 };
 use crate::torch::agents::ActorCriticConfig;
 use crate::utils::any::AsAny;
@@ -72,6 +72,7 @@ pub enum MultithreadAgentDef {
 pub trait RLSpace:
     Space
     + SendElementSpace
+    + NonEmptySpace
     + SampleSpace
     + ElementRefInto<Loggable>
     + Debug
@@ -84,6 +85,7 @@ pub trait RLSpace:
 impl<
         T: Space
             + SendElementSpace
+            + NonEmptySpace
             + SampleSpace
             + ElementRefInto<Loggable>
             + Debug

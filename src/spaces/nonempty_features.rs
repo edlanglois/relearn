@@ -1,5 +1,5 @@
 //! Wrap spaces to have non-empty feature vectors.
-use super::{EncoderFeatureSpace, FiniteSpace, NumFeatures, Space, SubsetOrd};
+use super::{EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures, Space, SubsetOrd};
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
 use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::{Float, Zero};
@@ -56,6 +56,12 @@ impl<S: FiniteSpace> FiniteSpace for NonEmptyFeatures<S> {
 
     fn from_index(&self, index: usize) -> Option<Self::Element> {
         self.inner.from_index(index)
+    }
+}
+
+impl<S: NonEmptySpace> NonEmptySpace for NonEmptyFeatures<S> {
+    fn some_element(&self) -> Self::Element {
+        self.inner.some_element()
     }
 }
 

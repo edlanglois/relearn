@@ -77,6 +77,15 @@ pub fn finite_space_macro_derive(input: TokenStream) -> TokenStream {
     space::impl_space_trait_macro::<space::FiniteSpaceImpl>(ast)
 }
 
+/// Derive `relearn::spaces::NonEmptySpace` for a struct as a Cartesian product space of its fields.
+///
+/// Expects that `Space` will be implemented according to `#[derive(Space)]`.
+#[proc_macro_derive(NonEmptySpace)]
+pub fn non_empty_space_macro_derive(input: TokenStream) -> TokenStream {
+    let ast = syn::parse(input).unwrap();
+    space::impl_space_trait_macro::<space::NonEmptySpaceImpl>(ast)
+}
+
 /// Derive `relearn::spaces::SampleSpace` for a struct as a Cartesian product space of its fields.
 ///
 /// Actually implements `rand::distributions::Distribution<Self::Element>`,
@@ -122,7 +131,7 @@ pub fn log_element_space_macro_derive(input: TokenStream) -> TokenStream {
 /// Derive `Space` and other space traits for a struct as a Cartesian product space of its fields.
 ///
 /// Derives the following traits:
-/// [`Space`], [`SubsetOrd`], [`SampleSpace`], [`NumFeatures`],
+/// [`Space`], [`SubsetOrd`], [`NonEmptySpace`], [`SampleSpace`], [`NumFeatures`],
 /// [`EncoderFeatureSpace`], and [`LogElementSpace`] (`ElementRefInto<Loggable>`).
 ///
 /// Does not derive [`FiniteSpace`].
