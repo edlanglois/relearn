@@ -17,7 +17,7 @@ use tch::{Device, Kind, Tensor};
 ///
 /// Implementing this trait provides implementations for:
 /// * [`ReprSpace<Tensor>`] as an integer index
-/// * [`FeatureSpace<Tensor>`] as a one-hot vector
+/// * [`EncoderFeatureSpace<Tensor>`] as a one-hot vector
 /// * [`ParameterizedDistributionSpace<Tensor>`] as a categorical distribution
 /// * [`ElementRefInto<Loggable>`] as [`Loggable::IndexSample`]
 pub trait CategoricalSpace: FiniteSpace {}

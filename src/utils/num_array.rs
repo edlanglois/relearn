@@ -32,10 +32,10 @@ pub trait NumArray2D {
     /// Create a new instance of the given size with all elements initialized to one.
     fn ones(size: (usize, usize)) -> Self;
 
-    /// View as a two-dimensional [`Array`].
+    /// View as a two-dimensional [`ArrayView`].
     fn view(&self) -> ArrayView<Self::Elem, Ix2>;
 
-    /// Mutable view as a two-dimensional [`Array`].
+    /// Mutable view as a two-dimensional [`ArrayViewMut`].
     fn view_mut(&mut self) -> ArrayViewMut<Self::Elem, Ix2>;
 }
 
