@@ -325,6 +325,7 @@ impl SpaceTraitImpl for SampleSpaceImpl {
             impl #impl_generics ::rand::distributions::Distribution<<Self as ::relearn::spaces::Space>::Element>
                 for #name #ty_generics #where_clause {
 
+                #[allow(clippy::unused_unit)]
                 fn sample<R: ::rand::Rng + ?Sized>(&self, rng: &mut R) -> <Self as ::relearn::spaces::Space>::Element {
                     #sampled_element
                 }
@@ -411,6 +412,8 @@ impl SpaceTraitImpl for EncoderFeatureSpaceImpl {
                     [usize; #num_fields]
                 );
 
+                // Relies on array values being evaluated in order.
+                #[allow(clippy::eval_order_dependence)]
                 fn encoder(&self) -> Self::Encoder {
                     // The trailing comma is important so that the one-field case is still a tuple
                     let field_encoders = ( #(#field_encoder,)* );
