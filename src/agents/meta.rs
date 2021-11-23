@@ -91,7 +91,6 @@ where
 {
     fn act(
         &mut self,
-        // obs: &<MetaObservationSpace<OS, AS> as Space>::Element, // XXX
         obs: &MetaObservation<OS::Element, AS::Element>,
         new_episode: bool,
     ) -> AS::Element {
