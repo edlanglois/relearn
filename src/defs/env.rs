@@ -4,7 +4,7 @@ use crate::envs::{
     DirichletRandomMdps, EnvStructure, FirstPlayerView, FruitGame, MemoryGame as MemoryGameEnv,
     MetaObservationSpace, MetaPomdp, OneHotBandits, Pomdp, UniformBernoulliBandits, WithStepLimit,
 };
-use crate::spaces::{FiniteSpace, Space};
+use crate::spaces::FiniteSpace;
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use rand::distributions::Distribution;
 use std::borrow::Borrow;
@@ -132,11 +132,7 @@ pub trait VisitEnvFiniteFinite: VisitEnvBase {
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace + FiniteSpace,
-        // TODO: Compiler can't tell these are the same
-        <EC::ObservationSpace as Space>::Element: Clone,
-        EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace + FiniteSpace,
-        <EC::ActionSpace as Space>::Element: Clone,
         EC::Environment: Send + 'static;
 }
 
@@ -147,13 +143,9 @@ pub trait VisitEnvMetaFinitFinite: VisitEnvBase {
         EC: BuildEnv<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + 'static,
         EC::Environment: Send + 'static,
         OS: RLObservationSpace + FiniteSpace,
-        // TODO: Compiler can't tell these are the same
-        OS::Element: Clone,
         AS: RLActionSpace + FiniteSpace,
-        AS::Element: Clone,
         // See impl BuildAgent for ForMetaFiniteFinite
-        EC::ObservationSpace: RLObservationSpace,
-        EC::Observation: Clone;
+        EC::ObservationSpace: RLObservationSpace;
 }
 
 /// Visit an environment configuration for any reinforcement learning environment.
@@ -162,10 +154,6 @@ pub trait VisitEnvAnyAny: VisitEnvBase {
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace,
-        // TODO: Compiler can't tell these are the same
-        <EC::ObservationSpace as Space>::Element: Clone,
-        EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace,
-        <EC::ActionSpace as Space>::Element: Clone,
         EC::Environment: Send + 'static;
 }

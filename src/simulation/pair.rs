@@ -48,13 +48,13 @@ where
     AC2: BuildAgent<OS2, AS2>,
     AC2::Agent: Send + 'static,
     OS1: Space,
-    OS1::Element: Clone + Send + 'static,
+    OS1::Element: 'static,
     OS2: Space,
-    OS2::Element: Clone + Send + 'static,
+    OS2::Element: 'static,
     AS1: Space,
-    AS1::Element: Send + 'static,
+    AS1::Element: 'static,
     AS2: Space,
-    AS2::Element: Send + 'static,
+    AS2::Element: 'static,
     HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace>,
 {
     fn run_simulation(

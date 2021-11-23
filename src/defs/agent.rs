@@ -11,7 +11,7 @@ use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::{Loggable, TimeSeriesLogger};
 use crate::spaces::{
     ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace,
-    ParameterizedDistributionSpace, SampleSpace, SendElementSpace, Space,
+    ParameterizedDistributionSpace, SampleSpace, Space,
 };
 use crate::torch::agents::ActorCriticConfig;
 use crate::utils::any::AsAny;
@@ -68,10 +68,8 @@ pub enum MultithreadAgentDef {
 ///
 /// This includes most interfaces required by any agent, environment, or simulator
 /// excluding interfaces that can only apply to some spaces, like [`FiniteSpace`].
-// TODO: Include CloneElementSpace like SendElementSpace
 pub trait RLSpace:
     Space
-    + SendElementSpace
     + NonEmptySpace
     + SampleSpace
     + ElementRefInto<Loggable>
@@ -84,7 +82,6 @@ pub trait RLSpace:
 }
 impl<
         T: Space
-            + SendElementSpace
             + NonEmptySpace
             + SampleSpace
             + ElementRefInto<Loggable>
@@ -191,9 +188,7 @@ where
 impl<OS, AS> BuildAgentFor<EnvAnyAny, OS, AS> for AgentDef
 where
     OS: RLObservationSpace,
-    OS::Element: Clone,
     AS: RLActionSpace,
-    AS::Element: Clone,
 {
     type Agent = Box<DynFullAgent<OS, AS>>;
 
@@ -245,9 +240,7 @@ where
 impl<OS, AS> BuildAgentFor<EnvFiniteFinite, OS, AS> for AgentDef
 where
     OS: RLObservationSpace + FiniteSpace,
-    OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace,
-    AS::Element: Clone,
 {
     type Agent = Box<DynFullAgent<OS, AS>>;
 
@@ -278,9 +271,7 @@ impl<OS, AS> BuildAgentFor<EnvMetaFiniteFinite, MetaObservationSpace<OS, AS>, AS
     for OptionalBatchAgentDef
 where
     OS: RLObservationSpace + FiniteSpace,
-    OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace,
-    AS::Element: Clone,
     // I think this ought to be inferable but for some reason it isn't
     MetaObservationSpace<OS, AS>: RLObservationSpace,
 {
@@ -298,12 +289,9 @@ where
 impl<OS, AS> BuildAgentFor<EnvMetaFiniteFinite, MetaObservationSpace<OS, AS>, AS> for AgentDef
 where
     OS: RLObservationSpace + FiniteSpace,
-    OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace,
-    AS::Element: Clone,
     // I think this ought to be inferable but for some reason it isn't
     MetaObservationSpace<OS, AS>: RLObservationSpace,
-    <MetaObservationSpace<OS, AS> as Space>::Element: Clone,
 {
     type Agent = Box<DynFullAgent<MetaObservationSpace<OS, AS>, AS>>;
 
@@ -368,9 +356,7 @@ where
 impl<OS, AS> BuildBatchUpdateActorFor<EnvAnyAny, OS, AS> for OptionalBatchAgentDef
 where
     OS: RLObservationSpace,
-    OS::Element: Clone,
     AS: RLActionSpace,
-    AS::Element: Clone,
 {
     type BatchUpdateActor = Box<DynFullBatchUpdateActor<OS, AS>>;
 
@@ -392,9 +378,7 @@ where
 impl<OS, AS> BuildBatchUpdateActorFor<EnvFiniteFinite, OS, AS> for OptionalBatchAgentDef
 where
     OS: RLObservationSpace + FiniteSpace,
-    OS::Element: Clone, // From impl BatchUpdate for OffPolicyAgent
     AS: RLActionSpace + FiniteSpace,
-    AS::Element: Clone,
 {
     type BatchUpdateActor = Box<DynFullBatchUpdateActor<OS, AS>>;
 
@@ -425,12 +409,9 @@ impl<OS, AS> BuildBatchUpdateActorFor<EnvMetaFiniteFinite, MetaObservationSpace<
     for OptionalBatchAgentDef
 where
     OS: RLObservationSpace + FiniteSpace,
-    OS::Element: Clone,
     AS: RLActionSpace + FiniteSpace,
-    AS::Element: Clone,
     // I think this ought to be inferable but for some reason it isn't
     MetaObservationSpace<OS, AS>: RLObservationSpace,
-    <MetaObservationSpace<OS, AS> as Space>::Element: Clone,
 {
     type BatchUpdateActor = Box<DynFullBatchUpdateActor<MetaObservationSpace<OS, AS>, AS>>;
 

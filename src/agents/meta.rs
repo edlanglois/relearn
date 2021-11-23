@@ -23,9 +23,7 @@ impl<T, OS, AS> BuildAgent<MetaObservationSpace<OS, AS>, AS> for ResettingMetaAg
 where
     T: BuildAgent<OS, AS> + Clone,
     OS: Space + Clone,
-    OS::Element: Clone,
     AS: NonEmptySpace + Clone,
-    AS::Element: Clone,
 {
     type Agent = ResettingMetaAgent<T, OS, AS>;
 
@@ -89,9 +87,7 @@ impl<AC, OS, AS> Actor<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Ele
 where
     AC: BuildAgent<OS, AS>,
     OS: Space + Clone,
-    OS::Element: Clone,
     AS: NonEmptySpace + Clone,
-    AS::Element: Clone,
 {
     fn act(
         &mut self,
@@ -146,9 +142,7 @@ impl<AC, OS, AS> Agent<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Ele
 where
     AC: BuildAgent<OS, AS>,
     OS: Space + Clone,
-    OS::Element: Clone,
     AS: NonEmptySpace + Clone,
-    AS::Element: Clone,
 {
     fn update(
         &mut self,

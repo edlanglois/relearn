@@ -41,7 +41,7 @@ impl<T: fmt::Display> fmt::Display for IntervalSpace<T> {
     }
 }
 
-impl<T: Float> Space for IntervalSpace<T> {
+impl<T: Float + Send> Space for IntervalSpace<T> {
     type Element = T;
 
     fn contains(&self, value: &Self::Element) -> bool {
@@ -64,7 +64,7 @@ impl<T: PartialOrd> SubsetOrd for IntervalSpace<T> {
     }
 }
 
-impl<T: Float> NonEmptySpace for IntervalSpace<T> {
+impl<T: Float + Send> NonEmptySpace for IntervalSpace<T> {
     fn some_element(&self) -> Self::Element {
         self.low
     }
@@ -73,8 +73,7 @@ impl<T: Float> NonEmptySpace for IntervalSpace<T> {
 /// Represent elements as the same type in a tensor.
 impl<T> ReprSpace<Tensor> for IntervalSpace<T>
 where
-    // NOTE: Remove copy if ever changing batch_repr to take a slice
-    T: Copy + Float + tch::kind::Element,
+    T: Float + tch::kind::Element + Send,
 {
     fn repr(&self, element: &Self::Element) -> Tensor {
         Tensor::of_slice(slice::from_ref(element)).squeeze_dim_(0)
@@ -91,13 +90,13 @@ where
     }
 }
 
-impl<T: Float> NumFeatures for IntervalSpace<T> {
+impl<T: Float + Send> NumFeatures for IntervalSpace<T> {
     fn num_features(&self) -> usize {
         1
     }
 }
 
-impl<T: Float + ToPrimitive> EncoderFeatureSpace for IntervalSpace<T> {
+impl<T: Float + ToPrimitive + Send> EncoderFeatureSpace for IntervalSpace<T> {
     type Encoder = ();
     fn encoder(&self) -> Self::Encoder {}
     fn encoder_features_out<F: Float>(
@@ -133,7 +132,7 @@ impl Distribution<f64> for IntervalSpace<f64> {
     }
 }
 
-impl<T: Copy + PartialOrd + Float + Into<f64>> ElementRefInto<Loggable> for IntervalSpace<T> {
+impl<T: Float + Into<f64> + Send> ElementRefInto<Loggable> for IntervalSpace<T> {
     fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
         Loggable::Scalar((*element).into())
     }

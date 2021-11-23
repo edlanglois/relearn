@@ -94,7 +94,7 @@ impl<T> Clone for IndexedTypeSpace<T> {
 
 impl<T> Copy for IndexedTypeSpace<T> {}
 
-impl<T> Space for IndexedTypeSpace<T> {
+impl<T: Clone + Send> Space for IndexedTypeSpace<T> {
     type Element = T;
 
     fn contains(&self, _element: &Self::Element) -> bool {
@@ -120,7 +120,7 @@ impl<T> SubsetOrd for IndexedTypeSpace<T> {
     }
 }
 
-impl<T: Indexed> NonEmptySpace for IndexedTypeSpace<T> {
+impl<T: Indexed + Clone + Send> NonEmptySpace for IndexedTypeSpace<T> {
     fn some_element(&self) -> Self::Element {
         T::from_index(0).expect("space is empty")
     }
@@ -132,7 +132,7 @@ impl<T: Indexed> Distribution<T> for IndexedTypeSpace<T> {
     }
 }
 
-impl<T: Indexed> FiniteSpace for IndexedTypeSpace<T> {
+impl<T: Indexed + Clone + Send> FiniteSpace for IndexedTypeSpace<T> {
     fn size(&self) -> usize {
         T::SIZE
     }
@@ -152,7 +152,7 @@ impl<T: Indexed> NumFeatures for IndexedTypeSpace<T> {
     }
 }
 
-impl<T: Indexed> EncoderFeatureSpace for IndexedTypeSpace<T> {
+impl<T: Indexed + Clone + Send> EncoderFeatureSpace for IndexedTypeSpace<T> {
     type Encoder = ();
     fn encoder(&self) -> Self::Encoder {}
 
@@ -193,7 +193,7 @@ impl<T: Indexed> EncoderFeatureSpace for IndexedTypeSpace<T> {
 }
 
 /// Represents elements as integer tensors.
-impl<T: Indexed> ReprSpace<Tensor> for IndexedTypeSpace<T> {
+impl<T: Indexed + Clone + Send> ReprSpace<Tensor> for IndexedTypeSpace<T> {
     fn repr(&self, element: &Self::Element) -> Tensor {
         Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu))
     }
@@ -211,7 +211,7 @@ impl<T: Indexed> ReprSpace<Tensor> for IndexedTypeSpace<T> {
     }
 }
 
-impl<T: Indexed> ParameterizedDistributionSpace<Tensor> for IndexedTypeSpace<T> {
+impl<T: Indexed + Clone + Send> ParameterizedDistributionSpace<Tensor> for IndexedTypeSpace<T> {
     type Distribution = Categorical;
 
     fn num_distribution_params(&self) -> usize {
@@ -235,7 +235,7 @@ impl<T: Indexed> ParameterizedDistributionSpace<Tensor> for IndexedTypeSpace<T> 
 }
 
 /// Log the index as a sample from `0..N`
-impl<T: Indexed> ElementRefInto<Loggable> for IndexedTypeSpace<T> {
+impl<T: Indexed + Clone + Send> ElementRefInto<Loggable> for IndexedTypeSpace<T> {
     fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
         Loggable::IndexSample {
             value: self.to_index(element),
@@ -264,7 +264,7 @@ impl Indexed for bool {
 mod trit {
     use relearn_derive::Indexed;
 
-    #[derive(Debug, Indexed, PartialEq, Eq)]
+    #[derive(Debug, Copy, Clone, Indexed, PartialEq, Eq)]
     pub enum Trit {
         Zero,
         One,
@@ -278,7 +278,7 @@ mod space {
     use super::trit::Trit;
     use super::*;
 
-    fn check_contains_samples<T: Indexed>() {
+    fn check_contains_samples<T: Indexed + Clone + Send>() {
         let space = IndexedTypeSpace::<T>::new();
         testing::check_contains_samples(&space, 100);
     }
@@ -293,7 +293,7 @@ mod space {
         check_contains_samples::<Trit>();
     }
 
-    fn check_from_to_index_iter_size<T: Indexed>() {
+    fn check_from_to_index_iter_size<T: Indexed + Clone + Send>() {
         let space = IndexedTypeSpace::<T>::new();
         testing::check_from_to_index_iter_size(&space);
     }
@@ -308,7 +308,7 @@ mod space {
         check_from_to_index_iter_size::<Trit>();
     }
 
-    fn check_from_index_sampled<T: Indexed>() {
+    fn check_from_index_sampled<T: Indexed + Clone + Send>() {
         let space = IndexedTypeSpace::<T>::new();
         testing::check_from_index_sampled(&space, 20);
     }
@@ -323,7 +323,7 @@ mod space {
         check_from_index_sampled::<Trit>();
     }
 
-    fn check_from_index_invalid<T: Indexed>() {
+    fn check_from_index_invalid<T: Indexed + Clone + Send>() {
         let space = IndexedTypeSpace::<T>::new();
         testing::check_from_index_invalid(&space);
     }

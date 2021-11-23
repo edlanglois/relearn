@@ -136,7 +136,7 @@ impl<S: SubsetOrd, W> SubsetOrd for WrappedElementSpace<S, W> {
 impl<S, W> Space for WrappedElementSpace<S, W>
 where
     S: Space,
-    W: Wrapper<Inner = S::Element>,
+    W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     type Element = W;
 
@@ -148,7 +148,7 @@ where
 impl<S, W> FiniteSpace for WrappedElementSpace<S, W>
 where
     S: FiniteSpace,
-    W: Wrapper<Inner = S::Element>,
+    W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     fn size(&self) -> usize {
         self.inner_space.size()
@@ -172,7 +172,7 @@ where
 impl<S, W> NonEmptySpace for WrappedElementSpace<S, W>
 where
     S: NonEmptySpace,
-    W: Wrapper<Inner = S::Element>,
+    W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     fn some_element(&self) -> Self::Element {
         W::wrap(self.inner_space.some_element())
@@ -182,7 +182,7 @@ where
 impl<S, W> Distribution<<Self as Space>::Element> for WrappedElementSpace<S, W>
 where
     S: Space + Distribution<S::Element>,
-    W: Wrapper<Inner = S::Element>,
+    W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
         W::wrap(self.inner_space.sample(rng))
@@ -193,7 +193,7 @@ impl<S, W, T, T0> ReprSpace<T, T0> for WrappedElementSpace<S, W>
 where
     S: ReprSpace<T, T0>,
     S::Element: 'static,
-    W: Wrapper<Inner = S::Element>,
+    W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     fn repr(&self, element: &Self::Element) -> T0 {
         self.inner_space.repr(element.inner_ref())
@@ -213,7 +213,7 @@ where
 impl<S, W> NumFeatures for WrappedElementSpace<S, W>
 where
     S: Space + NumFeatures,
-    W: Wrapper<Inner = S::Element>,
+    W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     fn num_features(&self) -> usize {
         self.inner_space.num_features()
@@ -224,7 +224,7 @@ impl<S, W> EncoderFeatureSpace for WrappedElementSpace<S, W>
 where
     S: Space + EncoderFeatureSpace,
     S::Element: 'static,
-    W: Wrapper<Inner = S::Element>,
+    W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     type Encoder = S::Encoder;
 
@@ -288,7 +288,7 @@ where
 impl<S, W, T> ElementRefInto<T> for WrappedElementSpace<S, W>
 where
     S: ElementRefInto<T>,
-    W: Wrapper<Inner = S::Element>,
+    W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     fn elem_ref_into(&self, element: &Self::Element) -> T {
         self.inner_space.elem_ref_into(element.inner_ref())

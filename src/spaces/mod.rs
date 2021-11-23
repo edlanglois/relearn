@@ -52,7 +52,8 @@ use std::iter::ExactSizeIterator;
 ///
 /// A space is effectively a runtime-defined type.
 pub trait Space {
-    type Element;
+    // It is awkward to constrain associated types in sub-traits so apply core constraints here.
+    type Element: Clone + Send;
 
     /// Check whether a particular value is contained in the space.
     fn contains(&self, value: &Self::Element) -> bool;
@@ -676,21 +677,4 @@ pub trait ElementTryFrom<T>: Space {
     ///
     /// Returns Some(x) if and only if x is an element of this space.
     fn elem_try_from(&self, value: T) -> Option<Self::Element>;
-}
-
-/// Space that enforces `Space::Element: Send`
-///
-/// This trait uses an associated type because directly bounding `where Space::Element: Send`
-/// does not stick to the trait. It must instead be re-asserted on each use.
-/// See <https://stackoverflow.com/questions/37600687>.
-///
-pub trait SendElementSpace: Space<Element = Self::SendElement> {
-    type SendElement: Send;
-}
-impl<S> SendElementSpace for S
-where
-    S: Space,
-    Self::Element: Send,
-{
-    type SendElement = Self::Element;
 }

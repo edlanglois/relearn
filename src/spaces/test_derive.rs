@@ -111,7 +111,7 @@ mod unit {
 mod named {
     use super::*;
 
-    #[derive(Debug, PartialEq, Eq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     struct NamedStruct {
         a: bool,
         b: usize,
@@ -263,7 +263,7 @@ mod named {
 mod named_generic {
     use super::*;
 
-    #[derive(Debug, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     struct NamedGeneric<T> {
         inner: T,
     }

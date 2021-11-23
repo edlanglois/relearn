@@ -6,7 +6,7 @@ use super::{AgentDef, EnvDef, HooksDef, MultithreadAgentDef};
 use crate::envs::{BuildEnv, MetaObservationSpace};
 use crate::logging::{BuildThreadLogger, TimeSeriesLogger};
 use crate::simulation::{MultithreadSimulatorConfig, SerialSimulator, Simulator};
-use crate::spaces::{FiniteSpace, Space};
+use crate::spaces::FiniteSpace;
 
 /// Construct a boxed serial agent-environment simulator
 ///
@@ -72,10 +72,7 @@ impl VisitEnvFiniteFinite for SerialSimulatorVisitor {
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace + FiniteSpace,
-        <EC::ObservationSpace as Space>::Element: Clone,
-        EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace + FiniteSpace,
-        <EC::ActionSpace as Space>::Element: Clone,
     {
         Box::new(SerialSimulator::new(
             env_config,
@@ -90,11 +87,8 @@ impl VisitEnvMetaFinitFinite for SerialSimulatorVisitor {
     where
         EC: BuildEnv<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + 'static,
         OS: RLObservationSpace + FiniteSpace,
-        OS::Element: Clone,
         AS: RLActionSpace + FiniteSpace,
-        AS::Element: Clone,
         EC::ObservationSpace: RLObservationSpace,
-        EC::Observation: Clone,
     {
         Box::new(SerialSimulator::new(
             env_config,
@@ -109,10 +103,7 @@ impl VisitEnvAnyAny for SerialSimulatorVisitor {
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace,
-        <EC::ObservationSpace as Space>::Element: Clone,
-        EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace,
-        <EC::ActionSpace as Space>::Element: Clone,
     {
         Box::new(SerialSimulator::new(
             env_config,
@@ -143,10 +134,7 @@ where
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace + FiniteSpace,
-        <EC::ObservationSpace as Space>::Element: Clone,
-        EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace + FiniteSpace,
-        <EC::ActionSpace as Space>::Element: Clone,
         EC::Environment: Send + 'static,
     {
         Box::new(self.sim_config.build_simulator(
@@ -168,11 +156,8 @@ where
         EC: BuildEnv<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + 'static,
         EC::Environment: Send + 'static,
         OS: RLObservationSpace + FiniteSpace,
-        OS::Element: Clone,
         AS: RLActionSpace + FiniteSpace,
-        AS::Element: Clone,
         EC::ObservationSpace: RLObservationSpace,
-        EC::Observation: Clone,
     {
         Box::new(self.sim_config.build_simulator(
             env_config,
@@ -192,10 +177,7 @@ where
     where
         EC: BuildEnv + 'static,
         EC::ObservationSpace: RLObservationSpace,
-        <EC::ObservationSpace as Space>::Element: Clone,
-        EC::Observation: Clone,
         EC::ActionSpace: RLActionSpace,
-        <EC::ActionSpace as Space>::Element: Clone,
         EC::Environment: Send + 'static,
     {
         Box::new(self.sim_config.build_simulator(

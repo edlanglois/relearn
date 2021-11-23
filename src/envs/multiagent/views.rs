@@ -30,7 +30,6 @@ where
     OS1: Space,
     OS2: Space,
     AS1: Space,
-    AS1::Element: Clone,
     AS2: Space,
     AS2::Element: Default,
 {
@@ -155,7 +154,6 @@ where
     AS1: Space,
     AS1::Element: Default,
     AS2: Space,
-    AS2::Element: Clone,
 {
     type State = E::State;
     type Observation = OS2::Element;

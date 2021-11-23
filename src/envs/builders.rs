@@ -12,8 +12,8 @@ pub trait CloneBuild: Clone {}
 /// Build a [`Pomdp`].
 pub trait BuildPomdp {
     type State;
-    type Observation;
-    type Action;
+    type Observation: Clone + Send;
+    type Action: Clone + Send;
     type ObservationSpace: Space<Element = Self::Observation>;
     type ActionSpace: Space<Element = Self::Action>;
     type Pomdp: Pomdp<State = Self::State, Observation = Self::Observation, Action = Self::Action>
@@ -26,6 +26,8 @@ pub trait BuildPomdp {
 impl<E> BuildPomdp for E
 where
     E: Pomdp + EnvStructure + CloneBuild,
+    E::Observation: Clone + Send,
+    E::Action: Clone + Send,
     E::ObservationSpace: Space<Element = E::Observation>,
     E::ActionSpace: Space<Element = E::Action>,
 {
@@ -48,9 +50,9 @@ where
 /// The user does not need to store the environment type.
 pub trait BuildEnv {
     /// Environment observation type.
-    type Observation;
+    type Observation: Clone + Send;
     /// Environment action type.
-    type Action;
+    type Action: Clone + Send;
     /// Environment observation space type.
     type ObservationSpace: Space<Element = Self::Observation>;
     /// Environment action space type.
@@ -95,8 +97,8 @@ impl From<Infallible> for BuildEnvError {
 
 /// Build a [`PomdpDistribution`].
 pub trait BuildPomdpDist {
-    type Observation;
-    type Action;
+    type Observation: Clone + Send;
+    type Action: Clone + Send;
     type ObservationSpace: Space<Element = Self::Observation>;
     type ActionSpace: Space<Element = Self::Action>;
     type PomdpDistribution: PomdpDistribution<
@@ -125,8 +127,8 @@ where
 
 /// Build an [`EnvDistribution`].
 pub trait BuildEnvDist {
-    type Observation;
-    type Action;
+    type Observation: Clone + Send;
+    type Action: Clone + Send;
     type ObservationSpace: Space<Element = Self::Observation>;
     type ActionSpace: Space<Element = Self::Action>;
     type EnvDistribution: EnvDistribution<
