@@ -58,6 +58,20 @@ pub trait Space {
     fn contains(&self, value: &Self::Element) -> bool;
 }
 
+impl<S: Space + ?Sized> Space for &'_ S {
+    type Element = S::Element;
+    fn contains(&self, value: &Self::Element) -> bool {
+        S::contains(self, value)
+    }
+}
+
+impl<S: Space + ?Sized> Space for Box<S> {
+    type Element = S::Element;
+    fn contains(&self, value: &Self::Element) -> bool {
+        S::contains(self, value)
+    }
+}
+
 /// Compare this space to another in terms of the subset relation.
 ///
 /// This is a partial order and the rules for implementing this are the same as for
@@ -96,6 +110,18 @@ pub trait SubsetOrd: PartialEq<Self> {
             self.subset_cmp(other),
             Some(Ordering::Greater | Ordering::Equal)
         )
+    }
+}
+
+impl<S: SubsetOrd + ?Sized> SubsetOrd for &'_ S {
+    fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
+        S::subset_cmp(self, other)
+    }
+}
+
+impl<S: SubsetOrd + ?Sized> SubsetOrd for Box<S> {
+    fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
+        S::subset_cmp(self, other)
     }
 }
 
@@ -158,10 +184,52 @@ pub trait FiniteSpace: Space {
     }
 }
 
+impl<S: FiniteSpace + ?Sized> FiniteSpace for &'_ S {
+    fn size(&self) -> usize {
+        S::size(self)
+    }
+    fn to_index(&self, element: &Self::Element) -> usize {
+        S::to_index(self, element)
+    }
+    fn from_index(&self, index: usize) -> Option<Self::Element> {
+        S::from_index(self, index)
+    }
+    fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
+        S::from_index_unchecked(self, index)
+    }
+}
+
+impl<S: FiniteSpace + ?Sized> FiniteSpace for Box<S> {
+    fn size(&self) -> usize {
+        S::size(self)
+    }
+    fn to_index(&self, element: &Self::Element) -> usize {
+        S::to_index(self, element)
+    }
+    fn from_index(&self, index: usize) -> Option<Self::Element> {
+        S::from_index(self, index)
+    }
+    fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
+        S::from_index_unchecked(self, index)
+    }
+}
+
 /// A space containing at least one element.
 pub trait NonEmptySpace: Space {
     /// An arbitrary deterministic element from the space.
     fn some_element(&self) -> Self::Element;
+}
+
+impl<S: NonEmptySpace + ?Sized> NonEmptySpace for &'_ S {
+    fn some_element(&self) -> Self::Element {
+        S::some_element(self)
+    }
+}
+
+impl<S: NonEmptySpace + ?Sized> NonEmptySpace for Box<S> {
+    fn some_element(&self) -> Self::Element {
+        S::some_element(self)
+    }
 }
 
 /// A space from which samples can be drawn.
@@ -210,6 +278,18 @@ pub trait ReprSpace<T, T0 = T>: Space {
 pub trait NumFeatures {
     /// Length of the feature vectors in which elements are encoded.
     fn num_features(&self) -> usize;
+}
+
+impl<S: NumFeatures + ?Sized> NumFeatures for &'_ S {
+    fn num_features(&self) -> usize {
+        S::num_features(self)
+    }
+}
+
+impl<S: NumFeatures + ?Sized> NumFeatures for Box<S> {
+    fn num_features(&self) -> usize {
+        S::num_features(self)
+    }
 }
 
 /// Encode elements as feature vectors with the help of an encoder object.
@@ -310,6 +390,100 @@ pub trait EncoderFeatureSpace: Space + NumFeatures {
         let mut array = T::Array::zeros((elements.len(), self.num_features()));
         self.encoder_batch_features_out(elements, &mut array.view_mut(), true, encoder);
         array.into()
+    }
+}
+
+impl<S: EncoderFeatureSpace + ?Sized> EncoderFeatureSpace for &'_ S {
+    type Encoder = S::Encoder;
+    fn encoder(&self) -> Self::Encoder {
+        S::encoder(self)
+    }
+    fn encoder_features_out<F: Float>(
+        &self,
+        element: &Self::Element,
+        out: &mut [F],
+        zeroed: bool,
+        encoder: &Self::Encoder,
+    ) {
+        S::encoder_features_out(self, element, out, zeroed, encoder)
+    }
+    fn encoder_features<T>(&self, element: &Self::Element, encoder: &Self::Encoder) -> T
+    where
+        T: BuildFromArray1D,
+        <T::Array as NumArray1D>::Elem: Float,
+    {
+        S::encoder_features(self, element, encoder)
+    }
+    fn encoder_batch_features_out<'a, I, A>(
+        &self,
+        elements: I,
+        out: &mut ArrayBase<A, Ix2>,
+        zeroed: bool,
+        encoder: &Self::Encoder,
+    ) where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+        A: DataMut,
+        A::Elem: Float,
+    {
+        S::encoder_batch_features_out(self, elements, out, zeroed, encoder)
+    }
+    fn encoder_batch_features<'a, I, T>(&self, elements: I, encoder: &Self::Encoder) -> T
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: ExactSizeIterator,
+        Self::Element: 'a,
+        T: BuildFromArray2D,
+        <T::Array as NumArray2D>::Elem: Float,
+    {
+        S::encoder_batch_features(self, elements, encoder)
+    }
+}
+
+impl<S: EncoderFeatureSpace + ?Sized> EncoderFeatureSpace for Box<S> {
+    type Encoder = S::Encoder;
+    fn encoder(&self) -> Self::Encoder {
+        S::encoder(self)
+    }
+    fn encoder_features_out<F: Float>(
+        &self,
+        element: &Self::Element,
+        out: &mut [F],
+        zeroed: bool,
+        encoder: &Self::Encoder,
+    ) {
+        S::encoder_features_out(self, element, out, zeroed, encoder)
+    }
+    fn encoder_features<T>(&self, element: &Self::Element, encoder: &Self::Encoder) -> T
+    where
+        T: BuildFromArray1D,
+        <T::Array as NumArray1D>::Elem: Float,
+    {
+        S::encoder_features(self, element, encoder)
+    }
+    fn encoder_batch_features_out<'a, I, A>(
+        &self,
+        elements: I,
+        out: &mut ArrayBase<A, Ix2>,
+        zeroed: bool,
+        encoder: &Self::Encoder,
+    ) where
+        I: IntoIterator<Item = &'a Self::Element>,
+        Self::Element: 'a,
+        A: DataMut,
+        A::Elem: Float,
+    {
+        S::encoder_batch_features_out(self, elements, out, zeroed, encoder)
+    }
+    fn encoder_batch_features<'a, I, T>(&self, elements: I, encoder: &Self::Encoder) -> T
+    where
+        I: IntoIterator<Item = &'a Self::Element>,
+        I::IntoIter: ExactSizeIterator,
+        Self::Element: 'a,
+        T: BuildFromArray2D,
+        <T::Array as NumArray2D>::Elem: Float,
+    {
+        S::encoder_batch_features(self, elements, encoder)
     }
 }
 
@@ -466,15 +640,27 @@ pub trait ElementInto<T>: Space {
     fn elem_into(&self, element: Self::Element) -> T;
 }
 
+impl<T: ElementRefInto<U>, U> ElementInto<U> for T {
+    fn elem_into(&self, element: Self::Element) -> U {
+        self.elem_ref_into(&element)
+    }
+}
+
 /// Create values of type `T` from element references.
 pub trait ElementRefInto<T>: Space {
     /// Create a value of type `T` from an element reference.
     fn elem_ref_into(&self, element: &Self::Element) -> T;
 }
 
-impl<T: ElementRefInto<U>, U> ElementInto<U> for T {
-    fn elem_into(&self, element: Self::Element) -> U {
-        self.elem_ref_into(&element)
+impl<S: ElementRefInto<T> + ?Sized, T> ElementRefInto<T> for &'_ S {
+    fn elem_ref_into(&self, element: &Self::Element) -> T {
+        S::elem_ref_into(self, element)
+    }
+}
+
+impl<S: ElementRefInto<T> + ?Sized, T> ElementRefInto<T> for Box<S> {
+    fn elem_ref_into(&self, element: &Self::Element) -> T {
+        S::elem_ref_into(self, element)
     }
 }
 

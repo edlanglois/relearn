@@ -138,7 +138,8 @@ impl<S: EncoderFeatureSpace, const N: usize> EncoderFeatureSpace for ArraySpace<
 
     fn encoder(&self) -> Self::Encoder {
         let inner_encoders =
-            array_init::from_iter(self.inner_spaces.iter().map(|space| space.encoder())).unwrap();
+            array_init::from_iter(self.inner_spaces.iter().map(EncoderFeatureSpace::encoder))
+                .unwrap();
 
         let mut offset = 0;
         let end_offsets = array_init::from_iter(self.inner_spaces.iter().map(|space| {
