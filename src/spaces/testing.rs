@@ -144,7 +144,7 @@ macro_rules! features_tests {
         mod $label {
             use super::*;
             use crate::spaces::testing;
-            use crate::utils::tensor::UniqueTensor;
+            use crate::utils::tensor::ExclusiveTensor;
             use ndarray::Array1;
 
             #[test]
@@ -161,17 +161,17 @@ macro_rules! features_tests {
             }
             #[test]
             fn tensor_features() {
-                testing::check_features::<_, UniqueTensor<f32, _>>(&$space, &$elem, &$expected);
+                testing::check_features::<_, ExclusiveTensor<f32, _>>(&$space, &$elem, &$expected);
             }
             #[test]
             fn tensor_features_out_zeroed() {
-                testing::check_features_out_zeroed::<_, UniqueTensor<f32, _>>(
+                testing::check_features_out_zeroed::<_, ExclusiveTensor<f32, _>>(
                     &$space, &$elem, &$expected,
                 );
             }
             #[test]
             fn tensor_features_out_nonzero() {
-                testing::check_features_out_nonzero::<_, UniqueTensor<f32, _>>(
+                testing::check_features_out_nonzero::<_, ExclusiveTensor<f32, _>>(
                     &$space, &$elem, &$expected,
                 );
             }
@@ -185,7 +185,7 @@ macro_rules! batch_features_tests {
         mod $label {
             use super::*;
             use crate::spaces::testing;
-            use crate::utils::tensor::UniqueTensor;
+            use crate::utils::tensor::ExclusiveTensor;
             use ndarray::{arr2, Array2};
 
             #[test]
@@ -214,7 +214,7 @@ macro_rules! batch_features_tests {
             }
             #[test]
             fn tensor_batch_features() {
-                testing::check_batch_features::<_, UniqueTensor<f32, _>, _>(
+                testing::check_batch_features::<_, ExclusiveTensor<f32, _>, _>(
                     &$space,
                     &$elems,
                     &arr2(&$expected),
@@ -222,7 +222,7 @@ macro_rules! batch_features_tests {
             }
             #[test]
             fn tensor_batch_features_out_zeroed() {
-                testing::check_batch_features_out_zeroed::<_, UniqueTensor<f32, _>, _>(
+                testing::check_batch_features_out_zeroed::<_, ExclusiveTensor<f32, _>, _>(
                     &$space,
                     &$elems,
                     &arr2(&$expected),
@@ -230,7 +230,7 @@ macro_rules! batch_features_tests {
             }
             #[test]
             fn tensor_batch_features_out_nonzero() {
-                testing::check_batch_features_out_nonzero::<_, UniqueTensor<f32, _>, _>(
+                testing::check_batch_features_out_nonzero::<_, ExclusiveTensor<f32, _>, _>(
                     &$space,
                     &$elems,
                     &arr2(&$expected),

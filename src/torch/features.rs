@@ -1,7 +1,7 @@
 //! Utilities for calculating step history features.
 use crate::spaces::{FeatureSpace, ReprSpace, Space};
 use crate::utils::packed::PackedSeqIter;
-use crate::utils::tensor::UniqueTensor;
+use crate::utils::tensor::ExclusiveTensor;
 use crate::Step;
 use lazycell::LazyCell;
 use tch::{Device, Tensor};
@@ -186,7 +186,7 @@ where
     fn returns(&self) -> &Tensor {
         self.cached_returns.borrow_with(|| {
             // Returns must be calculated from the end of the episode
-            let mut returns = UniqueTensor::zeros(*self.step_offsets.last().unwrap());
+            let mut returns = ExclusiveTensor::zeros(*self.step_offsets.last().unwrap());
             let returns_view = returns.as_slice_mut();
             for (ep_idx, episode) in self.episodes.iter().enumerate() {
                 // TODO: Allow specifying an estimated value for non-terminal-end-of-episode.

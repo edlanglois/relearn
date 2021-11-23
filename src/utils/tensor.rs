@@ -4,19 +4,19 @@ use std::ptr::NonNull;
 use std::{mem, slice};
 use tch::{kind::Element, Device, Kind, Tensor};
 
-/// A unique tensor object.
+/// An exclusive owner of a [`Tensor`] and its data.
 ///
-/// Given an ordinary [`Tensor`], it is impossible to reason about the lifetime of the data at
+/// Given an ordinary `Tensor`, it is impossible to reason about the lifetime of the data at
 /// [`Tensor::data_ptr`]. Copies created by [`Tensor::shallow_clone`] share the same underlying
 /// tensor object and can cause the data memory to be moved or reallocated at any time (for
 /// example, by calling `Tensor::resize_`].
 ///
-/// To avoid this issue `UniqueTensor` manages the creation of the tensor such that it has
+/// To avoid this issue `ExclusiveTensor` manages the creation of the tensor such that it has
 /// exclusive access to the underlying data.
 ///
 /// The managed tensor always lives on the CPU.
 #[derive(Debug)]
-pub struct UniqueTensor<E, D>
+pub struct ExclusiveTensor<E, D>
 where
     D: Dimension,
 {
@@ -29,7 +29,7 @@ where
     element_type: PhantomData<E>,
 }
 
-impl<E, D> UniqueTensor<E, D>
+impl<E, D> ExclusiveTensor<E, D>
 where
     E: Element,
     D: Dimension + IntoTorchShape,
@@ -55,11 +55,11 @@ where
     /// Initialize given a tensor construction function.
     ///
     /// # Safety
-    /// The construct tensor must
+    /// The constructed tensor must
     ///     * have number of elements corresponding to `shape`,
     ///     * have elements of type `E`,
     ///     * use `Device::Cpu`, and
-    ///     * uniquely manage its own memory (e.g. no `shallow_clone`).
+    ///     * exclusively manage its own memory (e.g. no `shallow_clone`).
     ///
     /// # Panics
     /// If the total size of all elements exceeds `isize::MAX`.
@@ -87,14 +87,14 @@ where
     }
 }
 
-impl<E, D: Dimension> UniqueTensor<E, D> {
+impl<E, D: Dimension> ExclusiveTensor<E, D> {
     /// Convert into the inner tensor.
     pub fn into_tensor(self) -> Tensor {
         self.tensor
     }
 }
 
-impl<E, D> UniqueTensor<E, D>
+impl<E, D> ExclusiveTensor<E, D>
 where
     E: Element,
     D: Dimension,
@@ -174,19 +174,19 @@ where
     }
 }
 
-impl<E, D: Dimension> From<UniqueTensor<E, D>> for Tensor {
-    fn from(unique: UniqueTensor<E, D>) -> Self {
-        unique.into_tensor()
+impl<E, D: Dimension> From<ExclusiveTensor<E, D>> for Tensor {
+    fn from(exclusive: ExclusiveTensor<E, D>) -> Self {
+        exclusive.into_tensor()
     }
 }
 
-impl<'a, E, D> From<&'a UniqueTensor<E, D>> for ArrayView<'a, E, D>
+impl<'a, E, D> From<&'a ExclusiveTensor<E, D>> for ArrayView<'a, E, D>
 where
     E: Element,
     D: Dimension,
 {
-    fn from(unique: &'a UniqueTensor<E, D>) -> Self {
-        unique.array_view()
+    fn from(exclusive: &'a ExclusiveTensor<E, D>) -> Self {
+        exclusive.array_view()
     }
 }
 
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn zeros() {
-        let u = UniqueTensor::<f32, _>::zeros([2, 4, 3]);
+        let u = ExclusiveTensor::<f32, _>::zeros([2, 4, 3]);
         let tensor: Tensor = u.into();
         assert_eq!(tensor.size(), vec![2, 4, 3]);
         assert_eq!(tensor.kind(), Kind::Float);
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn ones() {
-        let u = UniqueTensor::<f32, _>::ones([2, 4, 3]);
+        let u = ExclusiveTensor::<f32, _>::ones([2, 4, 3]);
         let tensor: Tensor = u.into();
         assert_eq!(tensor.size(), vec![2, 4, 3]);
         assert_eq!(tensor.kind(), Kind::Float);
@@ -296,14 +296,14 @@ mod tests {
     #[test]
     #[allow(clippy::float_cmp)]
     fn slice_f64() {
-        let u = UniqueTensor::<f64, _>::ones([3, 1, 2]);
+        let u = ExclusiveTensor::<f64, _>::ones([3, 1, 2]);
         assert_eq!(u.as_slice().len(), 6);
         assert_eq!(u.as_slice(), &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]);
     }
 
     #[test]
     fn slice_mut_i16() {
-        let mut u = UniqueTensor::<i16, _>::ones([3, 1, 2]);
+        let mut u = ExclusiveTensor::<i16, _>::ones([3, 1, 2]);
         assert_eq!(u.as_slice_mut().len(), 6);
         for (i, x) in u.as_slice_mut().iter_mut().enumerate() {
             *x = i.try_into().unwrap()
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn array_view_f32() {
-        let u = UniqueTensor::<f32, _>::ones([2, 4, 3]);
+        let u = ExclusiveTensor::<f32, _>::ones([2, 4, 3]);
         let view = u.array_view();
         assert_eq!(view.dim(), (2, 4, 3));
         assert_eq!(view, Array::ones((2, 4, 3)));
@@ -327,7 +327,7 @@ mod tests {
     #[test]
     #[allow(clippy::unit_cmp)]
     fn array_view_i64_scalar() {
-        let u = UniqueTensor::<i64, _>::ones([]);
+        let u = ExclusiveTensor::<i64, _>::ones([]);
         let view = u.array_view();
         assert_eq!(view.dim(), ());
         assert_eq!(view.into_scalar(), &1);
@@ -335,7 +335,7 @@ mod tests {
 
     #[test]
     fn array_view_f32_empty() {
-        let u = UniqueTensor::<f32, _>::ones([0]);
+        let u = ExclusiveTensor::<f32, _>::ones([0]);
         let view = u.array_view();
         assert_eq!(view.dim(), 0);
         assert!(view.as_slice().unwrap().is_empty());
@@ -343,7 +343,7 @@ mod tests {
 
     #[test]
     fn array_view_mut() {
-        let mut u = UniqueTensor::<i32, _>::ones([3, 4]);
+        let mut u = ExclusiveTensor::<i32, _>::ones([3, 4]);
         let mut view = u.array_view_mut();
         for (i, mut row) in view.rows_mut().into_iter().enumerate() {
             for (j, cell) in row.iter_mut().enumerate() {
@@ -359,7 +359,7 @@ mod tests {
 
     #[test]
     fn array_view_mut_empty() {
-        let mut u = UniqueTensor::<f32, _>::ones([2, 0, 3]);
+        let mut u = ExclusiveTensor::<f32, _>::ones([2, 0, 3]);
         let mut view = u.array_view_mut();
         assert!(view.as_slice_mut().unwrap().is_empty());
     }

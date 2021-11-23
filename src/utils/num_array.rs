@@ -1,6 +1,6 @@
 //! Numeric array interfaces.
 
-use super::tensor::UniqueTensor;
+use super::tensor::ExclusiveTensor;
 use ndarray::{Array1, Array2, ArrayView, ArrayViewMut, Ix1, Ix2};
 use num_traits::{One, Zero};
 use tch::{kind::Element, Tensor};
@@ -95,7 +95,7 @@ impl<A: Clone + Zero + One> NumArray2D for Array2<A> {
     }
 }
 
-impl<A: Element> NumArray1D for UniqueTensor<A, Ix1> {
+impl<A: Element> NumArray1D for ExclusiveTensor<A, Ix1> {
     type Elem = A;
 
     #[inline(always)]
@@ -116,7 +116,7 @@ impl<A: Element> NumArray1D for UniqueTensor<A, Ix1> {
     }
 }
 
-impl<A: Element> NumArray2D for UniqueTensor<A, Ix2> {
+impl<A: Element> NumArray2D for ExclusiveTensor<A, Ix2> {
     type Elem = A;
 
     #[inline(always)]
@@ -138,8 +138,8 @@ impl<A: Element> NumArray2D for UniqueTensor<A, Ix2> {
 }
 
 impl BuildFromArray1D for Tensor {
-    type Array = UniqueTensor<f32, Ix1>;
+    type Array = ExclusiveTensor<f32, Ix1>;
 }
 impl BuildFromArray2D for Tensor {
-    type Array = UniqueTensor<f32, Ix2>;
+    type Array = ExclusiveTensor<f32, Ix2>;
 }
