@@ -108,6 +108,22 @@ pub struct StoredEnvStructure<OS, AS> {
     pub discount_factor: f64,
 }
 
+impl<OS, AS> StoredEnvStructure<OS, AS> {
+    pub const fn new(
+        observation_space: OS,
+        action_space: AS,
+        reward_range: (f64, f64),
+        discount_factor: f64,
+    ) -> Self {
+        Self {
+            observation_space,
+            action_space,
+            reward_range,
+            discount_factor,
+        }
+    }
+}
+
 impl<OS, AS> EnvStructure for StoredEnvStructure<OS, AS>
 where
     OS: Space + Clone,

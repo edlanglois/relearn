@@ -8,6 +8,7 @@ pub mod buffers;
 mod finite;
 mod meta;
 pub mod multithread;
+mod pair;
 mod random;
 mod tabular;
 #[cfg(test)]
