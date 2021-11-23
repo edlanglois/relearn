@@ -2,8 +2,8 @@
 use crate::envs::{CloneBuild, EnvStructure, Pomdp};
 use crate::logging::Logger;
 use crate::spaces::{
-    BooleanSpace, BoxSpace, IndexSpace, IndexedTypeSpace, PowerSpace, Space, TupleSpace2,
-    TupleSpace3,
+    ArraySpace, BooleanSpace, BoxSpace, FiniteSpace, IndexSpace, IndexedTypeSpace, PowerSpace,
+    ProductSpace, Space, TupleSpace2,
 };
 use crate::utils::vector::Vector;
 use enum_map::{enum_map, Enum, EnumMap};
@@ -118,23 +118,29 @@ impl<const W: usize, const H: usize> FruitGameState<W, H> {
             self.positions[Player::Principal],
             self.positions[Player::Assistant],
         );
-        let Vector([pi, pj]) = self.positions[Player::Principal];
-        let assistant_view = grid_view(
-            &self.cells,
-            self.positions[Player::Assistant],
-            self.positions[Player::Principal],
-        );
-
+        let Vector(principal_pos) = self.positions[Player::Principal];
         // If more than 2 fruit then change from BooleanSpace to IndexedTypeSpace
         let goal_is_apple = match self.goal {
             Fruit::Apple => true,
             Fruit::Cherry => false,
         };
-        let Vector([ai, aj]) = self.positions[Player::Assistant];
-        (
-            (principal_view, (pi, pj), goal_is_apple),
-            (assistant_view, (ai, aj)),
-        )
+        let principal_obs = PrincipalObs {
+            visible_grid: principal_view,
+            position: principal_pos,
+            goal_is_apple,
+        };
+
+        let assistant_view = grid_view(
+            &self.cells,
+            self.positions[Player::Assistant],
+            self.positions[Player::Principal],
+        );
+        let Vector(assistant_pos) = self.positions[Player::Assistant];
+        let assistant_obs = AssistantObs {
+            visible_grid: assistant_view,
+            position: assistant_pos,
+        };
+        (principal_obs, assistant_obs)
     }
 
     fn step(&mut self, action: Move, player: Player) -> f64 {
@@ -163,19 +169,42 @@ impl<const W: usize, const H: usize> FruitGameState<W, H> {
 pub type VisibleGridSpace<const W: usize, const H: usize> =
     BoxSpace<PowerSpace<PowerSpace<IndexedTypeSpace<CellView>, W>, H>>;
 
-/// Grid coordinate pairs
-pub type CoordinateSpace = TupleSpace2<IndexSpace, IndexSpace>;
+/// Observation for the principal
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PrincipalObs<const W: usize, const H: usize> {
+    /// Visible part of the grid centered on own position
+    pub visible_grid: Box<[[CellView; W]; H]>,
+    /// Own position
+    pub position: [usize; 2],
+    /// Whether the goal is apple (true) or cherry (false).
+    pub goal_is_apple: bool,
+}
 
 /// Observation space for the principal
-pub type PrincipalObsSpace<const W: usize, const H: usize> = TupleSpace3<
-    VisibleGridSpace<W, H>,
-    CoordinateSpace, // Own position (absolute)
-    BooleanSpace,    // Whether goal is apple (true) or cherry (false).
->;
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, ProductSpace, FiniteSpace)]
+#[element(PrincipalObs<W, H>)]
+pub struct PrincipalObsSpace<const W: usize, const H: usize> {
+    pub visible_grid: VisibleGridSpace<W, H>,
+    pub position: ArraySpace<IndexSpace, 2>,
+    pub goal_is_apple: BooleanSpace,
+}
+
+/// Observation for the assistant
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AssistantObs<const W: usize, const H: usize> {
+    /// Visible part of the grid centered on own position
+    pub visible_grid: Box<[[CellView; W]; H]>,
+    /// Own position
+    pub position: [usize; 2],
+}
 
 /// Observation space for the assistant
-pub type AssistantObsSpace<const W: usize, const H: usize> =
-    TupleSpace2<VisibleGridSpace<W, H>, CoordinateSpace>;
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, ProductSpace, FiniteSpace)]
+#[element(AssistantObs<W, H>)]
+pub struct AssistantObsSpace<const W: usize, const H: usize> {
+    pub visible_grid: VisibleGridSpace<W, H>,
+    pub position: ArraySpace<IndexSpace, 2>,
+}
 
 pub type JointObsSpace<const VW: usize, const VH: usize> =
     TupleSpace2<PrincipalObsSpace<VW, VH>, AssistantObsSpace<VW, VH>>;
@@ -264,11 +293,17 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> EnvStruct
     type ActionSpace = TupleSpace2<IndexedTypeSpace<Move>, IndexedTypeSpace<Move>>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
-        let visible_grid_space = VisibleGridSpace::default(); // No dynamic structure
-        let coordinate_space = TupleSpace2(IndexSpace::new(H), IndexSpace::new(W));
-        let principal_obs_space =
-            TupleSpace3(visible_grid_space, coordinate_space, BooleanSpace::new());
-        let assistant_obs_space = TupleSpace2(visible_grid_space, coordinate_space);
+        let visible_grid = VisibleGridSpace::default(); // No dynamic structure
+        let position = ArraySpace::new([IndexSpace::new(H), IndexSpace::new(W)]);
+        let principal_obs_space = PrincipalObsSpace {
+            visible_grid,
+            position,
+            goal_is_apple: BooleanSpace,
+        };
+        let assistant_obs_space = AssistantObsSpace {
+            visible_grid,
+            position,
+        };
         TupleSpace2(principal_obs_space, assistant_obs_space)
     }
 
