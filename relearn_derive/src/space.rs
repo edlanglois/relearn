@@ -310,6 +310,7 @@ impl SpaceTraitImpl for NonEmptySpaceImpl {
         }));
 
         quote! {
+            #[allow(clippy::unused_unit)]
             impl #impl_generics ::relearn::spaces::NonEmptySpace for #name #ty_generics #where_clause {
                 fn some_element(&self) -> <Self as ::relearn::spaces::Space>::Element {
                     #some_element
