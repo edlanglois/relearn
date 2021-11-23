@@ -43,7 +43,7 @@ use crate::utils::distributions::ArrayDistribution;
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
 use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::Float;
-use rand::distributions::Distribution as RandDistribution;
+use rand::distributions::Distribution;
 use rand::RngCore;
 use std::cmp::Ordering;
 use std::iter::ExactSizeIterator;
@@ -169,6 +169,13 @@ pub trait NonEmptySpace: Space {
 /// No particular distribution is specified but the distribution:
 /// * must have support equal to the entire space, and
 /// * should be some form of reasonable "standard" distribution for the space.
+///
+/// # Note
+/// This re-implements sample method of [`Distribution`] rather than set
+/// `Distribution<Self::Element>` as a super-trait so that `SampleSpace` is object-safe since
+/// * `Distribution<T>` is not object-safe, and even if it was,
+/// * generic super traits using `<Self::AssocType>` are not object safe due to a bug / issue:
+///     <https://github.com/rust-lang/rust/issues/40533>.
 pub trait SampleSpace: Space {
     /// Sample a random element.
     fn sample(&self, rng: &mut dyn RngCore) -> Self::Element;
@@ -176,10 +183,10 @@ pub trait SampleSpace: Space {
 
 impl<S> SampleSpace for S
 where
-    S: Space + RandDistribution<<Self as Space>::Element>,
+    S: Space + Distribution<<Self as Space>::Element>,
 {
     fn sample(&self, rng: &mut dyn RngCore) -> Self::Element {
-        RandDistribution::sample(&self, rng)
+        Distribution::sample(&self, rng)
     }
 }
 

@@ -3,11 +3,12 @@ use criterion::{
     criterion_group, criterion_main, measurement::Measurement, AxisScale, BenchmarkGroup,
     BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
+use rand::distributions::Distribution;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use relearn::spaces::{
     BooleanSpace, FeatureSpace, IndexSpace, IntervalSpace, NonEmptyFeatures, OptionSpace,
-    PowerSpace, SampleSpace, SingletonSpace, TupleSpace3,
+    PowerSpace, SingletonSpace, TupleSpace3,
 };
 use tch::Tensor;
 
@@ -17,7 +18,7 @@ fn bench_space_batch_tensor_features<S, M>(
     space: S,
     batch_sizes: &[u64],
 ) where
-    S: SampleSpace + FeatureSpace,
+    S: Distribution<S::Element> + FeatureSpace,
     M: Measurement,
 {
     let mut rng = StdRng::seed_from_u64(0);
