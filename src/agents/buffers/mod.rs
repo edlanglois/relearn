@@ -18,10 +18,7 @@ pub trait HistoryBufferSteps<'a, O: 'a, A: 'a> {
     type StepsIter: Iterator<Item = &'a Step<O, A>>;
 
     /// All steps with episode steps ordered contiguously.
-    ///
-    /// # Args
-    /// * `include_incomplete` - Include incomplete episodes if they have at least this many steps.
-    fn steps_(&'a self, include_incomplete: Option<usize>) -> Self::StepsIter;
+    fn steps_(&'a self) -> Self::StepsIter;
 }
 
 pub trait StepsIter<'a, O: 'a, A: 'a>: Iterator<Item = &'a Step<O, A>> + ExactSizeIterator {}
@@ -32,7 +29,7 @@ impl<'a, O: 'a, A: 'a, T: ?Sized> StepsIter<'a, O, A> for T where
 
 /// Access steps from a history buffer via a boxed iterator.
 pub trait HistoryBufferBoxedSteps<O, A> {
-    fn steps<'a>(&'a self, include_incomplete: Option<usize>) -> Box<dyn StepsIter<O, A> + 'a>
+    fn steps<'a>(&'a self) -> Box<dyn StepsIter<O, A> + 'a>
     where
         O: 'a,
         A: 'a;
@@ -56,15 +53,12 @@ pub trait HistoryBufferEpisodes<'a, O: 'a, A: 'a> {
     ///
     /// # Args
     /// * `include_partial` - Include partial episodes if they have at least this many steps.
-    fn episodes_(&'a self, include_incomplete: Option<usize>) -> Self::EpisodesIter;
+    fn episodes_(&'a self) -> Self::EpisodesIter;
 }
 
 /// Access episodes from a history buffer via a boxed iterator.
 pub trait HistoryBufferBoxedEpisodes<O, A> {
-    fn episodes<'a>(
-        &'a self,
-        include_incomplete: Option<usize>,
-    ) -> Box<dyn EpisodesIter<O, A> + 'a>
+    fn episodes<'a>(&'a self) -> Box<dyn EpisodesIter<O, A> + 'a>
     where
         O: 'a,
         A: 'a;

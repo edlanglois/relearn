@@ -51,7 +51,7 @@ where
         history: &dyn HistoryBuffer<O, A>,
         logger: &mut dyn TimeSeriesLogger,
     ) {
-        for step in history.steps(Some(0)) {
+        for step in history.steps() {
             // TODO: Avoid clone. Maybe update should take &step?
             // Or maybe add a drain_steps() method.
             self.update(step.clone(), logger)

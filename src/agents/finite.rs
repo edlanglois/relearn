@@ -122,7 +122,7 @@ where
     ) {
         self.agent.batch_update_from_steps(
             history
-                .steps(Some(0))
+                .steps()
                 .map(|step| indexed_step(step, &self.observation_space, &self.action_space)),
             logger,
         )

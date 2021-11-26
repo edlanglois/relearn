@@ -20,7 +20,6 @@ use tch::{nn::VarStore, Device, Tensor};
 /// Configuration for [`ActorCriticAgent`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ActorCriticConfig<PB, PUB, CB, CUB> {
-    pub include_incomplete_episode_len: Option<usize>,
     pub policy_config: PB,
     pub policy_updater_config: PUB,
     pub critic_config: CB,
@@ -37,7 +36,6 @@ where
 {
     fn default() -> Self {
         Self {
-            include_incomplete_episode_len: Some(10),
             policy_config: Default::default(),
             policy_updater_config: Default::default(),
             critic_config: Default::default(),
@@ -87,9 +85,6 @@ where
 
     /// Device on which model variables are stored.
     pub device: Device,
-
-    /// Include incomplete episodes that are at least this long.
-    pub include_incomplete_episode_len: Option<usize>,
 
     /// The policy module (the "actor").
     pub policy: P,
@@ -178,7 +173,6 @@ where
             action_space,
             discount_factor,
             device: config.device,
-            include_incomplete_episode_len: config.include_incomplete_episode_len,
             policy,
             policy_updater,
             policy_variables,
@@ -227,7 +221,7 @@ where
         logger: &mut dyn TimeSeriesLogger,
     ) {
         let features = LazyPackedHistoryFeatures::new(
-            history.episodes(self.include_incomplete_episode_len),
+            history.episodes(),
             &self.observation_space,
             &self.action_space,
             self.discount_factor,

@@ -98,29 +98,19 @@ impl<O, A> Extend<Step<O, A>> for SerialBuffer<O, A> {
 impl<'a, O: 'a, A: 'a> HistoryBufferSteps<'a, O, A> for SerialBuffer<O, A> {
     type StepsIter = slice::Iter<'a, Step<O, A>>;
 
-    fn steps_(&'a self, include_incomplete: Option<usize>) -> Self::StepsIter {
-        // Initialize end to the end of completed episodes
-        let mut end: usize = self.episode_ends.last().cloned().unwrap_or(0);
-        if let Some(min_incomplete_len) = include_incomplete {
-            let num_steps = self.steps.len();
-            // If there is an incomplete episode at the end with length at least min_incomplete_len
-            // then change the end to be the last step.
-            if (num_steps - end) >= min_incomplete_len {
-                end = num_steps;
-            }
-        }
-        self.steps[..end].iter()
+    fn steps_(&'a self) -> Self::StepsIter {
+        self.steps.iter()
     }
 }
 // Would be implemented with a generic impl on HistoryBufferSteps except that requires
 // O: 'static and A: 'static
 impl<O, A> HistoryBufferBoxedSteps<O, A> for SerialBuffer<O, A> {
-    fn steps<'a>(&'a self, include_incomplete: Option<usize>) -> Box<dyn StepsIter<O, A> + 'a>
+    fn steps<'a>(&'a self) -> Box<dyn StepsIter<O, A> + 'a>
     where
         O: 'a,
         A: 'a,
     {
-        Box::new(HistoryBufferSteps::steps_(self, include_incomplete))
+        Box::new(HistoryBufferSteps::steps_(self))
     }
 }
 
@@ -133,16 +123,15 @@ pub type EpisodeStepsIter<'a, O, A> = SliceChunksAtIter<
 impl<'a, O: 'a, A: 'a> HistoryBufferEpisodes<'a, O, A> for SerialBuffer<O, A> {
     type EpisodesIter = EpisodeStepsIter<'a, O, A>;
 
-    fn episodes_(&'a self, include_incomplete: Option<usize>) -> Self::EpisodesIter {
-        // Check for a partial episode at the end to include
-        let mut incomplete_end = None;
-        if let Some(min_incomplete_len) = include_incomplete {
-            let last_complete_end: usize = self.episode_ends.last().cloned().unwrap_or(0);
-            let num_steps = self.steps.len();
-            if (num_steps - last_complete_end) >= min_incomplete_len {
-                incomplete_end = Some(num_steps)
-            }
-        }
+    fn episodes_(&'a self) -> Self::EpisodesIter {
+        // Check for an incomplete episode at the end to include
+        let last_complete_end: usize = self.episode_ends.last().cloned().unwrap_or(0);
+        let num_steps = self.steps.len();
+        let incomplete_end = if num_steps > last_complete_end {
+            Some(num_steps)
+        } else {
+            None
+        };
 
         let ends_iter: SizedChain<_, _> = self
             .episode_ends
@@ -154,12 +143,12 @@ impl<'a, O: 'a, A: 'a> HistoryBufferEpisodes<'a, O, A> for SerialBuffer<O, A> {
     }
 }
 impl<O, A> HistoryBufferBoxedEpisodes<O, A> for SerialBuffer<O, A> {
-    fn episodes<'a>(&'a self, include_incomplete: Option<usize>) -> Box<dyn EpisodesIter<O, A> + 'a>
+    fn episodes<'a>(&'a self) -> Box<dyn EpisodesIter<O, A> + 'a>
     where
         O: 'a,
         A: 'a,
     {
-        Box::new(HistoryBufferEpisodes::episodes_(self, include_incomplete))
+        Box::new(HistoryBufferEpisodes::episodes_(self))
     }
 }
 
@@ -293,26 +282,8 @@ mod tests {
     }
 
     #[rstest]
-    fn steps_no_incomplete(full_buffer: SerialBuffer<usize, bool>) {
-        let mut steps_iter = full_buffer.steps_(None);
-        assert_eq!(steps_iter.next(), Some(&step(0, None)));
-        assert_eq!(steps_iter.next(), Some(&step(1, Some(2))));
-        assert_eq!(steps_iter.next(), Some(&step(2, None)));
-        assert_eq!(steps_iter.next(), None);
-    }
-
-    #[rstest]
-    fn steps_incomplete_ge_5(full_buffer: SerialBuffer<usize, bool>) {
-        let mut steps_iter = full_buffer.steps_(Some(5));
-        assert_eq!(steps_iter.next(), Some(&step(0, None)));
-        assert_eq!(steps_iter.next(), Some(&step(1, Some(2))));
-        assert_eq!(steps_iter.next(), Some(&step(2, None)));
-        assert_eq!(steps_iter.next(), None);
-    }
-
-    #[rstest]
-    fn steps_incomplete_ge_1(full_buffer: SerialBuffer<usize, bool>) {
-        let mut steps_iter = full_buffer.steps_(Some(1));
+    fn steps(full_buffer: SerialBuffer<usize, bool>) {
+        let mut steps_iter = full_buffer.steps_();
         assert_eq!(steps_iter.next(), Some(&step(0, None)));
         assert_eq!(steps_iter.next(), Some(&step(1, Some(2))));
         assert_eq!(steps_iter.next(), Some(&step(2, None)));
@@ -323,7 +294,7 @@ mod tests {
 
     #[rstest]
     fn steps_is_fused(full_buffer: SerialBuffer<usize, bool>) {
-        let mut steps_iter = full_buffer.steps_(Some(0));
+        let mut steps_iter = full_buffer.steps_();
         for _ in 0..5 {
             assert!(steps_iter.next().is_some());
         }
@@ -333,45 +304,17 @@ mod tests {
 
     #[rstest]
     fn steps_len(full_buffer: SerialBuffer<usize, bool>) {
-        assert_eq!(full_buffer.steps_(Some(0)).len(), 5);
+        assert_eq!(full_buffer.steps_().len(), 5);
     }
 
     #[rstest]
     fn steps_count(full_buffer: SerialBuffer<usize, bool>) {
-        assert_eq!(full_buffer.steps_(Some(0)).count(), 5);
-    }
-
-    #[rstest]
-    fn episodes_no_incomplete(full_buffer: SerialBuffer<usize, bool>) {
-        let mut episodes_iter = full_buffer.episodes_(None);
-        assert_eq!(
-            episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(0, None)]
-        );
-        assert_eq!(
-            episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(1, Some(2)), &step(2, None)]
-        );
-        assert!(episodes_iter.next().is_none());
-    }
-
-    #[rstest]
-    fn episodes_incomplete_ge_5(full_buffer: SerialBuffer<usize, bool>) {
-        let mut episodes_iter = full_buffer.episodes_(Some(5));
-        assert_eq!(
-            episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(0, None)]
-        );
-        assert_eq!(
-            episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(1, Some(2)), &step(2, None)]
-        );
-        assert!(episodes_iter.next().is_none());
+        assert_eq!(full_buffer.steps_().count(), 5);
     }
 
     #[rstest]
     fn episodes_incomplete_ge_1(full_buffer: SerialBuffer<usize, bool>) {
-        let mut episodes_iter = full_buffer.episodes_(Some(1));
+        let mut episodes_iter = full_buffer.episodes_();
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
             vec![&step(0, None)]
