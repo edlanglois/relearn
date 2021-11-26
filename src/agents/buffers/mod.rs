@@ -15,7 +15,7 @@ pub trait BuildHistoryBuffer<O, A> {
 /// Access steps from a history buffer.
 pub trait HistoryBufferSteps<'a, O: 'a, A: 'a> {
     /// An iterator of steps.
-    type StepsIter: Iterator<Item = &'a Step<O, A>>;
+    type StepsIter: StepsIter<'a, O, A>;
 
     /// All steps with episode steps ordered contiguously.
     fn steps_(&'a self) -> Self::StepsIter;
@@ -47,7 +47,7 @@ impl<'a, O: 'a, A: 'a, T: ?Sized> EpisodesIter<'a, O, A> for T where
 /// Access episodes from a history buffer
 pub trait HistoryBufferEpisodes<'a, O: 'a, A: 'a> {
     /// An iterator of episodes. Each episode is a slice of steps.
-    type EpisodesIter: Iterator<Item = &'a [Step<O, A>]>;
+    type EpisodesIter: EpisodesIter<'a, O, A>;
 
     /// All completed (or partial) episodes in the buffer.
     ///
