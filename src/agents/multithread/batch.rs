@@ -232,7 +232,7 @@ where
             let mut actor = self.actor.lock().unwrap();
 
             // Get full buffers from the worker threads.
-            let buffers: Vec<_> = self.recv_buffer.iter().take(self.num_workers).collect();
+            let mut buffers: Vec<_> = self.recv_buffer.iter().take(self.num_workers).collect();
 
             if buffers.is_empty() {
                 // Worker threads have exited
@@ -240,7 +240,7 @@ where
             }
             assert_eq!(buffers.len(), self.num_workers);
 
-            actor.batch_update(&buffers, logger);
+            actor.batch_update(&mut buffers, logger);
             drop(actor);
 
             // Clear buffers and return to the agents.

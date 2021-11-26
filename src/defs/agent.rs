@@ -610,7 +610,7 @@ macro_rules! box_impl_batch_update {
         impl<O, A> BatchUpdate<O, A> for Box<$type> {
             fn batch_update(
                 &mut self,
-                history: &dyn HistoryBuffer<O, A>,
+                history: &mut dyn HistoryBuffer<O, A>,
                 logger: &mut dyn TimeSeriesLogger,
             ) {
                 self.as_mut().batch_update(history, logger)

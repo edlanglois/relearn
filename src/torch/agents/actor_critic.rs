@@ -217,7 +217,7 @@ where
 {
     fn batch_update(
         &mut self,
-        history: &dyn HistoryBuffer<OS::Element, AS::Element>,
+        history: &mut dyn HistoryBuffer<OS::Element, AS::Element>,
         logger: &mut dyn TimeSeriesLogger,
     ) {
         let features = LazyPackedHistoryFeatures::new(

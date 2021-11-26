@@ -32,7 +32,7 @@ pub trait BuildBatchUpdateActor<OS: Space, AS: Space> {
 pub trait BatchUpdate<O, A> {
     fn batch_update(
         &mut self,
-        history: &dyn HistoryBuffer<O, A>,
+        history: &mut dyn HistoryBuffer<O, A>,
         logger: &mut dyn TimeSeriesLogger,
     );
 }
@@ -43,18 +43,14 @@ pub trait OffPolicyAgent {}
 impl<T, O, A> BatchUpdate<O, A> for T
 where
     T: OffPolicyAgent + Agent<O, A>,
-    O: Clone,
-    A: Clone,
 {
     fn batch_update(
         &mut self,
-        history: &dyn HistoryBuffer<O, A>,
+        history: &mut dyn HistoryBuffer<O, A>,
         logger: &mut dyn TimeSeriesLogger,
     ) {
-        for step in history.steps() {
-            // TODO: Avoid clone. Maybe update should take &step?
-            // Or maybe add a drain_steps() method.
-            self.update(step.clone(), logger)
+        for step in history.drain_steps() {
+            self.update(step, logger)
         }
         logger.end_event(Event::AgentOptPeriod).unwrap();
     }
@@ -133,7 +129,7 @@ where
     fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
         let full = self.history.push(step);
         if full {
-            self.actor.batch_update(&self.history, logger);
+            self.actor.batch_update(&mut self.history, logger);
             self.history.clear();
         }
     }
