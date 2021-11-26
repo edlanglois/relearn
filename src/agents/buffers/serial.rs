@@ -321,7 +321,7 @@ mod tests {
     }
 
     #[rstest]
-    fn episodes_len_sum(full_buffer: SerialBuffer<usize, bool>) {
+    fn episode_len_sum(full_buffer: SerialBuffer<usize, bool>) {
         assert_eq!(
             full_buffer.episodes().map(|e| e.len()).sum::<usize>(),
             full_buffer.num_steps()
