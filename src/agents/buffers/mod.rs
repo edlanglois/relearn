@@ -1,6 +1,6 @@
 //! History buffers
-mod iter;
 mod serial;
+mod vec;
 
 use super::super::Step;
 pub use serial::{SerialBuffer, SerialBufferConfig};
@@ -12,64 +12,26 @@ pub trait BuildHistoryBuffer<O, A> {
     fn build_history_buffer(&self) -> Self::HistoryBuffer;
 }
 
-/// Access steps from a history buffer.
-pub trait HistoryBufferSteps<'a, O: 'a, A: 'a> {
-    /// An iterator of steps.
-    type StepsIter: StepsIter<'a, O, A>;
-
-    /// All steps with episode steps ordered contiguously.
-    fn steps_(&'a self) -> Self::StepsIter;
-}
-
-pub trait StepsIter<'a, O: 'a, A: 'a>: Iterator<Item = &'a Step<O, A>> + ExactSizeIterator {}
-impl<'a, O: 'a, A: 'a, T: ?Sized> StepsIter<'a, O, A> for T where
-    T: Iterator<Item = &'a Step<O, A>> + ExactSizeIterator
-{
-}
-
-/// Access steps from a history buffer via a boxed iterator.
-pub trait HistoryBufferBoxedSteps<O, A> {
-    fn steps<'a>(&'a self) -> Box<dyn StepsIter<O, A> + 'a>
-    where
-        O: 'a,
-        A: 'a;
-}
-
-pub trait EpisodesIter<'a, O: 'a, A: 'a>:
-    Iterator<Item = &'a [Step<O, A>]> + ExactSizeIterator
-{
-}
-impl<'a, O: 'a, A: 'a, T: ?Sized> EpisodesIter<'a, O, A> for T where
-    T: Iterator<Item = &'a [Step<O, A>]> + ExactSizeIterator
-{
-}
-
-/// Access episodes from a history buffer
-pub trait HistoryBufferEpisodes<'a, O: 'a, A: 'a> {
-    /// An iterator of episodes. Each episode is a slice of steps.
-    type EpisodesIter: EpisodesIter<'a, O, A>;
-
-    /// All completed (or partial) episodes in the buffer.
-    ///
-    /// # Args
-    /// * `include_partial` - Include partial episodes if they have at least this many steps.
-    fn episodes_(&'a self) -> Self::EpisodesIter;
-}
-
-/// Access episodes from a history buffer via a boxed iterator.
-pub trait HistoryBufferBoxedEpisodes<O, A> {
-    fn episodes<'a>(&'a self) -> Box<dyn EpisodesIter<O, A> + 'a>
-    where
-        O: 'a,
-        A: 'a;
-}
-
 /// Access collected episodes or steps.
-pub trait HistoryBuffer<O, A>:
-    HistoryBufferBoxedSteps<O, A> + HistoryBufferBoxedEpisodes<O, A>
-{
-}
-impl<T, O, A> HistoryBuffer<O, A> for T where
-    T: HistoryBufferBoxedSteps<O, A> + HistoryBufferBoxedEpisodes<O, A>
-{
+pub trait HistoryBuffer<O, A> {
+    /// Total number of steps
+    ///
+    /// Equal to `self.steps().len()` and `self.episodes().map(|e| e.len()).sum()`.
+    fn num_steps(&self) -> usize;
+
+    /// Total number of episodes (may include incomplete episodes)
+    ///
+    /// Equal to `self.episodes().len()`.
+    fn num_episodes(&self) -> usize;
+
+    /// All steps ordered contiguously by episode.
+    fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a Step<O, A>> + 'a>;
+
+    /// Drain all steps from the buffer (ordered contiguously by episode).
+    ///
+    /// The buffer will be empty once the iterator is consumed or dropped.
+    fn drain_steps(&mut self) -> Box<dyn ExactSizeIterator<Item = Step<O, A>> + '_>;
+
+    /// All episodes (including incomplete episodes).
+    fn episodes<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a [Step<O, A>]> + 'a>;
 }

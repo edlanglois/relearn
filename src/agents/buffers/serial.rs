@@ -1,11 +1,7 @@
 use super::super::Step;
-use super::{
-    BuildHistoryBuffer, EpisodesIter, HistoryBufferBoxedEpisodes, HistoryBufferBoxedSteps,
-    HistoryBufferEpisodes, HistoryBufferSteps, StepsIter,
-};
+use super::{BuildHistoryBuffer, HistoryBuffer};
 use crate::utils::iter::SizedChain;
-use std::iter::{Cloned, ExactSizeIterator, Extend, FusedIterator};
-use std::{option, slice};
+use std::iter::{ExactSizeIterator, Extend, FusedIterator};
 
 /// Configuration for [`SerialBuffer`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -95,35 +91,28 @@ impl<O, A> Extend<Step<O, A>> for SerialBuffer<O, A> {
     }
 }
 
-impl<'a, O: 'a, A: 'a> HistoryBufferSteps<'a, O, A> for SerialBuffer<O, A> {
-    type StepsIter = slice::Iter<'a, Step<O, A>>;
-
-    fn steps_(&'a self) -> Self::StepsIter {
-        self.steps.iter()
+impl<O, A> HistoryBuffer<O, A> for SerialBuffer<O, A> {
+    fn num_steps(&self) -> usize {
+        self.steps.len()
     }
-}
-// Would be implemented with a generic impl on HistoryBufferSteps except that requires
-// O: 'static and A: 'static
-impl<O, A> HistoryBufferBoxedSteps<O, A> for SerialBuffer<O, A> {
-    fn steps<'a>(&'a self) -> Box<dyn StepsIter<O, A> + 'a>
-    where
-        O: 'a,
-        A: 'a,
-    {
-        Box::new(HistoryBufferSteps::steps_(self))
+
+    fn num_episodes(&self) -> usize {
+        if self.steps.len() > self.episode_ends.last().cloned().unwrap_or(0) {
+            self.episode_ends.len() + 1
+        } else {
+            self.episode_ends.len()
+        }
     }
-}
 
-pub type EpisodeStepsIter<'a, O, A> = SliceChunksAtIter<
-    'a,
-    Step<O, A>,
-    SizedChain<Cloned<slice::Iter<'a, usize>>, option::IntoIter<usize>>,
->;
+    fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a Step<O, A>> + 'a> {
+        Box::new(self.steps.iter())
+    }
 
-impl<'a, O: 'a, A: 'a> HistoryBufferEpisodes<'a, O, A> for SerialBuffer<O, A> {
-    type EpisodesIter = EpisodeStepsIter<'a, O, A>;
+    fn drain_steps(&mut self) -> Box<dyn ExactSizeIterator<Item = Step<O, A>> + '_> {
+        Box::new(self.steps.drain(..))
+    }
 
-    fn episodes_(&'a self) -> Self::EpisodesIter {
+    fn episodes<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a [Step<O, A>]> + 'a> {
         // Check for an incomplete episode at the end to include
         let last_complete_end: usize = self.episode_ends.last().cloned().unwrap_or(0);
         let num_steps = self.steps.len();
@@ -139,16 +128,7 @@ impl<'a, O: 'a, A: 'a> HistoryBufferEpisodes<'a, O, A> for SerialBuffer<O, A> {
             .cloned()
             .chain(incomplete_end)
             .into();
-        SliceChunksAtIter::new(&self.steps, ends_iter)
-    }
-}
-impl<O, A> HistoryBufferBoxedEpisodes<O, A> for SerialBuffer<O, A> {
-    fn episodes<'a>(&'a self) -> Box<dyn EpisodesIter<O, A> + 'a>
-    where
-        O: 'a,
-        A: 'a,
-    {
-        Box::new(HistoryBufferEpisodes::episodes_(self))
+        Box::new(SliceChunksAtIter::new(&self.steps, ends_iter))
     }
 }
 
@@ -282,8 +262,18 @@ mod tests {
     }
 
     #[rstest]
+    fn num_steps(full_buffer: SerialBuffer<usize, bool>) {
+        assert_eq!(full_buffer.num_steps(), 5);
+    }
+
+    #[rstest]
+    fn num_episodes(full_buffer: SerialBuffer<usize, bool>) {
+        assert_eq!(full_buffer.num_episodes(), 3);
+    }
+
+    #[rstest]
     fn steps(full_buffer: SerialBuffer<usize, bool>) {
-        let mut steps_iter = full_buffer.steps_();
+        let mut steps_iter = full_buffer.steps();
         assert_eq!(steps_iter.next(), Some(&step(0, None)));
         assert_eq!(steps_iter.next(), Some(&step(1, Some(2))));
         assert_eq!(steps_iter.next(), Some(&step(2, None)));
@@ -294,7 +284,7 @@ mod tests {
 
     #[rstest]
     fn steps_is_fused(full_buffer: SerialBuffer<usize, bool>) {
-        let mut steps_iter = full_buffer.steps_();
+        let mut steps_iter = full_buffer.steps();
         for _ in 0..5 {
             assert!(steps_iter.next().is_some());
         }
@@ -304,17 +294,12 @@ mod tests {
 
     #[rstest]
     fn steps_len(full_buffer: SerialBuffer<usize, bool>) {
-        assert_eq!(full_buffer.steps_().len(), 5);
-    }
-
-    #[rstest]
-    fn steps_count(full_buffer: SerialBuffer<usize, bool>) {
-        assert_eq!(full_buffer.steps_().count(), 5);
+        assert_eq!(full_buffer.steps().len(), full_buffer.num_steps());
     }
 
     #[rstest]
     fn episodes_incomplete_ge_1(full_buffer: SerialBuffer<usize, bool>) {
-        let mut episodes_iter = full_buffer.episodes_();
+        let mut episodes_iter = full_buffer.episodes();
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
             vec![&step(0, None)]
@@ -328,5 +313,18 @@ mod tests {
             vec![&step(3, Some(4)), &step(4, Some(5))]
         );
         assert!(episodes_iter.next().is_none());
+    }
+
+    #[rstest]
+    fn episodes_len(full_buffer: SerialBuffer<usize, bool>) {
+        assert_eq!(full_buffer.episodes().len(), full_buffer.num_episodes());
+    }
+
+    #[rstest]
+    fn episodes_len_sum(full_buffer: SerialBuffer<usize, bool>) {
+        assert_eq!(
+            full_buffer.episodes().map(|e| e.len()).sum::<usize>(),
+            full_buffer.num_steps()
+        );
     }
 }
