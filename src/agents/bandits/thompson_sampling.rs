@@ -175,7 +175,7 @@ impl Agent<usize, usize> for BaseBetaThompsonSamplingAgent {
     }
 }
 
-impl OffPolicyAgent for BaseBetaThompsonSamplingAgent {}
+impl OffPolicyAgent<usize, usize> for BaseBetaThompsonSamplingAgent {}
 
 impl SetActorMode for BaseBetaThompsonSamplingAgent {
     fn set_actor_mode(&mut self, mode: ActorMode) {

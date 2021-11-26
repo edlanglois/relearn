@@ -176,7 +176,7 @@ impl Agent<usize, usize> for BaseUCB1Agent {
     }
 }
 
-impl OffPolicyAgent for BaseUCB1Agent {}
+impl OffPolicyAgent<usize, usize> for BaseUCB1Agent {}
 
 impl SetActorMode for BaseUCB1Agent {
     fn set_actor_mode(&mut self, mode: ActorMode) {

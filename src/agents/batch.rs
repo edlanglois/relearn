@@ -37,23 +37,22 @@ pub trait BatchUpdate<O, A> {
     );
 }
 
-/// An agent that accepts updates at any time from any policy.
-pub trait OffPolicyAgent {}
+/// Marker trait for agents that can accept updates at any time from any policy.
+pub trait OffPolicyAgent<O, A>: Agent<O, A> {}
 
-impl<T, O, A> BatchUpdate<O, A> for T
-where
-    T: OffPolicyAgent + Agent<O, A>,
+/// Helper implementaiton of [`BatchUpdate::batch_update`] for [`OffPolicyAgent`].
+pub fn off_policy_batch_update<T, O, A>(
+    agent: &mut T,
+    history: &mut dyn HistoryBuffer<O, A>,
+    logger: &mut dyn TimeSeriesLogger,
+) where
+    T: OffPolicyAgent<O, A>,
 {
-    fn batch_update(
-        &mut self,
-        history: &mut dyn HistoryBuffer<O, A>,
-        logger: &mut dyn TimeSeriesLogger,
-    ) {
-        for step in history.drain_steps() {
-            self.update(step, logger)
-        }
-        logger.end_event(Event::AgentOptPeriod).unwrap();
+    logger.start_event(Event::AgentOptPeriod).unwrap();
+    for step in history.drain_steps() {
+        agent.update(step, logger)
     }
+    logger.end_event(Event::AgentOptPeriod).unwrap();
 }
 
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]

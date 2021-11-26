@@ -72,46 +72,9 @@ where
     }
 }
 
-/// Perform a batch update from a in iterator of steps by value.
-///
-/// Used for finite spaces to help implement [`BatchUpdate`] for [`FiniteSpaceAgent`].
-/// The [`HistoryBuffer`] interface only returns iterators of references which makes it
-/// inconvenient to wrap a `HistoryBuffer<O, A>` as a `HistoryBuffer<usize, usize>`.
-///
-/// One approach could be to allow [`BatchUpdateAgent`] to use a history buffer with a different
-/// type from the external interface, along with a function `Fn(Step<O, A>) -> Step<O2, A2>`
-/// applied before pushing to the buffer.
-///
-/// Alternatively, since current finite space batch updates only perform one pass over the steps,
-/// a simpler solution is to use this alternate interface for batch updates. Since it takes steps
-/// by value, it is possibly to map the steps without having to allocate a new vector.
-pub trait BatchUpdateFromSteps<O, A> {
-    fn batch_update_from_steps<I: IntoIterator<Item = Step<O, A>>>(
-        &mut self,
-        steps: I,
-        logger: &mut dyn TimeSeriesLogger,
-    );
-}
-
-impl<T, O, A> BatchUpdateFromSteps<O, A> for T
-where
-    T: OffPolicyAgent + Agent<O, A>,
-{
-    fn batch_update_from_steps<I: IntoIterator<Item = Step<O, A>>>(
-        &mut self,
-        steps: I,
-        logger: &mut dyn TimeSeriesLogger,
-    ) {
-        for step in steps {
-            self.update(step, logger);
-        }
-        logger.end_event(Event::AgentOptPeriod).unwrap()
-    }
-}
-
 impl<T, OS, AS> BatchUpdate<OS::Element, AS::Element> for FiniteSpaceAgent<T, OS, AS>
 where
-    T: BatchUpdateFromSteps<usize, usize>,
+    T: OffPolicyAgent<usize, usize>,
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
@@ -120,12 +83,14 @@ where
         history: &mut dyn HistoryBuffer<OS::Element, AS::Element>,
         logger: &mut dyn TimeSeriesLogger,
     ) {
-        self.agent.batch_update_from_steps(
-            history
-                .steps()
-                .map(|step| indexed_step(step, &self.observation_space, &self.action_space)),
-            logger,
-        )
+        logger.start_event(Event::AgentOptPeriod).unwrap();
+        for step in history.steps() {
+            self.agent.update(
+                indexed_step(step, &self.observation_space, &self.action_space),
+                logger,
+            )
+        }
+        logger.end_event(Event::AgentOptPeriod).unwrap();
     }
 }
 
@@ -202,13 +167,11 @@ impl<B, OS, AS> BuildBatchUpdateActor<OS, AS> for B
 where
     // NOTE: This is slightly over-restrictive. Don't need BuildIndexAgent::Agent: Agent
     B: BuildIndexAgent,
-    B::Agent: BatchUpdateFromSteps<usize, usize>,
+    B::Agent: OffPolicyAgent<usize, usize>,
     OS: FiniteSpace,
-    OS::Element: 'static,
     AS: FiniteSpace,
-    AS::Element: 'static,
 {
-    type BatchUpdateActor = <Self as BuildAgent<OS, AS>>::Agent;
+    type BatchUpdateActor = FiniteSpaceAgent<B::Agent, OS, AS>;
 
     fn build_batch_update_actor(
         &self,

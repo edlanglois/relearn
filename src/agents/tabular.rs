@@ -1,7 +1,8 @@
 //! Tabular agents
 use super::{
-    Actor, ActorMode, Agent, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent,
-    SetActorMode, Step, SyncParams, SyncParamsError,
+    batch::off_policy_batch_update, buffers::HistoryBuffer, Actor, ActorMode, Agent, BatchUpdate,
+    BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent, SetActorMode, Step,
+    SyncParams, SyncParamsError,
 };
 use crate::logging::TimeSeriesLogger;
 use ndarray::{Array, Array2, Axis};
@@ -135,7 +136,17 @@ impl Agent<usize, usize> for BaseTabularQLearningAgent {
     }
 }
 
-impl OffPolicyAgent for BaseTabularQLearningAgent {}
+impl OffPolicyAgent<usize, usize> for BaseTabularQLearningAgent {}
+
+impl BatchUpdate<usize, usize> for BaseTabularQLearningAgent {
+    fn batch_update(
+        &mut self,
+        history: &mut dyn HistoryBuffer<usize, usize>,
+        logger: &mut dyn TimeSeriesLogger,
+    ) {
+        off_policy_batch_update(self, history, logger)
+    }
+}
 
 impl SetActorMode for BaseTabularQLearningAgent {
     fn set_actor_mode(&mut self, mode: ActorMode) {
