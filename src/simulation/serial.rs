@@ -143,6 +143,7 @@ pub fn run_actor<E, A, H>(
         }
 
         observation = if episode_done {
+            new_episode = true;
             environment.reset()
         } else {
             next_observation.expect("Observation must exist if the episode is not done")
