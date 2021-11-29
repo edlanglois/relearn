@@ -72,6 +72,15 @@ pub trait Actor<O, A> {
     fn act(&mut self, observation: &O, new_episode: bool) -> A;
 }
 
+impl<T, O, A> Actor<O, A> for &'_ mut T
+where
+    T: Actor<O, A> + ?Sized,
+{
+    fn act(&mut self, observation: &O, new_episode: bool) -> A {
+        T::act(self, observation, new_episode)
+    }
+}
+
 impl<T, O, A> Actor<O, A> for Box<T>
 where
     T: Actor<O, A> + ?Sized,
@@ -96,6 +105,15 @@ pub trait Agent<O, A>: Actor<O, A> {
     /// # Args
     /// * `step`: The environment step resulting from the  most recent call to [`Actor::act`].
     fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger);
+}
+
+impl<T, O, A> Agent<O, A> for &'_ mut T
+where
+    T: Agent<O, A> + ?Sized,
+{
+    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
+        T::update(self, step, logger)
+    }
 }
 
 impl<T, O, A> Agent<O, A> for Box<T>
@@ -139,6 +157,12 @@ pub trait SetActorMode {
     fn set_actor_mode(&mut self, _mode: ActorMode) {
         // The default implementation just ignores the mode.
         // Many actors only have a single kind of behaviour.
+    }
+}
+
+impl<T: SetActorMode + ?Sized> SetActorMode for &'_ mut T {
+    fn set_actor_mode(&mut self, mode: ActorMode) {
+        T::set_actor_mode(self, mode)
     }
 }
 
