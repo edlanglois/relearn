@@ -61,7 +61,7 @@ pub trait EnvStructure {
     fn discount_factor(&self) -> f64;
 }
 
-impl<E: EnvStructure + ?Sized> EnvStructure for Box<E> {
+impl<E: EnvStructure + ?Sized> EnvStructure for &'_ E {
     type ObservationSpace = E::ObservationSpace;
     type ActionSpace = E::ActionSpace;
 
@@ -79,7 +79,7 @@ impl<E: EnvStructure + ?Sized> EnvStructure for Box<E> {
     }
 }
 
-impl<E: EnvStructure + ?Sized> EnvStructure for &'_ E {
+impl<E: EnvStructure + ?Sized> EnvStructure for Box<E> {
     type ObservationSpace = E::ObservationSpace;
     type ActionSpace = E::ActionSpace;
 
@@ -296,6 +296,23 @@ pub trait Environment {
     /// # Returns
     /// * `observation`: An observation of the resulting state.
     fn reset(&mut self) -> Self::Observation;
+}
+
+impl<E: Environment + ?Sized> Environment for &'_ mut E {
+    type Observation = E::Observation;
+    type Action = E::Action;
+
+    fn step(
+        &mut self,
+        action: &Self::Action,
+        logger: &mut dyn Logger,
+    ) -> (Option<Self::Observation>, f64, bool) {
+        E::step(self, action, logger)
+    }
+
+    fn reset(&mut self) -> Self::Observation {
+        E::reset(self)
+    }
 }
 
 impl<E: Environment + ?Sized> Environment for Box<E> {
