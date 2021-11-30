@@ -2,13 +2,11 @@
 pub mod hooks;
 mod iter;
 mod multithread;
-mod pair;
 mod serial;
 
 pub use hooks::{BuildSimulationHook, GenericSimulationHook, SimulationHook};
 pub use iter::SimSteps;
 pub use multithread::{MultithreadSimulator, MultithreadSimulatorConfig};
-pub use pair::PairSimulator;
 pub use serial::{run_actor, run_agent, SerialSimulator};
 
 use crate::agents::BuildAgentError;
