@@ -65,7 +65,7 @@ impl<O, A> SerialBuffer<O, A> {
     ///
     /// Returns a Boolean indicating whether the buffer is ready to be drained for a model update.
     pub fn push(&mut self, step: Step<O, A>) -> bool {
-        let episode_done = step.episode_done;
+        let episode_done = step.next.episode_done();
         self.steps.push(step);
         let num_steps = self.steps.len();
         if episode_done {
@@ -198,20 +198,20 @@ impl<'a, T, I> FusedIterator for SliceChunksAtIter<'a, T, I> where I: FusedItera
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::envs::Successor::{self, Continue, Terminate};
     use rstest::{fixture, rstest};
 
     /// Make a step that either continues or is terminal.
-    const fn step(observation: usize, next_observation: Option<usize>) -> Step<usize, bool> {
+    const fn step(observation: usize, next: Successor<usize>) -> Step<usize, bool> {
         Step {
             observation,
             action: false,
             reward: 0.0,
-            next_observation,
-            episode_done: next_observation.is_none(),
+            next,
         }
     }
-    const STEP_NOT_DONE: Step<usize, bool> = step(0, Some(0));
-    const STEP_TERMINAL: Step<usize, bool> = step(0, None);
+    const STEP_NOT_DONE: Step<usize, bool> = step(0, Continue(0));
+    const STEP_TERMINAL: Step<usize, bool> = step(0, Terminate);
 
     #[test]
     fn fill_episodic() {
@@ -252,11 +252,11 @@ mod tests {
         }
         .build_history_buffer();
         buffer.extend([
-            step(0, None),
-            step(1, Some(2)),
-            step(2, None),
-            step(3, Some(4)),
-            step(4, Some(5)),
+            step(0, Terminate),
+            step(1, Continue(2)),
+            step(2, Terminate),
+            step(3, Continue(4)),
+            step(4, Continue(5)),
         ]);
         buffer
     }
@@ -274,11 +274,11 @@ mod tests {
     #[rstest]
     fn steps(full_buffer: SerialBuffer<usize, bool>) {
         let mut steps_iter = full_buffer.steps();
-        assert_eq!(steps_iter.next(), Some(&step(0, None)));
-        assert_eq!(steps_iter.next(), Some(&step(1, Some(2))));
-        assert_eq!(steps_iter.next(), Some(&step(2, None)));
-        assert_eq!(steps_iter.next(), Some(&step(3, Some(4))));
-        assert_eq!(steps_iter.next(), Some(&step(4, Some(5))));
+        assert_eq!(steps_iter.next(), Some(&step(0, Terminate)));
+        assert_eq!(steps_iter.next(), Some(&step(1, Continue(2))));
+        assert_eq!(steps_iter.next(), Some(&step(2, Terminate)));
+        assert_eq!(steps_iter.next(), Some(&step(3, Continue(4))));
+        assert_eq!(steps_iter.next(), Some(&step(4, Continue(5))));
         assert_eq!(steps_iter.next(), None);
     }
 
@@ -302,15 +302,15 @@ mod tests {
         let mut episodes_iter = full_buffer.episodes();
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(0, None)]
+            vec![&step(0, Terminate)]
         );
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(1, Some(2)), &step(2, None)]
+            vec![&step(1, Continue(2)), &step(2, Terminate)]
         );
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(3, Some(4)), &step(4, Some(5))]
+            vec![&step(3, Continue(4)), &step(4, Continue(5))]
         );
         assert!(episodes_iter.next().is_none());
     }

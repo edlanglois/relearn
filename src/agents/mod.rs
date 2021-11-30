@@ -29,7 +29,7 @@ pub use multithread::{
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
-use crate::envs::EnvStructure;
+use crate::envs::{EnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::Space;
 use crate::utils::any::AsAny;
@@ -46,13 +46,19 @@ pub struct Step<O, A> {
     pub action: A,
     /// The resulting reward.
     pub reward: f64,
-    /// The resulting successor state; is None if the successor state is terminal.
-    /// All trajectories from a terminal state have 0 reward on each step.
-    pub next_observation: Option<O>,
-    /// Whether this step ends the episode.
-    /// An episode is always done if it reaches a terminal state.
-    /// An episode may be done for other reasons, like a step limit.
-    pub episode_done: bool,
+    /// The next observation or outcome; how the episode progresses.
+    pub next: Successor<O>,
+}
+
+impl<O, A> Step<O, A> {
+    pub const fn new(observation: O, action: A, reward: f64, next: Successor<O>) -> Self {
+        Self {
+            observation,
+            action,
+            reward,
+            next,
+        }
+    }
 }
 
 /// An actor that produces actions in response to a sequence of observations.

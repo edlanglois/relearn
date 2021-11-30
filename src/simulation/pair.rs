@@ -1,7 +1,7 @@
 use super::hooks::BuildSimulationHook;
 use super::{run_agent, Simulator, SimulatorError};
 use crate::agents::{Actor, Agent, BuildAgent, Step};
-use crate::envs::{BuildEnv, FirstPlayerView, SecondPlayerView};
+use crate::envs::{BuildEnv, FirstPlayerView, SecondPlayerView, Successor};
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::{Space, TupleSpace2};
 use crossbeam_channel::{Receiver, Sender};
@@ -107,17 +107,19 @@ where
     fn update(&mut self, step: Step<(O1, O2), (A1, A2)>, logger: &mut dyn TimeSeriesLogger) {
         let (o1, o2) = step.observation;
         let (a1, a2) = step.action;
-        let (no1, no2) = match step.next_observation {
-            None => (None, None),
-            Some((no1, no2)) => (Some(no1), Some(no2)),
+        let (n1, n2) = match step.next {
+            Successor::Continue((no1, no2)) => (Successor::Continue(no1), Successor::Continue(no2)),
+            Successor::Terminate => (Successor::Terminate, Successor::Terminate),
+            Successor::Interrupt((no1, no2)) => {
+                (Successor::Interrupt(no1), Successor::Interrupt(no2))
+            }
         };
         self.0.update(
             Step {
                 observation: o1,
                 action: a1,
                 reward: step.reward,
-                next_observation: no1,
-                episode_done: step.episode_done,
+                next: n1,
             },
             logger,
         );
@@ -126,8 +128,7 @@ where
                 observation: o2,
                 action: a2,
                 reward: step.reward,
-                next_observation: no2,
-                episode_done: step.episode_done,
+                next: n2,
             },
             logger,
         );

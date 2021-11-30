@@ -57,10 +57,8 @@ where
             ClosureHook::from(|step: &Step<_, _>| -> bool {
                 assert!(step.reward >= min_reward);
                 assert!(step.reward <= max_reward);
-                if let Some(obs) = &step.next_observation {
-                    assert!(observation_space.contains(obs))
-                } else {
-                    assert!(step.episode_done);
+                if let Some(obs) = step.next.as_ref().into_inner() {
+                    assert!(observation_space.contains(obs));
                 }
                 true
             }),

@@ -320,6 +320,7 @@ fn packed_sequence_indices(
 #[allow(clippy::needless_pass_by_value)]
 mod lazy_features {
     use super::*;
+    use crate::envs::Successor::{Continue, Interrupt, Terminate};
     use crate::spaces::{BooleanSpace, IndexSpace};
     use rstest::{fixture, rstest};
 
@@ -343,53 +344,29 @@ mod lazy_features {
         }
     }
 
-    const fn step<O, A>(observation: O, action: A, reward: f64, next_observation: O) -> Step<O, A> {
-        Step {
-            observation,
-            action,
-            reward,
-            next_observation: Some(next_observation),
-            episode_done: false,
-        }
-    }
-    const fn end_step<O, A>(
-        observation: O,
-        action: A,
-        reward: f64,
-        next_observation: Option<O>,
-    ) -> Step<O, A> {
-        Step {
-            observation,
-            action,
-            reward,
-            next_observation,
-            episode_done: true,
-        }
-    }
-
     #[fixture]
     fn history() -> StoredHistory<BooleanSpace, IndexSpace> {
         let episodes = vec![
             vec![
-                step(true, 0, 1.0, true),
-                step(true, 1, 1.0, true),
-                step(true, 2, 1.0, true),
-                step(true, 3, 1.0, true),
+                Step::new(true, 0, 1.0, Continue(true)),
+                Step::new(true, 1, 1.0, Continue(true)),
+                Step::new(true, 2, 1.0, Continue(true)),
+                Step::new(true, 3, 1.0, Continue(true)),
             ],
             vec![
-                step(false, 10, -1.0, false),
-                step(false, 11, -1.0, false),
-                step(false, 12, 0.0, false),
-                step(false, 13, 0.0, false),
-                step(false, 14, 1.0, false),
-                end_step(false, 15, 1.0, None),
+                Step::new(false, 10, -1.0, Continue(false)),
+                Step::new(false, 11, -1.0, Continue(false)),
+                Step::new(false, 12, 0.0, Continue(false)),
+                Step::new(false, 13, 0.0, Continue(false)),
+                Step::new(false, 14, 1.0, Continue(false)),
+                Step::new(false, 15, 1.0, Terminate),
             ],
             vec![
-                step(false, 20, 2.0, true),
-                step(true, 21, 2.0, false),
-                end_step(false, 22, 2.0, Some(true)),
+                Step::new(false, 20, 2.0, Continue(true)),
+                Step::new(true, 21, 2.0, Continue(false)),
+                Step::new(false, 22, 2.0, Interrupt(true)),
             ],
-            vec![end_step(true, 30, 3.0, None)],
+            vec![Step::new(true, 30, 3.0, Terminate)],
         ];
 
         // Packing order (by action)

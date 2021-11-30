@@ -70,15 +70,13 @@ pub fn run_agent<E, A, H>(
 
     loop {
         let action = agent.act(&observation, new_episode);
-        let (successor, reward) =
-            environment.step(&action, &mut logger.event_logger(Event::EnvStep));
+        let (next, reward) = environment.step(&action, &mut logger.event_logger(Event::EnvStep));
 
         let step = Step {
             observation,
             action,
             reward,
-            next_observation: successor.clone().into_inner(),
-            episode_done: successor.episode_done(),
+            next: next.clone(),
         };
 
         let stop_simulation = !hook.call(&step, logger);
@@ -87,7 +85,7 @@ pub fn run_agent<E, A, H>(
             break;
         }
 
-        match successor.continue_() {
+        match next.continue_() {
             Some(obs) => {
                 observation = obs;
                 new_episode = false;
@@ -128,22 +126,20 @@ pub fn run_actor<E, A, H>(
 
     loop {
         let action = actor.act(&observation, new_episode);
-        let (successor, reward) =
-            environment.step(&action, &mut logger.event_logger(Event::EnvStep));
+        let (next, reward) = environment.step(&action, &mut logger.event_logger(Event::EnvStep));
 
         let step = Step {
             observation,
             action,
             reward,
-            next_observation: successor.clone().into_inner(),
-            episode_done: successor.episode_done(),
+            next: next.clone(),
         };
 
         if !hook.call(&step, logger) {
             break;
         }
 
-        match successor.continue_() {
+        match next.continue_() {
             Some(obs) => {
                 observation = obs;
                 new_episode = false;

@@ -198,7 +198,7 @@ impl GenericSimulationHook for EpisodeLimit {
     }
 
     fn call<O, A>(&mut self, step: &Step<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
-        if step.episode_done {
+        if step.next.episode_done() {
             self.episodes_remaining -= 1;
             self.episodes_remaining > 0
         } else {
@@ -292,7 +292,7 @@ where
 
         self.episode_length += 1;
         self.episode_reward += step.reward;
-        if step.episode_done {
+        if step.next.episode_done() {
             let mut episode_logger = logger.event_logger(Event::EnvEpisode);
             episode_logger.unwrap_log("length", self.episode_length as f64);
             self.episode_length = 0;
@@ -392,7 +392,7 @@ impl GenericSimulationHook for RewardStatistics {
     fn call<O, A>(&mut self, step: &Step<O, A>, _logger: &mut dyn TimeSeriesLogger) -> bool {
         self.partial_reward += step.reward;
         self.num_steps += 1;
-        if step.episode_done {
+        if step.next.episode_done() {
             self.total_episode_reward += self.partial_reward;
             self.partial_reward = 0.0;
             self.num_episodes += 1;

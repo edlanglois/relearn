@@ -116,7 +116,7 @@ impl Actor<usize, usize> for BaseTabularQLearningAgent {
 
 impl Agent<usize, usize> for BaseTabularQLearningAgent {
     fn update(&mut self, step: Step<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
-        let discounted_next_value = match step.next_observation {
+        let discounted_next_value = match step.next.into_inner() {
             None => 0.0,
             Some(next_observation) => {
                 self.state_action_values

@@ -117,11 +117,7 @@ where
         observation: observation_space.to_index(&step.observation),
         action: action_space.to_index(&step.action),
         reward: step.reward,
-        next_observation: step
-            .next_observation
-            .as_ref()
-            .map(|s| observation_space.to_index(s)),
-        episode_done: step.episode_done,
+        next: step.next.as_ref().map(|o| observation_space.to_index(o)),
     }
 }
 

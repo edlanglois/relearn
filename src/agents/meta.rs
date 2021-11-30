@@ -2,6 +2,7 @@
 use super::{Actor, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
 use crate::envs::{
     EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
+    Successor,
 };
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::{NonEmptySpace, Space};
@@ -105,14 +106,20 @@ where
         } else if let Some(ref step_obs) = &obs.prev_step {
             // Update the agent based on the most recent step result
             // Only relevant if the agent has not been reset.
+            let step_next = match (obs.inner_observation.as_ref().cloned(), obs.episode_done) {
+                (Some(obs), false) => Successor::Continue(obs),
+                (Some(obs), true) => Successor::Interrupt(obs),
+                (None, true) => Successor::Terminate,
+                (None, false) => panic!("must provide an observation if the episode continues"),
+            };
+
             let step = Step {
                 observation: self.prev_observation.take().expect(
                     "Meta observation follows a previous step but no previous observation stored",
                 ),
                 action: step_obs.action.clone(),
                 reward: step_obs.reward,
-                next_observation: obs.inner_observation.as_ref().cloned(),
-                episode_done: obs.episode_done,
+                next: step_next,
             };
             self.agent.update(step, &mut ());
         }

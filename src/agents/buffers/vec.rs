@@ -132,16 +132,16 @@ mod tests {
     use super::super::{BuildHistoryBuffer, SerialBuffer, SerialBufferConfig};
     use super::*;
     use crate::agents::Step;
+    use crate::envs::Successor::{self, Continue, Terminate};
     use rstest::{fixture, rstest};
 
     /// Make a step that either continues or is terminal.
-    const fn step(observation: usize, next_observation: Option<usize>) -> Step<usize, bool> {
+    const fn step(observation: usize, next: Successor<usize>) -> Step<usize, bool> {
         Step {
             observation,
             action: false,
             reward: 0.0,
-            next_observation,
-            episode_done: next_observation.is_none(),
+            next,
         }
     }
 
@@ -153,18 +153,18 @@ mod tests {
         };
         let mut b1 = config.build_history_buffer();
         b1.extend([
-            step(0, Some(1)),
-            step(1, Some(2)),
-            step(2, None),
-            step(3, Some(4)),
+            step(0, Continue(1)),
+            step(1, Continue(2)),
+            step(2, Terminate),
+            step(3, Continue(4)),
         ]);
 
         let mut b2 = config.build_history_buffer();
         b2.extend([
-            step(10, Some(11)),
-            step(11, None),
-            step(12, Some(13)),
-            step(13, Some(14)),
+            step(10, Continue(11)),
+            step(11, Terminate),
+            step(12, Continue(13)),
+            step(13, Continue(14)),
         ]);
         vec![b1, b2]
     }
@@ -182,14 +182,14 @@ mod tests {
     #[rstest]
     fn steps(buffers: Vec<SerialBuffer<usize, bool>>) {
         let mut steps_iter = buffers.steps();
-        assert_eq!(steps_iter.next(), Some(&step(0, Some(1))));
-        assert_eq!(steps_iter.next(), Some(&step(1, Some(2))));
-        assert_eq!(steps_iter.next(), Some(&step(2, None)));
-        assert_eq!(steps_iter.next(), Some(&step(3, Some(4))));
-        assert_eq!(steps_iter.next(), Some(&step(10, Some(11))));
-        assert_eq!(steps_iter.next(), Some(&step(11, None)));
-        assert_eq!(steps_iter.next(), Some(&step(12, Some(13))));
-        assert_eq!(steps_iter.next(), Some(&step(13, Some(14))));
+        assert_eq!(steps_iter.next(), Some(&step(0, Continue(1))));
+        assert_eq!(steps_iter.next(), Some(&step(1, Continue(2))));
+        assert_eq!(steps_iter.next(), Some(&step(2, Terminate)));
+        assert_eq!(steps_iter.next(), Some(&step(3, Continue(4))));
+        assert_eq!(steps_iter.next(), Some(&step(10, Continue(11))));
+        assert_eq!(steps_iter.next(), Some(&step(11, Terminate)));
+        assert_eq!(steps_iter.next(), Some(&step(12, Continue(13))));
+        assert_eq!(steps_iter.next(), Some(&step(13, Continue(14))));
         assert_eq!(steps_iter.next(), None);
     }
 
@@ -213,19 +213,23 @@ mod tests {
         let mut episodes_iter = buffers.episodes();
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(0, Some(1)), &step(1, Some(2)), &step(2, None)]
+            vec![
+                &step(0, Continue(1)),
+                &step(1, Continue(2)),
+                &step(2, Terminate)
+            ]
         );
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(3, Some(4))]
+            vec![&step(3, Continue(4))]
         );
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(10, Some(11)), &step(11, None)]
+            vec![&step(10, Continue(11)), &step(11, Terminate)]
         );
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(12, Some(13)), &step(13, Some(14))]
+            vec![&step(12, Continue(13)), &step(13, Continue(14))]
         );
         assert!(episodes_iter.next().is_none());
     }
