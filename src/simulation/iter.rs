@@ -6,6 +6,8 @@ use std::iter::FusedIterator;
 use std::mem;
 
 /// Actor-environment simulation steps.
+///
+/// Does not perform any updating.
 pub struct SimSteps<E, A, L>
 where
     E: Environment,
