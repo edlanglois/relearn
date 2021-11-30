@@ -3,9 +3,9 @@ use super::{
     CloneBuild, DeterministicBandit, EnvDistribution, EnvStructure, IntoEnv, Pomdp,
     PomdpDistribution, StoredEnvStructure, StructuredEnvironment,
 };
-use crate::agents::{FullStep, RandomAgent};
-use crate::simulation;
+use crate::agents::RandomAgent;
 use crate::simulation::hooks::{ClosureHook, StepLimit};
+use crate::simulation::{self, FullStep};
 use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space, SubsetOrd};
 use rand::{rngs::StdRng, SeedableRng};
 use std::cell::Cell;

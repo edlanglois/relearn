@@ -1,8 +1,8 @@
 //! Utilities for calculating step history features.
+use crate::simulation::FullStep;
 use crate::spaces::{FeatureSpace, ReprSpace, Space};
 use crate::utils::packed::PackedSeqIter;
 use crate::utils::tensor::ExclusiveTensor;
-use crate::FullStep;
 use lazycell::LazyCell;
 use tch::{Device, Tensor};
 

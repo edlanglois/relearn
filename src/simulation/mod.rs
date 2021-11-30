@@ -10,7 +10,7 @@ pub use pair::PairSimulator;
 pub use serial::{run_actor, run_agent, SerialSimulator};
 
 use crate::agents::BuildAgentError;
-use crate::envs::BuildEnvError;
+use crate::envs::{BuildEnvError, Successor};
 use crate::logging::TimeSeriesLogger;
 use thiserror::Error;
 
@@ -37,4 +37,30 @@ pub enum SimulatorError {
     BuildAgent(#[from] BuildAgentError),
     #[error("error building environment")]
     BuildEnv(#[from] BuildEnvError),
+}
+
+/// Full description of an environment step.
+///
+/// Includes the successor observation if one exists.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FullStep<O, A> {
+    /// The initial observation.
+    pub observation: O,
+    /// The action taken from the initial state given the initial observation.
+    pub action: A,
+    /// The resulting reward.
+    pub reward: f64,
+    /// The next observation or outcome; how the episode progresses.
+    pub next: Successor<O>,
+}
+
+impl<O, A> FullStep<O, A> {
+    pub const fn new(observation: O, action: A, reward: f64, next: Successor<O>) -> Self {
+        Self {
+            observation,
+            action,
+            reward,
+            next,
+        }
+    }
 }

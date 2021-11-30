@@ -1,5 +1,5 @@
 //! Simulator hooks.
-use crate::agents::FullStep;
+use super::FullStep;
 use crate::envs::EnvStructure;
 use crate::logging::{Event, Loggable, LoggerHelper, TimeSeriesLogger};
 use crate::spaces::{ElementRefInto, FiniteSpace, Space};

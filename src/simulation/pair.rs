@@ -1,6 +1,6 @@
 use super::hooks::BuildSimulationHook;
-use super::{run_agent, Simulator, SimulatorError};
-use crate::agents::{Actor, BuildAgent, FullStep, SynchronousAgent};
+use super::{run_agent, FullStep, Simulator, SimulatorError};
+use crate::agents::{Actor, BuildAgent, SynchronousAgent};
 use crate::envs::{BuildEnv, FirstPlayerView, SecondPlayerView, Successor};
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::{Space, TupleSpace2};

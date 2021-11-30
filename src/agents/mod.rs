@@ -29,39 +29,14 @@ pub use multithread::{
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
-use crate::envs::{EnvStructure, Successor};
+use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
+use crate::simulation::FullStep;
 use crate::spaces::Space;
 use crate::utils::any::AsAny;
 use std::any::Any;
 use tch::TchError;
 use thiserror::Error;
-
-/// Full description of an environment step.
-///
-/// Includes the successor observation if one exists.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct FullStep<O, A> {
-    /// The initial observation.
-    pub observation: O,
-    /// The action taken from the initial state given the initial observation.
-    pub action: A,
-    /// The resulting reward.
-    pub reward: f64,
-    /// The next observation or outcome; how the episode progresses.
-    pub next: Successor<O>,
-}
-
-impl<O, A> FullStep<O, A> {
-    pub const fn new(observation: O, action: A, reward: f64, next: Successor<O>) -> Self {
-        Self {
-            observation,
-            action,
-            reward,
-            next,
-        }
-    }
-}
 
 /// An actor that produces actions in response to a sequence of observations.
 ///

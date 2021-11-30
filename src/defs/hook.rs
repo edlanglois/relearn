@@ -1,9 +1,9 @@
-use crate::agents::FullStep;
 use crate::envs::EnvStructure;
 use crate::logging::{Loggable, TimeSeriesLogger};
 use crate::simulation::hooks::{
     BuildSimulationHook, EpisodeLimitConfig, SimulationHook, StepLimitConfig, StepLoggerConfig,
 };
+use crate::simulation::FullStep;
 use crate::spaces::ElementRefInto;
 use std::ops::DerefMut;
 

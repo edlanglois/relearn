@@ -1,10 +1,11 @@
 //! Meta agents
-use super::{Actor, BuildAgent, BuildAgentError, FullStep, SetActorMode, SynchronousAgent};
+use super::{Actor, BuildAgent, BuildAgentError, SetActorMode, SynchronousAgent};
 use crate::envs::{
     EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
     Successor,
 };
 use crate::logging::TimeSeriesLogger;
+use crate::simulation::FullStep;
 use crate::spaces::{NonEmptySpace, Space};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 

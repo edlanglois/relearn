@@ -1,7 +1,7 @@
 //! Serial (single-thread) simulation.
 use super::hooks::{BuildSimulationHook, SimulationHook};
-use super::{Simulator, SimulatorError};
-use crate::agents::{Actor, BuildAgent, FullStep, SynchronousAgent};
+use super::{FullStep, Simulator, SimulatorError};
+use crate::agents::{Actor, BuildAgent, SynchronousAgent};
 use crate::envs::{BuildEnv, Environment};
 use crate::logging::{Event, TimeSeriesLogger};
 

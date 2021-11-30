@@ -2,7 +2,7 @@
 mod serial;
 mod vec;
 
-use super::super::FullStep;
+use crate::simulation::FullStep;
 pub use serial::{SerialBuffer, SerialBufferConfig};
 
 /// Build a history buffer.

@@ -1,9 +1,10 @@
-use super::super::{Actor, BuildAgent, BuildAgentError, FullStep, SynchronousAgent};
+use super::super::{Actor, BuildAgent, BuildAgentError, SynchronousAgent};
 use super::{
     BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager, TryIntoActor,
 };
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
+use crate::simulation::FullStep;
 use crate::spaces::Space;
 use std::sync::{Arc, Mutex};
 

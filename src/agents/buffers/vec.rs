@@ -1,6 +1,6 @@
 //! History buffer implementation for an iterator of buffers.
-use super::super::FullStep;
 use super::HistoryBuffer;
+use crate::simulation::FullStep;
 use std::iter::FusedIterator;
 
 impl<T, O, A> HistoryBuffer<O, A> for Vec<T>

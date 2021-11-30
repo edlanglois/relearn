@@ -1,5 +1,5 @@
-use super::super::FullStep;
 use super::{BuildHistoryBuffer, HistoryBuffer};
+use crate::simulation::FullStep;
 use crate::utils::iter::SizedChain;
 use std::iter::{ExactSizeIterator, Extend, FusedIterator};
 
