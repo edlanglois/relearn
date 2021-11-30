@@ -150,11 +150,17 @@ impl BaseUCB1Agent {
 }
 
 impl Actor<usize, usize> for BaseUCB1Agent {
-    fn act(&mut self, observation: &usize, _new_episode: bool) -> usize {
+    #[inline]
+    fn act(&mut self, observation: &usize) -> usize {
         match self.mode {
             ActorMode::Training => self.act_training(*observation),
             ActorMode::Release => self.act_release(*observation),
         }
+    }
+
+    #[inline]
+    fn reset(&mut self) {
+        // No episode-specific state
     }
 }
 

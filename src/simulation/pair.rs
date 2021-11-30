@@ -92,11 +92,13 @@ where
     T1: Actor<O1, A1>,
     T2: Actor<O2, A2>,
 {
-    fn act(&mut self, observation: &(O1, O2), new_episode: bool) -> (A1, A2) {
-        (
-            self.0.act(&observation.0, new_episode),
-            self.1.act(&observation.1, new_episode),
-        )
+    fn act(&mut self, observation: &(O1, O2)) -> (A1, A2) {
+        (self.0.act(&observation.0), self.1.act(&observation.1))
+    }
+
+    fn reset(&mut self) {
+        self.0.reset();
+        self.1.reset();
     }
 }
 impl<T1, T2, O1, O2, A1, A2> SynchronousAgent<(O1, O2), (A1, A2)> for PairAgent<T1, T2>
@@ -142,7 +144,8 @@ struct RemoteAgent<O, A> {
 }
 
 enum Message<O, A> {
-    Act(O, bool),
+    Act(O),
+    Reset,
     Update(FullStep<O, A>),
 }
 
@@ -161,10 +164,11 @@ impl<O, A> RemoteAgent<O, A> {
         let worker = move || {
             while let Ok(msg) = recv_msg.recv() {
                 match msg {
-                    Message::Act(obs, new_episode) => {
-                        let action = agent.act(&obs, new_episode);
+                    Message::Act(obs) => {
+                        let action = agent.act(&obs);
                         send_act.send(action).unwrap();
                     }
+                    Message::Reset => agent.reset(),
                     Message::Update(step) => {
                         agent.update(step, &mut ());
                     }
@@ -179,11 +183,13 @@ impl<O, A> Actor<O, A> for RemoteAgent<O, A>
 where
     O: Clone,
 {
-    fn act(&mut self, observation: &O, new_episode: bool) -> A {
-        self.sender
-            .send(Message::Act(observation.clone(), new_episode))
-            .unwrap();
+    fn act(&mut self, observation: &O) -> A {
+        self.sender.send(Message::Act(observation.clone())).unwrap();
         self.receiver.recv().unwrap()
+    }
+
+    fn reset(&mut self) {
+        self.sender.send(Message::Reset).unwrap();
     }
 }
 

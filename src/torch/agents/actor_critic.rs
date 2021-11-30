@@ -191,17 +191,17 @@ where
     AS: ParameterizedDistributionSpace<Tensor>,
     P: StatefulIterativeModule,
 {
-    fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
+    fn act(&mut self, observation: &OS::Element) -> AS::Element {
         let _no_grad = tch::no_grad_guard();
         let observation_features = self.observation_space.features(observation);
 
         let policy = self.cpu_policy.as_mut().unwrap_or(&mut self.policy);
-        if new_episode {
-            policy.reset();
-        }
-
         let output = policy.step(&observation_features);
         self.action_space.sample_element(&output)
+    }
+
+    fn reset(&mut self) {
+        self.cpu_policy.as_mut().unwrap_or(&mut self.policy).reset();
     }
 }
 

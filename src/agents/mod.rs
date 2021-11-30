@@ -72,20 +72,23 @@ pub trait Actor<O, A> {
     ///
     /// This must be called sequentially within an episode,
     /// allowing the actor to internally maintain a history of the episode
-    /// that informs the actions.
-    ///
-    /// # Args
-    /// * `observation`: The current observation of the environment state.
-    /// * `new_episode`: Whether this observation is the start of a new episode.
-    fn act(&mut self, observation: &O, new_episode: bool) -> A;
+    /// that informs its actions.
+    fn act(&mut self, observation: &O) -> A;
+
+    /// Reset the actor for a new episode.
+    fn reset(&mut self);
 }
 
 impl<T, O, A> Actor<O, A> for &'_ mut T
 where
     T: Actor<O, A> + ?Sized,
 {
-    fn act(&mut self, observation: &O, new_episode: bool) -> A {
-        T::act(self, observation, new_episode)
+    fn act(&mut self, observation: &O) -> A {
+        T::act(self, observation)
+    }
+
+    fn reset(&mut self) {
+        T::reset(self)
     }
 }
 
@@ -93,8 +96,12 @@ impl<T, O, A> Actor<O, A> for Box<T>
 where
     T: Actor<O, A> + ?Sized,
 {
-    fn act(&mut self, observation: &O, new_episode: bool) -> A {
-        T::act(self, observation, new_episode)
+    fn act(&mut self, observation: &O) -> A {
+        T::act(self, observation)
+    }
+
+    fn reset(&mut self) {
+        T::reset(self)
     }
 }
 
@@ -106,7 +113,7 @@ pub trait SynchronousAgent<O, A>: Actor<O, A> {
     /// Update the agent based on the most recent action.
     ///
     /// Must be called immediately after the corresponding call to [`Actor::act`],
-    /// before any other calls to `act` are made.
+    /// before any other calls to `act` or [`Actor::reset`].
     /// This allows the agent to internally cache any information used in selecting the action
     /// that would also be useful for updating on the result.
     ///

@@ -52,8 +52,12 @@ impl<AS> RandomAgent<AS> {
 }
 
 impl<O, AS: SampleSpace> Actor<O, AS::Element> for RandomAgent<AS> {
-    fn act(&mut self, _observation: &O, _new_episode: bool) -> AS::Element {
+    fn act(&mut self, _observation: &O) -> AS::Element {
         self.action_space.sample(&mut self.rng)
+    }
+
+    fn reset(&mut self) {
+        // No episode state
     }
 }
 

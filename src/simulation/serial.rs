@@ -66,10 +66,9 @@ pub fn run_agent<E, A, H>(
         return;
     }
     let mut observation = environment.reset();
-    let mut new_episode = true;
 
     loop {
-        let action = agent.act(&observation, new_episode);
+        let action = agent.act(&observation);
         let (next, reward) = environment.step(&action, &mut logger.event_logger(Event::EnvStep));
 
         let step = FullStep {
@@ -88,11 +87,10 @@ pub fn run_agent<E, A, H>(
         match next.continue_() {
             Some(obs) => {
                 observation = obs;
-                new_episode = false;
             }
             None => {
                 observation = environment.reset();
-                new_episode = true;
+                agent.reset()
             }
         }
     }
@@ -122,10 +120,9 @@ pub fn run_actor<E, A, H>(
         return;
     }
     let mut observation = environment.reset();
-    let mut new_episode = true;
 
     loop {
-        let action = actor.act(&observation, new_episode);
+        let action = actor.act(&observation);
         let (next, reward) = environment.step(&action, &mut logger.event_logger(Event::EnvStep));
 
         let step = FullStep {
@@ -142,11 +139,10 @@ pub fn run_actor<E, A, H>(
         match next.continue_() {
             Some(obs) => {
                 observation = obs;
-                new_episode = false;
             }
             None => {
                 observation = environment.reset();
-                new_episode = true;
+                actor.reset()
             }
         }
     }

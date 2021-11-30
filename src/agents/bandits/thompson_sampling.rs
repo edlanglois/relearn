@@ -116,7 +116,7 @@ impl BaseBetaThompsonSamplingAgent {
             .mapv(|(beta, alpha)| -> f64 {
                 // Explanation for the rng reference:
                 // sample_iter takes its argument by value rather than by reference.
-                // We cannot the rng into sample_iter because it needs to stay with self.
+                // We cannot pass the rng into sample_iter because it needs to stay with self.
                 // However, (&mut rng) also implements Rng.
                 // We cannot directly use &mut self.rng in the closure because that would borrow
                 // self. Nor can we create a copy like we do for num_samples.
@@ -153,11 +153,17 @@ impl BaseBetaThompsonSamplingAgent {
 }
 
 impl Actor<usize, usize> for BaseBetaThompsonSamplingAgent {
-    fn act(&mut self, observation: &usize, _new_episode: bool) -> usize {
+    #[inline]
+    fn act(&mut self, observation: &usize) -> usize {
         match self.mode {
             ActorMode::Training => self.act_training(*observation),
             ActorMode::Release => self.act_release(*observation),
         }
+    }
+
+    #[inline]
+    fn reset(&mut self) {
+        // No episode-specific state
     }
 }
 

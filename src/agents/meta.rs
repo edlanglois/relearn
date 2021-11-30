@@ -50,7 +50,6 @@ where
     rng: StdRng,
     agent: AC::Agent,
     prev_observation: Option<OS::Element>,
-    prev_episode_done: bool,
 }
 
 impl<AC, OS, AS> ResettingMetaAgent<AC, OS, AS>
@@ -78,7 +77,6 @@ where
             rng,
             agent,
             prev_observation: None,
-            prev_episode_done: true,
         })
     }
 }
@@ -90,25 +88,12 @@ where
     OS: Space + Clone,
     AS: NonEmptySpace + Clone,
 {
-    fn act(
-        &mut self,
-        obs: &MetaObservation<OS::Element, AS::Element>,
-        new_episode: bool,
-    ) -> AS::Element {
-        if new_episode {
-            // Reset the agent
-            self.agent = self
-                .inner_agent_config
-                .build_agent(&self.inner_env_structure, self.rng.gen())
-                .expect("Failed to build inner agent");
-            self.prev_observation = None;
-            self.prev_episode_done = true;
-        } else if let Some(ref step_obs) = &obs.prev_step {
-            // Update the agent based on the most recent step result
-            // Only relevant if the agent has not been reset.
+    fn act(&mut self, obs: &MetaObservation<OS::Element, AS::Element>) -> AS::Element {
+        if let Some(ref step_obs) = &obs.prev_step {
+            // Update the agent based on the most recent step result when it exists
             let step_next = match (obs.inner_observation.as_ref().cloned(), obs.episode_done) {
-                (Some(obs), false) => Successor::Continue(obs),
-                (Some(obs), true) => Successor::Interrupt(obs),
+                (Some(o), false) => Successor::Continue(o),
+                (Some(o), true) => Successor::Interrupt(o),
                 (None, true) => Successor::Terminate,
                 (None, false) => panic!("must provide an observation if the episode continues"),
             };
@@ -124,22 +109,24 @@ where
             self.agent.update(step, &mut ());
         }
 
-        let action = if let Some(ref inner_observation) = &obs.inner_observation {
-            self.agent.act(inner_observation, self.prev_episode_done)
-        } else {
-            // If there is no inner observation then the current state is terminal
-            // and the inner episode is done so whatever this action is, it will be ignored.
-            assert!(
-                obs.episode_done,
-                "Expecting episode_done if inner_observation is None"
-            );
+        if obs.episode_done {
+            // This observation marks the end of the inner episode.
+            // Any action will be ignored. Reset the inner agent and sample an arbitrary action.
+            self.agent.reset();
+            self.prev_observation = None;
             self.inner_env_structure.action_space.some_element()
-        };
+        } else {
+            self.prev_observation = obs.inner_observation.as_ref().cloned();
+            self.agent.act(obs.inner_observation.as_ref().unwrap())
+        }
+    }
 
-        self.prev_observation = obs.inner_observation.as_ref().cloned();
-        self.prev_episode_done = obs.episode_done;
-
-        action
+    fn reset(&mut self) {
+        self.agent = self
+            .inner_agent_config
+            .build_agent(&self.inner_env_structure, self.rng.gen())
+            .expect("Failed to build inner agent");
+        self.prev_observation = None;
     }
 }
 

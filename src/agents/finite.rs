@@ -49,13 +49,17 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn act(&mut self, observation: &OS::Element, new_episode: bool) -> AS::Element {
+    fn act(&mut self, observation: &OS::Element) -> AS::Element {
         self.action_space
             .from_index(
                 self.agent
-                    .act(&self.observation_space.to_index(observation), new_episode),
+                    .act(&self.observation_space.to_index(observation)),
             )
             .expect("Invalid action index")
+    }
+
+    fn reset(&mut self) {
+        self.agent.reset()
     }
 }
 

@@ -16,11 +16,13 @@ where
     T: Actor<O1, A1>,
     U: Actor<O2, A2>,
 {
-    fn act(&mut self, observation: &(O1, O2), new_episode: bool) -> (A1, A2) {
-        (
-            self.0.act(&observation.0, new_episode),
-            self.1.act(&observation.1, new_episode),
-        )
+    fn act(&mut self, observation: &(O1, O2)) -> (A1, A2) {
+        (self.0.act(&observation.0), self.1.act(&observation.1))
+    }
+
+    fn reset(&mut self) {
+        self.0.reset();
+        self.1.reset();
     }
 }
 

@@ -100,7 +100,7 @@ impl fmt::Display for BaseTabularQLearningAgent {
 }
 
 impl Actor<usize, usize> for BaseTabularQLearningAgent {
-    fn act(&mut self, observation: &usize, _new_episode: bool) -> usize {
+    fn act(&mut self, observation: &usize) -> usize {
         if self.mode == ActorMode::Training && self.rng.gen::<f64>() < self.exploration_rate {
             // Random exploration with probability `exploration_rate` when in training mode
             let (_, num_actions) = self.state_action_counts.dim();
@@ -111,6 +111,10 @@ impl Actor<usize, usize> for BaseTabularQLearningAgent {
                 .argmax()
                 .unwrap()
         }
+    }
+
+    fn reset(&mut self) {
+        // No episode state
     }
 }
 

@@ -187,8 +187,12 @@ impl<T, O, A> Actor<O, A> for MultithreadBatchWorker<T, O, A>
 where
     T: Actor<O, A>,
 {
-    fn act(&mut self, observation: &O, new_episode: bool) -> A {
-        self.actor.act(observation, new_episode)
+    fn act(&mut self, observation: &O) -> A {
+        self.actor.act(observation)
+    }
+
+    fn reset(&mut self) {
+        self.actor.reset()
     }
 }
 

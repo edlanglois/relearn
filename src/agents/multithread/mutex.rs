@@ -100,8 +100,12 @@ impl<T, O, A> Actor<O, A> for MutexAgentWorker<T>
 where
     T: Actor<O, A>,
 {
-    fn act(&mut self, observation: &O, new_episode: bool) -> A {
-        self.agent.lock().unwrap().act(observation, new_episode)
+    fn act(&mut self, observation: &O) -> A {
+        self.agent.lock().unwrap().act(observation)
+    }
+
+    fn reset(&mut self) {
+        self.agent.lock().unwrap().reset()
     }
 }
 
