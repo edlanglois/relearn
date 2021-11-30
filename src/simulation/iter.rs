@@ -80,16 +80,12 @@ where
     /// Cannot return a `TransientStep` without Generic Associated Types
     type Item = PartialStep<E::Observation, E::Action>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let step = self.step();
-        Some(PartialStep {
-            observation: step.observation,
-            action: step.action,
-            reward: step.reward,
-            next: step.next.into_partial(),
-        })
+        Some(self.step().into_partial())
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         // infinite
         (usize::MAX, None)
