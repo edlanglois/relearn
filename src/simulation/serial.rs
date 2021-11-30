@@ -2,7 +2,7 @@
 use super::hooks::{BuildSimulationHook, SimulationHook};
 use super::{Simulator, SimulatorError, TransientStep};
 use crate::agents::{BuildAgent, SynchronousAgent};
-use crate::envs::{BuildEnv, Environment, Successor};
+use crate::envs::{BuildEnv, Environment};
 use crate::logging::{Event, TimeSeriesLogger};
 use std::mem;
 
@@ -71,28 +71,17 @@ pub fn run_agent<E, A, H>(
         let (next, reward) = environment.step(&action, &mut logger.event_logger(Event::EnvStep));
 
         let mut episode_done = false;
-        let mut reset = || {
+        let (partial_next, next_observation) = next.take_continue_or_else(|| {
             episode_done = true;
             environment.reset()
-        };
-
-        let (partial_successor, next_observation) = match next {
-            Successor::Continue(next_obs) => (Successor::Continue(()), next_obs),
-            Successor::Terminate => (Successor::Terminate, reset()),
-            Successor::Interrupt(next_obs) => (Successor::Interrupt(next_obs), reset()),
-        };
+        });
         let prev_observation = mem::replace(&mut observation, next_observation);
-        let ref_successor = match partial_successor {
-            Successor::Continue(()) => Successor::Continue(&observation),
-            Successor::Terminate => Successor::Terminate,
-            Successor::Interrupt(next_obs) => Successor::Interrupt(next_obs),
-        };
 
         let step = TransientStep {
             observation: prev_observation,
             action,
             reward,
-            next: ref_successor,
+            next: partial_next.map_continue(|_| &observation),
         };
         let done = !hook.call(&step, logger);
         agent.update(step, logger);

@@ -1,6 +1,6 @@
 use super::{PartialStep, TransientStep};
 use crate::agents::Actor;
-use crate::envs::{Environment, Successor};
+use crate::envs::Environment;
 use crate::logging::{Event, TimeSeriesLogger};
 use std::iter::FusedIterator;
 use std::mem;
@@ -47,28 +47,17 @@ where
             .environment
             .step(&action, &mut self.logger.event_logger(Event::EnvStep));
 
-        let mut reset = || {
+        let (partial_next, next_observation) = next.take_continue_or_else(|| {
             self.actor.reset();
             self.environment.reset()
-        };
-
-        let (partial_successor, next_observation) = match next {
-            Successor::Continue(next_obs) => (Successor::Continue(()), next_obs),
-            Successor::Terminate => (Successor::Terminate, reset()),
-            Successor::Interrupt(next_obs) => (Successor::Interrupt(next_obs), reset()),
-        };
+        });
         let observation = mem::replace(&mut self.observation, next_observation);
-        let ref_successor = match partial_successor {
-            Successor::Continue(()) => Successor::Continue(&self.observation),
-            Successor::Terminate => Successor::Terminate,
-            Successor::Interrupt(next_obs) => Successor::Interrupt(next_obs),
-        };
 
         TransientStep {
             observation,
             action,
             reward,
-            next: ref_successor,
+            next: partial_next.map_continue(|_| &self.observation),
         }
     }
 }

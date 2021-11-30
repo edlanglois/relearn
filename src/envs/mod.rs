@@ -152,6 +152,34 @@ impl<T, U> Successor<T, U> {
             Self::Interrupt(s) => Successor::Interrupt(s),
         }
     }
+
+    /// Apply a function to just the successor `Continue` variant.
+    #[inline]
+    pub fn map_continue<F, V>(self, f: F) -> Successor<T, V>
+    where
+        F: FnOnce(U) -> V,
+    {
+        match self {
+            Self::Continue(s) => Successor::Continue(f(s)),
+            Self::Terminate => Successor::Terminate,
+            Self::Interrupt(s) => Successor::Interrupt(s),
+        }
+    }
+
+    /// Take the `Continue` value or compute it from a closure.
+    ///
+    /// Also returns the rest of the `Successor` as a `PartialSuccessor`.
+    #[inline]
+    pub fn take_continue_or_else<F>(self, f: F) -> (PartialSuccessor<T>, U)
+    where
+        F: FnOnce() -> U,
+    {
+        match self {
+            Self::Continue(o) => (Successor::Continue(()), o),
+            Self::Terminate => (Successor::Terminate, f()),
+            Self::Interrupt(o) => (Successor::Interrupt(o), f()),
+        }
+    }
 }
 
 impl<T> Successor<T> {
