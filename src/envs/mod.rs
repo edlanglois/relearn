@@ -124,7 +124,8 @@ impl<T> Successor<T> {
         }
     }
 
-    /// Get the inner state of Successor::Continue
+    /// Get the inner state of `Successor::Continue`
+    #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
     #[inline]
     pub fn continue_(self) -> Option<T> {
         match self {
@@ -133,7 +134,8 @@ impl<T> Successor<T> {
         }
     }
 
-    /// Get the inner state of Successor::Interrupt
+    /// Get the inner state of `Successor::Interrupt`
+    #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
     #[inline]
     pub fn interrupt(self) -> Option<T> {
         match self {
@@ -143,6 +145,7 @@ impl<T> Successor<T> {
     }
 
     /// Get the inner state of `Continue` and `Interrupt` variants.
+    #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
     #[inline]
     pub fn into_inner(self) -> Option<T> {
         match self {
@@ -154,13 +157,13 @@ impl<T> Successor<T> {
 
     /// Whether this successor marks the end of an episode
     #[inline]
-    pub fn episode_done(&self) -> bool {
+    pub const fn episode_done(&self) -> bool {
         !matches!(self, Successor::Continue(_))
     }
 
     /// Convert `&Successor<T>` to `Successor<&T>`.
     #[inline]
-    pub fn as_ref(&self) -> Successor<&T> {
+    pub const fn as_ref(&self) -> Successor<&T> {
         match self {
             Self::Continue(s) => Successor::Continue(s),
             Self::Terminate => Successor::Terminate,
@@ -173,7 +176,7 @@ impl<'a, T: Clone> Successor<&'a T> {
     /// Convert `Successor<&T>` to `Successor<T>` by cloning its contents
     #[inline]
     pub fn cloned(self) -> Successor<T> {
-        self.map(|s| s.clone())
+        self.map(Clone::clone)
     }
 }
 
