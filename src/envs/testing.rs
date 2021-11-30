@@ -3,7 +3,7 @@ use super::{
     CloneBuild, DeterministicBandit, EnvDistribution, EnvStructure, IntoEnv, Pomdp,
     PomdpDistribution, StoredEnvStructure, StructuredEnvironment,
 };
-use crate::agents::{RandomAgent, Step};
+use crate::agents::{FullStep, RandomAgent};
 use crate::simulation;
 use crate::simulation::hooks::{ClosureHook, StepLimit};
 use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space, SubsetOrd};
@@ -54,7 +54,7 @@ where
         env,
         &mut agent,
         &mut (
-            ClosureHook::from(|step: &Step<_, _>| -> bool {
+            ClosureHook::from(|step: &FullStep<_, _>| -> bool {
                 assert!(step.reward >= min_reward);
                 assert!(step.reward <= max_reward);
                 if let Some(obs) = step.next.as_ref().into_inner() {

@@ -1,7 +1,7 @@
 //! Upper confidence bound bandit agent.
 use super::super::{
-    Actor, ActorMode, Agent, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent,
-    SetActorMode, Step, SyncParams, SyncParamsError,
+    Actor, ActorMode, Agent, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, FullStep,
+    OffPolicyAgent, SetActorMode, SyncParams, SyncParamsError,
 };
 use crate::logging::TimeSeriesLogger;
 use crate::utils::iter::ArgMaxBy;
@@ -159,7 +159,7 @@ impl Actor<usize, usize> for BaseUCB1Agent {
 }
 
 impl Agent<usize, usize> for BaseUCB1Agent {
-    fn update(&mut self, step: Step<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: FullStep<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
         let scaled_reward = (step.reward + self.reward_shift) * self.reward_scale_factor;
 
         self.state_visit_count[step.observation] += 1;

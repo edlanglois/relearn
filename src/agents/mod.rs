@@ -37,9 +37,11 @@ use std::any::Any;
 use tch::TchError;
 use thiserror::Error;
 
-/// Description of an environment step
+/// Full description of an environment step.
+///
+/// Includes the successor observation if one exists.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Step<O, A> {
+pub struct FullStep<O, A> {
     /// The initial observation.
     pub observation: O,
     /// The action taken from the initial state given the initial observation.
@@ -50,7 +52,7 @@ pub struct Step<O, A> {
     pub next: Successor<O>,
 }
 
-impl<O, A> Step<O, A> {
+impl<O, A> FullStep<O, A> {
     pub const fn new(observation: O, action: A, reward: f64, next: Successor<O>) -> Self {
         Self {
             observation,
@@ -110,14 +112,14 @@ pub trait Agent<O, A>: Actor<O, A> {
     ///
     /// # Args
     /// * `step`: The environment step resulting from the  most recent call to [`Actor::act`].
-    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger);
+    fn update(&mut self, step: FullStep<O, A>, logger: &mut dyn TimeSeriesLogger);
 }
 
 impl<T, O, A> Agent<O, A> for &'_ mut T
 where
     T: Agent<O, A> + ?Sized,
 {
-    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: FullStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         T::update(self, step, logger)
     }
 }
@@ -126,7 +128,7 @@ impl<T, O, A> Agent<O, A> for Box<T>
 where
     T: Agent<O, A> + ?Sized,
 {
-    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: FullStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         T::update(self, step, logger)
     }
 }

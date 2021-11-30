@@ -1,4 +1,4 @@
-use super::super::{Actor, Agent, BuildAgent, BuildAgentError, Step};
+use super::super::{Actor, Agent, BuildAgent, BuildAgentError, FullStep};
 use super::{
     BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager, TryIntoActor,
 };
@@ -109,7 +109,7 @@ impl<T, O, A> Agent<O, A> for MutexAgentWorker<T>
 where
     T: Agent<O, A>,
 {
-    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: FullStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         self.agent.lock().unwrap().update(step, logger)
     }
 }

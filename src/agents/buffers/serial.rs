@@ -1,4 +1,4 @@
-use super::super::Step;
+use super::super::FullStep;
 use super::{BuildHistoryBuffer, HistoryBuffer};
 use crate::utils::iter::SizedChain;
 use std::iter::{ExactSizeIterator, Extend, FusedIterator};
@@ -36,7 +36,7 @@ pub struct SerialBuffer<O, A> {
     pub hard_threshold: usize,
 
     /// Steps from all episodes with each episode stored contiguously
-    steps: Vec<Step<O, A>>,
+    steps: Vec<FullStep<O, A>>,
     /// One past the end index of each episode within `steps`.
     episode_ends: Vec<usize>,
 }
@@ -64,7 +64,7 @@ impl<O, A> SerialBuffer<O, A> {
     /// Steps must be pushed consecutively within each episode.
     ///
     /// Returns a Boolean indicating whether the buffer is ready to be drained for a model update.
-    pub fn push(&mut self, step: Step<O, A>) -> bool {
+    pub fn push(&mut self, step: FullStep<O, A>) -> bool {
         let episode_done = step.next.episode_done();
         self.steps.push(step);
         let num_steps = self.steps.len();
@@ -80,10 +80,10 @@ impl<O, A> SerialBuffer<O, A> {
     }
 }
 
-impl<O, A> Extend<Step<O, A>> for SerialBuffer<O, A> {
+impl<O, A> Extend<FullStep<O, A>> for SerialBuffer<O, A> {
     fn extend<T>(&mut self, iter: T)
     where
-        T: IntoIterator<Item = Step<O, A>>,
+        T: IntoIterator<Item = FullStep<O, A>>,
     {
         for step in iter {
             self.push(step);
@@ -104,15 +104,15 @@ impl<O, A> HistoryBuffer<O, A> for SerialBuffer<O, A> {
         }
     }
 
-    fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a Step<O, A>> + 'a> {
+    fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a FullStep<O, A>> + 'a> {
         Box::new(self.steps.iter())
     }
 
-    fn drain_steps(&mut self) -> Box<dyn ExactSizeIterator<Item = Step<O, A>> + '_> {
+    fn drain_steps(&mut self) -> Box<dyn ExactSizeIterator<Item = FullStep<O, A>> + '_> {
         Box::new(self.steps.drain(..))
     }
 
-    fn episodes<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a [Step<O, A>]> + 'a> {
+    fn episodes<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a [FullStep<O, A>]> + 'a> {
         // Check for an incomplete episode at the end to include
         let last_complete_end: usize = self.episode_ends.last().cloned().unwrap_or(0);
         let num_steps = self.steps.len();
@@ -202,16 +202,16 @@ mod tests {
     use rstest::{fixture, rstest};
 
     /// Make a step that either continues or is terminal.
-    const fn step(observation: usize, next: Successor<usize>) -> Step<usize, bool> {
-        Step {
+    const fn step(observation: usize, next: Successor<usize>) -> FullStep<usize, bool> {
+        FullStep {
             observation,
             action: false,
             reward: 0.0,
             next,
         }
     }
-    const STEP_NOT_DONE: Step<usize, bool> = step(0, Continue(0));
-    const STEP_TERMINAL: Step<usize, bool> = step(0, Terminate);
+    const STEP_NOT_DONE: FullStep<usize, bool> = step(0, Continue(0));
+    const STEP_TERMINAL: FullStep<usize, bool> = step(0, Terminate);
 
     #[test]
     fn fill_episodic() {

@@ -1,5 +1,5 @@
 use super::{
-    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, SetActorMode, Step, SyncParams,
+    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, FullStep, SetActorMode, SyncParams,
     SyncParamsError,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
@@ -29,7 +29,7 @@ where
     T: Agent<O1, A1>,
     U: Agent<O2, A2>,
 {
-    fn update(&mut self, step: Step<(O1, O2), (A1, A2)>, logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: FullStep<(O1, O2), (A1, A2)>, logger: &mut dyn TimeSeriesLogger) {
         let (o1, o2) = step.observation;
         let (a1, a2) = step.action;
         let (n1, n2) = match step.next {
@@ -40,7 +40,7 @@ where
             }
         };
         self.0.update(
-            Step {
+            FullStep {
                 observation: o1,
                 action: a1,
                 reward: step.reward,
@@ -49,7 +49,7 @@ where
             logger,
         );
         self.1.update(
-            Step {
+            FullStep {
                 observation: o2,
                 action: a2,
                 reward: step.reward,

@@ -1,6 +1,6 @@
 use super::{
-    buffers::HistoryBuffer, Actor, Agent, BatchUpdate, BuildAgent, BuildAgentError, OffPolicyAgent,
-    SetActorMode, Step, SyncParams, SyncParamsError,
+    buffers::HistoryBuffer, Actor, Agent, BatchUpdate, BuildAgent, BuildAgentError, FullStep,
+    OffPolicyAgent, SetActorMode, SyncParams, SyncParamsError,
 };
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
@@ -58,7 +58,7 @@ impl<O, AS: SampleSpace> Actor<O, AS::Element> for RandomAgent<AS> {
 }
 
 impl<O, AS: SampleSpace> Agent<O, AS::Element> for RandomAgent<AS> {
-    fn update(&mut self, _step: Step<O, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {}
+    fn update(&mut self, _step: FullStep<O, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {}
 }
 
 impl<O, AS: SampleSpace> OffPolicyAgent<O, AS::Element> for RandomAgent<AS> {}

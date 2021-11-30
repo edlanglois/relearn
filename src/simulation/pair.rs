@@ -1,6 +1,6 @@
 use super::hooks::BuildSimulationHook;
 use super::{run_agent, Simulator, SimulatorError};
-use crate::agents::{Actor, Agent, BuildAgent, Step};
+use crate::agents::{Actor, Agent, BuildAgent, FullStep};
 use crate::envs::{BuildEnv, FirstPlayerView, SecondPlayerView, Successor};
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::{Space, TupleSpace2};
@@ -104,7 +104,7 @@ where
     T1: Agent<O1, A1>,
     T2: Agent<O2, A2>,
 {
-    fn update(&mut self, step: Step<(O1, O2), (A1, A2)>, logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: FullStep<(O1, O2), (A1, A2)>, logger: &mut dyn TimeSeriesLogger) {
         let (o1, o2) = step.observation;
         let (a1, a2) = step.action;
         let (n1, n2) = match step.next {
@@ -115,7 +115,7 @@ where
             }
         };
         self.0.update(
-            Step {
+            FullStep {
                 observation: o1,
                 action: a1,
                 reward: step.reward,
@@ -124,7 +124,7 @@ where
             logger,
         );
         self.1.update(
-            Step {
+            FullStep {
                 observation: o2,
                 action: a2,
                 reward: step.reward,
@@ -143,7 +143,7 @@ struct RemoteAgent<O, A> {
 
 enum Message<O, A> {
     Act(O, bool),
-    Update(Step<O, A>),
+    Update(FullStep<O, A>),
 }
 
 impl<O, A> RemoteAgent<O, A> {
@@ -191,7 +191,7 @@ impl<O, A> Agent<O, A> for RemoteAgent<O, A>
 where
     O: Clone,
 {
-    fn update(&mut self, step: Step<O, A>, _logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: FullStep<O, A>, _logger: &mut dyn TimeSeriesLogger) {
         self.sender.send(Message::Update(step)).unwrap();
     }
 }

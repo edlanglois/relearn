@@ -1,7 +1,7 @@
 use super::buffers::HistoryBuffer;
 use super::{
     Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
-    OffPolicyAgent, SetActorMode, Step, SyncParams, SyncParamsError,
+    FullStep, OffPolicyAgent, SetActorMode, SyncParams, SyncParamsError,
 };
 use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
@@ -64,7 +64,11 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn TimeSeriesLogger) {
+    fn update(
+        &mut self,
+        step: FullStep<OS::Element, AS::Element>,
+        logger: &mut dyn TimeSeriesLogger,
+    ) {
         self.agent.update(
             indexed_step(&step, &self.observation_space, &self.action_space),
             logger,
@@ -105,15 +109,15 @@ where
 
 /// Convert a finite-space step into an index step.
 fn indexed_step<OS, AS>(
-    step: &Step<OS::Element, AS::Element>,
+    step: &FullStep<OS::Element, AS::Element>,
     observation_space: &OS,
     action_space: &AS,
-) -> Step<usize, usize>
+) -> FullStep<usize, usize>
 where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    Step {
+    FullStep {
         observation: observation_space.to_index(&step.observation),
         action: action_space.to_index(&step.action),
         reward: step.reward,

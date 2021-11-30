@@ -1,7 +1,7 @@
 //! Tabular agents
 use super::{
     batch::off_policy_batch_update, buffers::HistoryBuffer, Actor, ActorMode, Agent, BatchUpdate,
-    BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent, SetActorMode, Step,
+    BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, FullStep, OffPolicyAgent, SetActorMode,
     SyncParams, SyncParamsError,
 };
 use crate::logging::TimeSeriesLogger;
@@ -115,7 +115,7 @@ impl Actor<usize, usize> for BaseTabularQLearningAgent {
 }
 
 impl Agent<usize, usize> for BaseTabularQLearningAgent {
-    fn update(&mut self, step: Step<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: FullStep<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
         let discounted_next_value = match step.next.into_inner() {
             None => 0.0,
             Some(next_observation) => {

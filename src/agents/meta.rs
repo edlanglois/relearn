@@ -1,5 +1,5 @@
 //! Meta agents
-use super::{Actor, Agent, BuildAgent, BuildAgentError, SetActorMode, Step};
+use super::{Actor, Agent, BuildAgent, BuildAgentError, FullStep, SetActorMode};
 use crate::envs::{
     EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
     Successor,
@@ -113,7 +113,7 @@ where
                 (None, false) => panic!("must provide an observation if the episode continues"),
             };
 
-            let step = Step {
+            let step = FullStep {
                 observation: self.prev_observation.take().expect(
                     "Meta observation follows a previous step but no previous observation stored",
                 ),
@@ -152,7 +152,7 @@ where
 {
     fn update(
         &mut self,
-        _step: Step<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>,
+        _step: FullStep<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>,
         _logger: &mut dyn TimeSeriesLogger,
     ) {
         // Does not learn on a meta level

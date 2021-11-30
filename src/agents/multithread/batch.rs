@@ -1,5 +1,5 @@
 use super::super::buffers::{BuildHistoryBuffer, SerialBuffer, SerialBufferConfig};
-use super::super::{Actor, Agent, BatchUpdate, BuildBatchUpdateActor, Step, SyncParams};
+use super::super::{Actor, Agent, BatchUpdate, BuildBatchUpdateActor, FullStep, SyncParams};
 use super::{
     BuildAgentError, BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager,
     TryIntoActor,
@@ -194,7 +194,7 @@ impl<T, O, A> Agent<O, A> for MultithreadBatchWorker<T, O, A>
 where
     T: Actor<O, A> + BatchUpdate<O, A> + SyncParams,
 {
-    fn update(&mut self, step: Step<O, A>, _logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: FullStep<O, A>, _logger: &mut dyn TimeSeriesLogger) {
         let full = self.buffer.as_mut().unwrap().push(step);
         if full {
             // Send buffer to manager to update the reference actor
