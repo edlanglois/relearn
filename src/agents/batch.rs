@@ -1,7 +1,7 @@
 use super::buffers::{BuildHistoryBuffer, HistoryBuffer, SerialBuffer, SerialBufferConfig};
 use super::{
-    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, FullStep, SetActorMode, SyncParams,
-    SyncParamsError,
+    Actor, ActorMode, BuildAgent, BuildAgentError, FullStep, SetActorMode, SyncParams,
+    SyncParamsError, SynchronousAgent,
 };
 use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
@@ -38,7 +38,7 @@ pub trait BatchUpdate<O, A> {
 }
 
 /// Marker trait for agents that can accept updates at any time from any policy.
-pub trait OffPolicyAgent<O, A>: Agent<O, A> {}
+pub trait OffPolicyAgent<O, A>: SynchronousAgent<O, A> {}
 
 /// Helper implementaiton of [`BatchUpdate::batch_update`] for [`OffPolicyAgent`].
 pub fn off_policy_batch_update<T, O, A>(
@@ -121,7 +121,7 @@ where
     }
 }
 
-impl<T, O, A> Agent<O, A> for BatchUpdateAgent<T, O, A>
+impl<T, O, A> SynchronousAgent<O, A> for BatchUpdateAgent<T, O, A>
 where
     T: Actor<O, A> + BatchUpdate<O, A>,
 {

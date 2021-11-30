@@ -1,7 +1,7 @@
 use super::buffers::HistoryBuffer;
 use super::{
-    Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
-    FullStep, OffPolicyAgent, SetActorMode, SyncParams, SyncParamsError,
+    Actor, ActorMode, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchUpdateActor, FullStep,
+    OffPolicyAgent, SetActorMode, SyncParams, SyncParamsError, SynchronousAgent,
 };
 use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
@@ -12,7 +12,8 @@ use crate::spaces::{FiniteSpace, IndexSpace, Space};
 /// This is a helper trait that automatically implements [`BuildAgent`]
 /// with all finite-space environments.
 pub trait BuildIndexAgent {
-    type Agent: Agent<<IndexSpace as Space>::Element, <IndexSpace as Space>::Element> + SetActorMode;
+    type Agent: SynchronousAgent<<IndexSpace as Space>::Element, <IndexSpace as Space>::Element>
+        + SetActorMode;
 
     fn build_index_agent(
         &self,
@@ -58,9 +59,9 @@ where
     }
 }
 
-impl<T, OS, AS> Agent<OS::Element, AS::Element> for FiniteSpaceAgent<T, OS, AS>
+impl<T, OS, AS> SynchronousAgent<OS::Element, AS::Element> for FiniteSpaceAgent<T, OS, AS>
 where
-    T: Agent<usize, usize>, // Index-space agent
+    T: SynchronousAgent<usize, usize>, // Index-space agent
     OS: FiniteSpace,
     AS: FiniteSpace,
 {

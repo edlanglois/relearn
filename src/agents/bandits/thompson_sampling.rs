@@ -1,7 +1,7 @@
 //! Thompson sampling bandit agent
 use super::super::{
-    Actor, ActorMode, Agent, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, FullStep,
-    OffPolicyAgent, SetActorMode, SyncParams, SyncParamsError,
+    Actor, ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, FullStep, OffPolicyAgent,
+    SetActorMode, SyncParams, SyncParamsError, SynchronousAgent,
 };
 use crate::logging::TimeSeriesLogger;
 use crate::utils::iter::ArgMaxBy;
@@ -161,7 +161,7 @@ impl Actor<usize, usize> for BaseBetaThompsonSamplingAgent {
     }
 }
 
-impl Agent<usize, usize> for BaseBetaThompsonSamplingAgent {
+impl SynchronousAgent<usize, usize> for BaseBetaThompsonSamplingAgent {
     fn update(&mut self, step: FullStep<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
         let reward_count = self
             .low_high_reward_counts

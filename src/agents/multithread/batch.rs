@@ -1,5 +1,7 @@
 use super::super::buffers::{BuildHistoryBuffer, SerialBuffer, SerialBufferConfig};
-use super::super::{Actor, Agent, BatchUpdate, BuildBatchUpdateActor, FullStep, SyncParams};
+use super::super::{
+    Actor, BatchUpdate, BuildBatchUpdateActor, FullStep, SyncParams, SynchronousAgent,
+};
 use super::{
     BuildAgentError, BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager,
     TryIntoActor,
@@ -190,7 +192,7 @@ where
     }
 }
 
-impl<T, O, A> Agent<O, A> for MultithreadBatchWorker<T, O, A>
+impl<T, O, A> SynchronousAgent<O, A> for MultithreadBatchWorker<T, O, A>
 where
     T: Actor<O, A> + BatchUpdate<O, A> + SyncParams,
 {

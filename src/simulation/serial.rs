@@ -1,7 +1,7 @@
 //! Serial (single-thread) simulation.
 use super::hooks::{BuildSimulationHook, SimulationHook};
 use super::{Simulator, SimulatorError};
-use crate::agents::{Actor, Agent, BuildAgent, FullStep};
+use crate::agents::{Actor, BuildAgent, FullStep, SynchronousAgent};
 use crate::envs::{BuildEnv, Environment};
 use crate::logging::{Event, TimeSeriesLogger};
 
@@ -59,7 +59,7 @@ pub fn run_agent<E, A, H>(
 ) where
     E: Environment + ?Sized,
     E::Observation: Clone,
-    A: Agent<E::Observation, E::Action> + ?Sized,
+    A: SynchronousAgent<E::Observation, E::Action> + ?Sized,
     H: SimulationHook<E::Observation, E::Action> + ?Sized,
 {
     if !hook.start(logger) {

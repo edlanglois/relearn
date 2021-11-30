@@ -1,11 +1,11 @@
 use super::{CriticDef, CriticUpdaterDef, PolicyDef, PolicyUpdaterDef};
 use crate::agents::buffers::HistoryBuffer;
 use crate::agents::{
-    Actor, Agent, BatchUpdate, BatchUpdateAgentConfig, BetaThompsonSamplingAgentConfig,
+    Actor, BatchUpdate, BatchUpdateAgentConfig, BetaThompsonSamplingAgentConfig,
     BoxingMultithreadInitializer, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
     BuildMultithreadAgent, FullAgent, InitializeMultithreadAgent, MultithreadAgentManager,
     MultithreadBatchAgentConfig, MutexAgentConfig, RandomAgentConfig, ResettingMetaAgent,
-    SetActorMode, SyncParamsAny, TabularQLearningAgentConfig, UCB1AgentConfig,
+    SetActorMode, SyncParamsAny, SynchronousAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use crate::envs::{EnvStructure, InnerEnvStructure, MetaObservationSpace};
 use crate::logging::{Loggable, TimeSeriesLogger};
@@ -603,7 +603,7 @@ impl<O, A, T> FullBatchUpdateActor<O, A> for T where
 // TODO: Move to src/agents/batch.rs? Exporting macros is a pain
 //
 // A generic implementation `BatchUpdate<O, A> for Box<T>` conflicts with the
-// generic implementation below of `BatchUpdate<O, A> for T where T: OffPolicyAgent + Agent<O, A>`
+// generic implementation below of `BatchUpdate<O, A> for T where T: OffPolicyAgent + SynchronousAgent<O, A>`
 // because "downstream crates may implement trait `OffPolicyAgent` for type `Box<_>`
 macro_rules! box_impl_batch_update {
     ($type:ty) => {
@@ -629,5 +629,5 @@ pub type DynInitializeMultithreadAgent<OS, AS> = dyn InitializeMultithreadAgent<
     <OS as Space>::Element,
     <AS as Space>::Element,
     Manager = Box<dyn MultithreadAgentManager>,
-    Worker = Box<dyn Agent<<OS as Space>::Element, <AS as Space>::Element> + Send>,
+    Worker = Box<dyn SynchronousAgent<<OS as Space>::Element, <AS as Space>::Element> + Send>,
 >;

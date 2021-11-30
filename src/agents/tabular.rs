@@ -1,8 +1,8 @@
 //! Tabular agents
 use super::{
-    batch::off_policy_batch_update, buffers::HistoryBuffer, Actor, ActorMode, Agent, BatchUpdate,
+    batch::off_policy_batch_update, buffers::HistoryBuffer, Actor, ActorMode, BatchUpdate,
     BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, FullStep, OffPolicyAgent, SetActorMode,
-    SyncParams, SyncParamsError,
+    SyncParams, SyncParamsError, SynchronousAgent,
 };
 use crate::logging::TimeSeriesLogger;
 use ndarray::{Array, Array2, Axis};
@@ -114,7 +114,7 @@ impl Actor<usize, usize> for BaseTabularQLearningAgent {
     }
 }
 
-impl Agent<usize, usize> for BaseTabularQLearningAgent {
+impl SynchronousAgent<usize, usize> for BaseTabularQLearningAgent {
     fn update(&mut self, step: FullStep<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
         let discounted_next_value = match step.next.into_inner() {
             None => 0.0,

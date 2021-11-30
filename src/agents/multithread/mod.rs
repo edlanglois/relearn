@@ -8,7 +8,7 @@ pub use batch::{
 };
 pub use mutex::{MutexAgentConfig, MutexAgentInitializer, MutexAgentManager, MutexAgentWorker};
 
-use super::{Agent, BuildAgentError};
+use super::{BuildAgentError, SynchronousAgent};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::Space;
@@ -31,7 +31,7 @@ pub trait BuildMultithreadAgent<OS: Space, AS: Space> {
 /// The manager and workers are responsible for internaly coordinating updates and synchronization.
 pub trait InitializeMultithreadAgent<O, A> {
     type Manager: MultithreadAgentManager;
-    type Worker: Agent<O, A> + Send + 'static;
+    type Worker: SynchronousAgent<O, A> + Send + 'static;
 
     /// Create a new worker instance.
     fn new_worker(&mut self) -> Result<Self::Worker, BuildAgentError>;
@@ -115,7 +115,7 @@ where
     A: 'static,
 {
     type Manager = Box<dyn MultithreadAgentManager>;
-    type Worker = Box<dyn Agent<O, A> + Send>;
+    type Worker = Box<dyn SynchronousAgent<O, A> + Send>;
 
     fn new_worker(&mut self) -> Result<Self::Worker, BuildAgentError> {
         Ok(Box::new(self.inner.new_worker()?))

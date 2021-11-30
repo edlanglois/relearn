@@ -1,4 +1,4 @@
-use super::super::{Actor, Agent, BuildAgent, BuildAgentError, FullStep};
+use super::super::{Actor, BuildAgent, BuildAgentError, FullStep, SynchronousAgent};
 use super::{
     BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager, TryIntoActor,
 };
@@ -66,7 +66,7 @@ impl<T> MutexAgentInitializer<T> {
 
 impl<T, O, A> InitializeMultithreadAgent<O, A> for MutexAgentInitializer<T>
 where
-    T: Agent<O, A> + Send + 'static,
+    T: SynchronousAgent<O, A> + Send + 'static,
 {
     type Manager = MutexAgentManager<T>;
     type Worker = MutexAgentWorker<T>;
@@ -105,9 +105,9 @@ where
     }
 }
 
-impl<T, O, A> Agent<O, A> for MutexAgentWorker<T>
+impl<T, O, A> SynchronousAgent<O, A> for MutexAgentWorker<T>
 where
-    T: Agent<O, A>,
+    T: SynchronousAgent<O, A>,
 {
     fn update(&mut self, step: FullStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         self.agent.lock().unwrap().update(step, logger)

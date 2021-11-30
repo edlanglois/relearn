@@ -1,6 +1,6 @@
 use super::{
-    Actor, ActorMode, Agent, BuildAgent, BuildAgentError, FullStep, SetActorMode, SyncParams,
-    SyncParamsError,
+    Actor, ActorMode, BuildAgent, BuildAgentError, FullStep, SetActorMode, SyncParams,
+    SyncParamsError, SynchronousAgent,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
@@ -24,10 +24,10 @@ where
     }
 }
 
-impl<T, U, O1, O2, A1, A2> Agent<(O1, O2), (A1, A2)> for AgentPair<T, U>
+impl<T, U, O1, O2, A1, A2> SynchronousAgent<(O1, O2), (A1, A2)> for AgentPair<T, U>
 where
-    T: Agent<O1, A1>,
-    U: Agent<O2, A2>,
+    T: SynchronousAgent<O1, A1>,
+    U: SynchronousAgent<O2, A2>,
 {
     fn update(&mut self, step: FullStep<(O1, O2), (A1, A2)>, logger: &mut dyn TimeSeriesLogger) {
         let (o1, o2) = step.observation;

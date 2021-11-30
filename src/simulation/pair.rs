@@ -1,6 +1,6 @@
 use super::hooks::BuildSimulationHook;
 use super::{run_agent, Simulator, SimulatorError};
-use crate::agents::{Actor, Agent, BuildAgent, FullStep};
+use crate::agents::{Actor, BuildAgent, FullStep, SynchronousAgent};
 use crate::envs::{BuildEnv, FirstPlayerView, SecondPlayerView, Successor};
 use crate::logging::TimeSeriesLogger;
 use crate::spaces::{Space, TupleSpace2};
@@ -99,10 +99,10 @@ where
         )
     }
 }
-impl<T1, T2, O1, O2, A1, A2> Agent<(O1, O2), (A1, A2)> for PairAgent<T1, T2>
+impl<T1, T2, O1, O2, A1, A2> SynchronousAgent<(O1, O2), (A1, A2)> for PairAgent<T1, T2>
 where
-    T1: Agent<O1, A1>,
-    T2: Agent<O2, A2>,
+    T1: SynchronousAgent<O1, A1>,
+    T2: SynchronousAgent<O2, A2>,
 {
     fn update(&mut self, step: FullStep<(O1, O2), (A1, A2)>, logger: &mut dyn TimeSeriesLogger) {
         let (o1, o2) = step.observation;
@@ -150,7 +150,7 @@ impl<O, A> RemoteAgent<O, A> {
     /// Create a remote agent and a worker closure from an agent.
     fn from_agent<T>(mut agent: T) -> (Self, impl FnMut())
     where
-        T: Agent<O, A> + Send,
+        T: SynchronousAgent<O, A> + Send,
     {
         let (send_msg, recv_msg) = crossbeam_channel::bounded(0);
         let (send_act, recv_act) = crossbeam_channel::bounded(0);
@@ -187,7 +187,7 @@ where
     }
 }
 
-impl<O, A> Agent<O, A> for RemoteAgent<O, A>
+impl<O, A> SynchronousAgent<O, A> for RemoteAgent<O, A>
 where
     O: Clone,
 {

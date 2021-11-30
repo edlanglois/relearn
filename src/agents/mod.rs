@@ -98,11 +98,11 @@ where
     }
 }
 
-/// A learning agent.
+/// A synchronous learning agent.
 ///
-/// Takes actions in a reinforcement learning environment and updates based on the result
-/// (including reward).
-pub trait Agent<O, A>: Actor<O, A> {
+/// Takes actions in a reinforcement learning environment and updates immediately based on the
+/// result (including reward).
+pub trait SynchronousAgent<O, A>: Actor<O, A> {
     /// Update the agent based on the most recent action.
     ///
     /// Must be called immediately after the corresponding call to [`Actor::act`],
@@ -115,18 +115,18 @@ pub trait Agent<O, A>: Actor<O, A> {
     fn update(&mut self, step: FullStep<O, A>, logger: &mut dyn TimeSeriesLogger);
 }
 
-impl<T, O, A> Agent<O, A> for &'_ mut T
+impl<T, O, A> SynchronousAgent<O, A> for &'_ mut T
 where
-    T: Agent<O, A> + ?Sized,
+    T: SynchronousAgent<O, A> + ?Sized,
 {
     fn update(&mut self, step: FullStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         T::update(self, step, logger)
     }
 }
 
-impl<T, O, A> Agent<O, A> for Box<T>
+impl<T, O, A> SynchronousAgent<O, A> for Box<T>
 where
-    T: Agent<O, A> + ?Sized,
+    T: SynchronousAgent<O, A> + ?Sized,
 {
     fn update(&mut self, step: FullStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         T::update(self, step, logger)
@@ -232,8 +232,8 @@ pub enum SyncParamsError {
     IncompatibleType,
 }
 
-pub trait FullAgent<O, A>: Agent<O, A> + SetActorMode {}
-impl<O, A, T> FullAgent<O, A> for T where T: Agent<O, A> + SetActorMode + ?Sized {}
+pub trait FullAgent<O, A>: SynchronousAgent<O, A> + SetActorMode {}
+impl<O, A, T> FullAgent<O, A> for T where T: SynchronousAgent<O, A> + SetActorMode + ?Sized {}
 
 // TODO: Be more flexible about the bounds on Agent?
 /// Build an agent instance for a given environment structure.
