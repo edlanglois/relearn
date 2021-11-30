@@ -1,7 +1,7 @@
 //! Meta reinforcement learning environment.
 use super::{
     BuildEnv, BuildEnvDist, BuildEnvError, BuildPomdp, BuildPomdpDist, EnvDistribution,
-    EnvStructure, Environment, Pomdp, PomdpDistribution,
+    EnvStructure, Environment, Pomdp, PomdpDistribution, Successor,
 };
 use crate::logging::Logger;
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
@@ -128,22 +128,22 @@ where
         let inner_state = inner_env.initial_state(rng);
         MetaState {
             inner_env,
-            inner_state: Some(inner_state),
+            inner_successor: Successor::Continue(inner_state),
             episode_index: 0,
             prev_step_obs: None,
-            inner_episode_done: false,
         }
     }
 
     fn observe(&self, state: &Self::State, rng: &mut StdRng) -> Self::Observation {
-        let inner_observation = state
-            .inner_state
+        let inner_successor_obs = state
+            .inner_successor
             .as_ref()
             .map(|s| state.inner_env.observe(s, rng));
+        let episode_done = inner_successor_obs.episode_done();
         MetaObservation {
-            inner_observation,
+            inner_observation: inner_successor_obs.into_inner(),
             prev_step: state.prev_step_obs,
-            episode_done: state.inner_episode_done,
+            episode_done,
         }
     }
 
@@ -153,49 +153,47 @@ where
         action: &Self::Action,
         rng: &mut StdRng,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::State>, f64, bool) {
-        if state.inner_episode_done {
-            // Ignore the action and start a new inner episode
-            let inner_state = state.inner_env.initial_state(rng);
-            let state = MetaState {
-                inner_env: state.inner_env,
-                inner_state: Some(inner_state),
-                episode_index: state.episode_index,
-                prev_step_obs: None,
-                inner_episode_done: false,
-            };
-            (Some(state), 0.0, false)
-        } else {
-            // Take a step in the inner episode
-            let prev_inner_state = state
-                .inner_state
-                .expect("inner env has terminal state without ending the episode");
-            let (inner_state, inner_step_reward, inner_episode_done) =
-                state.inner_env.step(prev_inner_state, action, rng, logger);
+    ) -> (Successor<Self::State>, f64) {
+        match state.inner_successor {
+            Successor::Continue(prev_inner_state) => {
+                // Take a step in the inner episode
+                let (inner_successor, inner_step_reward) =
+                    state.inner_env.step(prev_inner_state, action, rng, logger);
 
-            let mut episode_index = state.episode_index;
-            let mut trial_done = false;
-            if inner_episode_done {
-                episode_index += 1;
-                if episode_index >= self.episodes_per_trial {
-                    // Completed the last inner episode of the trial.
-                    // This is treated as an abrupt cut-off of a theorically infinite sequence of
-                    // inner episodes so the meta state is not treated as terminal.
-                    trial_done = true;
+                let mut new_state = MetaState {
+                    inner_env: state.inner_env,
+                    inner_successor,
+                    episode_index: state.episode_index,
+                    prev_step_obs: Some(InnerStepObs {
+                        action: *action,
+                        reward: inner_step_reward,
+                    }),
+                };
+
+                if new_state.inner_successor.episode_done() {
+                    new_state.episode_index += 1;
+                    if new_state.episode_index >= self.episodes_per_trial {
+                        // Completed the last inner episode of the trial.
+                        // This is treated as an abrupt cut-off of a theorically infinite sequence of
+                        // inner episodes so the meta state is not treated as terminal.
+                        return (Successor::Interrupt(new_state), inner_step_reward);
+                    }
                 }
-            }
 
-            let state = MetaState {
-                inner_env: state.inner_env,
-                inner_state,
-                episode_index,
-                prev_step_obs: Some(InnerStepObs {
-                    action: *action,
-                    reward: inner_step_reward,
-                }),
-                inner_episode_done,
-            };
-            (Some(state), inner_step_reward, trial_done)
+                (Successor::Continue(new_state), inner_step_reward)
+            }
+            _ => {
+                // The inner state ended the episode.
+                // Ignore the action and start a new inner episode.
+                let inner_state = state.inner_env.initial_state(rng);
+                let state = MetaState {
+                    inner_env: state.inner_env,
+                    inner_successor: Successor::Continue(inner_state),
+                    episode_index: state.episode_index,
+                    prev_step_obs: None,
+                };
+                (Successor::Continue(state), 0.0)
+            }
         }
     }
 }
@@ -319,8 +317,9 @@ where
         &mut self,
         action: &Self::Action,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::Observation>, f64, bool) {
+    ) -> (Successor<Self::Observation>, f64) {
         let env = self.env.as_mut().expect("Must call reset() first");
+
         if self.inner_episode_done {
             // Ignore the action and start a new inner episode
             let inner_observation = env.reset();
@@ -330,33 +329,32 @@ where
                 prev_step: None,
                 episode_done: false,
             };
-            (Some(observation), 0.0, false)
+            (Successor::Continue(observation), 0.0)
         } else {
             // Take a step in the inner episode
-            let (inner_observation, reward, inner_episode_done) = env.step(action, logger);
-            self.inner_episode_done = inner_episode_done;
+            let (inner_successor, reward) = env.step(action, logger);
+            self.inner_episode_done = inner_successor.episode_done();
             let observation = MetaObservation {
-                inner_observation,
+                inner_observation: inner_successor.into_inner(),
                 prev_step: Some(InnerStepObs {
                     action: *action,
                     reward,
                 }),
-                episode_done: inner_episode_done,
+                episode_done: self.inner_episode_done,
             };
 
-            let mut trial_done = false;
-            if inner_episode_done {
+            if self.inner_episode_done {
                 self.episode_index += 1;
                 if self.episode_index >= self.episodes_per_trial {
                     // Completed the last inner episode of the trial.
                     // This is treated as an abrupt cut-off of a theorically infinite sequence of
                     // inner episodes so the meta state is not treated as terminal.
-                    trial_done = true;
                     self.env = None;
+                    return (Successor::Interrupt(observation), reward);
                 }
             }
 
-            (Some(observation), reward, trial_done)
+            (Successor::Continue(observation), reward)
         }
     }
 
@@ -378,6 +376,10 @@ where
 // # Meta Environment Types
 
 /// Observation of a completed inner step in a meta environment.
+///
+/// The agent is expected to remember the inner observation if necessary, so it is not included.
+/// The agent is not expected to have a mechanism to remember its own actions, since actions only
+/// ought to matter to the extent that they affect the resulting state.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct InnerStepObs<A> {
     /// Action selected by the agent on the step.
@@ -453,14 +455,12 @@ impl<OS, AS> MetaObservationSpace<OS, AS> {
 pub struct MetaState<E: Pomdp> {
     /// An instance of the inner environment (sampled for this trial).
     inner_env: E,
-    /// The current inner environment state. `None` represents a terminal state.
-    inner_state: Option<E::State>,
+    /// The upcoming inner environment state.
+    inner_successor: Successor<E::State>,
     /// The inner episode index within the current trial.
     episode_index: usize,
     /// Observation of the previous step of this inner episode.
     prev_step_obs: Option<InnerStepObs<E::Action>>,
-    /// Whether the previous step ended the inner episode.
-    inner_episode_done: bool,
 }
 
 /// Wrapper that provides the inner environment structure of a meta environment.
@@ -560,10 +560,9 @@ mod meta_env_bandits {
         // Trial 0; Ep 0; Step 0
         // Take action 0 and get 1 reward
         // Inner state is terminal.
-        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng, &mut ());
+        let (successor, reward) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 1.0);
-        assert!(!trial_done);
-        let state = maybe_state.unwrap();
+        let state = successor.continue_().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {
@@ -578,10 +577,9 @@ mod meta_env_bandits {
 
         // Trial 0; Ep 1; Init.
         // The action is ignored and a new inner episode is started.
-        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng, &mut ());
+        let (successor, reward) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
-        assert!(!trial_done);
-        let state = maybe_state.unwrap();
+        let state = successor.continue_().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {
@@ -594,10 +592,9 @@ mod meta_env_bandits {
         // Trial 0; Ep 1; Step 0
         // Take action 1 and get 0 reward
         // Inner state is terminal
-        let (maybe_state, reward, trial_done) = env.step(state, &1, &mut rng, &mut ());
+        let (successor, reward) = env.step(state, &1, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
-        assert!(!trial_done);
-        let state = maybe_state.unwrap();
+        let state = successor.continue_().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {
@@ -612,10 +609,9 @@ mod meta_env_bandits {
 
         // Trial 0; Ep 2; Init.
         // The action is ignored and a new inner episode is started.
-        let (maybe_state, reward, trial_done) = env.step(state, &1, &mut rng, &mut ());
+        let (successor, reward) = env.step(state, &1, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
-        assert!(!trial_done);
-        let state = maybe_state.unwrap();
+        let state = successor.continue_().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {
@@ -629,10 +625,9 @@ mod meta_env_bandits {
         // Take action 0 and get 1 reward
         // The inner state is terminal.
         // This inner episode was the last in the trial so the trial is done.
-        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng, &mut ());
+        let (successor, reward) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 1.0);
-        assert!(trial_done);
-        let state = maybe_state.unwrap();
+        let state = successor.interrupt().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {
@@ -659,10 +654,9 @@ mod meta_env_bandits {
         // Trial 1; Ep 0; Step 0
         // Take action 0 and get 0 reward, since now 1 is the target action
         // Inner state is terminal.
-        let (maybe_state, reward, trial_done) = env.step(state, &0, &mut rng, &mut ());
+        let (successor, reward) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
-        assert!(!trial_done);
-        let state = maybe_state.unwrap();
+        let state = successor.continue_().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {
@@ -694,12 +688,11 @@ mod meta_env_bandits {
         // Trial 0; Ep 0; Step 0
         // Take action 0 and get 1 reward
         // Inner state is terminal.
-        let (observation, reward, trial_done) = env.step(&0, &mut ());
+        let (successor, reward) = env.step(&0, &mut ());
         assert_eq!(reward, 1.0);
-        assert!(!trial_done);
         assert_eq!(
-            observation,
-            Some(MetaObservation {
+            successor,
+            Successor::Continue(MetaObservation {
                 inner_observation: None,
                 prev_step: Some(InnerStepObs {
                     action: 0,
@@ -711,12 +704,11 @@ mod meta_env_bandits {
 
         // Trial 0; Ep 1; Init.
         // The action is ignored and a new inner episode is started.
-        let (observation, reward, trial_done) = env.step(&0, &mut ());
+        let (successor, reward) = env.step(&0, &mut ());
         assert_eq!(reward, 0.0);
-        assert!(!trial_done);
         assert_eq!(
-            observation,
-            Some(MetaObservation {
+            successor,
+            Successor::Continue(MetaObservation {
                 inner_observation: Some(()),
                 prev_step: None,
                 episode_done: false
@@ -726,12 +718,11 @@ mod meta_env_bandits {
         // Trial 0; Ep 1; Step 0
         // Take action 1 and get 0 reward
         // Inner state is terminal
-        let (observation, reward, trial_done) = env.step(&1, &mut ());
+        let (successor, reward) = env.step(&1, &mut ());
         assert_eq!(reward, 0.0);
-        assert!(!trial_done);
         assert_eq!(
-            observation,
-            Some(MetaObservation {
+            successor,
+            Successor::Continue(MetaObservation {
                 inner_observation: None,
                 prev_step: Some(InnerStepObs {
                     action: 1,
@@ -743,12 +734,11 @@ mod meta_env_bandits {
 
         // Trial 0; Ep 2; Init.
         // The action is ignored and a new inner episode is started.
-        let (observation, reward, trial_done) = env.step(&1, &mut ());
+        let (successor, reward) = env.step(&1, &mut ());
         assert_eq!(reward, 0.0);
-        assert!(!trial_done);
         assert_eq!(
-            observation,
-            Some(MetaObservation {
+            successor,
+            Successor::Continue(MetaObservation {
                 inner_observation: Some(()),
                 prev_step: None,
                 episode_done: false
@@ -759,12 +749,11 @@ mod meta_env_bandits {
         // Take action 0 and get 1 reward
         // The inner state is terminal.
         // This inner episode was the last in the trial so the trial is done.
-        let (observation, reward, trial_done) = env.step(&0, &mut ());
+        let (successor, reward) = env.step(&0, &mut ());
         assert_eq!(reward, 1.0);
-        assert!(trial_done);
         assert_eq!(
-            observation,
-            Some(MetaObservation {
+            successor,
+            Successor::Interrupt(MetaObservation {
                 inner_observation: None,
                 prev_step: Some(InnerStepObs {
                     action: 0,
@@ -788,12 +777,11 @@ mod meta_env_bandits {
         // Trial 1; Ep 0; Step 0
         // Take action 0 and get 0 reward, since now 1 is the target action
         // Inner state is terminal.
-        let (observation, reward, trial_done) = env.step(&0, &mut ());
+        let (successor, reward) = env.step(&0, &mut ());
         assert_eq!(reward, 0.0);
-        assert!(!trial_done);
         assert_eq!(
-            observation,
-            Some(MetaObservation {
+            successor,
+            Successor::Continue(MetaObservation {
                 inner_observation: None,
                 prev_step: Some(InnerStepObs {
                     action: 0,

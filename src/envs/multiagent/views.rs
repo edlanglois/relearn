@@ -1,4 +1,4 @@
-use crate::envs::{BuildEnvError, BuildPomdp, EnvStructure, Environment, Pomdp};
+use crate::envs::{BuildEnvError, BuildPomdp, EnvStructure, Environment, Pomdp, Successor};
 use crate::logging::Logger;
 use crate::spaces::{Space, TupleSpace2};
 use rand::rngs::StdRng;
@@ -94,7 +94,7 @@ where
         action: &Self::Action,
         rng: &mut StdRng,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::State>, f64, bool) {
+    ) -> (Successor<Self::State>, f64) {
         let joint_action = (action.clone(), Default::default());
         self.inner.step(state, &joint_action, rng, logger)
     }
@@ -113,11 +113,11 @@ where
         &mut self,
         action: &Self::Action,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::Observation>, f64, bool) {
+    ) -> (Successor<Self::Observation>, f64) {
         let joint_action = (action.clone(), Default::default());
-        let (joint_observation, reward, episode_done) = self.inner.step(&joint_action, logger);
-        let observation = joint_observation.map(|o| o.0);
-        (observation, reward, episode_done)
+        let (joint_successor, reward) = self.inner.step(&joint_action, logger);
+        let successor = joint_successor.map(|(o1, _)| o1);
+        (successor, reward)
     }
 
     fn reset(&mut self) -> Self::Observation {
@@ -216,7 +216,7 @@ where
         action: &Self::Action,
         rng: &mut StdRng,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::State>, f64, bool) {
+    ) -> (Successor<Self::State>, f64) {
         let joint_action = (Default::default(), action.clone());
         self.inner.step(state, &joint_action, rng, logger)
     }
@@ -235,11 +235,11 @@ where
         &mut self,
         action: &Self::Action,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::Observation>, f64, bool) {
+    ) -> (Successor<Self::Observation>, f64) {
         let joint_action = (Default::default(), action.clone());
-        let (joint_observation, reward, episode_done) = self.inner.step(&joint_action, logger);
-        let observation = joint_observation.map(|o| o.1);
-        (observation, reward, episode_done)
+        let (joint_successor, reward) = self.inner.step(&joint_action, logger);
+        let successor = joint_successor.map(|(_, o2)| o2);
+        (successor, reward)
     }
 
     fn reset(&mut self) -> Self::Observation {

@@ -1,5 +1,5 @@
 //! Chain environment
-use super::{CloneBuild, EnvStructure, Mdp};
+use super::{CloneBuild, EnvStructure, Mdp, Successor};
 use crate::logging::Logger;
 use crate::spaces::{IndexSpace, IndexedTypeSpace};
 use rand::prelude::*;
@@ -75,7 +75,7 @@ impl Mdp for Chain {
         action: &Self::Action,
         rng: &mut StdRng,
         _logger: &mut dyn Logger,
-    ) -> (Option<Self::State>, f64, bool) {
+    ) -> (Successor<Self::State>, f64) {
         let mut action = *action;
         if rng.gen::<f64>() < 0.2 {
             action = action.swap();
@@ -90,7 +90,7 @@ impl Mdp for Chain {
                 }
             }
         };
-        (Some(state), reward, false)
+        (Successor::Continue(state), reward)
     }
 }
 

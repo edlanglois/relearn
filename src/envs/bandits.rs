@@ -1,5 +1,5 @@
 //! Multi-armed bandit environments
-use super::{CloneBuild, EnvStructure, Mdp, PomdpDistribution};
+use super::{CloneBuild, EnvStructure, Mdp, PomdpDistribution, Successor};
 use crate::logging::Logger;
 use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
@@ -60,9 +60,9 @@ impl<D: Distribution<f64> + Bounded<f64>> Mdp for Bandit<D> {
         action: &Self::Action,
         rng: &mut StdRng,
         _logger: &mut dyn Logger,
-    ) -> (Option<Self::State>, f64, bool) {
+    ) -> (Successor<Self::State>, f64) {
         let reward = self.distributions[*action].sample(rng);
-        (None, reward, true)
+        (Successor::Terminate, reward)
     }
 }
 
@@ -236,7 +236,7 @@ mod bernoulli_bandit {
         let mut rng = StdRng::seed_from_u64(1);
         let mut reward_1_count = 0;
         for _ in 0..num_samples {
-            let (_, reward, _) = env.step((), &0, &mut rng, &mut ());
+            let (_, reward) = env.step((), &0, &mut rng, &mut ());
             #[allow(clippy::float_cmp)] // Expecting exact values without error
             if reward < 0.5 {
                 assert_eq!(reward, 0.0);
@@ -273,9 +273,9 @@ mod deterministic_bandit {
     fn rewards() {
         let mut rng = StdRng::seed_from_u64(0);
         let env = DeterministicBandit::from_values(vec![0.2, 0.8]);
-        let (_, reward_0, _) = env.step((), &0, &mut rng, &mut ());
+        let (_, reward_0) = env.step((), &0, &mut rng, &mut ());
         assert_eq!(reward_0, 0.2);
-        let (_, reward_1, _) = env.step((), &1, &mut rng, &mut ());
+        let (_, reward_1) = env.step((), &1, &mut rng, &mut ());
         assert_eq!(reward_1, 0.8);
     }
 }

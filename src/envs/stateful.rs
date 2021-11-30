@@ -1,5 +1,5 @@
 //! Converting a `Pomdp` into an `Environment`
-use super::{Environment, Pomdp};
+use super::{Environment, Pomdp, Successor};
 use crate::envs::EnvStructure;
 use crate::logging::Logger;
 use rand::{rngs::StdRng, SeedableRng};
@@ -51,19 +51,17 @@ impl<E: Pomdp> Environment for PomdpEnv<E> {
         &mut self,
         action: &Self::Action,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::Observation>, f64, bool) {
+    ) -> (Successor<Self::Observation>, f64) {
         let state = self
             .state
             .take()
             .expect("Must call reset() before the start of each episode");
-        let (next_state, reward, episode_done) =
-            self.env.step(state, action, &mut self.rng, logger);
-        self.state = next_state;
-        let observation = match self.state.as_ref() {
-            Some(s) => Some(self.env.observe(s, &mut self.rng)),
-            None => None,
-        };
-        (observation, reward, episode_done)
+        let (successor, reward) = self.env.step(state, action, &mut self.rng, logger);
+        let successor_obs = successor
+            .as_ref()
+            .map(|s| self.env.observe(s, &mut self.rng));
+        self.state = successor.continue_();
+        (successor_obs, reward)
     }
 
     fn reset(&mut self) -> Self::Observation {

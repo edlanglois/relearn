@@ -1,4 +1,4 @@
-use super::{CloneBuild, EnvStructure, Pomdp};
+use super::{CloneBuild, EnvStructure, Pomdp, Successor};
 use crate::logging::Logger;
 use crate::spaces::IndexSpace;
 use rand::prelude::*;
@@ -93,18 +93,18 @@ impl Pomdp for MemoryGame {
         action: &Self::Action,
         _rng: &mut StdRng,
         _logger: &mut dyn Logger,
-    ) -> (Option<Self::State>, f64, bool) {
+    ) -> (Successor<Self::State>, f64) {
         let (current_state, initial_state) = state;
         if current_state == self.num_actions + self.history_len - 1 {
             let reward = if *action == initial_state { 1.0 } else { -1.0 };
-            (None, reward, true)
+            (Successor::Terminate, reward)
         } else {
             let new_state = if current_state < self.num_actions {
                 self.num_actions
             } else {
                 current_state + 1
             };
-            (Some((new_state, initial_state)), 0.0, false)
+            (Successor::Continue((new_state, initial_state)), 0.0)
         }
     }
 }

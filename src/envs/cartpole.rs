@@ -1,4 +1,4 @@
-use super::{BuildEnvError, BuildPomdp, EnvStructure, Pomdp};
+use super::{BuildEnvError, BuildPomdp, EnvStructure, Pomdp, Successor};
 use crate::logging::Logger;
 use crate::spaces::{Indexed, IndexedTypeSpace, IntervalSpace, TupleSpace4};
 use rand::{
@@ -132,7 +132,7 @@ impl Pomdp for CartPole {
         action: &Self::Action,
         _rng: &mut StdRng,
         _logger: &mut dyn Logger,
-    ) -> (Option<Self::State>, f64, bool) {
+    ) -> (Successor<Self::State>, f64) {
         let applied_force = match action {
             Push::Left => -self.env.action_force,
             Push::Right => self.env.action_force,
@@ -144,12 +144,13 @@ impl Pomdp for CartPole {
         // The OpenAI gym version returns the state as well as setting the done flag
         // but the gym API does not distinguish between the episode stopping with or without the
         // hypothetical potential for future rewards.
-        // Here, the successor state must be None to indicate that all future rewards are 0.
-        (
-            if !terminal { Some(next_state) } else { None },
-            reward,
-            terminal,
-        )
+        // Here, the successor must be Terminate to indicate that all future rewards are 0.
+        let successor = if terminal {
+            Successor::Terminate
+        } else {
+            Successor::Continue(next_state)
+        };
+        (successor, reward)
     }
 }
 

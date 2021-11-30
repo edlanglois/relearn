@@ -70,16 +70,15 @@ pub fn run_agent<E, A, H>(
 
     loop {
         let action = agent.act(&observation, new_episode);
-        let (next_observation, reward, episode_done) =
+        let (successor, reward) =
             environment.step(&action, &mut logger.event_logger(Event::EnvStep));
 
-        new_episode = false;
         let step = Step {
             observation,
             action,
             reward,
-            next_observation: next_observation.clone(),
-            episode_done,
+            next_observation: successor.clone().into_inner(),
+            episode_done: successor.episode_done(),
         };
 
         let stop_simulation = !hook.call(&step, logger);
@@ -88,12 +87,15 @@ pub fn run_agent<E, A, H>(
             break;
         }
 
-        if episode_done {
-            new_episode = true;
-            observation = environment.reset();
-        } else {
-            observation =
-                next_observation.expect("Observation must exist if the episode is not done")
+        match successor.continue_() {
+            Some(obs) => {
+                observation = obs;
+                new_episode = false;
+            }
+            None => {
+                observation = environment.reset();
+                new_episode = true;
+            }
         }
     }
 }
@@ -126,27 +128,30 @@ pub fn run_actor<E, A, H>(
 
     loop {
         let action = actor.act(&observation, new_episode);
-        let (next_observation, reward, episode_done) =
+        let (successor, reward) =
             environment.step(&action, &mut logger.event_logger(Event::EnvStep));
 
-        new_episode = false;
         let step = Step {
             observation,
             action,
             reward,
-            next_observation: next_observation.clone(),
-            episode_done,
+            next_observation: successor.clone().into_inner(),
+            episode_done: successor.episode_done(),
         };
 
         if !hook.call(&step, logger) {
             break;
         }
 
-        observation = if episode_done {
-            new_episode = true;
-            environment.reset()
-        } else {
-            next_observation.expect("Observation must exist if the episode is not done")
-        };
+        match successor.continue_() {
+            Some(obs) => {
+                observation = obs;
+                new_episode = false;
+            }
+            None => {
+                observation = environment.reset();
+                new_episode = true;
+            }
+        }
     }
 }

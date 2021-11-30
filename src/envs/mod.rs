@@ -97,6 +97,86 @@ impl<E: EnvStructure + ?Sized> EnvStructure for Box<E> {
     }
 }
 
+/// The successor state or outcome of an episode step.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum Successor<T> {
+    /// The episode continues with the given state.
+    Continue(T),
+    /// The episode ends by entering a terminal state.
+    ///
+    /// A terminal state is one from which all possible trajectories would have 0 reward.
+    Terminate,
+    /// The episode ends despite entering the given non-terminal state.
+    ///
+    /// Had the episode continued, non-zero future rewards might have been possible.
+    /// For example, the episode may have been interrupted due to a step limit.
+    Interrupt(T),
+}
+
+impl<T> Successor<T> {
+    /// Apply a transformation to the inner state when present.
+    #[inline]
+    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Successor<U> {
+        match self {
+            Self::Continue(state) => Successor::Continue(f(state)),
+            Self::Terminate => Successor::Terminate,
+            Self::Interrupt(state) => Successor::Interrupt(f(state)),
+        }
+    }
+
+    /// Get the inner state of Successor::Continue
+    #[inline]
+    pub fn continue_(self) -> Option<T> {
+        match self {
+            Self::Continue(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Get the inner state of Successor::Interrupt
+    #[inline]
+    pub fn interrupt(self) -> Option<T> {
+        match self {
+            Self::Interrupt(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Get the inner state of `Continue` and `Interrupt` variants.
+    #[inline]
+    pub fn into_inner(self) -> Option<T> {
+        match self {
+            Self::Continue(s) => Some(s),
+            Self::Interrupt(s) => Some(s),
+            Self::Terminate => None,
+        }
+    }
+
+    /// Whether this successor marks the end of an episode
+    #[inline]
+    pub fn episode_done(&self) -> bool {
+        !matches!(self, Successor::Continue(_))
+    }
+
+    /// Convert `&Successor<T>` to `Successor<&T>`.
+    #[inline]
+    pub fn as_ref(&self) -> Successor<&T> {
+        match self {
+            Self::Continue(s) => Successor::Continue(s),
+            Self::Terminate => Successor::Terminate,
+            Self::Interrupt(s) => Successor::Interrupt(s),
+        }
+    }
+}
+
+impl<'a, T: Clone> Successor<&'a T> {
+    /// Convert `Successor<&T>` to `Successor<T>` by cloning its contents
+    #[inline]
+    pub fn cloned(self) -> Successor<T> {
+        self.map(|s| s.clone())
+    }
+}
+
 /// Stored copy of an environment structure.
 ///
 /// See [`EnvStructure`] for details.
@@ -179,20 +259,15 @@ pub trait Mdp {
     /// * `logger` - Logger for any auxiliary information.
     ///
     /// # Returns
-    /// * `state`  - The resulting state.
-    ///              Is `None` if the resulting state is terminal.
-    ///              All trajectories from terminal states yield 0 reward on each step.
+    /// * `successor` - The resulting state or outcome.
     /// * `reward` - The reward value for this transition.
-    /// * `episode_done` - Whether this step ends the current episode.
-    ///     - If `observation` is `None` then `episode_done` must be true.
-    ///     - An episode may be done for other reasons, like a step limit.
     fn step(
         &self,
         state: Self::State,
         action: &Self::Action,
         rng: &mut StdRng,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::State>, f64, bool);
+    ) -> (Successor<Self::State>, f64);
 }
 
 /// A partially observable Markov decision process (POMDP).
@@ -219,20 +294,15 @@ pub trait Pomdp {
     /// * `logger` - Logger for any auxiliary information.
     ///
     /// # Returns
-    /// * `state`: The resulting state.
-    ///     Is `None` if the resulting state is terminal.
-    ///     All trajectories from terminal states yield 0 reward on each step.
-    /// * `reward`: The reward value for this transition.
-    /// * `episode_done`: Whether this step ends the episode.
-    ///     - If `observation` is `None` then `episode_done` must be true.
-    ///     - An episode may be done for other reasons, like a step limit.
+    /// * `successor` - The resulting state or outcome.
+    /// * `reward` - The reward value for this transition.
     fn step(
         &self,
         state: Self::State,
         action: &Self::Action,
         rng: &mut StdRng,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::State>, f64, bool);
+    ) -> (Successor<Self::State>, f64);
 }
 
 impl<E: Mdp> Pomdp for E
@@ -257,7 +327,7 @@ where
         action: &Self::Action,
         rng: &mut StdRng,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::State>, f64, bool) {
+    ) -> (Successor<Self::State>, f64) {
         Mdp::step(self, state, action, rng, logger)
     }
 }
@@ -276,18 +346,13 @@ pub trait Environment {
     /// after initialization or after a step returned `episod_done = True`.
     ///
     /// # Returns
-    /// * `observation`: An observation of the resulting state.
-    ///     Is `None` if the resulting state is terminal.
-    ///     All trajectories from terminal states yield 0 reward on each step.
-    /// * `reward`: The reward value for this transition
-    /// * `episode_done`: Whether this step ends the episode.
-    ///     - If `observation` is `None` then `episode_done` must be true.
-    ///     - An episode may be done for other reasons, like a step limit.
+    /// * `successor` - The resulting observation or outcome.
+    /// * `reward` - The reward value for this transition.
     fn step(
         &mut self,
         action: &Self::Action,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::Observation>, f64, bool);
+    ) -> (Successor<Self::Observation>, f64);
 
     /// Reset the environment to an initial state.
     ///
@@ -306,7 +371,7 @@ impl<E: Environment + ?Sized> Environment for &'_ mut E {
         &mut self,
         action: &Self::Action,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::Observation>, f64, bool) {
+    ) -> (Successor<Self::Observation>, f64) {
         E::step(self, action, logger)
     }
 
@@ -323,7 +388,7 @@ impl<E: Environment + ?Sized> Environment for Box<E> {
         &mut self,
         action: &Self::Action,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::Observation>, f64, bool) {
+    ) -> (Successor<Self::Observation>, f64) {
         E::step(self, action, logger)
     }
 

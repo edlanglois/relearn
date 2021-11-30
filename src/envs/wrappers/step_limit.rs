@@ -1,4 +1,4 @@
-use super::super::Pomdp;
+use super::super::{Pomdp, Successor};
 use super::Wrapped;
 use crate::logging::Logger;
 use rand::rngs::StdRng;
@@ -30,7 +30,7 @@ impl Default for StepLimit {
 pub type WithStepLimit<E> = Wrapped<E, StepLimit>;
 
 impl<E: Pomdp> Pomdp for Wrapped<E, StepLimit> {
-    /// `(inner_state, current_steps)`
+    /// `(inner_state, step_count)`
     type State = (E::State, u64);
     type Observation = E::Observation;
     type Action = E::Action;
@@ -49,21 +49,18 @@ impl<E: Pomdp> Pomdp for Wrapped<E, StepLimit> {
         action: &Self::Action,
         rng: &mut StdRng,
         logger: &mut dyn Logger,
-    ) -> (Option<Self::State>, f64, bool) {
-        let (inner_state, mut current_steps) = state;
-        let (next_inner_state, reward, mut episode_done) =
-            self.inner.step(inner_state, action, rng, logger);
-        current_steps += 1;
+    ) -> (Successor<Self::State>, f64) {
+        let (inner_state, step_count) = state;
+        let (inner_successor, reward) = self.inner.step(inner_state, action, rng, logger);
 
-        // Attach the new current step count to the state
-        let next_state = next_inner_state.map(|s| (s, current_steps));
-
-        // Check if the step limit has been reached.
-        // If so, cut off the episode (but don't mark next_state as terminal)
-        if current_steps >= self.wrapper.max_steps_per_episode {
-            episode_done = true;
-        }
-        (next_state, reward, episode_done)
+        // Add the step count to the state and interrupt if it is >= max_steps_per_episode
+        let successor = match inner_successor.map(|s| (s, step_count + 1)) {
+            Successor::Continue((state, steps)) if steps >= self.wrapper.max_steps_per_episode => {
+                Successor::Interrupt((state, steps))
+            }
+            s => s,
+        };
+        (successor, reward)
     }
 }
 
@@ -91,13 +88,12 @@ mod tests {
         let state = env.initial_state(&mut rng);
 
         // Step 1
-        let (opt_state, _, episode_done) = env.step(state, &Move::Left, &mut rng, &mut ());
-        assert!(!episode_done);
-        let state = opt_state.unwrap();
+        let (successor, _) = env.step(state, &Move::Left, &mut rng, &mut ());
+        assert!(matches!(successor, Successor::Continue(_)));
+        let state = successor.continue_().unwrap();
 
         // Step 2
-        let (state, _, episode_done) = env.step(state, &Move::Left, &mut rng, &mut ());
-        assert!(episode_done);
-        assert!(state.is_some());
+        let (successor, _) = env.step(state, &Move::Left, &mut rng, &mut ());
+        assert!(matches!(successor, Successor::Interrupt(_)));
     }
 }
