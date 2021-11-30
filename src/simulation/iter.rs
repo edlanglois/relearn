@@ -10,9 +10,9 @@ pub struct SimSteps<E, A, L>
 where
     E: Environment,
 {
-    environment: E,
-    actor: A,
-    logger: L,
+    pub environment: E,
+    pub actor: A,
+    pub logger: L,
 
     observation: E::Observation,
 }

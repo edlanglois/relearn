@@ -2,7 +2,7 @@
 mod serial;
 mod vec;
 
-use crate::simulation::Step;
+use crate::simulation::PartialStep;
 pub use serial::{SerialBuffer, SerialBufferConfig};
 
 /// Build a history buffer.
@@ -25,13 +25,13 @@ pub trait HistoryBuffer<O, A> {
     fn num_episodes(&self) -> usize;
 
     /// All steps ordered contiguously by episode.
-    fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a Step<O, A>> + 'a>;
+    fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a PartialStep<O, A>> + 'a>;
 
     /// Drain all steps from the buffer (ordered contiguously by episode).
     ///
     /// The buffer will be empty once the iterator is consumed or dropped.
-    fn drain_steps(&mut self) -> Box<dyn ExactSizeIterator<Item = Step<O, A>> + '_>;
+    fn drain_steps(&mut self) -> Box<dyn ExactSizeIterator<Item = PartialStep<O, A>> + '_>;
 
     /// All episodes (including incomplete episodes).
-    fn episodes<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a [Step<O, A>]> + 'a>;
+    fn episodes<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a [PartialStep<O, A>]> + 'a>;
 }

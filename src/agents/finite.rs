@@ -1,10 +1,11 @@
 use super::buffers::HistoryBuffer;
 use super::{
     Actor, ActorMode, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
-    OffPolicyAgent, SetActorMode, Step, SyncParams, SyncParamsError, SynchronousAgent,
+    OffPolicyAgent, SetActorMode, SyncParams, SyncParamsError, SynchronousAgent,
 };
-use crate::envs::EnvStructure;
+use crate::envs::{EnvStructure, Successor};
 use crate::logging::{Event, TimeSeriesLogger};
+use crate::simulation::{Step, TransientStep};
 use crate::spaces::{FiniteSpace, IndexSpace, Space};
 
 /// Build an agent for finite, indexed action and observation spaces.
@@ -69,11 +70,23 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn update(&mut self, step: Step<OS::Element, AS::Element>, logger: &mut dyn TimeSeriesLogger) {
-        self.agent.update(
-            indexed_step(&step, &self.observation_space, &self.action_space),
-            logger,
-        );
+    fn update(
+        &mut self,
+        step: TransientStep<OS::Element, AS::Element>,
+        logger: &mut dyn TimeSeriesLogger,
+    ) {
+        let step = indexed_step(&step, &self.observation_space, &self.action_space);
+        let transient_step = TransientStep {
+            observation: step.observation,
+            action: step.action,
+            reward: step.reward,
+            next: match step.next.as_ref() {
+                Successor::Continue(o) => Successor::Continue(o),
+                Successor::Terminate => Successor::Terminate,
+                Successor::Interrupt(o) => Successor::Interrupt(*o),
+            },
+        };
+        self.agent.update(transient_step, logger);
     }
 }
 
@@ -89,12 +102,37 @@ where
         logger: &mut dyn TimeSeriesLogger,
     ) {
         logger.start_event(Event::AgentOptPeriod).unwrap();
-        for step in history.steps() {
-            self.agent.update(
-                indexed_step(step, &self.observation_space, &self.action_space),
-                logger,
-            )
+
+        let mut steps = history.steps().peekable();
+        while let Some(step) = steps.next() {
+            let next_observation_index = if matches!(step.next, Successor::Continue(())) {
+                match steps.peek() {
+                    Some(next_step) => {
+                        Some(self.observation_space.to_index(&next_step.observation))
+                    }
+                    None => break, // incomplete step
+                }
+            } else {
+                None
+            };
+            let ref_index_next = match &step.next {
+                Successor::Continue(()) => {
+                    Successor::Continue(next_observation_index.as_ref().unwrap())
+                }
+                Successor::Terminate => Successor::Terminate,
+                Successor::Interrupt(obs) => {
+                    Successor::Interrupt(self.observation_space.to_index(obs))
+                }
+            };
+            let transient_step = TransientStep {
+                observation: self.observation_space.to_index(&step.observation),
+                action: self.action_space.to_index(&step.action),
+                reward: step.reward,
+                next: ref_index_next,
+            };
+            self.agent.update(transient_step, logger)
         }
+
         logger.end_event(Event::AgentOptPeriod).unwrap();
     }
 }
@@ -110,7 +148,7 @@ where
 
 /// Convert a finite-space step into an index step.
 fn indexed_step<OS, AS>(
-    step: &Step<OS::Element, AS::Element>,
+    step: &TransientStep<OS::Element, AS::Element>,
     observation_space: &OS,
     action_space: &AS,
 ) -> Step<usize, usize>

@@ -1,10 +1,11 @@
 use super::buffers::{BuildHistoryBuffer, HistoryBuffer, SerialBuffer, SerialBufferConfig};
 use super::{
-    Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, Step, SyncParams, SyncParamsError,
+    Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, SyncParams, SyncParamsError,
     SynchronousAgent,
 };
-use crate::envs::EnvStructure;
+use crate::envs::{EnvStructure, Successor};
 use crate::logging::{Event, TimeSeriesLogger};
+use crate::simulation::TransientStep;
 use crate::spaces::Space;
 
 /// Build an actor supporting batch updates ([`BatchUpdate`]).
@@ -49,9 +50,31 @@ pub fn off_policy_batch_update<T, O, A>(
     T: OffPolicyAgent<O, A>,
 {
     logger.start_event(Event::AgentOptPeriod).unwrap();
-    for step in history.drain_steps() {
-        agent.update(step, logger)
+
+    let mut steps = history.drain_steps().peekable();
+    while let Some(step) = steps.next() {
+        let ref_next = match step.next {
+            Successor::Continue(()) => {
+                match steps.peek() {
+                    Some(next_step) => Successor::Continue(&next_step.observation),
+                    // Next step is missing. Incomplete step so skip this update.
+                    // Note: Changing to Terminate would be wrong (return can be non-zero)
+                    // and don't have a successor state for Interrupt.
+                    None => break,
+                }
+            }
+            Successor::Terminate => Successor::Terminate,
+            Successor::Interrupt(obs) => Successor::Interrupt(obs),
+        };
+        let transient_step = TransientStep {
+            observation: step.observation,
+            action: step.action,
+            reward: step.reward,
+            next: ref_next,
+        };
+        agent.update(transient_step, logger);
     }
+
     logger.end_event(Event::AgentOptPeriod).unwrap();
 }
 
@@ -129,8 +152,8 @@ impl<T, O, A> SynchronousAgent<O, A> for BatchUpdateAgent<T, O, A>
 where
     T: Actor<O, A> + BatchUpdate<O, A>,
 {
-    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
-        let full = self.history.push(step);
+    fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
+        let full = self.history.push(step.into_partial());
         if full {
             self.actor.batch_update(&mut self.history, logger);
             self.history.clear();

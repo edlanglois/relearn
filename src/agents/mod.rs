@@ -31,7 +31,7 @@ pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
-use crate::simulation::Step;
+use crate::simulation::TransientStep;
 use crate::spaces::Space;
 use crate::utils::any::AsAny;
 use std::any::Any;
@@ -91,17 +91,14 @@ pub trait SynchronousAgent<O, A>: Actor<O, A> {
     /// before any other calls to `act` or [`Actor::reset`].
     /// This allows the agent to internally cache any information used in selecting the action
     /// that would also be useful for updating on the result.
-    ///
-    /// # Args
-    /// * `step`: The environment step resulting from the  most recent call to [`Actor::act`].
-    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger);
+    fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger);
 }
 
 impl<T, O, A> SynchronousAgent<O, A> for &'_ mut T
 where
     T: SynchronousAgent<O, A> + ?Sized,
 {
-    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         T::update(self, step, logger)
     }
 }
@@ -110,7 +107,7 @@ impl<T, O, A> SynchronousAgent<O, A> for Box<T>
 where
     T: SynchronousAgent<O, A> + ?Sized,
 {
-    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         T::update(self, step, logger)
     }
 }

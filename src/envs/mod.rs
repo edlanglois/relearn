@@ -201,6 +201,18 @@ impl<T: Clone, U: Clone> Successor<&'_ T, &'_ U> {
     }
 }
 
+impl<T: Clone> Successor<T, &'_ T> {
+    /// Convert into an owned successor by cloning any borrowed successor observation.
+    #[inline]
+    pub fn into_owned(self) -> Successor<T> {
+        match self {
+            Self::Continue(s) => Successor::Continue(s.clone()),
+            Self::Terminate => Successor::Terminate,
+            Self::Interrupt(s) => Successor::Interrupt(s),
+        }
+    }
+}
+
 /// A successor that only stores a reference to the successor state if continuing.
 pub type RefSuccessor<'a, T> = Successor<T, &'a T>;
 

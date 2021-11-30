@@ -52,8 +52,8 @@ pub struct Step<O, A, U = O> {
     pub next: Successor<O, U>,
 }
 
-impl<O, A> Step<O, A> {
-    pub const fn new(observation: O, action: A, reward: f64, next: Successor<O>) -> Self {
+impl<O, A, U> Step<O, A, U> {
+    pub const fn new(observation: O, action: A, reward: f64, next: Successor<O, U>) -> Self {
         Self {
             observation,
             action,
@@ -61,10 +61,32 @@ impl<O, A> Step<O, A> {
             next,
         }
     }
+
+    pub fn into_partial(self) -> PartialStep<O, A> {
+        Step {
+            observation: self.observation,
+            action: self.action,
+            reward: self.reward,
+            next: self.next.into_partial(),
+        }
+    }
 }
 
 /// Description of an environment step where the successor observation is borrowed.
 pub type TransientStep<'a, O, A> = Step<O, A, &'a O>;
+
+impl<O: Clone, A> TransientStep<'_, O, A> {
+    /// Convert a transient step into an owned step by cloning any borrowed successor observation.
+    #[inline]
+    pub fn into_owned(self) -> Step<O, A> {
+        Step {
+            observation: self.observation,
+            action: self.action,
+            reward: self.reward,
+            next: self.next.into_owned(),
+        }
+    }
+}
 
 /// Partial description of an environment step.
 ///

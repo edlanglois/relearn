@@ -5,7 +5,7 @@ use crate::envs::{
     Successor,
 };
 use crate::logging::TimeSeriesLogger;
-use crate::simulation::Step;
+use crate::simulation::TransientStep;
 use crate::spaces::{NonEmptySpace, Space};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -92,14 +92,14 @@ where
     fn act(&mut self, obs: &MetaObservation<OS::Element, AS::Element>) -> AS::Element {
         if let Some(ref step_obs) = &obs.prev_step {
             // Update the agent based on the most recent step result when it exists
-            let step_next = match (obs.inner_observation.as_ref().cloned(), obs.episode_done) {
+            let step_next = match (obs.inner_observation.as_ref(), obs.episode_done) {
                 (Some(o), false) => Successor::Continue(o),
-                (Some(o), true) => Successor::Interrupt(o),
+                (Some(o), true) => Successor::Interrupt(o.clone()),
                 (None, true) => Successor::Terminate,
                 (None, false) => panic!("must provide an observation if the episode continues"),
             };
 
-            let step = Step {
+            let step = TransientStep {
                 observation: self.prev_observation.take().expect(
                     "Meta observation follows a previous step but no previous observation stored",
                 ),
@@ -140,7 +140,7 @@ where
 {
     fn update(
         &mut self,
-        _step: Step<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>,
+        _step: TransientStep<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>,
         _logger: &mut dyn TimeSeriesLogger,
     ) {
         // Does not learn on a meta level

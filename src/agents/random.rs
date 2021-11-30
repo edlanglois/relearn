@@ -1,9 +1,10 @@
 use super::{
-    buffers::HistoryBuffer, Actor, BatchUpdate, BuildAgent, BuildAgentError, Step,
-    OffPolicyAgent, SetActorMode, SyncParams, SyncParamsError, SynchronousAgent,
+    buffers::HistoryBuffer, Actor, BatchUpdate, BuildAgent, BuildAgentError, OffPolicyAgent,
+    SetActorMode, SyncParams, SyncParamsError, SynchronousAgent,
 };
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
+use crate::simulation::TransientStep;
 use crate::spaces::{SampleSpace, Space};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -62,7 +63,8 @@ impl<O, AS: SampleSpace> Actor<O, AS::Element> for RandomAgent<AS> {
 }
 
 impl<O, AS: SampleSpace> SynchronousAgent<O, AS::Element> for RandomAgent<AS> {
-    fn update(&mut self, _step: Step<O, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {}
+    fn update(&mut self, _step: TransientStep<O, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {
+    }
 }
 
 impl<O, AS: SampleSpace> OffPolicyAgent<O, AS::Element> for RandomAgent<AS> {}

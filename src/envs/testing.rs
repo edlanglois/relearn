@@ -5,7 +5,7 @@ use super::{
 };
 use crate::agents::RandomAgent;
 use crate::simulation::hooks::{ClosureHook, StepLimit};
-use crate::simulation::{self, Step};
+use crate::simulation::{self, TransientStep};
 use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space, SubsetOrd};
 use rand::{rngs::StdRng, SeedableRng};
 use std::cell::Cell;
@@ -54,7 +54,7 @@ where
         env,
         &mut agent,
         &mut (
-            ClosureHook::from(|step: &Step<_, _>| -> bool {
+            ClosureHook::from(|step: &TransientStep<_, _>| -> bool {
                 assert!(step.reward >= min_reward);
                 assert!(step.reward <= max_reward);
                 if let Some(obs) = step.next.as_ref().into_inner() {

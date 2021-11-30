@@ -219,6 +219,24 @@ pub trait TimeSeriesLogger {
     fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn TimeSeriesLogger>;
 }
 
+impl<T: TimeSeriesLogger + ?Sized> TimeSeriesLogger for &mut T {
+    fn log_(&mut self, event: Event, id: Id, value: Loggable) -> Result<(), LogError> {
+        T::log_(self, event, id, value)
+    }
+    fn start_event_(&mut self, event: Event, time: Instant) -> Result<(), LogError> {
+        T::start_event_(self, event, time)
+    }
+    fn end_event_(&mut self, event: Event, time: Instant) -> Result<(), LogError> {
+        T::end_event_(self, event, time)
+    }
+    fn event_logger(&mut self, event: Event) -> TimeSeriesEventLogger {
+        T::event_logger(self, event)
+    }
+    fn scope(&mut self, scope: &'static str) -> ScopedLogger<dyn TimeSeriesLogger> {
+        T::scope(self, scope)
+    }
+}
+
 /// Generic helper methods for logging
 pub trait TimeSeriesLoggerHelper: TimeSeriesLogger {
     #[inline]

@@ -1,6 +1,6 @@
 //! History buffer implementation for an iterator of buffers.
 use super::HistoryBuffer;
-use crate::simulation::Step;
+use crate::simulation::PartialStep;
 use std::iter::FusedIterator;
 
 impl<T, O, A> HistoryBuffer<O, A> for Vec<T>
@@ -15,15 +15,15 @@ where
         self.iter().map(HistoryBuffer::num_episodes).sum()
     }
 
-    fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a Step<O, A>> + 'a> {
+    fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a PartialStep<O, A>> + 'a> {
         Box::new(SizedFlatMap::new(self.iter(), HistoryBuffer::steps))
     }
 
-    fn drain_steps(&mut self) -> Box<dyn ExactSizeIterator<Item = Step<O, A>> + '_> {
+    fn drain_steps(&mut self) -> Box<dyn ExactSizeIterator<Item = PartialStep<O, A>> + '_> {
         unimplemented!("hard to evaluate exact size")
     }
 
-    fn episodes<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a [Step<O, A>]> + 'a> {
+    fn episodes<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a [PartialStep<O, A>]> + 'a> {
         Box::new(SizedFlatMap::new(self.iter(), HistoryBuffer::episodes))
     }
 }
@@ -131,13 +131,13 @@ where
 mod tests {
     use super::super::{BuildHistoryBuffer, SerialBuffer, SerialBufferConfig};
     use super::*;
-    use crate::agents::Step;
     use crate::envs::Successor::{self, Continue, Terminate};
+    use crate::simulation::PartialStep;
     use rstest::{fixture, rstest};
 
     /// Make a step that either continues or is terminal.
-    const fn step(observation: usize, next: Successor<usize>) -> Step<usize, bool> {
-        Step {
+    const fn step(observation: usize, next: Successor<usize, ()>) -> PartialStep<usize, bool> {
+        PartialStep {
             observation,
             action: false,
             reward: 0.0,
@@ -153,18 +153,18 @@ mod tests {
         };
         let mut b1 = config.build_history_buffer();
         b1.extend([
-            step(0, Continue(1)),
-            step(1, Continue(2)),
+            step(0, Continue(())),
+            step(1, Continue(())),
             step(2, Terminate),
-            step(3, Continue(4)),
+            step(3, Continue(())),
         ]);
 
         let mut b2 = config.build_history_buffer();
         b2.extend([
-            step(10, Continue(11)),
+            step(10, Continue(())),
             step(11, Terminate),
-            step(12, Continue(13)),
-            step(13, Continue(14)),
+            step(12, Continue(())),
+            step(13, Continue(())),
         ]);
         vec![b1, b2]
     }
@@ -182,14 +182,14 @@ mod tests {
     #[rstest]
     fn steps(buffers: Vec<SerialBuffer<usize, bool>>) {
         let mut steps_iter = buffers.steps();
-        assert_eq!(steps_iter.next(), Some(&step(0, Continue(1))));
-        assert_eq!(steps_iter.next(), Some(&step(1, Continue(2))));
+        assert_eq!(steps_iter.next(), Some(&step(0, Continue(()))));
+        assert_eq!(steps_iter.next(), Some(&step(1, Continue(()))));
         assert_eq!(steps_iter.next(), Some(&step(2, Terminate)));
-        assert_eq!(steps_iter.next(), Some(&step(3, Continue(4))));
-        assert_eq!(steps_iter.next(), Some(&step(10, Continue(11))));
+        assert_eq!(steps_iter.next(), Some(&step(3, Continue(()))));
+        assert_eq!(steps_iter.next(), Some(&step(10, Continue(()))));
         assert_eq!(steps_iter.next(), Some(&step(11, Terminate)));
-        assert_eq!(steps_iter.next(), Some(&step(12, Continue(13))));
-        assert_eq!(steps_iter.next(), Some(&step(13, Continue(14))));
+        assert_eq!(steps_iter.next(), Some(&step(12, Continue(()))));
+        assert_eq!(steps_iter.next(), Some(&step(13, Continue(()))));
         assert_eq!(steps_iter.next(), None);
     }
 
@@ -214,22 +214,22 @@ mod tests {
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
             vec![
-                &step(0, Continue(1)),
-                &step(1, Continue(2)),
+                &step(0, Continue(())),
+                &step(1, Continue(())),
                 &step(2, Terminate)
             ]
         );
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(3, Continue(4))]
+            vec![&step(3, Continue(()))]
         );
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(10, Continue(11)), &step(11, Terminate)]
+            vec![&step(10, Continue(())), &step(11, Terminate)]
         );
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(12, Continue(13)), &step(13, Continue(14))]
+            vec![&step(12, Continue(())), &step(13, Continue(()))]
         );
         assert!(episodes_iter.next().is_none());
     }

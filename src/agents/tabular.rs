@@ -1,10 +1,11 @@
 //! Tabular agents
 use super::{
     batch::off_policy_batch_update, buffers::HistoryBuffer, Actor, ActorMode, BatchUpdate,
-    BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent, SetActorMode, Step,
-    SyncParams, SyncParamsError, SynchronousAgent,
+    BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent, SetActorMode, SyncParams,
+    SyncParamsError, SynchronousAgent,
 };
 use crate::logging::TimeSeriesLogger;
+use crate::simulation::TransientStep;
 use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
 use rand::rngs::StdRng;
@@ -119,10 +120,10 @@ impl Actor<usize, usize> for BaseTabularQLearningAgent {
 }
 
 impl SynchronousAgent<usize, usize> for BaseTabularQLearningAgent {
-    fn update(&mut self, step: Step<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
-        let discounted_next_value = match step.next.into_inner() {
+    fn update(&mut self, step: TransientStep<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
+        let discounted_next_value = match step.next.as_ref().into_inner() {
             None => 0.0,
-            Some(next_observation) => {
+            Some(&next_observation) => {
                 self.state_action_values
                     .index_axis(Axis(0), next_observation)
                     .max()

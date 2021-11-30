@@ -1,9 +1,10 @@
 use super::{
-    Actor, ActorMode, BuildAgent, BuildAgentError, Step, SetActorMode, SyncParams,
-    SyncParamsError, SynchronousAgent,
+    Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, SyncParams, SyncParamsError,
+    SynchronousAgent,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
+use crate::simulation::TransientStep;
 use crate::spaces::{Space, TupleSpace2};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -31,7 +32,11 @@ where
     T: SynchronousAgent<O1, A1>,
     U: SynchronousAgent<O2, A2>,
 {
-    fn update(&mut self, step: Step<(O1, O2), (A1, A2)>, logger: &mut dyn TimeSeriesLogger) {
+    fn update(
+        &mut self,
+        step: TransientStep<(O1, O2), (A1, A2)>,
+        logger: &mut dyn TimeSeriesLogger,
+    ) {
         let (o1, o2) = step.observation;
         let (a1, a2) = step.action;
         let (n1, n2) = match step.next {
@@ -42,7 +47,7 @@ where
             }
         };
         self.0.update(
-            Step {
+            TransientStep {
                 observation: o1,
                 action: a1,
                 reward: step.reward,
@@ -51,7 +56,7 @@ where
             logger,
         );
         self.1.update(
-            Step {
+            TransientStep {
                 observation: o2,
                 action: a2,
                 reward: step.reward,

@@ -1,9 +1,10 @@
 //! Serial (single-thread) simulation.
 use super::hooks::{BuildSimulationHook, SimulationHook};
-use super::{Step, Simulator, SimulatorError};
+use super::{Simulator, SimulatorError, TransientStep};
 use crate::agents::{Actor, BuildAgent, SynchronousAgent};
-use crate::envs::{BuildEnv, Environment};
+use crate::envs::{BuildEnv, Environment, Successor};
 use crate::logging::{Event, TimeSeriesLogger};
+use std::mem;
 
 /// Serial (single-thread) simulator.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -58,7 +59,6 @@ pub fn run_agent<E, A, H>(
     logger: &mut dyn TimeSeriesLogger,
 ) where
     E: Environment + ?Sized,
-    E::Observation: Clone,
     A: SynchronousAgent<E::Observation, E::Action> + ?Sized,
     H: SimulationHook<E::Observation, E::Action> + ?Sized,
 {
@@ -66,32 +66,41 @@ pub fn run_agent<E, A, H>(
         return;
     }
     let mut observation = environment.reset();
-
     loop {
         let action = agent.act(&observation);
         let (next, reward) = environment.step(&action, &mut logger.event_logger(Event::EnvStep));
 
-        let step = Step {
-            observation,
-            action,
-            reward,
-            next: next.clone(),
+        let mut episode_done = false;
+        let mut reset = || {
+            episode_done = true;
+            environment.reset()
         };
 
-        let stop_simulation = !hook.call(&step, logger);
-        agent.update(step, logger);
-        if stop_simulation {
-            break;
-        }
+        let (partial_successor, next_observation) = match next {
+            Successor::Continue(next_obs) => (Successor::Continue(()), next_obs),
+            Successor::Terminate => (Successor::Terminate, reset()),
+            Successor::Interrupt(next_obs) => (Successor::Interrupt(next_obs), reset()),
+        };
+        let prev_observation = mem::replace(&mut observation, next_observation);
+        let ref_successor = match partial_successor {
+            Successor::Continue(()) => Successor::Continue(&observation),
+            Successor::Terminate => Successor::Terminate,
+            Successor::Interrupt(next_obs) => Successor::Interrupt(next_obs),
+        };
 
-        match next.continue_() {
-            Some(obs) => {
-                observation = obs;
-            }
-            None => {
-                observation = environment.reset();
-                agent.reset()
-            }
+        let step = TransientStep {
+            observation: prev_observation,
+            action,
+            reward,
+            next: ref_successor,
+        };
+        let done = !hook.call(&step, logger);
+        agent.update(step, logger);
+        if episode_done {
+            agent.reset();
+        }
+        if done {
+            break;
         }
     }
 }
@@ -112,7 +121,6 @@ pub fn run_actor<E, A, H>(
     logger: &mut dyn TimeSeriesLogger,
 ) where
     E: Environment + ?Sized,
-    E::Observation: Clone,
     A: Actor<E::Observation, E::Action> + ?Sized,
     H: SimulationHook<E::Observation, E::Action> + ?Sized,
 {
@@ -120,30 +128,35 @@ pub fn run_actor<E, A, H>(
         return;
     }
     let mut observation = environment.reset();
-
     loop {
         let action = actor.act(&observation);
         let (next, reward) = environment.step(&action, &mut logger.event_logger(Event::EnvStep));
 
-        let step = Step {
-            observation,
-            action,
-            reward,
-            next: next.clone(),
+        let mut reset = || {
+            actor.reset();
+            environment.reset()
         };
 
+        let (partial_successor, next_observation) = match next {
+            Successor::Continue(next_obs) => (Successor::Continue(()), next_obs),
+            Successor::Terminate => (Successor::Terminate, reset()),
+            Successor::Interrupt(next_obs) => (Successor::Interrupt(next_obs), reset()),
+        };
+        let prev_observation = mem::replace(&mut observation, next_observation);
+        let ref_successor = match partial_successor {
+            Successor::Continue(()) => Successor::Continue(&observation),
+            Successor::Terminate => Successor::Terminate,
+            Successor::Interrupt(next_obs) => Successor::Interrupt(next_obs),
+        };
+
+        let step = TransientStep {
+            observation: prev_observation,
+            action,
+            reward,
+            next: ref_successor,
+        };
         if !hook.call(&step, logger) {
             break;
-        }
-
-        match next.continue_() {
-            Some(obs) => {
-                observation = obs;
-            }
-            None => {
-                observation = environment.reset();
-                actor.reset()
-            }
         }
     }
 }

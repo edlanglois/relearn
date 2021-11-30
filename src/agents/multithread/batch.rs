@@ -1,13 +1,12 @@
 use super::super::buffers::{BuildHistoryBuffer, SerialBuffer, SerialBufferConfig};
-use super::super::{
-    Actor, BatchUpdate, BuildBatchUpdateActor, Step, SyncParams, SynchronousAgent,
-};
+use super::super::{Actor, BatchUpdate, BuildBatchUpdateActor, SyncParams, SynchronousAgent};
 use super::{
     BuildAgentError, BuildMultithreadAgent, InitializeMultithreadAgent, MultithreadAgentManager,
     TryIntoActor,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure};
 use crate::logging::TimeSeriesLogger;
+use crate::simulation::TransientStep;
 use crate::spaces::Space;
 use crossbeam_channel::{self, Receiver, Sender};
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -199,9 +198,10 @@ where
 impl<T, O, A> SynchronousAgent<O, A> for MultithreadBatchWorker<T, O, A>
 where
     T: Actor<O, A> + BatchUpdate<O, A> + SyncParams,
+    O: Clone,
 {
-    fn update(&mut self, step: Step<O, A>, _logger: &mut dyn TimeSeriesLogger) {
-        let full = self.buffer.as_mut().unwrap().push(step);
+    fn update(&mut self, step: TransientStep<O, A>, _logger: &mut dyn TimeSeriesLogger) {
+        let full = self.buffer.as_mut().unwrap().push(step.into_partial());
         if full {
             // Send buffer to manager to update the reference actor
             self.send_buffer.send(self.buffer.take().unwrap()).unwrap();
