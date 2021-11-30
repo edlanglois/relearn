@@ -10,7 +10,7 @@ pub use pair::PairSimulator;
 pub use serial::{run_actor, run_agent, SerialSimulator};
 
 use crate::agents::BuildAgentError;
-use crate::envs::{BuildEnvError, PartialSuccessor, Successor};
+use crate::envs::{BuildEnvError, Successor};
 use crate::logging::TimeSeriesLogger;
 use thiserror::Error;
 
@@ -39,11 +39,9 @@ pub enum SimulatorError {
     BuildEnv(#[from] BuildEnvError),
 }
 
-/// Full description of an environment step.
-///
-/// Includes the successor observation if one exists.
+/// Description of an environment step.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Step<O, A> {
+pub struct Step<O, A, U = O> {
     /// The initial observation.
     pub observation: O,
     /// The action taken from the initial state given the initial observation.
@@ -51,7 +49,7 @@ pub struct Step<O, A> {
     /// The resulting reward.
     pub reward: f64,
     /// The next observation or outcome; how the episode progresses.
-    pub next: Successor<O>,
+    pub next: Successor<O, U>,
 }
 
 impl<O, A> Step<O, A> {
@@ -67,16 +65,6 @@ impl<O, A> Step<O, A> {
 
 /// Partial description of an environment step.
 ///
-/// Includes everything except the next observation when the episode continues.
-/// Using this instead of [`Step`] can avoid having to make copies of the observation.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct HalfStep<O, A> {
-    /// The initial observation.
-    pub observation: O,
-    /// The action taken from the initial state given the initial observation.
-    pub action: A,
-    /// The resulting reward.
-    pub reward: f64,
-    /// The step outcome; how the episode progresses.
-    pub next: PartialSuccessor<O>,
-}
+/// The successor state is omitted when the episode continues.
+/// Using this can help avoid copying the observation.
+pub type PartialStep<O, A> = Step<O, A, ()>;

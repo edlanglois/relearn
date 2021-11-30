@@ -32,6 +32,7 @@ pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 use crate::logging::Logger;
 use crate::spaces::Space;
 use rand::{rngs::StdRng, Rng};
+use std::borrow::Borrow;
 use std::f64;
 
 /// The external structure of a reinforcement learning environment.
@@ -99,9 +100,9 @@ impl<E: EnvStructure + ?Sized> EnvStructure for Box<E> {
 
 /// The successor state or outcome of an episode step.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum Successor<T> {
+pub enum Successor<T, U = T> {
     /// The episode continues with the given state.
-    Continue(T),
+    Continue(U),
     /// The episode ends by entering a terminal state.
     ///
     /// A terminal state is one from which all possible trajectories would have 0 reward.
@@ -112,33 +113,11 @@ pub enum Successor<T> {
     /// For example, the episode may have been interrupted due to a step limit.
     Interrupt(T),
 }
-
-impl<T> Successor<T> {
-    /// Partition into the continuing state and a [`PartialSuccessor`].
-    #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
-    #[inline]
-    pub fn into_continue_partial(self) -> (Option<T>, PartialSuccessor<T>) {
-        match self {
-            Self::Continue(state) => (Some(state), PartialSuccessor::Continue),
-            Self::Terminate => (None, PartialSuccessor::Terminate),
-            Self::Interrupt(state) => (None, PartialSuccessor::Interrupt(state)),
-        }
-    }
-
-    /// Apply a transformation to the inner state when present.
-    #[inline]
-    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Successor<U> {
-        match self {
-            Self::Continue(state) => Successor::Continue(f(state)),
-            Self::Terminate => Successor::Terminate,
-            Self::Interrupt(state) => Successor::Interrupt(f(state)),
-        }
-    }
-
+impl<T, U> Successor<T, U> {
     /// Get the inner state of `Successor::Continue`
     #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
     #[inline]
-    pub fn continue_(self) -> Option<T> {
+    pub fn continue_(self) -> Option<U> {
         match self {
             Self::Continue(s) => Some(s),
             _ => None,
@@ -155,6 +134,35 @@ impl<T> Successor<T> {
         }
     }
 
+    /// Whether this successor marks the end of an episode
+    #[inline]
+    pub const fn episode_done(&self) -> bool {
+        !matches!(self, Successor::Continue(_))
+    }
+}
+
+impl<T> Successor<T> {
+    /// Partition into the continuing state and a [`PartialSuccessor`].
+    #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
+    #[inline]
+    pub fn into_continue_partial(self) -> (Option<T>, PartialSuccessor<T>) {
+        match self {
+            Self::Continue(state) => (Some(state), Successor::Continue(())),
+            Self::Terminate => (None, Successor::Terminate),
+            Self::Interrupt(state) => (None, Successor::Interrupt(state)),
+        }
+    }
+
+    /// Apply a transformation to the inner state when present.
+    #[inline]
+    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Successor<U> {
+        match self {
+            Self::Continue(state) => Successor::Continue(f(state)),
+            Self::Terminate => Successor::Terminate,
+            Self::Interrupt(state) => Successor::Interrupt(f(state)),
+        }
+    }
+
     /// Get the inner state of `Continue` and `Interrupt` variants.
     #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
     #[inline]
@@ -165,45 +173,34 @@ impl<T> Successor<T> {
             Self::Terminate => None,
         }
     }
+}
 
-    /// Whether this successor marks the end of an episode
+impl<T, U: Borrow<T>> Successor<T, U> {
+    /// Convert `&Successor<T, U>` to `Successor<&T>`.
     #[inline]
-    pub const fn episode_done(&self) -> bool {
-        !matches!(self, Successor::Continue(_))
-    }
-
-    /// Convert `&Successor<T>` to `Successor<&T>`.
-    #[inline]
-    pub const fn as_ref(&self) -> Successor<&T> {
+    pub fn as_ref(&self) -> Successor<&T> {
         match self {
-            Self::Continue(s) => Successor::Continue(s),
+            Self::Continue(s) => Successor::Continue(s.borrow()),
             Self::Terminate => Successor::Terminate,
             Self::Interrupt(s) => Successor::Interrupt(s),
         }
     }
 }
 
-impl<'a, T: Clone> Successor<&'a T> {
-    /// Convert `Successor<&T>` to `Successor<T>` by cloning its contents
+impl<T: Clone, U: Clone> Successor<&'_ T, &'_ U> {
+    /// Convert `Successor<&T, &U>` to `Successor<T, U>` by cloning its contents
     #[inline]
-    pub fn cloned(self) -> Successor<T> {
-        self.map(Clone::clone)
+    pub fn cloned(self) -> Successor<T, U> {
+        match self {
+            Self::Continue(s) => Successor::Continue(s.clone()),
+            Self::Terminate => Successor::Terminate,
+            Self::Interrupt(s) => Successor::Interrupt(s.clone()),
+        }
     }
 }
 
-/// A partial successor state or outcome of an episode step.
-///
-/// Includes the state when interrupted but not when continuing.
-/// See [`Successor`].
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum PartialSuccessor<T> {
-    /// The episode continues.
-    Continue,
-    /// The episode ends by entering a terminal state.
-    Terminate,
-    /// The episode ends despite entering the given non-terminal state.
-    Interrupt(T),
-}
+/// A successor that does not store the successor state if continuing.
+pub type PartialSuccessor<T> = Successor<T, ()>;
 
 /// Stored copy of an environment structure.
 ///
