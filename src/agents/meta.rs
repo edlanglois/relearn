@@ -160,25 +160,27 @@ where
 mod resetting_meta {
     use super::super::{ActorMode, UCB1AgentConfig};
     use super::*;
-    use crate::envs::{MetaPomdp, OneHotBandits, PomdpEnv};
-    use crate::simulation;
-    use crate::simulation::hooks::{RewardStatistics, StepLimit};
+    use crate::envs::{Environment, MetaPomdp, OneHotBandits, PomdpEnv};
+    use crate::simulation::hooks::RewardStatistics;
 
     #[test]
     fn ucb_one_hot_bandits() {
         let config = ResettingMetaAgentConfig::new(UCB1AgentConfig::default());
         let num_arms = 3;
         let num_episodes_per_trial = 20;
-        let mut env = PomdpEnv::new(
+        let env = PomdpEnv::new(
             MetaPomdp::new(OneHotBandits::new(num_arms), num_episodes_per_trial),
             0,
         );
         let mut agent = config.build_agent(&env, 0).unwrap();
 
-        let mut hooks = (RewardStatistics::new(), StepLimit::new(1000));
         agent.set_actor_mode(ActorMode::Release);
-        simulation::run_actor(&mut env, &mut agent, &mut hooks, &mut ());
-
-        assert!(hooks.0.mean_episode_reward() > 0.7 * (num_episodes_per_trial - num_arms) as f64);
+        let mut reward_stats = RewardStatistics::new();
+        env.run(agent, ())
+            .take(1000)
+            .for_each(|s| reward_stats.call_(&s));
+        assert!(
+            reward_stats.mean_episode_reward() > 0.7 * (num_episodes_per_trial - num_arms) as f64
+        );
     }
 }

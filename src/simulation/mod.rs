@@ -1,10 +1,12 @@
 //! Simulating agent-environment interaction
 pub mod hooks;
+mod iter;
 mod multithread;
 mod pair;
 mod serial;
 
 pub use hooks::{BuildSimulationHook, GenericSimulationHook, SimulationHook};
+pub use iter::SimSteps;
 pub use multithread::{MultithreadSimulator, MultithreadSimulatorConfig};
 pub use pair::PairSimulator;
 pub use serial::{run_actor, run_agent, SerialSimulator};
@@ -62,6 +64,9 @@ impl<O, A> Step<O, A> {
         }
     }
 }
+
+/// Description of an environment step where the successor observation is borrowed.
+pub type TransientStep<'a, O, A> = Step<O, A, &'a O>;
 
 /// Partial description of an environment step.
 ///

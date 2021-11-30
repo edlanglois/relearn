@@ -29,7 +29,9 @@ pub use multiagent::views::{FirstPlayerView, SecondPlayerView};
 pub use stateful::{IntoEnv, PomdpEnv};
 pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 
-use crate::logging::Logger;
+use crate::agents::Actor;
+use crate::logging::{Logger, TimeSeriesLogger};
+use crate::simulation::SimSteps;
 use crate::spaces::Space;
 use rand::{rngs::StdRng, Rng};
 use std::borrow::Borrow;
@@ -139,20 +141,20 @@ impl<T, U> Successor<T, U> {
     pub const fn episode_done(&self) -> bool {
         !matches!(self, Successor::Continue(_))
     }
+
+    /// Drop any stored `Continue` state, converting into `PartialSuccessor`.
+    #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
+    #[inline]
+    pub fn into_partial(self) -> PartialSuccessor<T> {
+        match self {
+            Self::Continue(_) => Successor::Continue(()),
+            Self::Terminate => Successor::Terminate,
+            Self::Interrupt(s) => Successor::Interrupt(s),
+        }
+    }
 }
 
 impl<T> Successor<T> {
-    /// Partition into the continuing state and a [`PartialSuccessor`].
-    #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
-    #[inline]
-    pub fn into_continue_partial(self) -> (Option<T>, PartialSuccessor<T>) {
-        match self {
-            Self::Continue(state) => (Some(state), Successor::Continue(())),
-            Self::Terminate => (None, Successor::Terminate),
-            Self::Interrupt(state) => (None, Successor::Interrupt(state)),
-        }
-    }
-
     /// Apply a transformation to the inner state when present.
     #[inline]
     pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Successor<U> {
@@ -198,6 +200,9 @@ impl<T: Clone, U: Clone> Successor<&'_ T, &'_ U> {
         }
     }
 }
+
+/// A successor that only stores a reference to the successor state if continuing.
+pub type RefSuccessor<'a, T> = Successor<T, &'a T>;
 
 /// A successor that does not store the successor state if continuing.
 pub type PartialSuccessor<T> = Successor<T, ()>;
@@ -386,6 +391,16 @@ pub trait Environment {
     /// # Returns
     /// * `observation`: An observation of the resulting state.
     fn reset(&mut self) -> Self::Observation;
+
+    /// Run this environment with the given actor.
+    fn run<A, L>(self, actor: A, logger: L) -> SimSteps<Self, A, L>
+    where
+        A: Actor<Self::Observation, Self::Action>,
+        L: TimeSeriesLogger,
+        Self: Sized,
+    {
+        SimSteps::new(self, actor, logger)
+    }
 }
 
 impl<E: Environment + ?Sized> Environment for &'_ mut E {

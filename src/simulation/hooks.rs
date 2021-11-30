@@ -351,10 +351,14 @@ impl<AS: FiniteSpace> IndexedActionCounter<AS> {
             counts: vec![0; num_actions],
         }
     }
+
+    pub fn call_<O, U>(&mut self, step: &Step<O, AS::Element, U>) {
+        self.counts[self.action_space.to_index(&step.action)] += 1;
+    }
 }
 impl<O, AS: FiniteSpace> SimulationHook<O, AS::Element> for IndexedActionCounter<AS> {
     fn call(&mut self, step: &Step<O, AS::Element>, _: &mut dyn TimeSeriesLogger) -> bool {
-        self.counts[self.action_space.to_index(&step.action)] += 1;
+        self.call_(step);
         true
     }
 }
@@ -386,10 +390,8 @@ impl RewardStatistics {
     pub fn mean_episode_reward(&self) -> f64 {
         self.total_episode_reward / (self.num_episodes as f64)
     }
-}
 
-impl GenericSimulationHook for RewardStatistics {
-    fn call<O, A>(&mut self, step: &Step<O, A>, _logger: &mut dyn TimeSeriesLogger) -> bool {
+    pub fn call_<O, A, U>(&mut self, step: &Step<O, A, U>) {
         self.partial_reward += step.reward;
         self.num_steps += 1;
         if step.next.episode_done() {
@@ -397,6 +399,12 @@ impl GenericSimulationHook for RewardStatistics {
             self.partial_reward = 0.0;
             self.num_episodes += 1;
         }
+    }
+}
+
+impl GenericSimulationHook for RewardStatistics {
+    fn call<O, A>(&mut self, step: &Step<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
+        self.call_(step);
         true
     }
 }

@@ -1,7 +1,7 @@
 //! Tabular agents
 use super::{
     batch::off_policy_batch_update, buffers::HistoryBuffer, Actor, ActorMode, BatchUpdate,
-    BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, Step, OffPolicyAgent, SetActorMode,
+    BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent, SetActorMode, Step,
     SyncParams, SyncParamsError, SynchronousAgent,
 };
 use crate::logging::TimeSeriesLogger;
@@ -174,7 +174,7 @@ impl SyncParams for BaseTabularQLearningAgent {
 mod tabular_q_learning {
     use super::super::{testing, BuildAgent};
     use super::*;
-    use crate::envs::{DeterministicBandit, EnvStructure, IntoEnv};
+    use crate::envs::{DeterministicBandit, EnvStructure, Environment, IntoEnv};
     use crate::simulation;
     use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 
@@ -202,11 +202,10 @@ mod tabular_q_learning {
 
         // Release mode exploits
         agent.set_actor_mode(ActorMode::Release);
-        let mut exploit_hooks = (
-            IndexedActionCounter::new(env.action_space()),
-            StepLimit::new(1000),
-        );
-        simulation::run_actor(&mut env, &mut agent, &mut exploit_hooks, &mut ());
-        assert!(exploit_hooks.0.counts[1] > 900);
+        let mut action_counter = IndexedActionCounter::new(env.action_space());
+        env.run(agent, ())
+            .take(1000)
+            .for_each(|s| action_counter.call_(&s));
+        assert!(action_counter.counts[1] > 900);
     }
 }

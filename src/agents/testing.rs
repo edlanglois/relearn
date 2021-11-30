@@ -1,6 +1,6 @@
 //! Agent testing utilities
 use crate::agents::{ActorMode, SetActorMode};
-use crate::envs::{DeterministicBandit, IntoEnv, PomdpEnv};
+use crate::envs::{DeterministicBandit, Environment, IntoEnv, PomdpEnv};
 use crate::simulation;
 use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
 use crate::{EnvStructure, SynchronousAgent};
@@ -40,14 +40,13 @@ pub fn eval_deterministic_bandit<A>(
     A: SynchronousAgent<(), usize> + SetActorMode,
 {
     // Evaluation
-    let num_eval_steps = 1000;
-
-    let action_counter = IndexedActionCounter::new(env.action_space());
-    let mut hooks = (action_counter, StepLimit::new(num_eval_steps));
-
     agent.set_actor_mode(ActorMode::Release);
-    simulation::run_actor(env, &mut agent, &mut hooks, &mut ());
 
-    let action_1_count = hooks.0.counts[1];
+    let num_eval_steps = 1000;
+    let mut action_counter = IndexedActionCounter::new(env.action_space());
+    env.run(agent, ())
+        .take(num_eval_steps)
+        .for_each(|s| action_counter.call_(&s));
+    let action_1_count = action_counter.counts[1];
     assert!(action_1_count >= ((num_eval_steps as f64) * threshold) as u64);
 }
