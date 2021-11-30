@@ -21,7 +21,7 @@
 //! A reinforcement learning [`Environment`] is an environment structure with internal state.
 //! The fundamental operation is to take a [step](Environment::step) from a state given
 //! some action, resulting in a successor state, a reward value, and a flag indicating whether the
-//! current _episode_ is done. The [`FullStep`] structure stores a
+//! current _episode_ is done. The [`Step`] structure stores a
 //! description of the observable parts of an environment step.
 //!
 //! ### Episode
@@ -129,7 +129,7 @@ pub mod utils;
 pub use agents::{Actor, BuildAgent, SynchronousAgent};
 pub use defs::{AgentDef, EnvDef, MultithreadAgentDef, OptimizerDef, SeqModDef};
 pub use envs::{BuildEnv, EnvStructure, Environment, StructuredEnvironment};
-pub use simulation::{run_actor, run_agent, FullStep, Simulator};
+pub use simulation::{run_actor, run_agent, Simulator, Step};
 
 #[allow(unused_imports)]
 #[macro_use]

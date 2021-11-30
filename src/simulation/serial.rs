@@ -1,6 +1,6 @@
 //! Serial (single-thread) simulation.
 use super::hooks::{BuildSimulationHook, SimulationHook};
-use super::{FullStep, Simulator, SimulatorError};
+use super::{Step, Simulator, SimulatorError};
 use crate::agents::{Actor, BuildAgent, SynchronousAgent};
 use crate::envs::{BuildEnv, Environment};
 use crate::logging::{Event, TimeSeriesLogger};
@@ -71,7 +71,7 @@ pub fn run_agent<E, A, H>(
         let action = agent.act(&observation);
         let (next, reward) = environment.step(&action, &mut logger.event_logger(Event::EnvStep));
 
-        let step = FullStep {
+        let step = Step {
             observation,
             action,
             reward,
@@ -125,7 +125,7 @@ pub fn run_actor<E, A, H>(
         let action = actor.act(&observation);
         let (next, reward) = environment.step(&action, &mut logger.event_logger(Event::EnvStep));
 
-        let step = FullStep {
+        let step = Step {
             observation,
             action,
             reward,

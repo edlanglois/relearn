@@ -4,7 +4,7 @@ use super::{
 };
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
-use crate::simulation::FullStep;
+use crate::simulation::Step;
 use crate::spaces::Space;
 use std::sync::{Arc, Mutex};
 
@@ -114,7 +114,7 @@ impl<T, O, A> SynchronousAgent<O, A> for MutexAgentWorker<T>
 where
     T: SynchronousAgent<O, A>,
 {
-    fn update(&mut self, step: FullStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
         self.agent.lock().unwrap().update(step, logger)
     }
 }

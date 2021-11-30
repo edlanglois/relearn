@@ -43,7 +43,7 @@ pub enum SimulatorError {
 ///
 /// Includes the successor observation if one exists.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct FullStep<O, A> {
+pub struct Step<O, A> {
     /// The initial observation.
     pub observation: O,
     /// The action taken from the initial state given the initial observation.
@@ -54,7 +54,7 @@ pub struct FullStep<O, A> {
     pub next: Successor<O>,
 }
 
-impl<O, A> FullStep<O, A> {
+impl<O, A> Step<O, A> {
     pub const fn new(observation: O, action: A, reward: f64, next: Successor<O>) -> Self {
         Self {
             observation,
@@ -68,7 +68,7 @@ impl<O, A> FullStep<O, A> {
 /// Partial description of an environment step.
 ///
 /// Includes everything except the next observation when the episode continues.
-/// Using this instead of [`FullStep`] can avoid having to make copies of the observation.
+/// Using this instead of [`Step`] can avoid having to make copies of the observation.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HalfStep<O, A> {
     /// The initial observation.

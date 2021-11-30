@@ -1,6 +1,6 @@
 //! History buffer implementation for an iterator of buffers.
 use super::HistoryBuffer;
-use crate::simulation::FullStep;
+use crate::simulation::Step;
 use std::iter::FusedIterator;
 
 impl<T, O, A> HistoryBuffer<O, A> for Vec<T>
@@ -15,15 +15,15 @@ where
         self.iter().map(HistoryBuffer::num_episodes).sum()
     }
 
-    fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a FullStep<O, A>> + 'a> {
+    fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a Step<O, A>> + 'a> {
         Box::new(SizedFlatMap::new(self.iter(), HistoryBuffer::steps))
     }
 
-    fn drain_steps(&mut self) -> Box<dyn ExactSizeIterator<Item = FullStep<O, A>> + '_> {
+    fn drain_steps(&mut self) -> Box<dyn ExactSizeIterator<Item = Step<O, A>> + '_> {
         unimplemented!("hard to evaluate exact size")
     }
 
-    fn episodes<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a [FullStep<O, A>]> + 'a> {
+    fn episodes<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a [Step<O, A>]> + 'a> {
         Box::new(SizedFlatMap::new(self.iter(), HistoryBuffer::episodes))
     }
 }
@@ -131,13 +131,13 @@ where
 mod tests {
     use super::super::{BuildHistoryBuffer, SerialBuffer, SerialBufferConfig};
     use super::*;
-    use crate::agents::FullStep;
+    use crate::agents::Step;
     use crate::envs::Successor::{self, Continue, Terminate};
     use rstest::{fixture, rstest};
 
     /// Make a step that either continues or is terminal.
-    const fn step(observation: usize, next: Successor<usize>) -> FullStep<usize, bool> {
-        FullStep {
+    const fn step(observation: usize, next: Successor<usize>) -> Step<usize, bool> {
+        Step {
             observation,
             action: false,
             reward: 0.0,

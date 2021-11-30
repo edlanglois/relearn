@@ -1,5 +1,5 @@
 //! Utilities for calculating step history features.
-use crate::simulation::FullStep;
+use crate::simulation::Step;
 use crate::spaces::{FeatureSpace, ReprSpace, Space};
 use crate::utils::packed::PackedSeqIter;
 use crate::utils::tensor::ExclusiveTensor;
@@ -44,7 +44,7 @@ pub trait PackedHistoryFeaturesView {
 #[derive(Debug)]
 pub struct LazyPackedHistoryFeatures<'a, OS: Space + ?Sized, AS: Space + ?Sized> {
     /// Episodes sorted in monotonic decreasing order of length
-    episodes: Vec<&'a [FullStep<OS::Element, AS::Element>]>,
+    episodes: Vec<&'a [Step<OS::Element, AS::Element>]>,
     observation_space: &'a OS,
     action_space: &'a AS,
     discount_factor: f64,
@@ -77,7 +77,7 @@ where
         device: Device,
     ) -> Self
     where
-        I: IntoIterator<Item = &'a [FullStep<OS::Element, AS::Element>]>,
+        I: IntoIterator<Item = &'a [Step<OS::Element, AS::Element>]>,
     {
         let mut episodes: Vec<_> = episodes.into_iter().collect();
         episodes.sort_unstable_by(|&a, &b| b.len().cmp(&a.len()));
@@ -325,7 +325,7 @@ mod lazy_features {
     use rstest::{fixture, rstest};
 
     struct StoredHistory<OS: Space, AS: Space> {
-        episodes: Vec<Vec<FullStep<OS::Element, AS::Element>>>,
+        episodes: Vec<Vec<Step<OS::Element, AS::Element>>>,
         observation_space: OS,
         action_space: AS,
         discount_factor: f64,
@@ -348,25 +348,25 @@ mod lazy_features {
     fn history() -> StoredHistory<BooleanSpace, IndexSpace> {
         let episodes = vec![
             vec![
-                FullStep::new(true, 0, 1.0, Continue(true)),
-                FullStep::new(true, 1, 1.0, Continue(true)),
-                FullStep::new(true, 2, 1.0, Continue(true)),
-                FullStep::new(true, 3, 1.0, Continue(true)),
+                Step::new(true, 0, 1.0, Continue(true)),
+                Step::new(true, 1, 1.0, Continue(true)),
+                Step::new(true, 2, 1.0, Continue(true)),
+                Step::new(true, 3, 1.0, Continue(true)),
             ],
             vec![
-                FullStep::new(false, 10, -1.0, Continue(false)),
-                FullStep::new(false, 11, -1.0, Continue(false)),
-                FullStep::new(false, 12, 0.0, Continue(false)),
-                FullStep::new(false, 13, 0.0, Continue(false)),
-                FullStep::new(false, 14, 1.0, Continue(false)),
-                FullStep::new(false, 15, 1.0, Terminate),
+                Step::new(false, 10, -1.0, Continue(false)),
+                Step::new(false, 11, -1.0, Continue(false)),
+                Step::new(false, 12, 0.0, Continue(false)),
+                Step::new(false, 13, 0.0, Continue(false)),
+                Step::new(false, 14, 1.0, Continue(false)),
+                Step::new(false, 15, 1.0, Terminate),
             ],
             vec![
-                FullStep::new(false, 20, 2.0, Continue(true)),
-                FullStep::new(true, 21, 2.0, Continue(false)),
-                FullStep::new(false, 22, 2.0, Interrupt(true)),
+                Step::new(false, 20, 2.0, Continue(true)),
+                Step::new(true, 21, 2.0, Continue(false)),
+                Step::new(false, 22, 2.0, Interrupt(true)),
             ],
-            vec![FullStep::new(true, 30, 3.0, Terminate)],
+            vec![Step::new(true, 30, 3.0, Terminate)],
         ];
 
         // Packing order (by action)

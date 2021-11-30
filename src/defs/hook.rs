@@ -3,7 +3,7 @@ use crate::logging::{Loggable, TimeSeriesLogger};
 use crate::simulation::hooks::{
     BuildSimulationHook, EpisodeLimitConfig, SimulationHook, StepLimitConfig, StepLoggerConfig,
 };
-use crate::simulation::FullStep;
+use crate::simulation::Step;
 use crate::spaces::ElementRefInto;
 use std::ops::DerefMut;
 
@@ -89,7 +89,7 @@ impl<O, A> SimulationHook<O, A> for Box<dyn SimulationHook<O, A> + Send> {
         self.as_mut().start(logger)
     }
 
-    fn call(&mut self, step: &FullStep<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
+    fn call(&mut self, step: &Step<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
         self.as_mut().call(step, logger)
     }
 }
@@ -119,7 +119,7 @@ impl<O, A> SimulationHook<O, A> for Vec<Box<dyn SimulationHook<O, A> + Send>> {
         self.deref_mut().start(logger)
     }
 
-    fn call(&mut self, step: &FullStep<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
+    fn call(&mut self, step: &Step<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
         self.deref_mut().call(step, logger)
     }
 }

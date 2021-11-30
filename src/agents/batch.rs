@@ -1,7 +1,7 @@
 use super::buffers::{BuildHistoryBuffer, HistoryBuffer, SerialBuffer, SerialBufferConfig};
 use super::{
-    Actor, ActorMode, BuildAgent, BuildAgentError, FullStep, SetActorMode, SyncParams,
-    SyncParamsError, SynchronousAgent,
+    Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, Step, SyncParams, SyncParamsError,
+    SynchronousAgent,
 };
 use crate::envs::EnvStructure;
 use crate::logging::{Event, TimeSeriesLogger};
@@ -129,7 +129,7 @@ impl<T, O, A> SynchronousAgent<O, A> for BatchUpdateAgent<T, O, A>
 where
     T: Actor<O, A> + BatchUpdate<O, A>,
 {
-    fn update(&mut self, step: FullStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
+    fn update(&mut self, step: Step<O, A>, logger: &mut dyn TimeSeriesLogger) {
         let full = self.history.push(step);
         if full {
             self.actor.batch_update(&mut self.history, logger);
