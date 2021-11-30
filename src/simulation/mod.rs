@@ -7,7 +7,7 @@ mod serial;
 pub use hooks::{BuildSimulationHook, GenericSimulationHook, SimulationHook};
 pub use iter::SimSteps;
 pub use multithread::{MultithreadSimulator, MultithreadSimulatorConfig};
-pub use serial::{run_actor, run_agent, SerialSimulator};
+pub use serial::{run_agent, SerialSimulator};
 
 use crate::agents::BuildAgentError;
 use crate::envs::{BuildEnvError, Successor};
