@@ -10,7 +10,7 @@ pub use pair::PairSimulator;
 pub use serial::{run_actor, run_agent, SerialSimulator};
 
 use crate::agents::BuildAgentError;
-use crate::envs::{BuildEnvError, Successor};
+use crate::envs::{BuildEnvError, PartialSuccessor, Successor};
 use crate::logging::TimeSeriesLogger;
 use thiserror::Error;
 
@@ -63,4 +63,20 @@ impl<O, A> FullStep<O, A> {
             next,
         }
     }
+}
+
+/// Partial description of an environment step.
+///
+/// Includes everything except the next observation when the episode continues.
+/// Using this instead of [`FullStep`] can avoid having to make copies of the observation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HalfStep<O, A> {
+    /// The initial observation.
+    pub observation: O,
+    /// The action taken from the initial state given the initial observation.
+    pub action: A,
+    /// The resulting reward.
+    pub reward: f64,
+    /// The step outcome; how the episode progresses.
+    pub next: PartialSuccessor<O>,
 }

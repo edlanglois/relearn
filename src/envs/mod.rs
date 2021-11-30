@@ -114,6 +114,17 @@ pub enum Successor<T> {
 }
 
 impl<T> Successor<T> {
+    /// Partition into the continuing state and a [`PartialSuccessor`].
+    #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
+    #[inline]
+    pub fn into_continue_partial(self) -> (Option<T>, PartialSuccessor<T>) {
+        match self {
+            Self::Continue(state) => (Some(state), PartialSuccessor::Continue),
+            Self::Terminate => (None, PartialSuccessor::Terminate),
+            Self::Interrupt(state) => (None, PartialSuccessor::Interrupt(state)),
+        }
+    }
+
     /// Apply a transformation to the inner state when present.
     #[inline]
     pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Successor<U> {
@@ -178,6 +189,20 @@ impl<'a, T: Clone> Successor<&'a T> {
     pub fn cloned(self) -> Successor<T> {
         self.map(Clone::clone)
     }
+}
+
+/// A partial successor state or outcome of an episode step.
+///
+/// Includes the state when interrupted but not when continuing.
+/// See [`Successor`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum PartialSuccessor<T> {
+    /// The episode continues.
+    Continue,
+    /// The episode ends by entering a terminal state.
+    Terminate,
+    /// The episode ends despite entering the given non-terminal state.
+    Interrupt(T),
 }
 
 /// Stored copy of an environment structure.
