@@ -29,10 +29,9 @@ where
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::Agent, BuildAgentError> {
-        Ok(SerialBatchAgent {
-            agent: self.agent_config.build_batch_agent(env, seed)?,
-            history: self.agent_config.build_buffer(),
-        })
+        Ok(SerialBatchAgent::new(
+            self.agent_config.build_batch_agent(env, seed)?,
+        ))
     }
 }
 
@@ -49,8 +48,11 @@ impl<T, O, A> SerialBatchAgent<T, O, A>
 where
     T: BatchUpdate<O, A>,
 {
-    pub fn new(agent: T, history: T::HistoryBuffer) -> Self {
-        Self { agent, history }
+    pub fn new(agent: T) -> Self {
+        Self {
+            history: agent.new_buffer(),
+            agent,
+        }
     }
 }
 
@@ -125,12 +127,7 @@ where
     OS: Space,
     AS: Space,
 {
-    type HistoryBuffer = SerialBuffer<OS::Element, AS::Element>;
     type BatchAgent = BatchedUpdates<TC::Agent>;
-
-    fn build_buffer(&self) -> Self::HistoryBuffer {
-        self.history_buffer_config.build_history_buffer()
-    }
 
     fn build_batch_agent(
         &self,
@@ -139,6 +136,7 @@ where
     ) -> Result<Self::BatchAgent, BuildAgentError> {
         Ok(BatchedUpdates {
             agent: self.agent_config.build_agent(env, seed)?,
+            history_buffer_config: self.history_buffer_config,
         })
     }
 }
@@ -147,6 +145,7 @@ where
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BatchedUpdates<T> {
     agent: T,
+    history_buffer_config: SerialBufferConfig,
 }
 
 impl<T, O, A> Actor<O, A> for BatchedUpdates<T>
@@ -166,6 +165,10 @@ where
     T: Actor<O, A> + SynchronousUpdate<O, A> + AsyncAgent,
 {
     type HistoryBuffer = SerialBuffer<O, A>;
+
+    fn new_buffer(&self) -> Self::HistoryBuffer {
+        self.history_buffer_config.build_history_buffer()
+    }
 
     fn batch_update(
         &mut self,

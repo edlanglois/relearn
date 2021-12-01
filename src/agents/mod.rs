@@ -156,6 +156,9 @@ where
 pub trait BatchUpdate<O, A> {
     type HistoryBuffer: WriteHistoryBuffer<O, A>;
 
+    /// Create a new history buffer.
+    fn new_buffer(&self) -> Self::HistoryBuffer;
+
     /// Update the agent from a collection of history buffers.
     ///
     /// This function is responsible for draining the buffer if the data should not be reused.
@@ -174,6 +177,9 @@ where
     T: BatchUpdate<O, A>,
 {
     type HistoryBuffer = T::HistoryBuffer;
+    fn new_buffer(&self) -> Self::HistoryBuffer {
+        T::new_buffer(self)
+    }
     fn batch_update(
         &mut self,
         buffers: &mut [Self::HistoryBuffer],
@@ -187,6 +193,9 @@ where
     T: BatchUpdate<O, A>,
 {
     type HistoryBuffer = T::HistoryBuffer;
+    fn new_buffer(&self) -> Self::HistoryBuffer {
+        T::new_buffer(self)
+    }
     fn batch_update(
         &mut self,
         buffers: &mut [Self::HistoryBuffer],
@@ -205,12 +214,7 @@ pub trait MakeActor<'a, O, A> {
 }
 
 pub trait BuildBatchAgent<OS: Space, AS: Space> {
-    type HistoryBuffer: WriteHistoryBuffer<OS::Element, AS::Element> + Send;
-    type BatchAgent: BatchUpdate<OS::Element, AS::Element, HistoryBuffer = Self::HistoryBuffer>
-        + SetActorMode;
-
-    /// Build a new history buffer.
-    fn build_buffer(&self) -> Self::HistoryBuffer;
+    type BatchAgent: BatchUpdate<OS::Element, AS::Element> + SetActorMode;
 
     /// Build a new batch agent for the given environment structure ([`EnvStructure`]).
     ///

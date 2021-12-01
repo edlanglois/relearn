@@ -49,12 +49,7 @@ where
     OS: Space,
     AS: Space,
 {
-    type HistoryBuffer = TC::HistoryBuffer;
     type BatchAgent = PureAsActor<TC::BatchAgent, OS::Element, AS::Element>;
-
-    fn build_buffer(&self) -> Self::HistoryBuffer {
-        self.actor_config.build_buffer()
-    }
 
     fn build_batch_agent(
         &self,
@@ -121,6 +116,10 @@ where
     T: PureActor<O, A> + BatchUpdate<O, A>,
 {
     type HistoryBuffer = T::HistoryBuffer;
+
+    fn new_buffer(&self) -> Self::HistoryBuffer {
+        self.actor.new_buffer()
+    }
 
     fn batch_update(
         &mut self,
