@@ -7,10 +7,10 @@ mod serial;
 pub use hooks::{BuildSimulationHook, GenericSimulationHook, SimulationHook};
 pub use iter::SimSteps;
 pub use multithread::{MultithreadSimulator, MultithreadSimulatorConfig};
-pub use serial::{run_agent, SerialSimulator};
+pub use serial::SerialSimulator;
 
-use crate::agents::BuildAgentError;
-use crate::envs::{BuildEnvError, Successor};
+use crate::agents::{BuildAgentError, SynchronousAgent};
+use crate::envs::{BuildEnvError, Environment, Successor};
 use crate::logging::TimeSeriesLogger;
 use thiserror::Error;
 
@@ -93,3 +93,31 @@ impl<O: Clone, A> TransientStep<'_, O, A> {
 /// The successor state is omitted when the episode continues.
 /// Using this can help avoid copying the observation.
 pub type PartialStep<O, A> = Step<O, A, ()>;
+
+/// Run an agent-environment simulation.
+///
+/// # Args
+/// * `environment` - The environment to simulate.
+/// * `agent` - The agent to simulate.
+/// * `hook` - A simulation hook run on each step. Controls when the simulation stops.
+/// * `logger` - The logger to use.
+pub fn run_agent<E, A, H>(
+    environment: &mut E,
+    agent: &mut A,
+    hook: &mut H,
+    logger: &mut dyn TimeSeriesLogger,
+) where
+    E: Environment + ?Sized,
+    A: SynchronousAgent<E::Observation, E::Action> + ?Sized,
+    H: SimulationHook<E::Observation, E::Action> + ?Sized,
+{
+    if !hook.start(logger) {
+        return;
+    }
+    let mut sim = environment.run(agent, logger);
+    while sim.step_with(|_, agent, step, logger| {
+        let done = !hook.call(&step, logger);
+        agent.update(step, logger);
+        done
+    }) {}
+}

@@ -166,18 +166,13 @@ impl<T, U> Successor<T, U> {
         }
     }
 
-    /// Take the `Continue` value or compute it from a closure.
-    ///
-    /// Also returns the rest of the `Successor` as a `PartialSuccessor`.
+    /// Partition into a `PartialSuccessor` and the `Continue` state, if any.
     #[inline]
-    pub fn take_continue_or_else<F>(self, f: F) -> (PartialSuccessor<T>, U)
-    where
-        F: FnOnce() -> U,
-    {
+    pub fn into_partial_continue(self) -> (PartialSuccessor<T>, Option<U>) {
         match self {
-            Self::Continue(o) => (Successor::Continue(()), o),
-            Self::Terminate => (Successor::Terminate, f()),
-            Self::Interrupt(o) => (Successor::Interrupt(o), f()),
+            Self::Continue(o) => (Successor::Continue(()), Some(o)),
+            Self::Terminate => (Successor::Terminate, None),
+            Self::Interrupt(o) => (Successor::Interrupt(o), None),
         }
     }
 }
