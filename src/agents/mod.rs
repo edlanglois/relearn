@@ -3,6 +3,7 @@
 //! More agents can be found in [`crate::torch::agents`].
 
 mod bandits;
+mod batch;
 pub mod buffers;
 mod finite;
 mod meta;
@@ -15,6 +16,8 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
+pub use batch::{SerialBatchAgent, SerialBatchConfig};
+pub use buffers::{HistoryBuffer, WriteHistoryBuffer};
 use finite::{BuildIndexAgent, FiniteSpaceAgent};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
 pub use random::{RandomAgent, RandomAgentConfig};
@@ -99,6 +102,37 @@ where
     fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         T::update(self, step, logger)
     }
+}
+
+/// An agent that updates from steps collected into a history buffer.
+pub trait BatchAgent<O, A>: Actor<O, A> {
+    type HistoryBuffer: WriteHistoryBuffer<O, A> + Send;
+
+    /// Create a new history buffer.
+    fn new_buffer(&self) -> Self::HistoryBuffer;
+
+    /// Update the agent from a collection of history buffers.
+    ///
+    /// Unless otherwise specified, the buffer data must all be sampled on-policy.
+    fn batch_update(&mut self, buffers: &[Self::HistoryBuffer], logger: &mut dyn TimeSeriesLogger);
+}
+
+impl<T, O, A> BatchAgent<O, A> for &'_ mut T
+where
+    T: BatchAgent<O, A>,
+{
+    type HistoryBuffer = T::HistoryBuffer;
+    fn new_buffer(&self) -> Self::HistoryBuffer {
+        T::new_buffer(self)
+    }
+    fn batch_update(&mut self, buffers: &[Self::HistoryBuffer], logger: &mut dyn TimeSeriesLogger) {
+        T::batch_update(self, buffers, logger)
+    }
+}
+
+pub trait MakeActor<'a, O, A> {
+    type Actor: Actor<O, A> + Send;
+    fn make_actor(&'a self, seed: u64) -> Self::Actor;
 }
 
 /// The behaviour mode of an [`Actor`].

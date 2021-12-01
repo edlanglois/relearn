@@ -4,12 +4,41 @@ mod vec;
 
 use crate::simulation::PartialStep;
 pub use serial::{SerialBuffer, SerialBufferConfig};
+use thiserror::Error;
 
 /// Build a history buffer.
 pub trait BuildHistoryBuffer<O, A> {
     type HistoryBuffer;
 
     fn build_history_buffer(&self) -> Self::HistoryBuffer;
+}
+
+#[derive(Debug, Error, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[error("iterator ended before the buffer was full")]
+pub struct InsufficientSteps;
+
+/// Add data to a history buffer.
+pub trait WriteHistoryBuffer<O, A> {
+    /// Insert a step into the buffer and return whether the buffer is full.
+    fn push(&mut self, step: PartialStep<O, A>) -> bool;
+
+    /// Consume steps from an interator until the buffer is full.
+    ///
+    /// Returns `Err(())` if there were not enough steps to fill the buffer and `Ok(())` otherwise.
+    fn fill<I>(&mut self, steps: I) -> Result<(), InsufficientSteps>
+    where
+        I: IntoIterator<Item = PartialStep<O, A>>,
+    {
+        for step in steps {
+            if self.push(step) {
+                return Ok(());
+            }
+        }
+        Err(InsufficientSteps)
+    }
+
+    /// Clear the buffer, removing all values.
+    fn clear(&mut self);
 }
 
 /// Access collected episodes or steps.
