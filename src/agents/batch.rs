@@ -1,6 +1,6 @@
 use super::{
-    Actor, ActorMode, BatchAgent, BuildAgent, BuildAgentError, SetActorMode, SynchronousAgent,
-    WriteHistoryBuffer,
+    Actor, ActorMode, BatchAgent, BuildAgent, BuildAgentError, BuildBatchAgent, SetActorMode,
+    SynchronousAgent, WriteHistoryBuffer,
 };
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
@@ -15,19 +15,21 @@ pub struct SerialBatchConfig<TC> {
 
 impl<TC, OS, AS> BuildAgent<OS, AS> for SerialBatchConfig<TC>
 where
-    TC: BuildAgent<OS, AS>,
-    TC::Agent: BatchAgent<OS::Element, AS::Element>,
+    TC: BuildBatchAgent<OS, AS>,
     OS: Space,
     AS: Space,
 {
-    type Agent = SerialBatchAgent<TC::Agent, OS::Element, AS::Element>;
+    type Agent = SerialBatchAgent<TC::BatchAgent, OS::Element, AS::Element>;
 
     fn build_agent(
         &self,
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::Agent, BuildAgentError> {
-        Ok(self.agent_config.build_agent(env, seed)?.into())
+        Ok(SerialBatchAgent {
+            agent: self.agent_config.build_batch_agent(env, seed)?,
+            history: self.agent_config.new_buffer(),
+        })
     }
 }
 
@@ -44,18 +46,8 @@ impl<T, O, A> SerialBatchAgent<T, O, A>
 where
     T: BatchAgent<O, A>,
 {
-    pub fn new(agent: T) -> Self {
-        let history = agent.new_buffer();
+    pub fn new(agent: T, history: T::HistoryBuffer) -> Self {
         Self { agent, history }
-    }
-}
-
-impl<T, O, A> From<T> for SerialBatchAgent<T, O, A>
-where
-    T: BatchAgent<O, A>,
-{
-    fn from(agent: T) -> Self {
-        Self::new(agent)
     }
 }
 

@@ -108,9 +108,6 @@ where
 pub trait BatchAgent<O, A>: Actor<O, A> {
     type HistoryBuffer: WriteHistoryBuffer<O, A> + Send;
 
-    /// Create a new history buffer.
-    fn new_buffer(&self) -> Self::HistoryBuffer;
-
     /// Update the agent from a collection of history buffers.
     ///
     /// Unless otherwise specified, the buffer data must all be sampled on-policy.
@@ -122,9 +119,15 @@ where
     T: BatchAgent<O, A>,
 {
     type HistoryBuffer = T::HistoryBuffer;
-    fn new_buffer(&self) -> Self::HistoryBuffer {
-        T::new_buffer(self)
+    fn batch_update(&mut self, buffers: &[Self::HistoryBuffer], logger: &mut dyn TimeSeriesLogger) {
+        T::batch_update(self, buffers, logger)
     }
+}
+impl<T, O, A> BatchAgent<O, A> for Box<T>
+where
+    T: BatchAgent<O, A>,
+{
+    type HistoryBuffer = T::HistoryBuffer;
     fn batch_update(&mut self, buffers: &[Self::HistoryBuffer], logger: &mut dyn TimeSeriesLogger) {
         T::batch_update(self, buffers, logger)
     }
@@ -133,6 +136,24 @@ where
 pub trait MakeActor<'a, O, A> {
     type Actor: Actor<O, A> + Send;
     fn make_actor(&'a self, seed: u64) -> Self::Actor;
+}
+
+pub trait BuildBatchAgent<OS: Space, AS: Space> {
+    type HistoryBuffer: WriteHistoryBuffer<OS::Element, AS::Element> + Send;
+    type BatchAgent: BatchAgent<OS::Element, AS::Element, HistoryBuffer = Self::HistoryBuffer>
+        + SetActorMode;
+
+    /// Create a new history buffer.
+    fn new_buffer(&self) -> Self::HistoryBuffer;
+
+    /// Build a new batch agent for the given environment structure ([`EnvStructure`]).
+    ///
+    /// The agent is built in [`ActorMode::Training`].
+    fn build_batch_agent(
+        &self,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        seed: u64,
+    ) -> Result<Self::BatchAgent, BuildAgentError>;
 }
 
 /// The behaviour mode of an [`Actor`].
