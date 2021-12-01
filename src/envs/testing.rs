@@ -49,11 +49,11 @@ where
         return;
     }
 
-    let mut agent = RandomAgent::new(action_space, seed);
+    let agent = RandomAgent::new(action_space, seed);
     simulation::run_agent(
         env,
-        &mut agent,
-        &mut (
+        agent,
+        (
             ClosureHook::from(|step: &TransientStep<_, _>| -> bool {
                 assert!(step.reward >= min_reward);
                 assert!(step.reward <= max_reward);
@@ -64,7 +64,7 @@ where
             }),
             StepLimit::new(num_steps),
         ),
-        &mut (),
+        (),
     );
 }
 

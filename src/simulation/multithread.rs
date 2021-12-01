@@ -83,12 +83,12 @@ where
 
         let mut env_seed_rng = StdRng::seed_from_u64(env_seed);
         for i in 0..self.num_workers {
-            let mut env = self.env_config.build_env(env_seed_rng.gen())?;
-            let mut worker = agent_initializer.new_worker()?;
-            let mut hook = self.hook_config.build_hook(&env, self.num_workers, i);
-            let mut worker_logger = self.worker_logger_config.build_thread_logger(i);
+            let env = self.env_config.build_env(env_seed_rng.gen())?;
+            let worker = agent_initializer.new_worker()?;
+            let hook = self.hook_config.build_hook(&env, self.num_workers, i);
+            let worker_logger = self.worker_logger_config.build_thread_logger(i);
             worker_threads.push(thread::spawn(move || {
-                run_agent(&mut env, &mut worker, &mut hook, &mut worker_logger);
+                run_agent(env, worker, hook, worker_logger);
             }));
         }
 

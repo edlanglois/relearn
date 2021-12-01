@@ -36,10 +36,10 @@ where
         agent_seed: u64,
         logger: &mut dyn TimeSeriesLogger,
     ) -> Result<(), SimulatorError> {
-        let mut env = self.env_config.build_env(env_seed)?;
-        let mut agent = self.agent_config.build_agent(&env, agent_seed)?;
-        let mut hook = self.hook_config.build_hook(&env, 1, 0);
-        run_agent(&mut env, &mut agent, &mut hook, logger);
+        let env = self.env_config.build_env(env_seed)?;
+        let agent = self.agent_config.build_agent(&env, agent_seed)?;
+        let hook = self.hook_config.build_hook(&env, 1, 0);
+        run_agent(env, agent, hook, logger);
         Ok(())
     }
 }

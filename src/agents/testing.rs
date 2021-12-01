@@ -19,12 +19,7 @@ where
 
     // Training
     if num_train_steps > 0 {
-        simulation::run_agent(
-            &mut env,
-            &mut agent,
-            &mut StepLimit::new(num_train_steps),
-            &mut (),
-        );
+        simulation::run_agent(&mut env, &mut agent, StepLimit::new(num_train_steps), ());
     }
 
     eval_deterministic_bandit(agent, &mut env, threshold);

@@ -96,23 +96,23 @@ pub type PartialStep<O, A> = Step<O, A, ()>;
 
 /// Run an agent-environment simulation.
 ///
+/// Note that `Environment`, `SynchronousAgent`, etc. are also implemented for mutable references
+/// so this function can be called either with owned objects or with references.
+///
 /// # Args
 /// * `environment` - The environment to simulate.
 /// * `agent` - The agent to simulate.
 /// * `hook` - A simulation hook run on each step. Controls when the simulation stops.
 /// * `logger` - The logger to use.
-pub fn run_agent<E, A, H>(
-    environment: &mut E,
-    agent: &mut A,
-    hook: &mut H,
-    logger: &mut dyn TimeSeriesLogger,
-) where
-    E: Environment + ?Sized,
-    A: SynchronousAgent<E::Observation, E::Action> + ?Sized,
-    H: SimulationHook<E::Observation, E::Action> + ?Sized,
+pub fn run_agent<E, A, H, L>(environment: E, agent: A, mut hook: H, mut logger: L) -> A
+where
+    E: Environment,
+    A: SynchronousAgent<E::Observation, E::Action>,
+    H: SimulationHook<E::Observation, E::Action>,
+    L: TimeSeriesLogger,
 {
-    if !hook.start(logger) {
-        return;
+    if !hook.start(&mut logger) {
+        return agent;
     }
     let mut sim = environment.run(agent, logger);
     while sim.step_with(|_, agent, step, logger| {
@@ -120,4 +120,5 @@ pub fn run_agent<E, A, H>(
         agent.update(step, logger);
         continue_
     }) {}
+    sim.actor
 }
