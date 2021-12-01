@@ -117,8 +117,6 @@
 extern crate self as relearn;
 
 pub mod agents;
-pub mod cli;
-pub mod defs;
 pub mod envs;
 pub mod logging;
 pub mod simulation;
@@ -127,7 +125,6 @@ pub mod torch;
 pub mod utils;
 
 pub use agents::{Actor, BuildAgent, SynchronousAgent};
-pub use defs::{AgentDef, EnvDef, MultithreadAgentDef, OptimizerDef, SeqModDef};
 pub use envs::{BuildEnv, EnvStructure, Environment, StructuredEnvironment};
 pub use simulation::{run_agent, Simulator, Step};
 
