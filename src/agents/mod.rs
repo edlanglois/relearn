@@ -16,7 +16,7 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
-pub use batch::{SerialBatchAgent, SerialBatchConfig};
+pub use batch::{AsyncAgent, BatchedUpdates, SerialBatchAgent, SerialBatchConfig};
 pub use buffers::{HistoryBuffer, WriteHistoryBuffer};
 use finite::{BuildIndexAgent, FiniteSpaceAgent};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
@@ -106,7 +106,7 @@ where
 
 /// An agent that updates from steps collected into a history buffer.
 pub trait BatchAgent<O, A>: Actor<O, A> {
-    type HistoryBuffer: WriteHistoryBuffer<O, A> + Send;
+    type HistoryBuffer: WriteHistoryBuffer<O, A>;
 
     /// Update the agent from a collection of history buffers.
     ///
@@ -158,8 +158,8 @@ pub trait BuildBatchAgent<OS: Space, AS: Space> {
     type BatchAgent: BatchAgent<OS::Element, AS::Element, HistoryBuffer = Self::HistoryBuffer>
         + SetActorMode;
 
-    /// Create a new history buffer.
-    fn new_buffer(&self) -> Self::HistoryBuffer;
+    /// Build a new history buffer.
+    fn build_buffer(&self) -> Self::HistoryBuffer;
 
     /// Build a new batch agent for the given environment structure ([`EnvStructure`]).
     ///
