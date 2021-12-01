@@ -1,6 +1,5 @@
 //! History buffers
 mod serial;
-mod vec;
 
 use crate::simulation::PartialStep;
 pub use serial::{SerialBuffer, SerialBufferConfig};
