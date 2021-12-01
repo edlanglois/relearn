@@ -4,7 +4,7 @@ mod iter;
 mod multithread;
 mod serial;
 
-pub use hooks::{BuildSimulationHook, GenericSimulationHook, SimulationHook};
+pub use hooks::{BuildSimulationHook, SimulationHook};
 pub use iter::SimSteps;
 pub use multithread::{MultithreadSimulator, MultithreadSimulatorConfig};
 pub use serial::SerialSimulator;

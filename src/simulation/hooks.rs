@@ -47,38 +47,6 @@ pub trait SimulationHook<O, A> {
     fn call(&mut self, step: &TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool;
 }
 
-/// A generic simulation hook that applies to every state, action, and logger.
-pub trait GenericSimulationHook {
-    /// Call the hook at the start of the simulation.
-    ///
-    /// # Returns
-    /// Whether the simulation should run.
-    fn start(&mut self, _logger: &mut dyn TimeSeriesLogger) -> bool {
-        true
-    }
-
-    /// Call the hook on the current step.
-    ///
-    /// # Args
-    /// * `step` - The most recent environment step.
-    /// * `logger` - A logger.
-    ///
-    /// # Returns
-    /// Whether the simulation should continue after this step.
-    fn call<O, A>(&mut self, step: &TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger)
-        -> bool;
-}
-
-impl<O, A, T: GenericSimulationHook> SimulationHook<O, A> for T {
-    fn start(&mut self, logger: &mut dyn TimeSeriesLogger) -> bool {
-        GenericSimulationHook::start(self, logger)
-    }
-
-    fn call(&mut self, step: &TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
-        GenericSimulationHook::call(self, step, logger)
-    }
-}
-
 /// Divide `total` almost evently into `parts` that sum up to `total`.
 ///
 /// Each part gets `ceil(total / parts)` or `floor(total / parts)` depending on `part_index`.
@@ -136,11 +104,11 @@ impl StepLimit {
     }
 }
 
-impl GenericSimulationHook for StepLimit {
+impl<O, A> SimulationHook<O, A> for StepLimit {
     fn start(&mut self, _: &mut dyn TimeSeriesLogger) -> bool {
         self.steps_remaining > 0
     }
-    fn call<O, A>(&mut self, _: &TransientStep<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
+    fn call(&mut self, _: &TransientStep<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
         self.steps_remaining -= 1;
         self.steps_remaining > 0
     }
@@ -193,12 +161,12 @@ impl EpisodeLimit {
     }
 }
 
-impl GenericSimulationHook for EpisodeLimit {
+impl<O, A> SimulationHook<O, A> for EpisodeLimit {
     fn start(&mut self, _: &mut dyn TimeSeriesLogger) -> bool {
         self.episodes_remaining > 0
     }
 
-    fn call<O, A>(&mut self, step: &TransientStep<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
+    fn call(&mut self, step: &TransientStep<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
         if step.next.episode_done() {
             self.episodes_remaining -= 1;
             self.episodes_remaining > 0
@@ -308,8 +276,8 @@ where
 
 // For a collection (list or tuple) of hooks, stop if any hook requests a stop.
 
-impl GenericSimulationHook for () {
-    fn call<O, A>(&mut self, _: &TransientStep<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
+impl<O, A> SimulationHook<O, A> for () {
+    fn call(&mut self, _: &TransientStep<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
         true
     }
 }
@@ -403,8 +371,8 @@ impl RewardStatistics {
     }
 }
 
-impl GenericSimulationHook for RewardStatistics {
-    fn call<O, A>(&mut self, step: &TransientStep<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
+impl<O, A> SimulationHook<O, A> for RewardStatistics {
+    fn call(&mut self, step: &TransientStep<O, A>, _: &mut dyn TimeSeriesLogger) -> bool {
         self.call_(step);
         true
     }
