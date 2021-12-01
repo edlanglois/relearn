@@ -9,6 +9,7 @@ mod finite;
 mod meta;
 mod pair;
 mod random;
+mod stateful;
 mod tabular;
 #[cfg(test)]
 pub mod testing;
@@ -29,6 +30,43 @@ use crate::simulation::TransientStep;
 use crate::spaces::Space;
 use tch::TchError;
 use thiserror::Error;
+
+/// An actor with explicit episodic state.
+pub trait PureActor<O, A> {
+    type State;
+
+    /// Create a new episodic state object.
+    fn initial_state(&self, seed: u64) -> Self::State;
+
+    /// Choose an action in the environment.
+    fn act(&self, state: &mut Self::State, observation: &O) -> A;
+}
+
+impl<T, O, A> PureActor<O, A> for &'_ T
+where
+    T: PureActor<O, A> + ?Sized,
+{
+    type State = T::State;
+    fn initial_state(&self, seed: u64) -> Self::State {
+        T::initial_state(self, seed)
+    }
+    fn act(&self, state: &mut Self::State, observation: &O) -> A {
+        T::act(self, state, observation)
+    }
+}
+
+impl<T, O, A> PureActor<O, A> for Box<T>
+where
+    T: PureActor<O, A> + ?Sized,
+{
+    type State = T::State;
+    fn initial_state(&self, seed: u64) -> Self::State {
+        T::initial_state(self, seed)
+    }
+    fn act(&self, state: &mut Self::State, observation: &O) -> A {
+        T::act(self, state, observation)
+    }
+}
 
 /// An actor that produces actions in response to a sequence of observations.
 ///
