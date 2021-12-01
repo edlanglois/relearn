@@ -2,8 +2,8 @@ use super::buffers::{
     BuildHistoryBuffer, HistoryBuffer, SerialBuffer, SerialBufferConfig, WriteHistoryBuffer,
 };
 use super::{
-    Actor, ActorMode, BatchAgent, BuildAgent, BuildAgentError, BuildBatchAgent, SetActorMode,
-    SynchronousAgent,
+    Actor, ActorMode, BatchAgent, BuildAgent, BuildAgentError, BuildBatchAgent, MakeActor,
+    SetActorMode, SynchronousAgent,
 };
 use crate::envs::{EnvStructure, Successor};
 use crate::logging::{Event, TimeSeriesLogger};
@@ -183,6 +183,16 @@ where
         }
 
         logger.end_event(Event::AgentOptPeriod).unwrap();
+    }
+}
+
+impl<'a, T, O, A> MakeActor<'a, O, A> for BatchedUpdates<T>
+where
+    T: MakeActor<'a, O, A>,
+{
+    type Actor = T::Actor;
+    fn make_actor(&'a self, seed: u64) -> Self::Actor {
+        self.agent.make_actor(seed)
     }
 }
 

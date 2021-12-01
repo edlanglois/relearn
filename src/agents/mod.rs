@@ -148,6 +148,9 @@ where
     }
 }
 
+/// Make a new actor instance with the same model.
+///
+/// The new actor can include references to self.
 pub trait MakeActor<'a, O, A> {
     type Actor: Actor<O, A> + Send;
     fn make_actor(&'a self, seed: u64) -> Self::Actor;
