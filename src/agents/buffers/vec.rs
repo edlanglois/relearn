@@ -129,7 +129,7 @@ where
 #[allow(clippy::needless_pass_by_value)]
 #[cfg(test)]
 mod tests {
-    use super::super::{BuildHistoryBuffer, SerialBuffer, SerialBufferConfig};
+    use super::super::{BuildHistoryBuffer, SerialBuffer, SerialBufferConfig, WriteHistoryBuffer};
     use super::*;
     use crate::envs::Successor::{self, Continue, Terminate};
     use crate::simulation::PartialStep;

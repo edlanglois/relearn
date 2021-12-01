@@ -1,7 +1,7 @@
-use super::{BuildHistoryBuffer, HistoryBuffer};
+use super::{BuildHistoryBuffer, HistoryBuffer, WriteHistoryBuffer};
 use crate::simulation::PartialStep;
 use crate::utils::iter::SizedChain;
-use std::iter::{ExactSizeIterator, Extend, FusedIterator};
+use std::iter::{ExactSizeIterator, FusedIterator};
 
 /// Configuration for [`SerialBuffer`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -58,13 +58,8 @@ impl<O, A> BuildHistoryBuffer<O, A> for SerialBufferConfig {
     }
 }
 
-impl<O, A> SerialBuffer<O, A> {
-    /// Push a new step into the buffer.
-    ///
-    /// Steps must be pushed consecutively within each episode.
-    ///
-    /// Returns a Boolean indicating whether the buffer is ready to be drained for a model update.
-    pub fn push(&mut self, step: PartialStep<O, A>) -> bool {
+impl<O, A> WriteHistoryBuffer<O, A> for SerialBuffer<O, A> {
+    fn push(&mut self, step: PartialStep<O, A>) -> bool {
         let episode_done = step.next.episode_done();
         self.steps.push(step);
         let num_steps = self.steps.len();
@@ -74,20 +69,9 @@ impl<O, A> SerialBuffer<O, A> {
         (episode_done && num_steps >= self.soft_threshold) || (num_steps >= self.hard_threshold)
     }
 
-    pub fn clear(&mut self) {
+    fn clear(&mut self) {
         self.steps.clear();
         self.episode_ends.clear();
-    }
-}
-
-impl<O, A> Extend<PartialStep<O, A>> for SerialBuffer<O, A> {
-    fn extend<T>(&mut self, iter: T)
-    where
-        T: IntoIterator<Item = PartialStep<O, A>>,
-    {
-        for step in iter {
-            self.push(step);
-        }
     }
 }
 
