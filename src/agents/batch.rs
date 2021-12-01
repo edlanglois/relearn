@@ -71,9 +71,8 @@ where
         let full = self.history.push(step.into_partial());
         if full {
             self.agent
-                .batch_update(slice::from_ref(&self.history), logger);
+                .batch_update(slice::from_mut(&mut self.history), logger);
         }
-        self.history.clear();
     }
 }
 

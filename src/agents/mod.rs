@@ -110,8 +110,15 @@ pub trait BatchAgent<O, A>: Actor<O, A> {
 
     /// Update the agent from a collection of history buffers.
     ///
-    /// Unless otherwise specified, the buffer data must all be sampled on-policy.
-    fn batch_update(&mut self, buffers: &[Self::HistoryBuffer], logger: &mut dyn TimeSeriesLogger);
+    /// This function is responsible for draining the buffer if the data should not be reused.
+    /// Any data left in the buffer should remain for the next call to `batch_update`.
+    ///
+    /// All new data inserted into the buffers since the last call must be on-policy.
+    fn batch_update(
+        &mut self,
+        buffers: &mut [Self::HistoryBuffer],
+        logger: &mut dyn TimeSeriesLogger,
+    );
 }
 
 impl<T, O, A> BatchAgent<O, A> for &'_ mut T
@@ -119,7 +126,11 @@ where
     T: BatchAgent<O, A>,
 {
     type HistoryBuffer = T::HistoryBuffer;
-    fn batch_update(&mut self, buffers: &[Self::HistoryBuffer], logger: &mut dyn TimeSeriesLogger) {
+    fn batch_update(
+        &mut self,
+        buffers: &mut [Self::HistoryBuffer],
+        logger: &mut dyn TimeSeriesLogger,
+    ) {
         T::batch_update(self, buffers, logger)
     }
 }
@@ -128,7 +139,11 @@ where
     T: BatchAgent<O, A>,
 {
     type HistoryBuffer = T::HistoryBuffer;
-    fn batch_update(&mut self, buffers: &[Self::HistoryBuffer], logger: &mut dyn TimeSeriesLogger) {
+    fn batch_update(
+        &mut self,
+        buffers: &mut [Self::HistoryBuffer],
+        logger: &mut dyn TimeSeriesLogger,
+    ) {
         T::batch_update(self, buffers, logger)
     }
 }
