@@ -167,6 +167,7 @@ impl<T, U> Successor<T, U> {
     }
 
     /// Partition into a `PartialSuccessor` and the `Continue` state, if any.
+    #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
     #[inline]
     pub fn into_partial_continue(self) -> (PartialSuccessor<T>, Option<U>) {
         match self {
