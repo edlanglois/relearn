@@ -16,6 +16,9 @@ where
     }
 
     fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a PartialStep<O, A>> + 'a> {
+        // TODO: Bug.
+        // With partial step, incomplete episodes look like they lead into the first episode of the
+        // next buffer.
         Box::new(SizedFlatMap::new(self.iter(), HistoryBuffer::steps))
     }
 
