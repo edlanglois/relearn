@@ -182,14 +182,10 @@ impl<T: SetActorMode + ?Sized> SetActorMode for Box<T> {
     }
 }
 
-pub trait FullAgent<O, A>: SynchronousAgent<O, A> + SetActorMode {}
-impl<O, A, T> FullAgent<O, A> for T where T: SynchronousAgent<O, A> + SetActorMode + ?Sized {}
-
-// TODO: Be more flexible about the bounds on Agent?
 /// Build an agent instance for a given environment structure.
 pub trait BuildAgent<OS: Space, AS: Space> {
     /// Type of agent to build
-    type Agent: FullAgent<OS::Element, AS::Element>;
+    type Agent: SynchronousAgent<OS::Element, AS::Element> + SetActorMode;
 
     /// Build an agent for the given environment structure ([`EnvStructure`]).
     ///
