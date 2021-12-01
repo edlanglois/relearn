@@ -26,6 +26,11 @@ where
         )
     }
 
+    fn reset_state(&self, state: &mut Self::State) {
+        self.0.reset_state(&mut state.0);
+        self.1.reset_state(&mut state.1);
+    }
+
     fn act(&self, state: &mut Self::State, observation: &(O1, O2)) -> (A1, A2) {
         (
             self.0.act(&mut state.0, &observation.0),

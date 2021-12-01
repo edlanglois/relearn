@@ -103,7 +103,7 @@ where
     }
 
     fn reset(&mut self) {
-        self.state = self.actor.initial_state(self.rng.gen())
+        self.actor.reset_state(&mut self.state);
     }
 }
 

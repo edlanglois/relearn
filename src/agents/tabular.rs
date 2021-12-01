@@ -102,6 +102,8 @@ impl PureActor<usize, usize> for BaseTabularQLearningAgent {
         StdRng::seed_from_u64(seed)
     }
 
+    fn reset_state(&self, _state: &mut Self::State) {}
+
     fn act(&self, rng: &mut Self::State, observation: &usize) -> usize {
         if self.mode == ActorMode::Training && rng.gen::<f64>() < self.exploration_rate {
             // Random exploration with probability `exploration_rate` when in training mode

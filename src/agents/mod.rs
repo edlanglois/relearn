@@ -39,6 +39,12 @@ pub trait PureActor<O, A> {
     /// Create a new episodic state object.
     fn initial_state(&self, seed: u64) -> Self::State;
 
+    /// Reset the state for a new episode.
+    ///
+    /// Pseudo-random number generators may be left unchanged
+    /// since they do not represent stored memory.
+    fn reset_state(&self, state: &mut Self::State);
+
     /// Choose an action in the environment.
     fn act(&self, state: &mut Self::State, observation: &O) -> A;
 }
@@ -50,6 +56,9 @@ where
     type State = T::State;
     fn initial_state(&self, seed: u64) -> Self::State {
         T::initial_state(self, seed)
+    }
+    fn reset_state(&self, state: &mut Self::State) {
+        T::reset_state(self, state)
     }
     fn act(&self, state: &mut Self::State, observation: &O) -> A {
         T::act(self, state, observation)
@@ -63,6 +72,9 @@ where
     type State = T::State;
     fn initial_state(&self, seed: u64) -> Self::State {
         T::initial_state(self, seed)
+    }
+    fn reset_state(&self, state: &mut Self::State) {
+        T::reset_state(self, state)
     }
     fn act(&self, state: &mut Self::State, observation: &O) -> A {
         T::act(self, state, observation)

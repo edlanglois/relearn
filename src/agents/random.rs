@@ -52,6 +52,8 @@ impl<O, AS: SampleSpace> PureActor<O, AS::Element> for RandomAgent<AS> {
         StdRng::seed_from_u64(seed)
     }
 
+    fn reset_state(&self, _state: &mut Self::State) {}
+
     fn act(&self, rng: &mut Self::State, _observation: &O) -> AS::Element {
         self.action_space.sample(rng)
     }

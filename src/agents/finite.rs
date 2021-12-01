@@ -54,6 +54,10 @@ where
         self.agent.initial_state(seed)
     }
 
+    fn reset_state(&self, state: &mut Self::State) {
+        self.agent.reset_state(state)
+    }
+
     fn act(&self, state: &mut Self::State, observation: &OS::Element) -> AS::Element {
         self.action_space
             .from_index(

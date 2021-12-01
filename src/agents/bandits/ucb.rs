@@ -157,6 +157,9 @@ impl PureActor<usize, usize> for BaseUCB1Agent {
     fn initial_state(&self, _seed: u64) -> Self::State {}
 
     #[inline]
+    fn reset_state(&self, _state: &mut Self::State) {}
+
+    #[inline]
     fn act(&self, _: &mut Self::State, observation: &usize) -> usize {
         match self.mode {
             ActorMode::Training => self.act_training(*observation),

@@ -156,6 +156,9 @@ impl PureActor<usize, usize> for BaseBetaThompsonSamplingAgent {
     }
 
     #[inline]
+    fn reset_state(&self, _state: &mut Self::State) {}
+
+    #[inline]
     fn act(&self, rng: &mut Self::State, observation: &usize) -> usize {
         match self.mode {
             ActorMode::Training => self.act_training(*observation, rng),
