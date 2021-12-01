@@ -47,6 +47,28 @@ pub trait SimulationHook<O, A> {
     fn call(&mut self, step: &TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool;
 }
 
+impl<O, A, T: SimulationHook<O, A> + ?Sized> SimulationHook<O, A> for &'_ mut T {
+    #[inline]
+    fn start(&mut self, logger: &mut dyn TimeSeriesLogger) -> bool {
+        T::start(self, logger)
+    }
+    #[inline]
+    fn call(&mut self, step: &TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
+        T::call(self, step, logger)
+    }
+}
+
+impl<O, A, T: SimulationHook<O, A> + ?Sized> SimulationHook<O, A> for Box<T> {
+    #[inline]
+    fn start(&mut self, logger: &mut dyn TimeSeriesLogger) -> bool {
+        T::start(self, logger)
+    }
+    #[inline]
+    fn call(&mut self, step: &TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
+        T::call(self, step, logger)
+    }
+}
+
 /// Divide `total` almost evently into `parts` that sum up to `total`.
 ///
 /// Each part gets `ceil(total / parts)` or `floor(total / parts)` depending on `part_index`.

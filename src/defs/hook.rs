@@ -84,16 +84,6 @@ where
     }
 }
 
-impl<O, A> SimulationHook<O, A> for Box<dyn SimulationHook<O, A> + Send> {
-    fn start(&mut self, logger: &mut dyn TimeSeriesLogger) -> bool {
-        self.as_mut().start(logger)
-    }
-
-    fn call(&mut self, step: &TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) -> bool {
-        self.as_mut().call(step, logger)
-    }
-}
-
 impl<OS, AS> BuildSimulationHook<OS, AS> for HooksDef
 where
     OS: ElementRefInto<Loggable> + Send + 'static,
