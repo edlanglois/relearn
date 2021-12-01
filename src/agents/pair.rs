@@ -1,4 +1,6 @@
-use super::{Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, SynchronousUpdate};
+use super::{
+    Actor, ActorMode, BuildAgent, BuildAgentError, PureActor, SetActorMode, SynchronousUpdate,
+};
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
@@ -8,6 +10,29 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 /// A pair of agents for a two-agent environment.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct AgentPair<T, U>(pub T, pub U);
+
+impl<T, U, O1, O2, A1, A2> PureActor<(O1, O2), (A1, A2)> for AgentPair<T, U>
+where
+    T: PureActor<O1, A1>,
+    U: PureActor<O2, A2>,
+{
+    type State = (T::State, U::State);
+
+    fn initial_state(&self, seed: u64) -> Self::State {
+        let mut rng = StdRng::seed_from_u64(seed);
+        (
+            self.0.initial_state(rng.gen()),
+            self.1.initial_state(rng.gen()),
+        )
+    }
+
+    fn act(&self, state: &mut Self::State, observation: &(O1, O2)) -> (A1, A2) {
+        (
+            self.0.act(&mut state.0, &observation.0),
+            self.1.act(&mut state.1, &observation.1),
+        )
+    }
+}
 
 impl<T, U, O1, O2, A1, A2> Actor<(O1, O2), (A1, A2)> for AgentPair<T, U>
 where
@@ -34,34 +59,36 @@ where
         step: TransientStep<(O1, O2), (A1, A2)>,
         logger: &mut dyn TimeSeriesLogger,
     ) {
-        let (o1, o2) = step.observation;
-        let (a1, a2) = step.action;
-        let (n1, n2) = match step.next {
-            Successor::Continue((no1, no2)) => (Successor::Continue(no1), Successor::Continue(no2)),
-            Successor::Terminate => (Successor::Terminate, Successor::Terminate),
-            Successor::Interrupt((no1, no2)) => {
-                (Successor::Interrupt(no1), Successor::Interrupt(no2))
-            }
-        };
-        self.0.update(
-            TransientStep {
-                observation: o1,
-                action: a1,
-                reward: step.reward,
-                next: n1,
-            },
-            logger,
-        );
-        self.1.update(
-            TransientStep {
-                observation: o2,
-                action: a2,
-                reward: step.reward,
-                next: n2,
-            },
-            logger,
-        );
+        let (step1, step2) = split_step(step);
+        self.0.update(step1, logger);
+        self.1.update(step2, logger);
     }
+}
+
+#[allow(clippy::missing_const_for_fn)]
+fn split_step<O1, O2, A1, A2>(
+    step: TransientStep<(O1, O2), (A1, A2)>,
+) -> (TransientStep<O1, A1>, TransientStep<O2, A2>) {
+    let (o1, o2) = step.observation;
+    let (a1, a2) = step.action;
+    let (n1, n2) = match step.next {
+        Successor::Continue((no1, no2)) => (Successor::Continue(no1), Successor::Continue(no2)),
+        Successor::Terminate => (Successor::Terminate, Successor::Terminate),
+        Successor::Interrupt((no1, no2)) => (Successor::Interrupt(no1), Successor::Interrupt(no2)),
+    };
+    let step1 = TransientStep {
+        observation: o1,
+        action: a1,
+        reward: step.reward,
+        next: n1,
+    };
+    let step2 = TransientStep {
+        observation: o2,
+        action: a2,
+        reward: step.reward,
+        next: n2,
+    };
+    (step1, step2)
 }
 
 impl<T, U> SetActorMode for AgentPair<T, U>

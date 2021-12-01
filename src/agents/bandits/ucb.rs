@@ -1,6 +1,6 @@
 //! Upper confidence bound bandit agent.
 use super::super::{
-    Actor, ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, SetActorMode,
+    ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, PureActor, SetActorMode,
     SynchronousUpdate,
 };
 use crate::logging::TimeSeriesLogger;
@@ -125,7 +125,7 @@ impl fmt::Display for BaseUCB1Agent {
 
 impl BaseUCB1Agent {
     /// Take a training-mode action.
-    fn act_training(&mut self, obs_idx: usize) -> usize {
+    fn act_training(&self, obs_idx: usize) -> usize {
         let log_squared_visit_count = 2.0 * (self.state_visit_count[obs_idx] as f64).ln();
         let ucb = self
             .state_action_count
@@ -140,7 +140,7 @@ impl BaseUCB1Agent {
     }
 
     /// Take a release-mode (greedy) action.
-    fn act_release(&mut self, obs_idx: usize) -> usize {
+    fn act_release(&self, obs_idx: usize) -> usize {
         // Take the action with the largest action count
         self.state_action_count
             .index_axis(Axis(0), obs_idx)
@@ -150,18 +150,18 @@ impl BaseUCB1Agent {
     }
 }
 
-impl Actor<usize, usize> for BaseUCB1Agent {
+impl PureActor<usize, usize> for BaseUCB1Agent {
+    type State = ();
+
     #[inline]
-    fn act(&mut self, observation: &usize) -> usize {
+    fn initial_state(&self, _seed: u64) -> Self::State {}
+
+    #[inline]
+    fn act(&self, _: &mut Self::State, observation: &usize) -> usize {
         match self.mode {
             ActorMode::Training => self.act_training(*observation),
             ActorMode::Release => self.act_release(*observation),
         }
-    }
-
-    #[inline]
-    fn reset(&mut self) {
-        // No episode-specific state
     }
 }
 
@@ -197,6 +197,10 @@ mod ucb1_agent {
     #[test]
     fn learns_determinstic_bandit() {
         let config = UCB1AgentConfig::default();
-        testing::train_deterministic_bandit(|env| config.build_agent(env, 0).unwrap(), 1000, 0.9);
+        testing::pure_train_deterministic_bandit(
+            |env| config.build_agent(env, 0).unwrap(),
+            1000,
+            0.9,
+        );
     }
 }

@@ -14,6 +14,12 @@ pub struct PureAsActorConfig<TC> {
     pub actor_config: TC,
 }
 
+impl<TC> PureAsActorConfig<TC> {
+    pub const fn new(actor_config: TC) -> Self {
+        Self { actor_config }
+    }
+}
+
 impl<TC, OS, AS> BuildAgent<OS, AS> for PureAsActorConfig<TC>
 where
     TC: BuildAgent<OS, AS>,

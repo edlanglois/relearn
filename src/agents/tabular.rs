@@ -1,6 +1,6 @@
 //! Tabular agents
 use super::{
-    Actor, ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, SetActorMode,
+    ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, PureActor, SetActorMode,
     SynchronousUpdate,
 };
 use crate::logging::TimeSeriesLogger;
@@ -39,14 +39,13 @@ impl BuildIndexAgent for TabularQLearningAgentConfig {
         num_actions: usize,
         _reward_range: (f64, f64),
         discount_factor: f64,
-        seed: u64,
+        _seed: u64,
     ) -> Result<Self::Agent, BuildAgentError> {
         Ok(BaseTabularQLearningAgent::new(
             num_observations,
             num_actions,
             discount_factor,
             self.exploration_rate,
-            seed,
         ))
     }
 }
@@ -65,7 +64,6 @@ pub struct BaseTabularQLearningAgent {
 
     state_action_counts: Array2<u32>,
     state_action_values: Array2<f64>,
-    rng: StdRng,
 }
 
 impl BaseTabularQLearningAgent {
@@ -74,7 +72,6 @@ impl BaseTabularQLearningAgent {
         num_actions: usize,
         discount_factor: f64,
         exploration_rate: f64,
-        seed: u64,
     ) -> Self {
         let state_action_counts = Array::from_elem((num_observations, num_actions), 0);
         let state_action_values = Array::from_elem((num_observations, num_actions), 0.0);
@@ -84,7 +81,6 @@ impl BaseTabularQLearningAgent {
             state_action_counts,
             state_action_values,
             mode: ActorMode::Training,
-            rng: StdRng::seed_from_u64(seed),
         }
     }
 }
@@ -99,22 +95,24 @@ impl fmt::Display for BaseTabularQLearningAgent {
     }
 }
 
-impl Actor<usize, usize> for BaseTabularQLearningAgent {
-    fn act(&mut self, observation: &usize) -> usize {
-        if self.mode == ActorMode::Training && self.rng.gen::<f64>() < self.exploration_rate {
+impl PureActor<usize, usize> for BaseTabularQLearningAgent {
+    type State = StdRng;
+
+    fn initial_state(&self, seed: u64) -> Self::State {
+        StdRng::seed_from_u64(seed)
+    }
+
+    fn act(&self, rng: &mut Self::State, observation: &usize) -> usize {
+        if self.mode == ActorMode::Training && rng.gen::<f64>() < self.exploration_rate {
             // Random exploration with probability `exploration_rate` when in training mode
             let (_, num_actions) = self.state_action_counts.dim();
-            self.rng.gen_range(0..num_actions)
+            rng.gen_range(0..num_actions)
         } else {
             self.state_action_values
                 .index_axis(Axis(0), *observation)
                 .argmax()
                 .unwrap()
         }
-    }
-
-    fn reset(&mut self) {
-        // No episode state
     }
 }
 
@@ -148,7 +146,7 @@ impl SetActorMode for BaseTabularQLearningAgent {
 
 #[cfg(test)]
 mod tabular_q_learning {
-    use super::super::{testing, BuildAgent};
+    use super::super::{testing, BuildAgent, PureAsActorConfig};
     use super::*;
     use crate::envs::{DeterministicBandit, EnvStructure, Environment, IntoEnv};
     use crate::simulation;
@@ -157,7 +155,11 @@ mod tabular_q_learning {
     #[test]
     fn learns_determinstic_bandit() {
         let config = TabularQLearningAgentConfig::default();
-        testing::train_deterministic_bandit(|env| config.build_agent(env, 0).unwrap(), 1000, 0.9);
+        testing::pure_train_deterministic_bandit(
+            |env| config.build_agent(env, 0).unwrap(),
+            1000,
+            0.9,
+        );
     }
 
     #[test]
@@ -165,7 +167,7 @@ mod tabular_q_learning {
         let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).into_env(0);
 
         // The initial mode explores
-        let config = TabularQLearningAgentConfig::new(0.95);
+        let config = PureAsActorConfig::new(TabularQLearningAgentConfig::new(0.95));
         let mut agent = config.build_agent(&env, 0).unwrap();
         let mut explore_hooks = (
             IndexedActionCounter::new(env.action_space()),

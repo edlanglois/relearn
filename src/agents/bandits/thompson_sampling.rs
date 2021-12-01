@@ -1,6 +1,6 @@
 //! Thompson sampling bandit agent
 use super::super::{
-    Actor, ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, SetActorMode,
+    ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, PureActor, SetActorMode,
     SynchronousUpdate,
 };
 use crate::logging::TimeSeriesLogger;
@@ -41,14 +41,13 @@ impl BuildIndexAgent for BetaThompsonSamplingAgentConfig {
         num_actions: usize,
         reward_range: (f64, f64),
         _discount_factor: f64,
-        seed: u64,
+        _seed: u64,
     ) -> Result<Self::Agent, BuildAgentError> {
         Ok(BaseBetaThompsonSamplingAgent::new(
             num_observations,
             num_actions,
             reward_range,
             self.num_samples,
-            seed,
         ))
     }
 }
@@ -72,8 +71,6 @@ pub struct BaseBetaThompsonSamplingAgent {
 
     /// Count of low and high rewards for each observation-action pair.
     low_high_reward_counts: Array2<(u64, u64)>,
-
-    rng: StdRng,
 }
 
 impl BaseBetaThompsonSamplingAgent {
@@ -82,7 +79,6 @@ impl BaseBetaThompsonSamplingAgent {
         num_actions: usize,
         reward_range: (f64, f64),
         num_samples: usize,
-        seed: u64,
     ) -> Self {
         let (reward_min, reward_max) = reward_range;
         let reward_threshold = (reward_min + reward_max) / 2.0;
@@ -92,7 +88,6 @@ impl BaseBetaThompsonSamplingAgent {
             num_samples,
             mode: ActorMode::Training,
             low_high_reward_counts,
-            rng: StdRng::seed_from_u64(seed),
         }
     }
 }
@@ -109,9 +104,8 @@ impl fmt::Display for BaseBetaThompsonSamplingAgent {
 
 impl BaseBetaThompsonSamplingAgent {
     /// Take a training-mode action.
-    fn act_training(&mut self, obs_idx: usize) -> usize {
+    fn act_training(&self, obs_idx: usize, rng: &mut StdRng) -> usize {
         let num_samples = self.num_samples;
-        let rng = &mut self.rng;
         self.low_high_reward_counts
             .index_axis(Axis(0), obs_idx)
             .mapv(|(beta, alpha)| -> f64 {
@@ -141,7 +135,7 @@ impl BaseBetaThompsonSamplingAgent {
     }
 
     /// Take a release-mode (greedy) action.
-    fn act_release(&mut self, obs_idx: usize) -> usize {
+    fn act_release(&self, obs_idx: usize) -> usize {
         // Take the action with highest posterior mean
         // Counts are initalized to 1 so there is no risk of 0/0
         self.low_high_reward_counts
@@ -153,18 +147,20 @@ impl BaseBetaThompsonSamplingAgent {
     }
 }
 
-impl Actor<usize, usize> for BaseBetaThompsonSamplingAgent {
+impl PureActor<usize, usize> for BaseBetaThompsonSamplingAgent {
+    type State = StdRng;
+
     #[inline]
-    fn act(&mut self, observation: &usize) -> usize {
-        match self.mode {
-            ActorMode::Training => self.act_training(*observation),
-            ActorMode::Release => self.act_release(*observation),
-        }
+    fn initial_state(&self, seed: u64) -> Self::State {
+        StdRng::seed_from_u64(seed)
     }
 
     #[inline]
-    fn reset(&mut self) {
-        // No episode-specific state
+    fn act(&self, rng: &mut Self::State, observation: &usize) -> usize {
+        match self.mode {
+            ActorMode::Training => self.act_training(*observation, rng),
+            ActorMode::Release => self.act_release(*observation),
+        }
     }
 }
 
@@ -196,6 +192,10 @@ mod beta_thompson_sampling {
     #[test]
     fn learns_determinstic_bandit() {
         let config = BetaThompsonSamplingAgentConfig::default();
-        testing::train_deterministic_bandit(|env| config.build_agent(env, 0).unwrap(), 1000, 0.9);
+        testing::pure_train_deterministic_bandit(
+            |env| config.build_agent(env, 0).unwrap(),
+            1000,
+            0.9,
+        );
     }
 }

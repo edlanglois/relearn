@@ -3,7 +3,7 @@ use super::buffers::{
 };
 use super::{
     Actor, ActorMode, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchAgent, MakeActor,
-    SetActorMode, SynchronousUpdate,
+    PureActor, SetActorMode, SynchronousUpdate,
 };
 use crate::envs::{EnvStructure, Successor};
 use crate::logging::{Event, TimeSeriesLogger};
@@ -51,6 +51,20 @@ where
 {
     pub fn new(agent: T, history: T::HistoryBuffer) -> Self {
         Self { agent, history }
+    }
+}
+
+impl<T, O, A> PureActor<O, A> for SerialBatchAgent<T, O, A>
+where
+    T: PureActor<O, A> + BatchUpdate<O, A>,
+{
+    type State = T::State;
+
+    fn initial_state(&self, seed: u64) -> Self::State {
+        self.agent.initial_state(seed)
+    }
+    fn act(&self, state: &mut Self::State, observation: &O) -> A {
+        self.agent.act(state, observation)
     }
 }
 

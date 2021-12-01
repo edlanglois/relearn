@@ -3,7 +3,7 @@ use super::{
     CloneBuild, DeterministicBandit, EnvDistribution, EnvStructure, IntoEnv, Pomdp,
     PomdpDistribution, StoredEnvStructure, StructuredEnvironment,
 };
-use crate::agents::RandomAgent;
+use crate::agents::{PureAsActor, RandomAgent};
 use crate::simulation::hooks::{ClosureHook, StepLimit};
 use crate::simulation::{self, TransientStep};
 use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space, SubsetOrd};
@@ -49,7 +49,7 @@ where
         return;
     }
 
-    let agent = RandomAgent::new(action_space, seed);
+    let agent = PureAsActor::new(RandomAgent::new(action_space), seed);
     simulation::run_agent(
         env,
         agent,

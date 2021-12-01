@@ -1,4 +1,6 @@
-use super::{Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, SynchronousUpdate};
+use super::{
+    Actor, ActorMode, BuildAgent, BuildAgentError, PureActor, SetActorMode, SynchronousUpdate,
+};
 use crate::envs::{EnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::{Step, TransientStep};
@@ -40,6 +42,28 @@ impl<T, OS, AS> FiniteSpaceAgent<T, OS, AS> {
     }
 }
 
+impl<T, OS, AS> PureActor<OS::Element, AS::Element> for FiniteSpaceAgent<T, OS, AS>
+where
+    T: PureActor<usize, usize>,
+    OS: FiniteSpace,
+    AS: FiniteSpace,
+{
+    type State = T::State;
+
+    fn initial_state(&self, seed: u64) -> Self::State {
+        self.agent.initial_state(seed)
+    }
+
+    fn act(&self, state: &mut Self::State, observation: &OS::Element) -> AS::Element {
+        self.action_space
+            .from_index(
+                self.agent
+                    .act(state, &self.observation_space.to_index(observation)),
+            )
+            .expect("invalid action index")
+    }
+}
+
 impl<T, OS, AS> Actor<OS::Element, AS::Element> for FiniteSpaceAgent<T, OS, AS>
 where
     T: Actor<usize, usize>, // Index-space actor
@@ -52,7 +76,7 @@ where
                 self.agent
                     .act(&self.observation_space.to_index(observation)),
             )
-            .expect("Invalid action index")
+            .expect("invalid action index")
     }
 
     fn reset(&mut self) {

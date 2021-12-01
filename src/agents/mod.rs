@@ -22,6 +22,7 @@ pub use buffers::{HistoryBuffer, WriteHistoryBuffer};
 use finite::{BuildIndexAgent, FiniteSpaceAgent};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
 pub use random::{RandomAgent, RandomAgentConfig};
+pub use stateful::{PureAsActor, PureAsActorConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
 use crate::envs::EnvStructure;

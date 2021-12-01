@@ -1,4 +1,4 @@
-use super::{Actor, BuildAgent, BuildAgentError, SetActorMode, SynchronousUpdate};
+use super::{BuildAgent, BuildAgentError, PureActor, SetActorMode, SynchronousUpdate};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
@@ -27,9 +27,9 @@ where
     fn build_agent(
         &self,
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
-        seed: u64,
+        _seed: u64,
     ) -> Result<Self::Agent, BuildAgentError> {
-        Ok(RandomAgent::new(env.action_space(), seed))
+        Ok(RandomAgent::new(env.action_space()))
     }
 }
 
@@ -37,25 +37,23 @@ where
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RandomAgent<AS> {
     action_space: AS,
-    rng: StdRng,
 }
 
 impl<AS> RandomAgent<AS> {
-    pub fn new(action_space: AS, seed: u64) -> Self {
-        Self {
-            action_space,
-            rng: StdRng::seed_from_u64(seed),
-        }
+    pub const fn new(action_space: AS) -> Self {
+        Self { action_space }
     }
 }
 
-impl<O, AS: SampleSpace> Actor<O, AS::Element> for RandomAgent<AS> {
-    fn act(&mut self, _observation: &O) -> AS::Element {
-        self.action_space.sample(&mut self.rng)
+impl<O, AS: SampleSpace> PureActor<O, AS::Element> for RandomAgent<AS> {
+    type State = StdRng;
+
+    fn initial_state(&self, seed: u64) -> Self::State {
+        StdRng::seed_from_u64(seed)
     }
 
-    fn reset(&mut self) {
-        // No episode state
+    fn act(&self, rng: &mut Self::State, _observation: &O) -> AS::Element {
+        self.action_space.sample(rng)
     }
 }
 

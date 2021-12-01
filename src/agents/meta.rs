@@ -159,14 +159,15 @@ where
 
 #[cfg(test)]
 mod resetting_meta {
-    use super::super::{ActorMode, UCB1AgentConfig};
+    use super::super::{ActorMode, PureAsActorConfig, UCB1AgentConfig};
     use super::*;
     use crate::envs::{Environment, MetaPomdp, OneHotBandits, PomdpEnv};
     use crate::simulation::hooks::RewardStatistics;
 
     #[test]
     fn ucb_one_hot_bandits() {
-        let config = ResettingMetaAgentConfig::new(UCB1AgentConfig::default());
+        let config =
+            ResettingMetaAgentConfig::new(PureAsActorConfig::new(UCB1AgentConfig::default()));
         let num_arms = 3;
         let num_episodes_per_trial = 20;
         let env = PomdpEnv::new(
