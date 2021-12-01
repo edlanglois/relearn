@@ -1,4 +1,4 @@
-use super::{Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, SynchronousAgent};
+use super::{Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, SynchronousUpdate};
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
@@ -24,10 +24,10 @@ where
     }
 }
 
-impl<T, U, O1, O2, A1, A2> SynchronousAgent<(O1, O2), (A1, A2)> for AgentPair<T, U>
+impl<T, U, O1, O2, A1, A2> SynchronousUpdate<(O1, O2), (A1, A2)> for AgentPair<T, U>
 where
-    T: SynchronousAgent<O1, A1>,
-    U: SynchronousAgent<O2, A2>,
+    T: SynchronousUpdate<O1, A1>,
+    U: SynchronousUpdate<O2, A2>,
 {
     fn update(
         &mut self,

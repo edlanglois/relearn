@@ -1,7 +1,7 @@
 //! Serial (single-thread) simulation.
 use super::hooks::BuildSimulationHook;
 use super::{run_agent, Simulator, SimulatorError};
-use crate::agents::BuildAgent;
+use crate::agents::{Actor, BuildAgent};
 use crate::envs::BuildEnv;
 use crate::logging::TimeSeriesLogger;
 
@@ -28,6 +28,7 @@ where
     EC: BuildEnv,
     EC::Observation: Clone,
     AC: BuildAgent<EC::ObservationSpace, EC::ActionSpace>,
+    AC::Agent: Actor<EC::Observation, EC::Action>,
     HC: BuildSimulationHook<EC::ObservationSpace, EC::ActionSpace>,
 {
     fn run_simulation(

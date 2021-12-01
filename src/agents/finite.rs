@@ -1,4 +1,4 @@
-use super::{Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, SynchronousAgent};
+use super::{Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, SynchronousUpdate};
 use crate::envs::{EnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::{Step, TransientStep};
@@ -9,7 +9,7 @@ use crate::spaces::{FiniteSpace, IndexSpace, Space};
 /// This is a helper trait that automatically implements [`BuildAgent`]
 /// with all finite-space environments.
 pub trait BuildIndexAgent {
-    type Agent: SynchronousAgent<<IndexSpace as Space>::Element, <IndexSpace as Space>::Element>
+    type Agent: SynchronousUpdate<<IndexSpace as Space>::Element, <IndexSpace as Space>::Element>
         + SetActorMode;
 
     fn build_index_agent(
@@ -60,9 +60,9 @@ where
     }
 }
 
-impl<T, OS, AS> SynchronousAgent<OS::Element, AS::Element> for FiniteSpaceAgent<T, OS, AS>
+impl<T, OS, AS> SynchronousUpdate<OS::Element, AS::Element> for FiniteSpaceAgent<T, OS, AS>
 where
-    T: SynchronousAgent<usize, usize>, // Index-space agent
+    T: SynchronousUpdate<usize, usize>, // Index-space agent
     OS: FiniteSpace,
     AS: FiniteSpace,
 {

@@ -1,5 +1,5 @@
 //! Meta agents
-use super::{Actor, BuildAgent, BuildAgentError, SetActorMode, SynchronousAgent};
+use super::{Actor, BuildAgent, BuildAgentError, SetActorMode, SynchronousUpdate};
 use crate::envs::{
     EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
     Successor,
@@ -86,6 +86,7 @@ impl<AC, OS, AS> Actor<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Ele
     for ResettingMetaAgent<AC, OS, AS>
 where
     AC: BuildAgent<OS, AS>,
+    AC::Agent: Actor<OS::Element, AS::Element>,
     OS: Space + Clone,
     AS: NonEmptySpace + Clone,
 {
@@ -131,7 +132,7 @@ where
     }
 }
 
-impl<AC, OS, AS> SynchronousAgent<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>
+impl<AC, OS, AS> SynchronousUpdate<<MetaObservationSpace<OS, AS> as Space>::Element, AS::Element>
     for ResettingMetaAgent<AC, OS, AS>
 where
     AC: BuildAgent<OS, AS>,

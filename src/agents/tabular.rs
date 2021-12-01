@@ -1,7 +1,7 @@
 //! Tabular agents
 use super::{
     Actor, ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, SetActorMode,
-    SynchronousAgent,
+    SynchronousUpdate,
 };
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
@@ -118,7 +118,7 @@ impl Actor<usize, usize> for BaseTabularQLearningAgent {
     }
 }
 
-impl SynchronousAgent<usize, usize> for BaseTabularQLearningAgent {
+impl SynchronousUpdate<usize, usize> for BaseTabularQLearningAgent {
     fn update(&mut self, step: TransientStep<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
         let discounted_next_value = match step.next.as_ref().into_inner() {
             None => 0.0,

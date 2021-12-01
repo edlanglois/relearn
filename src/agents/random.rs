@@ -1,4 +1,4 @@
-use super::{Actor, BuildAgent, BuildAgentError, SetActorMode, SynchronousAgent};
+use super::{Actor, BuildAgent, BuildAgentError, SetActorMode, SynchronousUpdate};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
@@ -59,7 +59,7 @@ impl<O, AS: SampleSpace> Actor<O, AS::Element> for RandomAgent<AS> {
     }
 }
 
-impl<O, AS: SampleSpace> SynchronousAgent<O, AS::Element> for RandomAgent<AS> {
+impl<O, AS: SampleSpace> SynchronousUpdate<O, AS::Element> for RandomAgent<AS> {
     fn update(&mut self, _step: TransientStep<O, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {
     }
 }

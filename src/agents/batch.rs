@@ -2,8 +2,8 @@ use super::buffers::{
     BuildHistoryBuffer, HistoryBuffer, SerialBuffer, SerialBufferConfig, WriteHistoryBuffer,
 };
 use super::{
-    Actor, ActorMode, BatchAgent, BuildAgent, BuildAgentError, BuildBatchAgent, MakeActor,
-    SetActorMode, SynchronousAgent,
+    Actor, ActorMode, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchAgent, MakeActor,
+    SetActorMode, SynchronousUpdate,
 };
 use crate::envs::{EnvStructure, Successor};
 use crate::logging::{Event, TimeSeriesLogger};
@@ -36,18 +36,18 @@ where
     }
 }
 
-/// Wrap a [`BatchAgent`] as as [`SynchronousAgent`].
+/// Wrap a [`BatchUpdate`] as as [`SynchronousUpdate`].
 ///
 /// Caches updates into a history buffer then performs a batch update once full.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct SerialBatchAgent<T: BatchAgent<O, A>, O, A> {
+pub struct SerialBatchAgent<T: BatchUpdate<O, A>, O, A> {
     agent: T,
     history: T::HistoryBuffer,
 }
 
 impl<T, O, A> SerialBatchAgent<T, O, A>
 where
-    T: BatchAgent<O, A>,
+    T: BatchUpdate<O, A>,
 {
     pub fn new(agent: T, history: T::HistoryBuffer) -> Self {
         Self { agent, history }
@@ -56,7 +56,7 @@ where
 
 impl<T, O, A> Actor<O, A> for SerialBatchAgent<T, O, A>
 where
-    T: BatchAgent<O, A>,
+    T: Actor<O, A> + BatchUpdate<O, A>,
 {
     fn act(&mut self, observation: &O) -> A {
         self.agent.act(observation)
@@ -66,9 +66,9 @@ where
     }
 }
 
-impl<T, O, A> SynchronousAgent<O, A> for SerialBatchAgent<T, O, A>
+impl<T, O, A> SynchronousUpdate<O, A> for SerialBatchAgent<T, O, A>
 where
-    T: BatchAgent<O, A>,
+    T: BatchUpdate<O, A>,
 {
     fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         let full = self.history.push(step.into_partial());
@@ -81,17 +81,17 @@ where
 
 impl<T, O, A> SetActorMode for SerialBatchAgent<T, O, A>
 where
-    T: BatchAgent<O, A> + SetActorMode,
+    T: BatchUpdate<O, A> + SetActorMode,
 {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         self.agent.set_actor_mode(mode)
     }
 }
 
-/// Marker trait for a [`SynchronousAgent`] that can accept on-policy updates at any time.
+/// Marker trait for a [`SynchronousUpdate`] that can accept on-policy updates at any time.
 ///
 /// The updates must still be on-policy and in-order, they just do not have to immediately follow
-/// the corresponding call to `SynchronousAgent::act`.
+/// the corresponding call to `SynchronousUpdate::act`.
 pub trait AsyncAgent {}
 
 /// Configuration for [`BatchedUpdates`].
@@ -104,7 +104,7 @@ pub struct BatchedUpdatesConfig<TC> {
 impl<TC, OS, AS> BuildBatchAgent<OS, AS> for BatchedUpdatesConfig<TC>
 where
     TC: BuildAgent<OS, AS>,
-    TC::Agent: AsyncAgent,
+    TC::Agent: Actor<OS::Element, AS::Element> + AsyncAgent,
     OS: Space,
     AS: Space,
 {
@@ -126,7 +126,7 @@ where
     }
 }
 
-/// Wrapper that implements [`BatchAgent`] for a [`SynchronousAgent`] implementing [`AsyncAgent`].
+/// Wrapper that implements [`BatchUpdate`] for a [`SynchronousUpdate`] implementing [`AsyncAgent`].
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BatchedUpdates<T> {
     agent: T,
@@ -144,9 +144,9 @@ where
     }
 }
 
-impl<T, O, A> BatchAgent<O, A> for BatchedUpdates<T>
+impl<T, O, A> BatchUpdate<O, A> for BatchedUpdates<T>
 where
-    T: SynchronousAgent<O, A> + AsyncAgent,
+    T: Actor<O, A> + SynchronousUpdate<O, A> + AsyncAgent,
 {
     type HistoryBuffer = SerialBuffer<O, A>;
 

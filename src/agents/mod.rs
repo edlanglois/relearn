@@ -72,40 +72,37 @@ where
     }
 }
 
-/// A synchronous learning agent.
-///
-/// Takes actions in a reinforcement learning environment and updates immediately based on the
-/// result (including reward).
-pub trait SynchronousAgent<O, A>: Actor<O, A> {
+/// Update an agent with the immediate result of an action (synchronous update).
+pub trait SynchronousUpdate<O, A> {
     /// Update the agent based on the most recent action.
     ///
-    /// Must be called immediately after the corresponding call to [`Actor::act`],
-    /// before any other calls to `act` or [`Actor::reset`].
+    /// Must be called immediately after the corresponding call to `act`,
+    /// before any other calls to the agent's methods.
     /// This allows the agent to internally cache any information used in selecting the action
     /// that would also be useful for updating on the result.
     fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger);
 }
 
-impl<T, O, A> SynchronousAgent<O, A> for &'_ mut T
+impl<T, O, A> SynchronousUpdate<O, A> for &'_ mut T
 where
-    T: SynchronousAgent<O, A> + ?Sized,
+    T: SynchronousUpdate<O, A> + ?Sized,
 {
     fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         T::update(self, step, logger)
     }
 }
 
-impl<T, O, A> SynchronousAgent<O, A> for Box<T>
+impl<T, O, A> SynchronousUpdate<O, A> for Box<T>
 where
-    T: SynchronousAgent<O, A> + ?Sized,
+    T: SynchronousUpdate<O, A> + ?Sized,
 {
     fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
         T::update(self, step, logger)
     }
 }
 
-/// An agent that updates from steps collected into a history buffer.
-pub trait BatchAgent<O, A>: Actor<O, A> {
+/// Update an agent with steps collected into history buffers.
+pub trait BatchUpdate<O, A> {
     type HistoryBuffer: WriteHistoryBuffer<O, A>;
 
     /// Update the agent from a collection of history buffers.
@@ -121,9 +118,9 @@ pub trait BatchAgent<O, A>: Actor<O, A> {
     );
 }
 
-impl<T, O, A> BatchAgent<O, A> for &'_ mut T
+impl<T, O, A> BatchUpdate<O, A> for &'_ mut T
 where
-    T: BatchAgent<O, A>,
+    T: BatchUpdate<O, A>,
 {
     type HistoryBuffer = T::HistoryBuffer;
     fn batch_update(
@@ -134,9 +131,9 @@ where
         T::batch_update(self, buffers, logger)
     }
 }
-impl<T, O, A> BatchAgent<O, A> for Box<T>
+impl<T, O, A> BatchUpdate<O, A> for Box<T>
 where
-    T: BatchAgent<O, A>,
+    T: BatchUpdate<O, A>,
 {
     type HistoryBuffer = T::HistoryBuffer;
     fn batch_update(
@@ -158,7 +155,7 @@ pub trait MakeActor<'a, O, A> {
 
 pub trait BuildBatchAgent<OS: Space, AS: Space> {
     type HistoryBuffer: WriteHistoryBuffer<OS::Element, AS::Element> + Send;
-    type BatchAgent: BatchAgent<OS::Element, AS::Element, HistoryBuffer = Self::HistoryBuffer>
+    type BatchAgent: BatchUpdate<OS::Element, AS::Element, HistoryBuffer = Self::HistoryBuffer>
         + SetActorMode;
 
     /// Build a new history buffer.
@@ -224,7 +221,7 @@ impl<T: SetActorMode + ?Sized> SetActorMode for Box<T> {
 /// Build an agent instance for a given environment structure.
 pub trait BuildAgent<OS: Space, AS: Space> {
     /// Type of agent to build
-    type Agent: SynchronousAgent<OS::Element, AS::Element> + SetActorMode;
+    type Agent: SynchronousUpdate<OS::Element, AS::Element> + SetActorMode;
 
     /// Build an agent for the given environment structure ([`EnvStructure`]).
     ///

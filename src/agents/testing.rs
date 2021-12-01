@@ -1,9 +1,8 @@
 //! Agent testing utilities
-use crate::agents::{ActorMode, SetActorMode};
-use crate::envs::{DeterministicBandit, Environment, IntoEnv, PomdpEnv};
+use crate::agents::{Actor, ActorMode, SetActorMode, SynchronousUpdate};
+use crate::envs::{DeterministicBandit, EnvStructure, Environment, IntoEnv, PomdpEnv};
 use crate::simulation;
 use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
-use crate::{EnvStructure, SynchronousAgent};
 
 /// Check that the agent can be trained to perform well on a trivial bandit environment.
 ///
@@ -11,7 +10,7 @@ use crate::{EnvStructure, SynchronousAgent};
 /// the first arm always gives 0 reward and the second 1.
 pub fn train_deterministic_bandit<A, F>(make_agent: F, num_train_steps: u64, threshold: f64)
 where
-    A: SynchronousAgent<(), usize> + SetActorMode,
+    A: Actor<(), usize> + SynchronousUpdate<(), usize> + SetActorMode,
     F: FnOnce(&PomdpEnv<DeterministicBandit>) -> A,
 {
     let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).into_env(0);
@@ -27,12 +26,12 @@ where
 
 /// Evaluate a trained agent on the 0-1 deterministic bandit environment.
 #[allow(clippy::cast_possible_truncation)]
-pub fn eval_deterministic_bandit<A>(
-    mut agent: A,
+pub fn eval_deterministic_bandit<T>(
+    mut agent: T,
     env: &mut PomdpEnv<DeterministicBandit>,
     threshold: f64,
 ) where
-    A: SynchronousAgent<(), usize> + SetActorMode,
+    T: Actor<(), usize> + SynchronousUpdate<(), usize> + SetActorMode,
 {
     // Evaluation
     agent.set_actor_mode(ActorMode::Release);

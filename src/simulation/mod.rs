@@ -7,7 +7,7 @@ pub use hooks::{BuildSimulationHook, SimulationHook};
 pub use iter::SimSteps;
 pub use serial::SerialSimulator;
 
-use crate::agents::{BuildAgentError, SynchronousAgent};
+use crate::agents::{Actor, BuildAgentError, SynchronousUpdate};
 use crate::envs::{BuildEnvError, Environment, Successor};
 use crate::logging::TimeSeriesLogger;
 use thiserror::Error;
@@ -94,7 +94,7 @@ pub type PartialStep<O, A> = Step<O, A, ()>;
 
 /// Run an agent-environment simulation.
 ///
-/// Note that `Environment`, `SynchronousAgent`, etc. are also implemented for mutable references
+/// Note that `Environment`, `SynchronousUpdate`, etc. are also implemented for mutable references
 /// so this function can be called either with owned objects or with references.
 ///
 /// # Args
@@ -105,7 +105,7 @@ pub type PartialStep<O, A> = Step<O, A, ()>;
 pub fn run_agent<E, A, H, L>(environment: E, agent: A, mut hook: H, mut logger: L) -> A
 where
     E: Environment,
-    A: SynchronousAgent<E::Observation, E::Action>,
+    A: Actor<E::Observation, E::Action> + SynchronousUpdate<E::Observation, E::Action>,
     H: SimulationHook<E::Observation, E::Action>,
     L: TimeSeriesLogger,
 {
