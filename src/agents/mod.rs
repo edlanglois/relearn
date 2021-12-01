@@ -3,11 +3,9 @@
 //! More agents can be found in [`crate::torch::agents`].
 
 mod bandits;
-mod batch;
 pub mod buffers;
 mod finite;
 mod meta;
-pub mod multithread;
 mod pair;
 mod random;
 mod tabular;
@@ -17,15 +15,8 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
-pub use batch::{
-    BatchUpdate, BatchUpdateAgent, BatchUpdateAgentConfig, BuildBatchUpdateActor, OffPolicyAgent,
-};
 use finite::{BuildIndexAgent, FiniteSpaceAgent};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
-pub use multithread::{
-    BoxingMultithreadInitializer, BuildMultithreadAgent, InitializeMultithreadAgent,
-    MultithreadAgentManager, MultithreadBatchAgentConfig, MutexAgentConfig,
-};
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
@@ -33,8 +24,6 @@ use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
 use crate::spaces::Space;
-use crate::utils::any::AsAny;
-use std::any::Any;
 use tch::TchError;
 use thiserror::Error;
 
@@ -157,58 +146,6 @@ impl<T: SetActorMode + ?Sized> SetActorMode for Box<T> {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         T::set_actor_mode(self, mode)
     }
-}
-
-/// Synchronize model parameters to match those of a target instance of the same object.
-///
-/// Synchronizes parameters that are learned via [`Agent::update`] or
-/// [`BatchUpdate::batch_update`]. Does not synchronize random state or hyper-parameters.
-///
-/// Hyper-parameters are those parameters set at agent construction and not learned.
-/// May fail if the agents have different hyper-parameters.
-pub trait SyncParams {
-    /// Synchronize own model parameters to match those of the target.
-    fn sync_params(&mut self, target: &Self) -> Result<(), SyncParamsError>;
-}
-
-/// Object-safe version of [`SyncParams`] that down-casts the target to `Self`.
-pub trait SyncParamsAny {
-    /// Synchronize own model parameters to match those of the target.
-    ///
-    /// If the target cannot be down-cast to `Self` then `SyncParamsError::IncompatibleTypes`
-    /// is returned as an error.
-    fn sync_params_any(&mut self, target: &dyn Any) -> Result<(), SyncParamsError>;
-}
-
-impl<T: SyncParams + Any> SyncParamsAny for T {
-    fn sync_params_any(&mut self, target: &dyn Any) -> Result<(), SyncParamsError> {
-        self.sync_params(
-            target
-                .downcast_ref()
-                .ok_or(SyncParamsError::IncompatibleType)?,
-        )
-    }
-}
-
-/// This is intended just for unsized `T`.
-/// The implementation it generates for `T: Sized` is inefficient
-/// (`Box<T>::sync_params` uses `T::sync_params_any` uses `T::sync_params`)
-/// but maybe the compiler is smart enough to cut out `T::sync_param_any` in that case.
-///
-/// Requiring `Box<T>: SyncParams` for `T: Sized` is less likely than for unsized `T` so the
-/// inefficient implementation shouldn't be too much of a problem.
-impl<T: SyncParamsAny + AsAny + ?Sized + 'static> SyncParams for Box<T> {
-    fn sync_params(&mut self, target: &Self) -> Result<(), SyncParamsError> {
-        self.as_mut().sync_params_any(target.as_ref().as_any())
-    }
-}
-
-#[derive(Error, Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum SyncParamsError {
-    #[error("incompatible parameter sets")]
-    IncompatibleParams,
-    #[error("incompatible types")]
-    IncompatibleType,
 }
 
 pub trait FullAgent<O, A>: SynchronousAgent<O, A> + SetActorMode {}

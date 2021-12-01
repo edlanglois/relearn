@@ -1,20 +1,11 @@
 use super::super::{
     critic::{BuildCritic, Critic},
-    features::LazyPackedHistoryFeatures,
-    policy::{BuildPolicy, Policy},
-    seq_modules::StatefulIterativeModule,
-    updaters::{BuildCriticUpdater, BuildPolicyUpdater, UpdateCritic, UpdatePolicy},
+    policy::BuildPolicy,
+    updaters::{BuildCriticUpdater, BuildPolicyUpdater},
 };
-use crate::agents::{
-    buffers::HistoryBuffer, Actor, BatchUpdate, BuildAgentError, BuildBatchUpdateActor,
-    SetActorMode, SyncParams, SyncParamsError,
-};
+use crate::agents::SetActorMode;
 use crate::envs::EnvStructure;
-use crate::logging::{Event, Logger, LoggerHelper, TimeSeriesLogger, TimeSeriesLoggerHelper};
-use crate::spaces::{
-    EncoderFeatureSpace, FeatureSpace, NonEmptyFeatures, NumFeatures,
-    ParameterizedDistributionSpace, ReprSpace, Space,
-};
+use crate::spaces::{NonEmptyFeatures, NumFeatures, ParameterizedDistributionSpace, Space};
 use tch::{nn::VarStore, Device, Tensor};
 
 /// Configuration for [`ActorCriticAgent`]
@@ -45,6 +36,7 @@ where
     }
 }
 
+/*
 impl<PB, PUB, CB, CUB, OS, AS> BuildBatchUpdateActor<OS, AS> for ActorCriticConfig<PB, PUB, CB, CUB>
 where
     PB: BuildPolicy,
@@ -66,6 +58,7 @@ where
         Ok(ActorCriticAgent::new(env, self))
     }
 }
+*/
 
 /// Actor-critic agent.
 #[derive(Debug)]
@@ -123,7 +116,7 @@ where
     OS: Space + NumFeatures,
     AS: ParameterizedDistributionSpace<Tensor>,
 {
-    fn new<E, PB, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
+    pub fn new<E, PB, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
         PB: BuildPolicy<Policy = P>,
@@ -184,6 +177,7 @@ where
     }
 }
 
+/*
 impl<OS, AS, P, PU, C, CU> Actor<OS::Element, AS::Element>
     for ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
@@ -264,11 +258,6 @@ where
         logger.end_event(Event::AgentOptPeriod).unwrap();
     }
 }
-
-impl<OS: Space, AS: Space, P, PU, C, CU> SyncParams for ActorCriticAgent<OS, AS, P, PU, C, CU> {
-    fn sync_params(&mut self, _target: &Self) -> Result<(), SyncParamsError> {
-        todo!()
-    }
-}
+*/
 
 impl<OS: Space, AS: Space, P, PU, C, CU> SetActorMode for ActorCriticAgent<OS, AS, P, PU, C, CU> {}

@@ -1,10 +1,6 @@
-use super::buffers::HistoryBuffer;
-use super::{
-    Actor, ActorMode, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchUpdateActor,
-    OffPolicyAgent, SetActorMode, SyncParams, SyncParamsError, SynchronousAgent,
-};
+use super::{Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, SynchronousAgent};
 use crate::envs::{EnvStructure, Successor};
-use crate::logging::{Event, TimeSeriesLogger};
+use crate::logging::TimeSeriesLogger;
 use crate::simulation::{Step, TransientStep};
 use crate::spaces::{FiniteSpace, IndexSpace, Space};
 
@@ -90,6 +86,7 @@ where
     }
 }
 
+/*
 impl<T, OS, AS> BatchUpdate<OS::Element, AS::Element> for FiniteSpaceAgent<T, OS, AS>
 where
     T: OffPolicyAgent<usize, usize>,
@@ -136,15 +133,7 @@ where
         logger.end_event(Event::AgentOptPeriod).unwrap();
     }
 }
-
-impl<T, OS, AS> SyncParams for FiniteSpaceAgent<T, OS, AS>
-where
-    T: SyncParams,
-{
-    fn sync_params(&mut self, target: &Self) -> Result<(), SyncParamsError> {
-        self.agent.sync_params(&target.agent)
-    }
-}
+*/
 
 /// Convert a finite-space step into an index step.
 fn indexed_step<OS, AS>(
@@ -199,24 +188,5 @@ where
             observation_space,
             action_space,
         })
-    }
-}
-
-impl<B, OS, AS> BuildBatchUpdateActor<OS, AS> for B
-where
-    // NOTE: This is slightly over-restrictive. Don't need BuildIndexAgent::Agent: Agent
-    B: BuildIndexAgent,
-    B::Agent: OffPolicyAgent<usize, usize>,
-    OS: FiniteSpace,
-    AS: FiniteSpace,
-{
-    type BatchUpdateActor = FiniteSpaceAgent<B::Agent, OS, AS>;
-
-    fn build_batch_update_actor(
-        &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
-        seed: u64,
-    ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
-        self.build_agent(env, seed)
     }
 }

@@ -1,7 +1,4 @@
-use super::{
-    Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, SyncParams, SyncParamsError,
-    SynchronousAgent,
-};
+use super::{Actor, ActorMode, BuildAgent, BuildAgentError, SetActorMode, SynchronousAgent};
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
@@ -75,18 +72,6 @@ where
     fn set_actor_mode(&mut self, mode: ActorMode) {
         self.0.set_actor_mode(mode);
         self.1.set_actor_mode(mode);
-    }
-}
-
-impl<T, U> SyncParams for AgentPair<T, U>
-where
-    T: SyncParams,
-    U: SyncParams,
-{
-    fn sync_params(&mut self, target: &Self) -> Result<(), SyncParamsError> {
-        self.0.sync_params(&target.0)?;
-        self.1.sync_params(&target.1)?;
-        Ok(())
     }
 }
 

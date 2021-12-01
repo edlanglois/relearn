@@ -1,8 +1,7 @@
 //! Tabular agents
 use super::{
-    batch::off_policy_batch_update, buffers::HistoryBuffer, Actor, ActorMode, BatchUpdate,
-    BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, OffPolicyAgent, SetActorMode, SyncParams,
-    SyncParamsError, SynchronousAgent,
+    Actor, ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, SetActorMode,
+    SynchronousAgent,
 };
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
@@ -141,33 +140,9 @@ impl SynchronousAgent<usize, usize> for BaseTabularQLearningAgent {
     }
 }
 
-impl OffPolicyAgent<usize, usize> for BaseTabularQLearningAgent {}
-
-impl BatchUpdate<usize, usize> for BaseTabularQLearningAgent {
-    fn batch_update(
-        &mut self,
-        history: &mut dyn HistoryBuffer<usize, usize>,
-        logger: &mut dyn TimeSeriesLogger,
-    ) {
-        off_policy_batch_update(self, history, logger)
-    }
-}
-
 impl SetActorMode for BaseTabularQLearningAgent {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         self.mode = mode;
-    }
-}
-
-impl SyncParams for BaseTabularQLearningAgent {
-    fn sync_params(&mut self, target: &Self) -> Result<(), SyncParamsError> {
-        if self.state_action_counts.raw_dim() == target.state_action_counts.raw_dim() {
-            self.state_action_counts.assign(&target.state_action_counts);
-            self.state_action_values.assign(&target.state_action_values);
-            Ok(())
-        } else {
-            Err(SyncParamsError::IncompatibleParams)
-        }
     }
 }
 
