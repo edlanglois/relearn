@@ -116,8 +116,8 @@ pub fn run_agent<E, A, H>(
     }
     let mut sim = environment.run(agent, logger);
     while sim.step_with(|_, agent, step, logger| {
-        let done = !hook.call(&step, logger);
+        let continue_ = hook.call(&step, logger);
         agent.update(step, logger);
-        done
+        continue_
     }) {}
 }
