@@ -1,7 +1,7 @@
 //! Upper confidence bound bandit agent.
 use super::super::{
-    ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, PureActor, SetActorMode,
-    SynchronousUpdate,
+    ActorMode, AsyncUpdate, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, PureActor,
+    SetActorMode, SynchronousUpdate,
 };
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
@@ -185,6 +185,8 @@ impl SynchronousUpdate<usize, usize> for BaseUCB1Agent {
         *mean_reward += (scaled_reward - *mean_reward) / (*state_action_count as f64);
     }
 }
+
+impl AsyncUpdate for BaseUCB1Agent {}
 
 impl SetActorMode for BaseUCB1Agent {
     fn set_actor_mode(&mut self, mode: ActorMode) {

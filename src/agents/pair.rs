@@ -1,5 +1,6 @@
 use super::{
-    Actor, ActorMode, BuildAgent, BuildAgentError, PureActor, SetActorMode, SynchronousUpdate,
+    Actor, ActorMode, AsyncUpdate, BuildAgent, BuildAgentError, PureActor, SetActorMode,
+    SynchronousUpdate,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
@@ -68,6 +69,13 @@ where
         self.0.update(step1, logger);
         self.1.update(step2, logger);
     }
+}
+
+impl<T, U> AsyncUpdate for AgentPair<T, U>
+where
+    T: AsyncUpdate,
+    U: AsyncUpdate,
+{
 }
 
 #[allow(clippy::missing_const_for_fn)]

@@ -1,5 +1,5 @@
 //! Meta agents
-use super::{Actor, BuildAgent, BuildAgentError, SetActorMode, SynchronousUpdate};
+use super::{Actor, AsyncUpdate, BuildAgent, BuildAgentError, SetActorMode, SynchronousUpdate};
 use crate::envs::{
     EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
     Successor,
@@ -137,7 +137,7 @@ impl<AC, OS, AS> SynchronousUpdate<<MetaObservationSpace<OS, AS> as Space>::Elem
 where
     AC: BuildAgent<OS, AS>,
     OS: Space + Clone,
-    AS: NonEmptySpace + Clone,
+    AS: Space + Clone,
 {
     fn update(
         &mut self,
@@ -146,6 +146,14 @@ where
     ) {
         // Does not learn on a meta level
     }
+}
+
+impl<AC, OS, AS> AsyncUpdate for ResettingMetaAgent<AC, OS, AS>
+where
+    AC: BuildAgent<OS, AS>,
+    OS: Space + Clone,
+    AS: Space + Clone,
+{
 }
 
 /// Never learns on a meta level. Always acts like "Release" mode.

@@ -1,6 +1,6 @@
 use super::{
-    Actor, ActorMode, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchAgent, MakeActor,
-    PureActor, SetActorMode, SynchronousUpdate,
+    Actor, ActorMode, AsyncUpdate, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchAgent,
+    MakeActor, PureActor, SetActorMode, SynchronousUpdate,
 };
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
@@ -110,6 +110,11 @@ where
         self.actor.update(step, logger)
     }
 }
+
+// TODO: Remove AsyncUpdate bound?
+// A PureActor should have no way of caching anything from its most recent action.
+// Unless it uses a Cell.
+impl<T, O, A> AsyncUpdate for PureAsActor<T, O, A> where T: PureActor<O, A> + AsyncUpdate {}
 
 impl<T, O, A> BatchUpdate<O, A> for PureAsActor<T, O, A>
 where

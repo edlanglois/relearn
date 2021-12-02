@@ -1,7 +1,7 @@
 //! Thompson sampling bandit agent
 use super::super::{
-    ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, PureActor, SetActorMode,
-    SynchronousUpdate,
+    ActorMode, AsyncUpdate, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, PureActor,
+    SetActorMode, SynchronousUpdate,
 };
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
@@ -180,6 +180,8 @@ impl SynchronousUpdate<usize, usize> for BaseBetaThompsonSamplingAgent {
         }
     }
 }
+
+impl AsyncUpdate for BaseBetaThompsonSamplingAgent {}
 
 impl SetActorMode for BaseBetaThompsonSamplingAgent {
     fn set_actor_mode(&mut self, mode: ActorMode) {

@@ -1,7 +1,7 @@
 //! Tabular agents
 use super::{
-    ActorMode, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, PureActor, SetActorMode,
-    SynchronousUpdate,
+    ActorMode, AsyncUpdate, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, PureActor,
+    SetActorMode, SynchronousUpdate,
 };
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
@@ -139,6 +139,8 @@ impl SynchronousUpdate<usize, usize> for BaseTabularQLearningAgent {
         self.state_action_values[idx] += weight * value;
     }
 }
+
+impl AsyncUpdate for BaseTabularQLearningAgent {}
 
 impl SetActorMode for BaseTabularQLearningAgent {
     fn set_actor_mode(&mut self, mode: ActorMode) {

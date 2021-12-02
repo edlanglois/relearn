@@ -16,6 +16,12 @@ pub struct SerialBatchConfig<TC> {
     pub agent_config: TC,
 }
 
+impl<TC> SerialBatchConfig<TC> {
+    pub const fn new(agent_config: TC) -> Self {
+        Self { agent_config }
+    }
+}
+
 impl<TC, OS, AS> BuildAgent<OS, AS> for SerialBatchConfig<TC>
 where
     TC: BuildBatchAgent<OS, AS>,
@@ -98,6 +104,8 @@ where
     }
 }
 
+impl<T, O, A> AsyncUpdate for SerialBatchAgent<T, O, A> where T: BatchUpdate<O, A> {}
+
 impl<T, O, A> SetActorMode for SerialBatchAgent<T, O, A>
 where
     T: BatchUpdate<O, A> + SetActorMode,
@@ -111,7 +119,10 @@ where
 ///
 /// The updates must still be on-policy and in-order, they just do not have to immediately follow
 /// the corresponding call to `SynchronousUpdate::act`.
-pub trait AsyncAgent {}
+pub trait AsyncUpdate {}
+
+// TODO: Some kind of blanket impl for PureActor<O, A>?
+// A pure actor without its `state` has no way of knowing anything about its most recent step.
 
 /// Configuration for [`BatchedUpdates`].
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
@@ -120,10 +131,19 @@ pub struct BatchedUpdatesConfig<TC> {
     pub history_buffer_config: SerialBufferConfig,
 }
 
+impl<TC> BatchedUpdatesConfig<TC> {
+    pub const fn new(agent_config: TC, history_buffer_config: SerialBufferConfig) -> Self {
+        Self {
+            agent_config,
+            history_buffer_config,
+        }
+    }
+}
+
 impl<TC, OS, AS> BuildBatchAgent<OS, AS> for BatchedUpdatesConfig<TC>
 where
     TC: BuildAgent<OS, AS>,
-    TC::Agent: Actor<OS::Element, AS::Element> + AsyncAgent,
+    TC::Agent: Actor<OS::Element, AS::Element> + AsyncUpdate,
     OS: Space,
     AS: Space,
     // Required because of compiler bug (see impl BatchUpdate for BatchedUpdates)
@@ -144,7 +164,7 @@ where
     }
 }
 
-/// Wrapper that implements [`BatchUpdate`] for a [`SynchronousUpdate`] implementing [`AsyncAgent`].
+/// Wrapper that implements [`BatchUpdate`] for a [`SynchronousUpdate`] implementing [`AsyncUpdate`].
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BatchedUpdates<T> {
     agent: T,
@@ -182,7 +202,7 @@ where
 
 impl<T, O, A> BatchUpdate<O, A> for BatchedUpdates<T>
 where
-    T: Actor<O, A> + SynchronousUpdate<O, A> + AsyncAgent,
+    T: Actor<O, A> + SynchronousUpdate<O, A> + AsyncUpdate,
     // Only required because of a compiler bug: https://github.com/rust-lang/rust/issues/85451
     // In `batch_update`, the compiler needs the bound `Self::HistoryBuffer: 'a`
     // for the `I: ...` bound. It wants to infer this bound from `O: 'a` & `A: 'a` and ignores

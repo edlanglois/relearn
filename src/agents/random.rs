@@ -1,4 +1,4 @@
-use super::{BuildAgent, BuildAgentError, PureActor, SetActorMode, SynchronousUpdate};
+use super::{AsyncUpdate, BuildAgent, BuildAgentError, PureActor, SetActorMode, SynchronousUpdate};
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
@@ -59,10 +59,12 @@ impl<O, AS: SampleSpace> PureActor<O, AS::Element> for RandomAgent<AS> {
     }
 }
 
-impl<O, AS: SampleSpace> SynchronousUpdate<O, AS::Element> for RandomAgent<AS> {
+impl<O, AS: Space> SynchronousUpdate<O, AS::Element> for RandomAgent<AS> {
     fn update(&mut self, _step: TransientStep<O, AS::Element>, _logger: &mut dyn TimeSeriesLogger) {
     }
 }
+
+impl<AS> AsyncUpdate for RandomAgent<AS> {}
 
 impl<AS: fmt::Display> fmt::Display for RandomAgent<AS> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

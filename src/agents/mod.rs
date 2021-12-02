@@ -18,7 +18,7 @@ pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
 pub use batch::{
-    AsyncAgent, BatchedUpdates, BatchedUpdatesConfig, SerialBatchAgent, SerialBatchConfig,
+    AsyncUpdate, BatchedUpdates, BatchedUpdatesConfig, SerialBatchAgent, SerialBatchConfig,
 };
 pub use buffers::{HistoryBuffer, WriteHistoryBuffer};
 use finite::{BuildIndexAgent, FiniteSpaceAgent};

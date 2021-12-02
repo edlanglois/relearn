@@ -1,5 +1,5 @@
 use super::{
-    Actor, ActorMode, AsyncAgent, BatchUpdate, BuildAgent, BuildAgentError, PureActor,
+    Actor, ActorMode, AsyncUpdate, BatchUpdate, BuildAgent, BuildAgentError, PureActor,
     SetActorMode, SynchronousUpdate, WriteHistoryBuffer,
 };
 use crate::envs::{EnvStructure, Successor};
@@ -115,7 +115,7 @@ where
     }
 }
 
-impl<T: AsyncAgent, OS, AS> AsyncAgent for FiniteSpaceAgent<T, OS, AS> {}
+impl<T: AsyncUpdate, OS, AS> AsyncUpdate for FiniteSpaceAgent<T, OS, AS> {}
 
 // Wrap an index-space buffer to accept finite-space elements.
 pub struct FiniteSpaceBuffer<B, OS, AS> {
