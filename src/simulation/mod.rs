@@ -7,9 +7,12 @@ pub use hooks::{BuildSimulationHook, SimulationHook};
 pub use iter::SimSteps;
 pub use serial::SerialSimulator;
 
-use crate::agents::{Actor, BuildAgentError, SynchronousUpdate};
-use crate::envs::{BuildEnvError, Environment, Successor};
+use crate::agents::{
+    Actor, BatchUpdate, BuildAgentError, MakeActor, SynchronousUpdate, WriteHistoryBuffer,
+};
+use crate::envs::{BuildEnv, BuildEnvError, Environment, Successor};
 use crate::logging::TimeSeriesLogger;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use thiserror::Error;
 
 /// Runs agent-environment simulations.
@@ -119,4 +122,92 @@ where
         continue_
     }) {}
     sim.actor
+}
+
+/// Train a batch agent in parallel.
+pub fn train_parallel<T, EC>(
+    agent: &mut T,
+    env_config: &EC,
+    num_epochs: usize,
+    num_threads: usize,
+    seed: u64,
+    logger: &mut dyn TimeSeriesLogger,
+) -> Result<(), SimulatorError>
+where
+    EC: BuildEnv + ?Sized,
+    EC::Environment: Send,
+    T: BatchUpdate<EC::Observation, EC::Action>,
+    for<'a> T: MakeActor<'a, EC::Observation, EC::Action>,
+    T::HistoryBuffer: Send,
+{
+    let mut seed_rng = StdRng::seed_from_u64(seed);
+    let mut buffers: Vec<_> = (0..num_threads).map(|_| agent.new_buffer()).collect();
+
+    for _ in 0..num_epochs {
+        crossbeam::scope(|scope| {
+            // Send a buffer to each thread to be filled
+            let mut threads = Vec::new();
+            for mut buffer in buffers.drain(..) {
+                let env = env_config.build_env(seed_rng.gen()).unwrap(); // XXX
+                let actor = agent.make_actor(seed_rng.gen());
+                threads.push(scope.spawn(move |_scope| {
+                    let full = buffer.extend(env.run(actor, ()));
+                    assert!(full);
+                    buffer
+                }));
+            }
+
+            buffers.extend(threads.into_iter().map(|t| t.join().unwrap()))
+        })
+        .unwrap();
+
+        agent.batch_update(&mut buffers, logger);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::agents::{
+        buffers::SerialBufferConfig, testing, BatchedUpdatesConfig, BuildBatchAgent, PureAsActor,
+        TabularQLearningAgentConfig,
+    };
+    use crate::envs::DeterministicBandit;
+
+    #[test]
+    fn train_parallel_tabular_q_bandit() {
+        let env_config = DeterministicBandit::from_values(vec![0.0, 1.0]);
+        let inner_agent_config = TabularQLearningAgentConfig::default();
+        let history_buffer_config = SerialBufferConfig {
+            soft_threshold: 100,
+            hard_threshold: 110,
+        };
+        let agent_config = BatchedUpdatesConfig {
+            agent_config: inner_agent_config,
+            history_buffer_config,
+        };
+        let num_epochs = 10;
+        let num_threads = 4;
+        let seed = 0;
+        let mut logger = ();
+
+        let env = env_config.build_env(0).unwrap();
+        let mut agent = agent_config.build_batch_agent(&env, 1).unwrap();
+        train_parallel(
+            &mut agent,
+            &env_config,
+            num_epochs,
+            num_threads,
+            seed,
+            &mut logger,
+        )
+        .unwrap();
+
+        testing::eval_deterministic_bandit(
+            PureAsActor::new(agent, 1),
+            &mut env_config.build_env(2).unwrap(),
+            0.9,
+        );
+    }
 }
