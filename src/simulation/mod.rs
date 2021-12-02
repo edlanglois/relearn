@@ -3,7 +3,7 @@ pub mod hooks;
 mod iter;
 
 pub use hooks::{BuildSimulationHook, SimulationHook};
-pub use iter::SimSteps;
+pub use iter::ActorSteps;
 
 use crate::agents::{
     Actor, BatchUpdate, BuildAgentError, MakeActor, SynchronousUpdate, WriteHistoryBuffer,

@@ -4,10 +4,8 @@ use crate::envs::Environment;
 use crate::logging::{Event, TimeSeriesLogger};
 use std::iter::FusedIterator;
 
-/// Actor-environment simulation steps.
-///
-/// Does not perform any updating.
-pub struct SimSteps<E, A, L>
+/// Iterator of actor-environment simulation steps.
+pub struct ActorSteps<E, A, L>
 where
     E: Environment,
 {
@@ -18,7 +16,7 @@ where
     observation: Option<E::Observation>,
 }
 
-impl<E, A, L> SimSteps<E, A, L>
+impl<E, A, L> ActorSteps<E, A, L>
 where
     E: Environment,
 {
@@ -32,7 +30,7 @@ where
     }
 }
 
-impl<E, A, L> SimSteps<E, A, L>
+impl<E, A, L> ActorSteps<E, A, L>
 where
     E: Environment,
     A: Actor<E::Observation, E::Action>,
@@ -75,7 +73,7 @@ where
     }
 }
 
-impl<E, A, L> Iterator for SimSteps<E, A, L>
+impl<E, A, L> Iterator for ActorSteps<E, A, L>
 where
     E: Environment,
     A: Actor<E::Observation, E::Action>,
@@ -96,7 +94,7 @@ where
     }
 }
 
-impl<E, A, L> FusedIterator for SimSteps<E, A, L>
+impl<E, A, L> FusedIterator for ActorSteps<E, A, L>
 where
     E: Environment,
     A: Actor<E::Observation, E::Action>,

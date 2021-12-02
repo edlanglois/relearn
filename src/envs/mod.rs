@@ -31,7 +31,7 @@ pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 
 use crate::agents::Actor;
 use crate::logging::{Logger, TimeSeriesLogger};
-use crate::simulation::SimSteps;
+use crate::simulation::ActorSteps;
 use crate::spaces::Space;
 use rand::{rngs::StdRng, Rng};
 use std::borrow::Borrow;
@@ -429,13 +429,13 @@ pub trait Environment {
     fn reset(&mut self) -> Self::Observation;
 
     /// Run this environment with the given actor.
-    fn run<A, L>(self, actor: A, logger: L) -> SimSteps<Self, A, L>
+    fn run<A, L>(self, actor: A, logger: L) -> ActorSteps<Self, A, L>
     where
         A: Actor<Self::Observation, Self::Action>,
         L: TimeSeriesLogger,
         Self: Sized,
     {
-        SimSteps::new(self, actor, logger)
+        ActorSteps::new(self, actor, logger)
     }
 }
 
