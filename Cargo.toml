@@ -19,7 +19,6 @@ ndarray = "0.15"
 ndarray-stats = "0.5"
 num-traits = "0.2"
 num_cpus = "1.13"
-once_cell = "1.8"
 rand = "0.8"
 rand_distr = "0.4"
 relearn_derive = { version = "0.1.0", path = "relearn_derive" }
