@@ -1,9 +1,10 @@
 use super::{
-    Actor, ActorMode, BuildAgent, BuildAgentError, PureActor, SetActorMode, SynchronousUpdate,
+    Actor, ActorMode, AsyncAgent, BatchUpdate, BuildAgent, BuildAgentError, PureActor,
+    SetActorMode, SynchronousUpdate, WriteHistoryBuffer,
 };
 use crate::envs::{EnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
-use crate::simulation::{Step, TransientStep};
+use crate::simulation::{PartialStep, Step, TransientStep};
 use crate::spaces::{FiniteSpace, IndexSpace, Space};
 
 /// Build an agent for finite, indexed action and observation spaces.
@@ -114,54 +115,74 @@ where
     }
 }
 
-/*
-impl<T, OS, AS> BatchUpdate<OS::Element, AS::Element> for FiniteSpaceAgent<T, OS, AS>
+impl<T: AsyncAgent, OS, AS> AsyncAgent for FiniteSpaceAgent<T, OS, AS> {}
+
+// Wrap an index-space buffer to accept finite-space elements.
+pub struct FiniteSpaceBuffer<B, OS, AS> {
+    buffer: B,
+    observation_space: OS,
+    action_space: AS,
+}
+
+impl<B, OS, AS> WriteHistoryBuffer<OS::Element, AS::Element> for FiniteSpaceBuffer<B, OS, AS>
 where
-    T: OffPolicyAgent<usize, usize>,
+    B: WriteHistoryBuffer<usize, usize>,
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn batch_update(
-        &mut self,
-        history: &mut dyn HistoryBuffer<OS::Element, AS::Element>,
-        logger: &mut dyn TimeSeriesLogger,
-    ) {
-        logger.start_event(Event::AgentOptPeriod).unwrap();
+    fn push(&mut self, step: PartialStep<OS::Element, AS::Element>) -> bool {
+        self.buffer.push(indexed_partial_step(
+            &step,
+            &self.observation_space,
+            &self.action_space,
+        ))
+    }
 
-        let mut steps = history.steps().peekable();
-        while let Some(step) = steps.next() {
-            let next_observation_index = if matches!(step.next, Successor::Continue(())) {
-                match steps.peek() {
-                    Some(next_step) => {
-                        Some(self.observation_space.to_index(&next_step.observation))
-                    }
-                    None => break, // incomplete step
-                }
-            } else {
-                None
-            };
-            let ref_index_next = match &step.next {
-                Successor::Continue(()) => {
-                    Successor::Continue(next_observation_index.as_ref().unwrap())
-                }
-                Successor::Terminate => Successor::Terminate,
-                Successor::Interrupt(obs) => {
-                    Successor::Interrupt(self.observation_space.to_index(obs))
-                }
-            };
-            let transient_step = TransientStep {
-                observation: self.observation_space.to_index(&step.observation),
-                action: self.action_space.to_index(&step.action),
-                reward: step.reward,
-                next: ref_index_next,
-            };
-            self.agent.update(transient_step, logger)
-        }
+    fn extend<I>(&mut self, steps: I) -> bool
+    where
+        I: IntoIterator<Item = PartialStep<OS::Element, AS::Element>>,
+    {
+        self.buffer.extend(
+            steps.into_iter().map(|step| {
+                indexed_partial_step(&step, &self.observation_space, &self.action_space)
+            }),
+        )
+    }
 
-        logger.end_event(Event::AgentOptPeriod).unwrap();
+    fn clear(&mut self) {
+        self.buffer.clear()
     }
 }
-*/
+
+impl<T, OS, AS> BatchUpdate<OS::Element, AS::Element> for FiniteSpaceAgent<T, OS, AS>
+where
+    T: BatchUpdate<usize, usize>,
+    OS: FiniteSpace + Clone,
+    AS: FiniteSpace + Clone,
+    // Compiler bug https://github.com/rust-lang/rust/issues/85451
+    T::HistoryBuffer: 'static,
+    OS: 'static,
+    AS: 'static,
+{
+    type HistoryBuffer = FiniteSpaceBuffer<T::HistoryBuffer, OS, AS>;
+
+    fn new_buffer(&self) -> Self::HistoryBuffer {
+        FiniteSpaceBuffer {
+            buffer: self.agent.new_buffer(),
+            observation_space: self.observation_space.clone(),
+            action_space: self.action_space.clone(),
+        }
+    }
+
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    where
+        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+        Self::HistoryBuffer: 'a,
+    {
+        self.agent
+            .batch_update(buffers.into_iter().map(|b| &mut b.buffer), logger)
+    }
+}
 
 /// Convert a finite-space step into an index step.
 fn indexed_step<OS, AS>(
@@ -178,6 +199,28 @@ where
         action: action_space.to_index(&step.action),
         reward: step.reward,
         next: step.next.as_ref().map(|o| observation_space.to_index(o)),
+    }
+}
+
+/// Convert a finite-space `PartialStep` into an index step.
+fn indexed_partial_step<OS, AS>(
+    step: &PartialStep<OS::Element, AS::Element>,
+    observation_space: &OS,
+    action_space: &AS,
+) -> PartialStep<usize, usize>
+where
+    OS: FiniteSpace,
+    AS: FiniteSpace,
+{
+    Step {
+        observation: observation_space.to_index(&step.observation),
+        action: action_space.to_index(&step.action),
+        reward: step.reward,
+        next: match &step.next {
+            Successor::Continue(()) => Successor::Continue(()),
+            Successor::Terminate => Successor::Terminate,
+            Successor::Interrupt(s) => Successor::Interrupt(observation_space.to_index(s)),
+        },
     }
 }
 
