@@ -92,7 +92,7 @@ impl CLILogger {
             );
             print!(
                 " ({:?} / event)",
-                event_log.total_duration / summary_size.try_into().unwrap()
+                event_log.summary_duration / summary_size.try_into().unwrap()
             );
             println!(" ====");
 
@@ -101,6 +101,7 @@ impl CLILogger {
                 aggregator.clear();
             }
             event_log.summary_start_index = event_log.index;
+            event_log.summary_duration = Duration::new(0, 0);
         }
         self.last_display_time = Instant::now();
     }
@@ -143,7 +144,7 @@ impl TimeSeriesLogger for CLILogger {
             aggregator.commit()
         }
 
-        event_info.total_duration += time
+        event_info.summary_duration += time
             .checked_duration_since(event_info.active_start_time)
             .ok_or(LogError::EndBeforeStart)?;
         event_info.active_start_time = time; // Start the next event instance
@@ -194,11 +195,11 @@ struct EventLog {
     /// Value of `index` at the start of this summary period
     summary_start_index: u64,
 
-    /// Total time spent with this event active.
+    /// Total time spent with this event active this summary period.
     ///
     /// This is the sum of `(end_time[i] - start_time[i])` for each
-    /// instance `i` of this event included in the summary.
-    total_duration: Duration,
+    /// instance `i` of this event included in this summary period.
+    summary_duration: Duration,
 
     /// Start time of the current event instance.
     active_start_time: Instant,
@@ -213,7 +214,7 @@ impl EventLog {
         Self {
             index: 0,
             summary_start_index: 0,
-            total_duration: Duration::new(0, 0),
+            summary_duration: Duration::new(0, 0),
             active_start_time: Instant::now(),
             aggregators: BTreeMap::new(),
         }
