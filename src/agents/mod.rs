@@ -165,11 +165,10 @@ pub trait BatchUpdate<O, A> {
     /// Any data left in the buffer should remain for the next call to `batch_update`.
     ///
     /// All new data inserted into the buffers since the last call must be on-policy.
-    fn batch_update(
-        &mut self,
-        buffers: &mut [Self::HistoryBuffer],
-        logger: &mut dyn TimeSeriesLogger,
-    );
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    where
+        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+        Self::HistoryBuffer: 'a;
 }
 
 impl<T, O, A> BatchUpdate<O, A> for &'_ mut T
@@ -180,11 +179,11 @@ where
     fn new_buffer(&self) -> Self::HistoryBuffer {
         T::new_buffer(self)
     }
-    fn batch_update(
-        &mut self,
-        buffers: &mut [Self::HistoryBuffer],
-        logger: &mut dyn TimeSeriesLogger,
-    ) {
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    where
+        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+        Self::HistoryBuffer: 'a,
+    {
         T::batch_update(self, buffers, logger)
     }
 }
@@ -196,11 +195,11 @@ where
     fn new_buffer(&self) -> Self::HistoryBuffer {
         T::new_buffer(self)
     }
-    fn batch_update(
-        &mut self,
-        buffers: &mut [Self::HistoryBuffer],
-        logger: &mut dyn TimeSeriesLogger,
-    ) {
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    where
+        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+        Self::HistoryBuffer: 'a,
+    {
         T::batch_update(self, buffers, logger)
     }
 }

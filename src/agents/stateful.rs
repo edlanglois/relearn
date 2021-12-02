@@ -121,11 +121,11 @@ where
         self.actor.new_buffer()
     }
 
-    fn batch_update(
-        &mut self,
-        buffers: &mut [Self::HistoryBuffer],
-        logger: &mut dyn TimeSeriesLogger,
-    ) {
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    where
+        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+        Self::HistoryBuffer: 'a,
+    {
         self.actor.batch_update(buffers, logger);
     }
 }

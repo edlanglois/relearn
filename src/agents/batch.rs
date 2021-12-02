@@ -9,7 +9,7 @@ use crate::envs::{EnvStructure, Successor};
 use crate::logging::{Event, TimeSeriesLogger};
 use crate::simulation::TransientStep;
 use crate::spaces::Space;
-use std::slice;
+use std::iter;
 
 /// Configuration for [`SerialBatchAgent`]
 pub struct SerialBatchConfig<TC> {
@@ -93,7 +93,7 @@ where
         let full = self.history.push(step.into_partial());
         if full {
             self.agent
-                .batch_update(slice::from_mut(&mut self.history), logger);
+                .batch_update(iter::once(&mut self.history), logger);
         }
     }
 }
@@ -126,6 +126,9 @@ where
     TC::Agent: Actor<OS::Element, AS::Element> + AsyncAgent,
     OS: Space,
     AS: Space,
+    // Required because of compiler bug (see impl BatchUpdate for BatchedUpdates)
+    OS::Element: 'static,
+    AS::Element: 'static,
 {
     type BatchAgent = BatchedUpdates<TC::Agent>;
 
@@ -163,6 +166,12 @@ where
 impl<T, O, A> BatchUpdate<O, A> for BatchedUpdates<T>
 where
     T: Actor<O, A> + SynchronousUpdate<O, A> + AsyncAgent,
+    // Only required because of a compiler bug: https://github.com/rust-lang/rust/issues/85451
+    // In `batch_update`, the compiler needs the bound `Self::HistoryBuffer: 'a`
+    // for the `I: ...` bound. It wants to infer this bound from `O: 'a` & `A: 'a` and ignores
+    // `Self::HistoryBuffer: 'a`.
+    O: 'static,
+    A: 'static,
 {
     type HistoryBuffer = SerialBuffer<O, A>;
 
@@ -170,11 +179,11 @@ where
         self.history_buffer_config.build_history_buffer()
     }
 
-    fn batch_update(
-        &mut self,
-        buffers: &mut [Self::HistoryBuffer],
-        logger: &mut dyn TimeSeriesLogger,
-    ) {
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    where
+        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+        Self::HistoryBuffer: 'a,
+    {
         logger.start_event(Event::AgentOptPeriod).unwrap();
         for buffer in buffers {
             let mut steps = buffer.drain_steps().peekable();
