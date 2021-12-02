@@ -25,7 +25,7 @@ impl<T, OS, AS> BuildAgent<MetaObservationSpace<OS, AS>, AS> for ResettingMetaAg
 where
     T: BuildAgent<OS, AS> + Clone,
     OS: Space + Clone,
-    AS: NonEmptySpace + Clone,
+    AS: Space + Clone,
 {
     type Agent = ResettingMetaAgent<T, OS, AS>;
 
@@ -43,8 +43,8 @@ where
 pub struct ResettingMetaAgent<AC, OS, AS>
 where
     AC: BuildAgent<OS, AS>,
-    OS: Space + Clone,
-    AS: Space + Clone,
+    OS: Space,
+    AS: Space,
 {
     inner_agent_config: AC,
     inner_env_structure: StoredEnvStructure<OS, AS>,
@@ -136,8 +136,8 @@ impl<AC, OS, AS> SynchronousUpdate<<MetaObservationSpace<OS, AS> as Space>::Elem
     for ResettingMetaAgent<AC, OS, AS>
 where
     AC: BuildAgent<OS, AS>,
-    OS: Space + Clone,
-    AS: Space + Clone,
+    OS: Space,
+    AS: Space,
 {
     fn update(
         &mut self,
@@ -151,8 +151,8 @@ where
 impl<AC, OS, AS> AsyncUpdate for ResettingMetaAgent<AC, OS, AS>
 where
     AC: BuildAgent<OS, AS>,
-    OS: Space + Clone,
-    AS: Space + Clone,
+    OS: Space,
+    AS: Space,
 {
 }
 
@@ -160,8 +160,8 @@ where
 impl<AC, OS, AS> SetActorMode for ResettingMetaAgent<AC, OS, AS>
 where
     AC: BuildAgent<OS, AS>,
-    OS: Space + Clone,
-    AS: Space + Clone,
+    OS: Space,
+    AS: Space,
 {
 }
 
