@@ -143,7 +143,7 @@ impl<TC> BatchedUpdatesConfig<TC> {
 impl<TC, OS, AS> BuildBatchAgent<OS, AS> for BatchedUpdatesConfig<TC>
 where
     TC: BuildAgent<OS, AS>,
-    TC::Agent: Actor<OS::Element, AS::Element> + AsyncUpdate,
+    TC::Agent: AsyncUpdate,
     OS: Space,
     AS: Space,
     // Required because of compiler bug (see impl BatchUpdate for BatchedUpdates)
@@ -202,7 +202,7 @@ where
 
 impl<T, O, A> BatchUpdate<O, A> for BatchedUpdates<T>
 where
-    T: Actor<O, A> + SynchronousUpdate<O, A> + AsyncUpdate,
+    T: SynchronousUpdate<O, A> + AsyncUpdate,
     // Only required because of a compiler bug: https://github.com/rust-lang/rust/issues/85451
     // In `batch_update`, the compiler needs the bound `Self::HistoryBuffer: 'a`
     // for the `I: ...` bound. It wants to infer this bound from `O: 'a` & `A: 'a` and ignores
@@ -268,5 +268,28 @@ where
 {
     fn set_actor_mode(&mut self, mode: ActorMode) {
         self.agent.set_actor_mode(mode)
+    }
+}
+
+#[cfg(test)]
+mod batch_tabular_q_learning {
+    use super::super::{buffers::SerialBufferConfig, testing, TabularQLearningAgentConfig};
+    use super::*;
+
+    #[test]
+    fn learns_determinstic_bandit() {
+        let config = SerialBatchConfig::new(BatchedUpdatesConfig::new(
+            TabularQLearningAgentConfig::default(),
+            SerialBufferConfig {
+                soft_threshold: 20,
+                hard_threshold: 25,
+            },
+        ));
+
+        testing::pure_train_deterministic_bandit(
+            |env| config.build_agent(env, 0).unwrap(),
+            1000,
+            0.9,
+        );
     }
 }
