@@ -144,11 +144,11 @@ where
     let mut buffers: Vec<_> = (0..num_threads).map(|_| agent.new_buffer()).collect();
 
     for _ in 0..num_epochs {
-        crossbeam::scope(|scope| {
+        crossbeam::scope(|scope| -> Result<(), SimulatorError> {
             // Send a buffer to each thread to be filled
             let mut threads = Vec::new();
             for mut buffer in buffers.drain(..) {
-                let env = env_config.build_env(seed_rng.gen()).unwrap(); // XXX
+                let env = env_config.build_env(seed_rng.gen())?;
                 let actor = agent.make_actor(seed_rng.gen());
                 threads.push(scope.spawn(move |_scope| {
                     let full = buffer.extend(env.run(actor, ()));
@@ -157,9 +157,10 @@ where
                 }));
             }
 
-            buffers.extend(threads.into_iter().map(|t| t.join().unwrap()))
+            buffers.extend(threads.into_iter().map(|t| t.join().unwrap()));
+            Ok(())
         })
-        .unwrap();
+        .unwrap()?;
 
         agent.batch_update(&mut buffers, logger);
     }
