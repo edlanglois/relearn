@@ -722,7 +722,6 @@ version = "0.1.2"
 dependencies = [
  "array-init",
  "criterion",
- "crossbeam-channel",
  "enum-map",
  "impl-trait-for-tuples",
  "lazycell",
