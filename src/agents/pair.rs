@@ -1,10 +1,10 @@
 use super::{
-    Actor, ActorMode, AsyncUpdate, BuildAgent, BuildAgentError, PureActor, SetActorMode,
-    SynchronousUpdate,
+    Actor, ActorMode, AsyncUpdate, BatchUpdate, BuildAgent, BuildAgentError, PureActor,
+    SetActorMode, SynchronousUpdate, WriteHistoryBuffer,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
-use crate::simulation::TransientStep;
+use crate::simulation::{PartialStep, TransientStep};
 use crate::spaces::{Space, TupleSpace2};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -78,6 +78,57 @@ where
 {
 }
 
+pub struct HistoryBufferPair<B1, B2>(pub B1, pub B2);
+
+impl<B1, B2, O1, O2, A1, A2> WriteHistoryBuffer<(O1, O2), (A1, A2)> for HistoryBufferPair<B1, B2>
+where
+    B1: WriteHistoryBuffer<O1, A1>,
+    B2: WriteHistoryBuffer<O2, A2>,
+{
+    fn push(&mut self, step: PartialStep<(O1, O2), (A1, A2)>) -> bool {
+        // wait until both buffers are full
+        let (step1, step2) = split_partial_step(step);
+        let full1 = self.0.push(step1);
+        let full2 = self.1.push(step2);
+        full1 && full2
+    }
+
+    fn clear(&mut self) {
+        self.0.clear();
+        self.1.clear();
+    }
+}
+
+impl<T, U, O1, O2, A1, A2> BatchUpdate<(O1, O2), (A1, A2)> for AgentPair<T, U>
+where
+    T: BatchUpdate<O1, A1>,
+    U: BatchUpdate<O2, A2>,
+    // Compiler bug https://github.com/rust-lang/rust/issues/85451
+    T::HistoryBuffer: 'static,
+    U::HistoryBuffer: 'static,
+{
+    type HistoryBuffer = HistoryBufferPair<T::HistoryBuffer, U::HistoryBuffer>;
+
+    fn new_buffer(&self) -> Self::HistoryBuffer {
+        HistoryBufferPair(self.0.new_buffer(), self.1.new_buffer())
+    }
+
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    where
+        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+        Self::HistoryBuffer: 'a,
+    {
+        let mut buffers1 = Vec::new();
+        let mut buffers2 = Vec::new();
+        for buffer in buffers {
+            buffers1.push(&mut buffer.0);
+            buffers2.push(&mut buffer.1);
+        }
+        self.0.batch_update(buffers1.into_iter(), logger);
+        self.1.batch_update(buffers2.into_iter(), logger);
+    }
+}
+
 #[allow(clippy::missing_const_for_fn)]
 fn split_step<O1, O2, A1, A2>(
     step: TransientStep<(O1, O2), (A1, A2)>,
@@ -96,6 +147,32 @@ fn split_step<O1, O2, A1, A2>(
         next: n1,
     };
     let step2 = TransientStep {
+        observation: o2,
+        action: a2,
+        reward: step.reward,
+        next: n2,
+    };
+    (step1, step2)
+}
+
+#[allow(clippy::missing_const_for_fn)]
+fn split_partial_step<O1, O2, A1, A2>(
+    step: PartialStep<(O1, O2), (A1, A2)>,
+) -> (PartialStep<O1, A1>, PartialStep<O2, A2>) {
+    let (o1, o2) = step.observation;
+    let (a1, a2) = step.action;
+    let (n1, n2) = match step.next {
+        Successor::Continue(()) => (Successor::Continue(()), Successor::Continue(())),
+        Successor::Terminate => (Successor::Terminate, Successor::Terminate),
+        Successor::Interrupt((no1, no2)) => (Successor::Interrupt(no1), Successor::Interrupt(no2)),
+    };
+    let step1 = PartialStep {
+        observation: o1,
+        action: a1,
+        reward: step.reward,
+        next: n1,
+    };
+    let step2 = PartialStep {
         observation: o2,
         action: a2,
         reward: step.reward,
