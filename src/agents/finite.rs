@@ -1,5 +1,5 @@
 use super::{
-    Actor, ActorMode, AsyncUpdate, BatchUpdate, BuildAgent, BuildAgentError, PureActor,
+    Actor, ActorMode, AsyncUpdate, BatchUpdate, BuildAgent, BuildAgentError, MakeActor, PureActor,
     SetActorMode, SynchronousUpdate, WriteHistoryBuffer,
 };
 use crate::envs::{EnvStructure, Successor};
@@ -181,6 +181,23 @@ where
     {
         self.agent
             .batch_update(buffers.into_iter().map(|b| &mut b.buffer), logger)
+    }
+}
+
+impl<'a, T, OS, AS> MakeActor<'a, OS::Element, AS::Element> for FiniteSpaceAgent<T, OS, AS>
+where
+    T: MakeActor<'a, usize, usize>,
+    OS: FiniteSpace + Sync + 'a,
+    AS: FiniteSpace + Sync + 'a,
+{
+    type Actor = FiniteSpaceAgent<T::Actor, &'a OS, &'a AS>;
+
+    fn make_actor(&'a self, seed: u64) -> Self::Actor {
+        FiniteSpaceAgent {
+            agent: self.agent.make_actor(seed),
+            observation_space: &self.observation_space,
+            action_space: &self.action_space,
+        }
     }
 }
 

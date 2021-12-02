@@ -106,6 +106,17 @@ where
 
 impl<T, O, A> AsyncUpdate for SerialBatchAgent<T, O, A> where T: BatchUpdate<O, A> {}
 
+impl<'a, T, O, A> MakeActor<'a, O, A> for SerialBatchAgent<T, O, A>
+where
+    T: BatchUpdate<O, A> + MakeActor<'a, O, A>,
+{
+    type Actor = T::Actor;
+
+    fn make_actor(&'a self, seed: u64) -> Self::Actor {
+        self.agent.make_actor(seed)
+    }
+}
+
 impl<T, O, A> SetActorMode for SerialBatchAgent<T, O, A>
 where
     T: BatchUpdate<O, A> + SetActorMode,
