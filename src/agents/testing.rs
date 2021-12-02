@@ -47,7 +47,7 @@ pub fn eval_deterministic_bandit<T>(
     env: &mut PomdpEnv<DeterministicBandit>,
     threshold: f64,
 ) where
-    T: Actor<(), usize> + SynchronousUpdate<(), usize> + SetActorMode,
+    T: Actor<(), usize> + SetActorMode,
 {
     // Evaluation
     agent.set_actor_mode(ActorMode::Release);
