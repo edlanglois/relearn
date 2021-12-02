@@ -13,25 +13,9 @@ use crate::logging::TimeSeriesLogger;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use thiserror::Error;
 
-/// Runs agent-environment simulations.
-pub trait Simulator {
-    /// Run a simulation
-    ///
-    /// # Args
-    /// * `env_seed` - Random seed used to derive the environment initialization seed(s).
-    /// * `agent_seed` - Random seed used to derive the agent initialization seed(s).
-    /// * `logger` - The logger for the main thread.
-    fn run_simulation(
-        &self,
-        env_seed: u64,
-        agent_seed: u64,
-        logger: &mut dyn TimeSeriesLogger,
-    ) -> Result<(), SimulatorError>;
-}
-
 /// Error initializing or running a simulation.
 #[derive(Error, Debug)]
-pub enum SimulatorError {
+pub enum SimulationError {
     #[error("error building agent")]
     BuildAgent(#[from] BuildAgentError),
     #[error("error building environment")]
@@ -130,7 +114,7 @@ pub fn train_parallel<T, EC>(
     num_threads: usize,
     seed: u64,
     logger: &mut dyn TimeSeriesLogger,
-) -> Result<(), SimulatorError>
+) -> Result<(), SimulationError>
 where
     EC: BuildEnv + ?Sized,
     EC::Environment: Send,
@@ -142,7 +126,7 @@ where
     let mut buffers: Vec<_> = (0..num_threads).map(|_| agent.new_buffer()).collect();
 
     for _ in 0..num_epochs {
-        crossbeam::scope(|scope| -> Result<(), SimulatorError> {
+        crossbeam::scope(|scope| -> Result<(), SimulationError> {
             // Send a buffer to each thread to be filled
             let mut threads = Vec::new();
             for mut buffer in buffers.drain(..) {

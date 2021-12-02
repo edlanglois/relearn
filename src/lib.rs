@@ -126,7 +126,7 @@ pub mod utils;
 
 pub use agents::{Actor, BuildAgent, SynchronousUpdate};
 pub use envs::{BuildEnv, EnvStructure, Environment, StructuredEnvironment};
-pub use simulation::{run_agent, Simulator, Step};
+pub use simulation::{run_agent, Step};
 
 #[allow(unused_imports)]
 #[macro_use]
