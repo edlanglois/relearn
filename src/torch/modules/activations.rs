@@ -1,10 +1,9 @@
 //! Activation functions
 use crate::torch::backends::CudnnSupport;
-use clap::ArgEnum;
 use tch::{nn, Tensor};
 
 /// Activation functions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Activation {
     /// No transformation
     Identity,
