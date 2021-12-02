@@ -3,7 +3,7 @@ pub mod hooks;
 mod steps;
 
 pub use hooks::{BuildSimulationHook, SimulationHook};
-pub use steps::ActorSteps;
+pub use steps::{ActorSteps, SimulationSummary};
 
 use crate::agents::{
     Actor, BatchUpdate, BuildAgentError, MakeActor, SynchronousUpdate, WriteHistoryBuffer,
