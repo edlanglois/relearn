@@ -151,6 +151,23 @@ pub struct BatchedUpdates<T> {
     history_buffer_config: SerialBufferConfig,
 }
 
+impl<T, O, A> PureActor<O, A> for BatchedUpdates<T>
+where
+    T: PureActor<O, A>,
+{
+    type State = T::State;
+
+    fn initial_state(&self, seed: u64) -> Self::State {
+        self.agent.initial_state(seed)
+    }
+    fn reset_state(&self, state: &mut Self::State) {
+        self.agent.reset_state(state)
+    }
+    fn act(&self, state: &mut Self::State, observation: &O) -> A {
+        self.agent.act(state, observation)
+    }
+}
+
 impl<T, O, A> Actor<O, A> for BatchedUpdates<T>
 where
     T: Actor<O, A>,
