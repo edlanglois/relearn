@@ -1,11 +1,9 @@
 //! Simulating agent-environment interaction
 pub mod hooks;
 mod iter;
-mod serial;
 
 pub use hooks::{BuildSimulationHook, SimulationHook};
 pub use iter::SimSteps;
-pub use serial::SerialSimulator;
 
 use crate::agents::{
     Actor, BatchUpdate, BuildAgentError, MakeActor, SynchronousUpdate, WriteHistoryBuffer,
