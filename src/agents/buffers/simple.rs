@@ -3,14 +3,14 @@ use crate::simulation::PartialStep;
 use crate::utils::iter::SizedChain;
 use std::iter::{ExactSizeIterator, FusedIterator};
 
-/// Configuration for [`SerialBuffer`].
+/// Configuration for [`SimpleBuffer`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct SerialBufferConfig {
+pub struct SimpleBufferConfig {
     pub soft_threshold: usize,
     pub hard_threshold: usize,
 }
 
-impl Default for SerialBufferConfig {
+impl Default for SimpleBufferConfig {
     fn default() -> Self {
         Self {
             soft_threshold: 10_000,
@@ -19,14 +19,14 @@ impl Default for SerialBufferConfig {
     }
 }
 
-/// Serial step history buffer.
+/// Simple history buffer. Stores and replays observed steps without additional processing.
 ///
 /// The buffer records steps from a series of episodes one after another.
 /// The buffer is ready when either
 /// * the current episode is done and at least `soft_threshold` steps have been collected; or
 /// * at least `hard_threshold` steps have been collected.
 #[derive(Debug, Clone)]
-pub struct SerialBuffer<O, A> {
+pub struct SimpleBuffer<O, A> {
     /// The buffer is ready when the current episode is done and at least `soft_threshold` steps
     /// have been collected.
     pub soft_threshold: usize,
@@ -41,15 +41,15 @@ pub struct SerialBuffer<O, A> {
     episode_ends: Vec<usize>,
 }
 
-impl<O, A> BuildHistoryBuffer<O, A> for SerialBufferConfig {
-    type HistoryBuffer = SerialBuffer<O, A>;
+impl<O, A> BuildHistoryBuffer<O, A> for SimpleBufferConfig {
+    type HistoryBuffer = SimpleBuffer<O, A>;
 
     fn build_history_buffer(&self) -> Self::HistoryBuffer {
         assert!(
             self.hard_threshold >= self.soft_threshold,
             "hard_threshold must be >= soft_threshold"
         );
-        SerialBuffer {
+        SimpleBuffer {
             soft_threshold: self.soft_threshold,
             hard_threshold: self.hard_threshold,
             steps: Vec::with_capacity(self.hard_threshold),
@@ -58,7 +58,7 @@ impl<O, A> BuildHistoryBuffer<O, A> for SerialBufferConfig {
     }
 }
 
-impl<O, A> WriteHistoryBuffer<O, A> for SerialBuffer<O, A> {
+impl<O, A> WriteHistoryBuffer<O, A> for SimpleBuffer<O, A> {
     fn push(&mut self, step: PartialStep<O, A>) -> bool {
         let episode_done = step.next.episode_done();
         self.steps.push(step);
@@ -75,7 +75,7 @@ impl<O, A> WriteHistoryBuffer<O, A> for SerialBuffer<O, A> {
     }
 }
 
-impl<O, A> HistoryBuffer<O, A> for SerialBuffer<O, A> {
+impl<O, A> HistoryBuffer<O, A> for SimpleBuffer<O, A> {
     fn num_steps(&self) -> usize {
         self.steps.len()
     }
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn fill_episodic() {
-        let mut buffer = SerialBufferConfig {
+        let mut buffer = SimpleBufferConfig {
             soft_threshold: 3,
             hard_threshold: 5,
         }
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn fill_non_episodic() {
-        let mut buffer = SerialBufferConfig {
+        let mut buffer = SimpleBufferConfig {
             soft_threshold: 3,
             hard_threshold: 5,
         }
@@ -229,8 +229,8 @@ mod tests {
     /// * an episode of length 1,
     /// * an episode of length 2, and
     /// * 2 steps of an incomplete episode.
-    fn full_buffer() -> SerialBuffer<usize, bool> {
-        let mut buffer = SerialBufferConfig {
+    fn full_buffer() -> SimpleBuffer<usize, bool> {
+        let mut buffer = SimpleBufferConfig {
             soft_threshold: 5,
             hard_threshold: 6,
         }
@@ -246,17 +246,17 @@ mod tests {
     }
 
     #[rstest]
-    fn num_steps(full_buffer: SerialBuffer<usize, bool>) {
+    fn num_steps(full_buffer: SimpleBuffer<usize, bool>) {
         assert_eq!(full_buffer.num_steps(), 5);
     }
 
     #[rstest]
-    fn num_episodes(full_buffer: SerialBuffer<usize, bool>) {
+    fn num_episodes(full_buffer: SimpleBuffer<usize, bool>) {
         assert_eq!(full_buffer.num_episodes(), 3);
     }
 
     #[rstest]
-    fn steps(full_buffer: SerialBuffer<usize, bool>) {
+    fn steps(full_buffer: SimpleBuffer<usize, bool>) {
         let mut steps_iter = full_buffer.steps();
         assert_eq!(steps_iter.next(), Some(&step(0, Terminate)));
         assert_eq!(steps_iter.next(), Some(&step(1, Continue(()))));
@@ -267,7 +267,7 @@ mod tests {
     }
 
     #[rstest]
-    fn steps_is_fused(full_buffer: SerialBuffer<usize, bool>) {
+    fn steps_is_fused(full_buffer: SimpleBuffer<usize, bool>) {
         let mut steps_iter = full_buffer.steps();
         for _ in 0..5 {
             assert!(steps_iter.next().is_some());
@@ -277,12 +277,12 @@ mod tests {
     }
 
     #[rstest]
-    fn steps_len(full_buffer: SerialBuffer<usize, bool>) {
+    fn steps_len(full_buffer: SimpleBuffer<usize, bool>) {
         assert_eq!(full_buffer.steps().len(), full_buffer.num_steps());
     }
 
     #[rstest]
-    fn episodes_incomplete_ge_1(full_buffer: SerialBuffer<usize, bool>) {
+    fn episodes_incomplete_ge_1(full_buffer: SimpleBuffer<usize, bool>) {
         let mut episodes_iter = full_buffer.episodes();
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
@@ -300,12 +300,12 @@ mod tests {
     }
 
     #[rstest]
-    fn episodes_len(full_buffer: SerialBuffer<usize, bool>) {
+    fn episodes_len(full_buffer: SimpleBuffer<usize, bool>) {
         assert_eq!(full_buffer.episodes().len(), full_buffer.num_episodes());
     }
 
     #[rstest]
-    fn episode_len_sum(full_buffer: SerialBuffer<usize, bool>) {
+    fn episode_len_sum(full_buffer: SimpleBuffer<usize, bool>) {
         assert_eq!(
             full_buffer.episodes().map(|e| e.len()).sum::<usize>(),
             full_buffer.num_steps()

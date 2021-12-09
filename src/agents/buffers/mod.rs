@@ -1,8 +1,8 @@
 //! History buffers
-mod serial;
+mod simple;
 
 use crate::simulation::PartialStep;
-pub use serial::{SerialBuffer, SerialBufferConfig};
+pub use simple::{SimpleBuffer, SimpleBufferConfig};
 
 /// Build a history buffer.
 pub trait BuildHistoryBuffer<O, A> {

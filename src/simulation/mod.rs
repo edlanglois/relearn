@@ -153,7 +153,7 @@ where
 mod tests {
     use super::*;
     use crate::agents::{
-        buffers::SerialBufferConfig, testing, BatchedUpdatesConfig, BuildBatchAgent, PureAsActor,
+        buffers::SimpleBufferConfig, testing, BatchedUpdatesConfig, BuildBatchAgent, PureAsActor,
         TabularQLearningAgentConfig,
     };
     use crate::envs::DeterministicBandit;
@@ -162,7 +162,7 @@ mod tests {
     fn train_parallel_tabular_q_bandit() {
         let env_config = DeterministicBandit::from_values(vec![0.0, 1.0]);
         let inner_agent_config = TabularQLearningAgentConfig::default();
-        let history_buffer_config = SerialBufferConfig {
+        let history_buffer_config = SimpleBufferConfig {
             soft_threshold: 100,
             hard_threshold: 110,
         };

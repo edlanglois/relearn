@@ -1,5 +1,5 @@
 use relearn::agents::{
-    buffers::SerialBufferConfig, ActorMode, BatchedUpdatesConfig, BuildBatchAgent, PureAsActor,
+    buffers::SimpleBufferConfig, ActorMode, BatchedUpdatesConfig, BuildBatchAgent, PureAsActor,
     SetActorMode, TabularQLearningAgentConfig,
 };
 use relearn::envs::{BuildEnv, Chain, Environment};
@@ -8,7 +8,7 @@ use relearn::simulation::{train_parallel, SimulationSummary};
 
 fn main() {
     let env_config = Chain::default();
-    let history_buffer_config = SerialBufferConfig {
+    let history_buffer_config = SimpleBufferConfig {
         soft_threshold: 1_000_000,
         hard_threshold: 1_100_000,
     };

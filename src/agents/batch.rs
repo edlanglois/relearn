@@ -1,5 +1,5 @@
 use super::buffers::{
-    BuildHistoryBuffer, HistoryBuffer, SerialBuffer, SerialBufferConfig, WriteHistoryBuffer,
+    BuildHistoryBuffer, HistoryBuffer, SimpleBuffer, SimpleBufferConfig, WriteHistoryBuffer,
 };
 use super::{
     Actor, ActorMode, BatchUpdate, BuildAgent, BuildAgentError, BuildBatchAgent, MakeActor,
@@ -139,11 +139,11 @@ pub trait AsyncUpdate {}
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BatchedUpdatesConfig<TC> {
     pub agent_config: TC,
-    pub history_buffer_config: SerialBufferConfig,
+    pub history_buffer_config: SimpleBufferConfig,
 }
 
 impl<TC> BatchedUpdatesConfig<TC> {
-    pub const fn new(agent_config: TC, history_buffer_config: SerialBufferConfig) -> Self {
+    pub const fn new(agent_config: TC, history_buffer_config: SimpleBufferConfig) -> Self {
         Self {
             agent_config,
             history_buffer_config,
@@ -179,7 +179,7 @@ where
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BatchedUpdates<T> {
     agent: T,
-    history_buffer_config: SerialBufferConfig,
+    history_buffer_config: SimpleBufferConfig,
 }
 
 impl<T, O, A> PureActor<O, A> for BatchedUpdates<T>
@@ -221,7 +221,7 @@ where
     O: 'static,
     A: 'static,
 {
-    type HistoryBuffer = SerialBuffer<O, A>;
+    type HistoryBuffer = SimpleBuffer<O, A>;
 
     fn new_buffer(&self) -> Self::HistoryBuffer {
         self.history_buffer_config.build_history_buffer()
@@ -284,14 +284,14 @@ where
 
 #[cfg(test)]
 mod batch_tabular_q_learning {
-    use super::super::{buffers::SerialBufferConfig, testing, TabularQLearningAgentConfig};
+    use super::super::{buffers::SimpleBufferConfig, testing, TabularQLearningAgentConfig};
     use super::*;
 
     #[test]
     fn learns_determinstic_bandit() {
         let config = SerialBatchConfig::new(BatchedUpdatesConfig::new(
             TabularQLearningAgentConfig::default(),
-            SerialBufferConfig {
+            SimpleBufferConfig {
                 soft_threshold: 20,
                 hard_threshold: 25,
             },
