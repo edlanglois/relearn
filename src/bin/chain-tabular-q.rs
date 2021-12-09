@@ -8,10 +8,7 @@ use relearn::simulation::{train_parallel, SimulationSummary};
 
 fn main() {
     let env_config = Chain::default();
-    let history_buffer_config = SimpleBufferConfig {
-        soft_threshold: 1_000_000,
-        hard_threshold: 1_100_000,
-    };
+    let history_buffer_config = SimpleBufferConfig::with_threshold(1_000_000);
     let agent_config = BatchedUpdatesConfig {
         agent_config: TabularQLearningAgentConfig::default(),
         history_buffer_config,

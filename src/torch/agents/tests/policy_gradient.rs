@@ -28,10 +28,7 @@ fn test_train_policy_gradient<PB, CB>(
     actor_config.critic_updater_config.optimizer.learning_rate = 0.1;
     let config = BatchUpdateAgentConfig {
         actor_config,
-        history_buffer_config: SimpleBufferConfig {
-            soft_threshold: 25,
-            hard_threshold: 30,
-        },
+        history_buffer_config: SimpleBufferConfig::with_threshold(25),
     };
     testing::train_deterministic_bandit(|env| config.build_agent(env, 0).unwrap(), 1_000, 0.9);
 }

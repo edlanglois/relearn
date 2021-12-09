@@ -162,10 +162,7 @@ mod tests {
     fn train_parallel_tabular_q_bandit() {
         let env_config = DeterministicBandit::from_values(vec![0.0, 1.0]);
         let inner_agent_config = TabularQLearningAgentConfig::default();
-        let history_buffer_config = SimpleBufferConfig {
-            soft_threshold: 100,
-            hard_threshold: 110,
-        };
+        let history_buffer_config = SimpleBufferConfig::with_threshold(100);
         let agent_config = BatchedUpdatesConfig {
             agent_config: inner_agent_config,
             history_buffer_config,

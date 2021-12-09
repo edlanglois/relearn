@@ -12,9 +12,16 @@ pub struct SimpleBufferConfig {
 
 impl Default for SimpleBufferConfig {
     fn default() -> Self {
+        Self::with_threshold(10_000)
+    }
+}
+
+impl SimpleBufferConfig {
+    /// Initialize with the given soft threshold; hard threshold is 10% more.
+    pub const fn with_threshold(soft_threshold: usize) -> Self {
         Self {
-            soft_threshold: 10_000,
-            hard_threshold: 11_000,
+            soft_threshold,
+            hard_threshold: soft_threshold + soft_threshold / 10,
         }
     }
 }

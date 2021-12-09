@@ -291,10 +291,7 @@ mod batch_tabular_q_learning {
     fn learns_determinstic_bandit() {
         let config = SerialBatchConfig::new(BatchedUpdatesConfig::new(
             TabularQLearningAgentConfig::default(),
-            SimpleBufferConfig {
-                soft_threshold: 20,
-                hard_threshold: 25,
-            },
+            SimpleBufferConfig::with_threshold(25),
         ));
 
         testing::pure_train_deterministic_bandit(
