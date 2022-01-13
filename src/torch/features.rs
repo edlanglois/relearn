@@ -335,7 +335,7 @@ mod lazy_features {
     impl<OS: Space, AS: Space> StoredHistory<OS, AS> {
         fn features(&self) -> LazyPackedHistoryFeatures<OS, AS> {
             LazyPackedHistoryFeatures::new(
-                self.episodes.iter().map(|e| e.as_ref()),
+                self.episodes.iter().map(AsRef::as_ref),
                 &self.observation_space,
                 &self.action_space,
                 self.discount_factor,

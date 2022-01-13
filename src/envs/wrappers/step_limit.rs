@@ -1,7 +1,7 @@
-use super::super::{Pomdp, Successor};
+use super::super::{Environment, Successor};
 use super::Wrapped;
 use crate::logging::Logger;
-use rand::rngs::StdRng;
+use crate::Prng;
 
 /// Environment wrapper that cuts off episodes after a set number of steps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -29,17 +29,17 @@ impl Default for StepLimit {
 /// Wrap an environment with a per-episode step limit.
 pub type WithStepLimit<E> = Wrapped<E, StepLimit>;
 
-impl<E: Pomdp> Pomdp for Wrapped<E, StepLimit> {
+impl<E: Environment> Environment for Wrapped<E, StepLimit> {
     /// `(inner_state, step_count)`
     type State = (E::State, u64);
     type Observation = E::Observation;
     type Action = E::Action;
 
-    fn initial_state(&self, rng: &mut StdRng) -> Self::State {
+    fn initial_state(&self, rng: &mut Prng) -> Self::State {
         (self.inner.initial_state(rng), 0)
     }
 
-    fn observe(&self, state: &Self::State, rng: &mut StdRng) -> Self::Observation {
+    fn observe(&self, state: &Self::State, rng: &mut Prng) -> Self::Observation {
         self.inner.observe(&state.0, rng)
     }
 
@@ -47,7 +47,7 @@ impl<E: Pomdp> Pomdp for Wrapped<E, StepLimit> {
         &self,
         state: Self::State,
         action: &Self::Action,
-        rng: &mut StdRng,
+        rng: &mut Prng,
         logger: &mut dyn Logger,
     ) -> (Successor<Self::State>, f64) {
         let (inner_state, step_count) = state;
@@ -66,24 +66,24 @@ impl<E: Pomdp> Pomdp for Wrapped<E, StepLimit> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::{chain::Move, testing, BuildEnv, Chain, PomdpEnv};
+    use super::super::super::{chain::Move, testing, BuildEnv, Chain};
     use super::*;
     use rand::SeedableRng;
 
     #[test]
     fn run_default() {
-        testing::run_pomdp(WithStepLimit::<Chain>::default(), 1000, 119);
+        testing::check_structured_env(&WithStepLimit::<Chain>::default(), 1000, 119);
     }
 
     #[test]
     fn build() {
         let config = WithStepLimit::<Chain>::default();
-        let _env: PomdpEnv<WithStepLimit<Chain>> = config.build_env(0).unwrap();
+        let _env = config.build_env(&mut Prng::seed_from_u64(0)).unwrap();
     }
 
     #[test]
     fn step_limit() {
-        let mut rng = StdRng::seed_from_u64(110);
+        let mut rng = Prng::seed_from_u64(110);
         let env = WithStepLimit::new(Chain::default(), StepLimit::new(2));
         let state = env.initial_state(&mut rng);
 

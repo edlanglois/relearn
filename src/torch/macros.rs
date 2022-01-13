@@ -12,20 +12,6 @@ macro_rules! box_impl_sequence_module {
     };
 }
 
-macro_rules! box_impl_stateful_iterative_module {
-    ($type:ty) => {
-        impl StatefulIterativeModule for Box<$type> {
-            fn step(&mut self, input: &Tensor) -> Tensor {
-                self.as_mut().step(input)
-            }
-
-            fn reset(&mut self) {
-                self.as_mut().reset()
-            }
-        }
-    };
-}
-
 macro_rules! box_impl_cudnn_support {
     ($type:ty) => {
         impl CudnnSupport for Box<$type> {

@@ -1,5 +1,5 @@
 //! Sequence modules test utilities.
-use super::{IterativeModule, SequenceModule, StatefulIterativeModule};
+use super::{IterativeModule, SequenceModule};
 use std::iter;
 use tch::{self, kind::Kind, nn::Module, Device, IndexOp, Tensor};
 
@@ -112,28 +112,4 @@ pub fn check_step<M: IterativeModule>(module: &M, in_dim: usize, out_dim: usize)
     let input2 = -input1;
     let (output2, _) = module.step(&input2, &state2);
     assert_eq!(output2.size(), vec![batch_size as i64, out_dim as i64]);
-}
-
-/// Basic check of [`StatefulIterativeModule::step`]
-///
-/// * Checks that the output size is correct.
-/// * Checks that multiple steps work.
-/// * Checks that reset followed by a step works and matches the first output
-pub fn check_stateful_step<M: StatefulIterativeModule>(
-    module: &mut M,
-    in_dim: usize,
-    out_dim: usize,
-) {
-    let _no_grad_guard = tch::no_grad_guard();
-    let input = Tensor::ones(&[in_dim as i64], (Kind::Float, Device::Cpu));
-    let output1 = module.step(&input);
-    assert_eq!(output1.size(), vec![out_dim as i64]);
-
-    let output2 = module.step(&input);
-    assert_eq!(output2.size(), vec![out_dim as i64]);
-
-    module.reset();
-    let output3 = module.step(&input);
-    assert_eq!(output3.size(), vec![out_dim as i64]);
-    assert_eq!(output1, output3);
 }

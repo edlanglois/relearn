@@ -1,39 +1,38 @@
-//! PPO actor-critic tests
-use crate::agents::{buffers::SimpleBufferConfig, testing, BatchUpdateAgentConfig, BuildAgent};
-use crate::torch::agents::ActorCriticConfig;
-use crate::torch::critic::{BuildCritic, GaeConfig, Return};
-use crate::torch::modules::{BuildModule, MlpConfig};
-use crate::torch::optimizers::AdamConfig;
-use crate::torch::policy::Policy;
-use crate::torch::seq_modules::{GruMlpConfig, WithStateConfig};
-use crate::torch::updaters::{CriticLossUpdateRule, PpoPolicyUpdateRule, WithOptimizer};
+//! Policy-gradient actor critic agent tests.
+use crate::agents::testing;
+use crate::torch::{
+    agents::ActorCriticConfig,
+    critic::{BuildCritic, GaeConfig, Return},
+    modules::MlpConfig,
+    optimizers::AdamConfig,
+    policy::BuildPolicy,
+    seq_modules::{GruMlpConfig, IterativeModule},
+    updaters::{CriticLossUpdateRule, PpoPolicyUpdateRule, WithOptimizer},
+};
 use tch::Device;
 
-fn test_train_policy_gradient<PB, CB>(
-    mut actor_config: ActorCriticConfig<
+fn test_train_ppo<PB, CB>(
+    mut config: ActorCriticConfig<
         PB,
         WithOptimizer<PpoPolicyUpdateRule, AdamConfig>,
         CB,
         WithOptimizer<CriticLossUpdateRule, AdamConfig>,
     >,
 ) where
-    PB: BuildModule,
-    PB::Module: Policy,
+    PB: BuildPolicy + Clone,
+    PB::Policy: IterativeModule,
     CB: BuildCritic,
 {
     // Speed up learning for this simple environment
-    actor_config.policy_updater_config.optimizer.learning_rate = 0.1;
-    actor_config.critic_updater_config.optimizer.learning_rate = 0.1;
-    let config = BatchUpdateAgentConfig {
-        actor_config,
-        history_buffer_config: SimpleBufferConfig::with_threshold(25),
-    };
-    testing::train_deterministic_bandit(|env| config.build_agent(env, 0).unwrap(), 1_000, 0.9);
+    config.policy_updater_config.optimizer.learning_rate = 0.1;
+    config.critic_updater_config.optimizer.learning_rate = 0.1;
+    config.min_batch_steps = 25;
+    testing::train_deterministic_bandit(&config, 10, 0.9);
 }
 
 #[test]
 fn default_mlp_return_learns_derministic_bandit() {
-    test_train_policy_gradient::<MlpConfig, Return>(Default::default())
+    test_train_ppo::<MlpConfig, Return>(Default::default())
 }
 
 #[test]
@@ -42,31 +41,27 @@ fn default_mlp_return_learns_derministic_bandit_cuda_if_available() {
         device: Device::cuda_if_available(),
         ..ActorCriticConfig::default()
     };
-    test_train_policy_gradient::<MlpConfig, Return>(config)
+    test_train_ppo::<MlpConfig, Return>(config)
 }
 
 #[test]
 fn default_mlp_gae_mlp_learns_derministic_bandit() {
-    test_train_policy_gradient::<MlpConfig, GaeConfig<MlpConfig>>(Default::default())
+    test_train_ppo::<MlpConfig, GaeConfig<MlpConfig>>(Default::default())
 }
 
 #[test]
 fn default_gru_mlp_return_learns_derministic_bandit() {
-    test_train_policy_gradient::<WithStateConfig<GruMlpConfig>, Return>(Default::default())
+    test_train_ppo::<GruMlpConfig, Return>(Default::default())
 }
 
 #[test]
 fn default_gru_mlp_gae_mlp_derministic_bandit() {
-    test_train_policy_gradient::<WithStateConfig<GruMlpConfig>, GaeConfig<MlpConfig>>(
-        Default::default(),
-    )
+    test_train_ppo::<GruMlpConfig, GaeConfig<MlpConfig>>(Default::default())
 }
 
 #[test]
 fn default_gru_mlp_gae_gru_mlp_derministic_bandit() {
-    test_train_policy_gradient::<WithStateConfig<GruMlpConfig>, GaeConfig<GruMlpConfig>>(
-        Default::default(),
-    )
+    test_train_ppo::<GruMlpConfig, GaeConfig<GruMlpConfig>>(Default::default())
 }
 
 #[test]
@@ -75,5 +70,5 @@ fn default_gru_mlp_gae_gru_mlp_derministic_bandit_cuda_if_available() {
         device: Device::cuda_if_available(),
         ..ActorCriticConfig::default()
     };
-    test_train_policy_gradient::<WithStateConfig<GruMlpConfig>, GaeConfig<GruMlpConfig>>(config)
+    test_train_ppo::<GruMlpConfig, GaeConfig<GruMlpConfig>>(config)
 }

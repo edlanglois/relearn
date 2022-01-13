@@ -1,25 +1,106 @@
 //! History buffers
+mod null;
 mod simple;
 
-use crate::simulation::PartialStep;
-pub use simple::{SimpleBuffer, SimpleBufferConfig};
+pub use null::NullBuffer;
+pub use simple::SimpleBuffer;
 
-/// Build a history buffer.
-pub trait BuildHistoryBuffer<O, A> {
-    type HistoryBuffer;
+use crate::envs::Successor;
+use crate::simulation::{PartialStep, TransientStep};
 
-    fn build_history_buffer(&self) -> Self::HistoryBuffer;
+/// Lower bound on the amount of data required by a buffer to ready itself.
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct BufferCapacityBound {
+    /// Minimum number of steps for the buffer to store.
+    pub min_steps: usize,
+
+    /// Minimum number of episodes for the buffer to store.
+    pub min_episodes: usize,
+
+    /// Minimum length of an incomplete episode at which the buffer may indicate ready.
+    ///
+    /// Buffers will generally try to indicate `ready` only at episode boundaries.
+    /// Setting this allows the buffer to ready itself on environments with unbounded or infinitely
+    /// long episodes.
+    pub min_incomplete_episode_len: Option<usize>,
+}
+
+impl BufferCapacityBound {
+    /// Minimal lower bound; accept empty buffers
+    pub const fn empty() -> Self {
+        Self {
+            min_steps: 0,
+            min_episodes: 0,
+            min_incomplete_episode_len: Some(0),
+        }
+    }
+
+    /// Set `min_steps` to the maximum of the current value and the given value.
+    pub fn with_steps_at_least(mut self, min_steps: usize) -> Self {
+        self.min_steps = self.min_steps.max(min_steps);
+        self
+    }
+
+    /// Set `min_episodes` to the maximum of the current value and the given value.
+    pub fn with_episodes_at_least(mut self, min_episodes: usize) -> Self {
+        self.min_episodes = self.min_episodes.max(min_episodes);
+        self
+    }
+
+    /// Set `min_incomplete_episode_len` to the maximum of the current value and the given value.
+    pub fn with_incomplete_len_at_least(mut self, min_incomplete_episode_len: usize) -> Self {
+        self.min_incomplete_episode_len = Some(
+            self.min_incomplete_episode_len
+                .map_or(min_incomplete_episode_len, |len| {
+                    len.max(min_incomplete_episode_len)
+                }),
+        );
+        self
+    }
+
+    /// The maximum of two bounds (field-by-field)
+    pub fn max(self, other: Self) -> Self {
+        Self {
+            min_steps: self.min_steps.max(other.min_steps),
+            min_episodes: self.min_episodes.max(other.min_episodes),
+            min_incomplete_episode_len: self
+                .min_incomplete_episode_len
+                .zip(other.min_incomplete_episode_len)
+                .map(|(a, b)| a.max(b)),
+        }
+    }
+
+    /// Divide the capacity into a bound of `1 / n` the size, rounding up.
+    ///
+    /// `n` buffers meeting the smaller bound will collectively meet the larger bound.
+    pub const fn divide(self, n: usize) -> Self {
+        Self {
+            min_steps: div_ceil(self.min_steps, n),
+            min_episodes: div_ceil(self.min_episodes, n),
+            min_incomplete_episode_len: self.min_incomplete_episode_len,
+        }
+    }
+}
+
+/// Division rounding up
+const fn div_ceil(numerator: usize, denominator: usize) -> usize {
+    let mut quotient = numerator / denominator;
+    let remainder = numerator % denominator;
+    if remainder > 0 {
+        quotient += 1;
+    }
+    quotient
 }
 
 /// Add data to a history buffer.
 pub trait WriteHistoryBuffer<O, A> {
-    /// Insert a step into the buffer and return whether the buffer is full.
+    /// Insert a step into the buffer and return whether the buffer is ready for use.
     fn push(&mut self, step: PartialStep<O, A>) -> bool;
 
-    /// Extend the buffer with steps from an iterator, stopping once full.
+    /// Extend the buffer with steps from an iterator, stopping once ready for use.
     ///
-    /// Returns whether the buffer is full.
-    fn extend<I>(&mut self, steps: I) -> bool
+    /// Returns whether the buffer is ready.
+    fn extend_until_ready<I>(&mut self, steps: I) -> bool
     where
         I: IntoIterator<Item = PartialStep<O, A>>,
     {
@@ -35,26 +116,50 @@ pub trait WriteHistoryBuffer<O, A> {
     fn clear(&mut self);
 }
 
-/// Access collected episodes or steps.
-pub trait HistoryBuffer<O, A> {
-    /// Total number of steps
-    ///
-    /// Equal to `self.steps().len()` and `self.episodes().map(|e| e.len()).sum()`.
-    fn num_steps(&self) -> usize;
+/// Implement `WriteHistoryBuffer<O, A>` for a deref-able generic wrapper type.
+macro_rules! impl_wrapped_write_history_buffer {
+    ($wrapper:ty) => {
+        impl<T, O, A> WriteHistoryBuffer<O, A> for $wrapper
+        where
+            T: WriteHistoryBuffer<O, A> + ?Sized,
+        {
+            fn push(&mut self, step: PartialStep<O, A>) -> bool {
+                T::push(self, step)
+            }
 
-    /// Total number of episodes (may include incomplete episodes)
-    ///
-    /// Equal to `self.episodes().len()`.
-    fn num_episodes(&self) -> usize;
+            fn clear(&mut self) {
+                T::clear(self)
+            }
+        }
+    };
+}
+impl_wrapped_write_history_buffer!(&'_ mut T);
+impl_wrapped_write_history_buffer!(Box<T>);
 
-    /// All steps ordered contiguously by episode.
-    fn steps<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a PartialStep<O, A>> + 'a>;
-
-    /// Drain all steps from the buffer (ordered contiguously by episode).
-    ///
-    /// The buffer will be empty once the iterator is consumed or dropped.
-    fn drain_steps(&mut self) -> Box<dyn ExactSizeIterator<Item = PartialStep<O, A>> + '_>;
-
-    /// All episodes (including incomplete episodes).
-    fn episodes<'a>(&'a self) -> Box<dyn ExactSizeIterator<Item = &'a [PartialStep<O, A>]> + 'a>;
+/// Call a closure on each step of a [`PartialStep`] iterator as a [`TransientStep`].
+///
+/// Skips the final step if its `next` is `Successor::Continue` since the following observation is
+/// not available.
+pub fn for_each_transient_step<I, F, O, A>(steps: I, mut f: F)
+where
+    I: Iterator<Item = PartialStep<O, A>>,
+    F: FnMut(TransientStep<O, A>),
+{
+    let mut steps = steps.peekable();
+    while let Some(step) = steps.next() {
+        let transient_step = TransientStep {
+            observation: step.observation,
+            action: step.action,
+            reward: step.reward,
+            next: match step.next {
+                Successor::Continue(()) => match steps.peek() {
+                    Some(next_step) => Successor::Continue(&next_step.observation),
+                    None => break, // Missing successor step
+                },
+                Successor::Terminate => Successor::Terminate,
+                Successor::Interrupt(o) => Successor::Interrupt(o),
+            },
+        };
+        f(transient_step)
+    }
 }

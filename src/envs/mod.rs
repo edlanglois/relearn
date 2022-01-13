@@ -7,7 +7,6 @@ mod mdps;
 mod memory;
 mod meta;
 mod multiagent;
-mod stateful;
 #[cfg(test)]
 pub mod testing;
 mod wrappers;
@@ -15,27 +14,150 @@ mod wrappers;
 pub use bandits::{
     Bandit, BernoulliBandit, DeterministicBandit, OneHotBandits, UniformBernoulliBandits,
 };
-pub use builders::{BuildEnv, BuildEnvDist, BuildEnvError, BuildPomdp, BuildPomdpDist, CloneBuild};
+pub use builders::{BuildEnv, BuildEnvDist, BuildEnvError, CloneBuild};
 pub use cartpole::{CartPole, CartPoleConfig};
 pub use chain::Chain;
 pub use mdps::DirichletRandomMdps;
 pub use memory::MemoryGame;
-pub use meta::{
-    InnerEnvStructure, MetaEnv, MetaEnvConfig, MetaObservation, MetaObservationSpace, MetaPomdp,
-    MetaState,
-};
+pub use meta::{InnerEnvStructure, MetaEnv, MetaObservation, MetaObservationSpace, MetaState};
 pub use multiagent::fruit::FruitGame;
 pub use multiagent::views::{FirstPlayerView, SecondPlayerView};
-pub use stateful::{IntoEnv, PomdpEnv};
 pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 
 use crate::agents::Actor;
 use crate::logging::{Logger, TimeSeriesLogger};
-use crate::simulation::ActorSteps;
+use crate::simulation::SimulatorSteps;
 use crate::spaces::Space;
-use rand::{rngs::StdRng, Rng};
+use crate::Prng;
+use rand::SeedableRng;
 use std::borrow::Borrow;
 use std::f64;
+
+/// A reinforcement learning [`Environment`] with consistent [`EnvStructure`].
+///
+/// # Design Discussion
+/// [`EnvStructure`] is not a supertrait of [`Pomdp`] because knowing the observation and action
+/// spaces is not necessary for simulation, only the observation and action types must be known.
+///
+pub trait StructuredEnvironment:
+    EnvStructure
+    + Environment<
+        Observation = <Self::ObservationSpace as Space>::Element,
+        Action = <Self::ActionSpace as Space>::Element,
+    >
+{
+}
+impl<T> StructuredEnvironment for T where
+    T: EnvStructure
+        + Environment<
+            Observation = <Self::ObservationSpace as Space>::Element,
+            Action = <Self::ActionSpace as Space>::Element,
+        > + ?Sized
+{
+}
+
+/// A reinforcement learning environment.
+///
+/// Formally, this is a Partially Observable Markov Decision Process (POMDP) with episodes.
+/// The concept of an episode is an abstraction on the POMDP formalism.
+/// An episode ending means that all possible future trajectories have 0 reward on each step.
+///
+/// This trait encodes the dynamics of a reinforcement learning environment.
+/// The actual state is represented by the `State` associated type.
+///
+/// # Design Discussion
+/// ## `State`
+/// The use of an explicit `State` associated type allows the type system to manage episode
+/// lifetimes; there is no possibility of an incomplete reset between episodes.
+/// However, it forces the users of this trait to handle `State` when they might prefer it to be
+/// a hidden internal implementation detail.
+/// Once [Generic Associated Types][GAT] are stable, an alternative [`Environment`] trait could
+/// have an `Episode<'a>` associated type where `Episode` provides a `step` method and
+/// internally manages state.
+/// However, using the generic `Episode<'a>` approach would make it difficult to store an
+/// environment and an episode together.
+/// Something similar could be done without GAT using an
+/// `Episode<'a, E: Environment>(&'a E, E::State)` struct with the same drawbacks.
+///
+/// ## Random State
+/// The episode is not responsible for managing its own pseudo-random state.
+/// This avoids having to frequently re-initialize the random number generator on each episode and
+/// simplifies  state definitions.
+///
+/// [GAT]: https://rust-lang.github.io/rfcs/1598-generic_associated_types.html
+pub trait Environment {
+    type State;
+    type Observation;
+    type Action;
+
+    /// Sample a state for the start of a new episode.
+    ///
+    /// `rng` is a source of randomness for sampling the initial state.
+    /// This includes seeding any pseudo-random number generators used by the environment, which
+    /// must be stored within `State`.
+    fn initial_state(&self, rng: &mut Prng) -> Self::State;
+
+    /// Generate an observation for a given state.
+    fn observe(&self, state: &Self::State, rng: &mut Prng) -> Self::Observation;
+
+    /// Perform a state transition in reponse to an action.
+    ///
+    /// # Args
+    /// * `state`  - The initial state.
+    /// * `action` - The action to take at this state.
+    /// * `logger` - Logger for any auxiliary information.
+    ///
+    /// # Returns
+    /// * `successor` - The resulting state or outcome.
+    /// * `reward` - The reward value for this transition.
+    fn step(
+        &self,
+        state: Self::State,
+        action: &Self::Action,
+        rng: &mut Prng,
+        logger: &mut dyn Logger,
+    ) -> (Successor<Self::State>, f64);
+
+    /// Run this environment with the given actor.
+    fn run<T, L>(self, actor: T, seed: u64, logger: L) -> SimulatorSteps<Self, T, Prng, L>
+    where
+        T: Actor<Self::Observation, Self::Action>,
+        L: TimeSeriesLogger,
+        Self: Sized,
+    {
+        let mut rng_env = Prng::seed_from_u64(seed);
+        let rng_actor = Prng::from_rng(&mut rng_env).unwrap();
+        SimulatorSteps::new(self, actor, rng_env, rng_actor, logger)
+    }
+}
+
+/// Implement `Environment` for a deref-able wrapper type generic over `T: Environment + ?Sized`.
+macro_rules! impl_wrapped_environment {
+    ($wrapper:ty) => {
+        impl<T: Environment + ?Sized> Environment for $wrapper {
+            type State = T::State;
+            type Observation = T::Observation;
+            type Action = T::Action;
+            fn initial_state(&self, rng: &mut Prng) -> Self::State {
+                T::initial_state(self, rng)
+            }
+            fn observe(&self, state: &Self::State, rng: &mut Prng) -> Self::Observation {
+                T::observe(self, state, rng)
+            }
+            fn step(
+                &self,
+                state: Self::State,
+                action: &Self::Action,
+                rng: &mut Prng,
+                logger: &mut dyn Logger,
+            ) -> (Successor<Self::State>, f64) {
+                T::step(self, state, action, rng, logger)
+            }
+        }
+    };
+}
+impl_wrapped_environment!(&'_ T);
+impl_wrapped_environment!(Box<T>);
 
 /// The external structure of a reinforcement learning environment.
 pub trait EnvStructure {
@@ -64,41 +186,30 @@ pub trait EnvStructure {
     fn discount_factor(&self) -> f64;
 }
 
-impl<E: EnvStructure + ?Sized> EnvStructure for &'_ E {
-    type ObservationSpace = E::ObservationSpace;
-    type ActionSpace = E::ActionSpace;
+/// Implement `EnvStructure` for a deref-able wrapper type generic over `T: EnvStructure + ?Sized`.
+macro_rules! impl_wrapped_env_structure {
+    ($wrapper:ty) => {
+        impl<T: EnvStructure + ?Sized> EnvStructure for $wrapper {
+            type ObservationSpace = T::ObservationSpace;
+            type ActionSpace = T::ActionSpace;
 
-    fn observation_space(&self) -> Self::ObservationSpace {
-        E::observation_space(self)
-    }
-    fn action_space(&self) -> Self::ActionSpace {
-        E::action_space(self)
-    }
-    fn reward_range(&self) -> (f64, f64) {
-        E::reward_range(self)
-    }
-    fn discount_factor(&self) -> f64 {
-        E::discount_factor(self)
-    }
+            fn observation_space(&self) -> Self::ObservationSpace {
+                T::observation_space(self)
+            }
+            fn action_space(&self) -> Self::ActionSpace {
+                T::action_space(self)
+            }
+            fn reward_range(&self) -> (f64, f64) {
+                T::reward_range(self)
+            }
+            fn discount_factor(&self) -> f64 {
+                T::discount_factor(self)
+            }
+        }
+    };
 }
-
-impl<E: EnvStructure + ?Sized> EnvStructure for Box<E> {
-    type ObservationSpace = E::ObservationSpace;
-    type ActionSpace = E::ActionSpace;
-
-    fn observation_space(&self) -> Self::ObservationSpace {
-        E::observation_space(self)
-    }
-    fn action_space(&self) -> Self::ActionSpace {
-        E::action_space(self)
-    }
-    fn reward_range(&self) -> (f64, f64) {
-        E::reward_range(self)
-    }
-    fn discount_factor(&self) -> f64 {
-        E::discount_factor(self)
-    }
-}
+impl_wrapped_env_structure!(&'_ T);
+impl_wrapped_env_structure!(Box<T>);
 
 /// The successor state or outcome of an episode step.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -115,6 +226,7 @@ pub enum Successor<T, U = T> {
     /// For example, the episode may have been interrupted due to a step limit.
     Interrupt(T),
 }
+
 impl<T, U> Successor<T, U> {
     /// Get the inner state of `Successor::Continue`
     #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
@@ -305,241 +417,20 @@ where
     }
 }
 
-/// A Markov decision process (MDP).
-///
-/// The concept of an episode is an abstraction on the MDP formalism.
-/// An episode ending means that all possible future trajectories have 0 reward on each step.
-pub trait Mdp {
-    type State;
-    type Action;
-
-    /// Sample a new initial state.
-    fn initial_state(&self, rng: &mut StdRng) -> Self::State;
-
-    /// Sample a state transition.
-    ///
-    /// # Args
-    /// * `state`  - The initial state.
-    /// * `action` - The action to take at this state.
-    /// * `rng`    - Random number generator for any stochasticity in the transition.
-    /// * `logger` - Logger for any auxiliary information.
-    ///
-    /// # Returns
-    /// * `successor` - The resulting state or outcome.
-    /// * `reward` - The reward value for this transition.
-    fn step(
-        &self,
-        state: Self::State,
-        action: &Self::Action,
-        rng: &mut StdRng,
-        logger: &mut dyn Logger,
-    ) -> (Successor<Self::State>, f64);
-}
-
-/// A partially observable Markov decision process (POMDP).
-///
-/// The concept of an episode is an abstraction on the MDP formalism.
-/// An episode ending means that all possible future trajectories have 0 reward on each step.
-pub trait Pomdp {
-    type State;
-    type Observation;
-    type Action;
-
-    /// Sample a new initial state.
-    fn initial_state(&self, rng: &mut StdRng) -> Self::State;
-
-    /// Sample an observation for a state.
-    fn observe(&self, state: &Self::State, rng: &mut StdRng) -> Self::Observation;
-
-    /// Sample a state transition.
-    ///
-    /// # Args
-    /// * `state`  - The initial state.
-    /// * `action` - The action to take at this state.
-    /// * `rng`    - Random number generator for any stochasticity in the transition.
-    /// * `logger` - Logger for any auxiliary information.
-    ///
-    /// # Returns
-    /// * `successor` - The resulting state or outcome.
-    /// * `reward` - The reward value for this transition.
-    fn step(
-        &self,
-        state: Self::State,
-        action: &Self::Action,
-        rng: &mut StdRng,
-        logger: &mut dyn Logger,
-    ) -> (Successor<Self::State>, f64);
-}
-
-impl<E: Mdp> Pomdp for E
-where
-    E::State: Copy,
-{
-    type State = E::State;
-    type Observation = E::State;
-    type Action = E::Action;
-
-    fn initial_state(&self, rng: &mut StdRng) -> Self::State {
-        Mdp::initial_state(self, rng)
-    }
-
-    fn observe(&self, state: &Self::State, _: &mut StdRng) -> Self::Observation {
-        *state
-    }
-
-    fn step(
-        &self,
-        state: Self::State,
-        action: &Self::Action,
-        rng: &mut StdRng,
-        logger: &mut dyn Logger,
-    ) -> (Successor<Self::State>, f64) {
-        Mdp::step(self, state, action, rng, logger)
-    }
-}
-
-/// A reinforcement learning environment with internal state.
-///
-/// Prefer implementing [`Pomdp`] since [`PomdpEnv`] can be used
-/// to create an [`Environment`] out of a [`Pomdp`].
-pub trait Environment {
-    type Observation;
-    type Action;
-
-    /// Take a step in the environment.
-    ///
-    /// This may panic if the state has not be initialized with reset()
-    /// after initialization or after a step returned `episod_done = True`.
-    ///
-    /// # Returns
-    /// * `successor` - The resulting observation or outcome.
-    /// * `reward` - The reward value for this transition.
-    fn step(
-        &mut self,
-        action: &Self::Action,
-        logger: &mut dyn Logger,
-    ) -> (Successor<Self::Observation>, f64);
-
-    /// Reset the environment to an initial state.
-    ///
-    /// Must be called before each new episode.
-    ///
-    /// # Returns
-    /// * `observation`: An observation of the resulting state.
-    fn reset(&mut self) -> Self::Observation;
-
-    /// Run this environment with the given actor.
-    fn run<A, L>(self, actor: A, logger: L) -> ActorSteps<Self, A, L>
-    where
-        A: Actor<Self::Observation, Self::Action>,
-        L: TimeSeriesLogger,
-        Self: Sized,
-    {
-        ActorSteps::new(self, actor, logger)
-    }
-}
-
-impl<E: Environment + ?Sized> Environment for &'_ mut E {
-    type Observation = E::Observation;
-    type Action = E::Action;
-
-    fn step(
-        &mut self,
-        action: &Self::Action,
-        logger: &mut dyn Logger,
-    ) -> (Successor<Self::Observation>, f64) {
-        E::step(self, action, logger)
-    }
-
-    fn reset(&mut self) -> Self::Observation {
-        E::reset(self)
-    }
-}
-
-impl<E: Environment + ?Sized> Environment for Box<E> {
-    type Observation = E::Observation;
-    type Action = E::Action;
-
-    fn step(
-        &mut self,
-        action: &Self::Action,
-        logger: &mut dyn Logger,
-    ) -> (Successor<Self::Observation>, f64) {
-        E::step(self, action, logger)
-    }
-
-    fn reset(&mut self) -> Self::Observation {
-        E::reset(self)
-    }
-}
-
-/// An [`Environment`] with consistent [`EnvStructure`].
-///
-/// The reason that [`EnvStructure`] is not already a supertrait of [`Environment`] is because when
-/// simulating environments we only need to know `Observation` and `Action`, not `ObservationSpace`
-/// and `ActionSpace`. The trait object `dyn Environment<Observation=_, Action=_>` can be used
-/// without also having to monomorphize over the space.
-pub trait StructuredEnvironment:
-    EnvStructure
-    + Environment<
-        Observation = <Self::ObservationSpace as Space>::Element,
-        Action = <Self::ActionSpace as Space>::Element,
-    >
-{
-}
-impl<T> StructuredEnvironment for T where
-    T: EnvStructure
-        + Environment<
-            Observation = <Self::ObservationSpace as Space>::Element,
-            Action = <Self::ActionSpace as Space>::Element,
-        >
-{
-}
-
-/// A distribution of [`Pomdp`] sharing the same external structure.
-///
-/// The [`EnvStructure`] of each sampled environment must be a subset of the `EnvStructure` of the
-/// distribution as a whole. The discount factors must be identical.
-/// The transition dynamics of the individual environment samples may differ.
-pub trait PomdpDistribution: EnvStructure {
-    type Pomdp: Pomdp<
-            Observation = <Self::ObservationSpace as Space>::Element,
-            Action = <Self::ActionSpace as Space>::Element,
-        > + EnvStructure<ObservationSpace = Self::ObservationSpace, ActionSpace = Self::ActionSpace>;
-
-    /// Sample a POMDP from the distribution.
-    ///
-    /// # Args
-    /// * `rng` - Random number generator used for sampling the environment structure.
-    fn sample_pomdp(&self, rng: &mut StdRng) -> Self::Pomdp;
-}
-
-/// A distribution of environments sharing the same external structure.
+/// A distribution of [`Environment`] sharing the same external structure.
 ///
 /// The [`EnvStructure`] of each sampled environment must be a subset of the `EnvStructure` of the
 /// distribution as a whole. The discount factors must be identical.
 /// The transition dynamics of the individual environment samples may differ.
 pub trait EnvDistribution: EnvStructure {
-    type Environment: Environment<
-            Observation = <Self::ObservationSpace as Space>::Element,
-            Action = <Self::ActionSpace as Space>::Element,
-        > + EnvStructure<ObservationSpace = Self::ObservationSpace, ActionSpace = Self::ActionSpace>;
+    type Environment: StructuredEnvironment<
+        ObservationSpace = Self::ObservationSpace,
+        ActionSpace = Self::ActionSpace,
+    >;
 
     /// Sample an environment from the distribution.
     ///
     /// # Args
-    /// * `rng` - Random number generator used for sampling the environment structure and for
-    ///           seeding any internal randomness of the environment dynamics.
-    fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment;
-}
-
-impl<T> EnvDistribution for T
-where
-    T: PomdpDistribution,
-{
-    type Environment = PomdpEnv<T::Pomdp>;
-
-    fn sample_environment(&self, rng: &mut StdRng) -> Self::Environment {
-        PomdpEnv::new(self.sample_pomdp(rng), rng.gen())
-    }
+    /// * `rng` - Random number generator used for sampling the environment structure.
+    fn sample_environment(&self, rng: &mut Prng) -> Self::Environment;
 }

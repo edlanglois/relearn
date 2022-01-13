@@ -1,11 +1,21 @@
 use super::super::{
     critic::{BuildCritic, Critic},
-    policy::BuildPolicy,
-    updaters::{BuildCriticUpdater, BuildPolicyUpdater},
+    features::LazyPackedHistoryFeatures,
+    policy::{BuildPolicy, Policy},
+    seq_modules::IterativeModule,
+    updaters::{BuildCriticUpdater, BuildPolicyUpdater, UpdateCritic, UpdatePolicy},
 };
-use crate::agents::SetActorMode;
+use crate::agents::buffers::{BufferCapacityBound, SimpleBuffer, WriteHistoryBuffer};
+use crate::agents::{Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError};
 use crate::envs::EnvStructure;
-use crate::spaces::{NonEmptyFeatures, NumFeatures, ParameterizedDistributionSpace, Space};
+use crate::logging::{Event, Logger, LoggerHelper, TimeSeriesLogger, TimeSeriesLoggerHelper};
+use crate::spaces::{
+    EncoderFeatureSpace, NonEmptyFeatures, NumFeatures, ParameterizedDistributionSpace, ReprSpace,
+};
+use crate::Prng;
+use std::fmt;
+use std::fmt::Debug;
+use std::sync::Arc;
 use tch::{nn::VarStore, Device, Tensor};
 
 /// Configuration for [`ActorCriticAgent`]
@@ -15,6 +25,7 @@ pub struct ActorCriticConfig<PB, PUB, CB, CUB> {
     pub policy_updater_config: PUB,
     pub critic_config: CB,
     pub critic_updater_config: CUB,
+    pub min_batch_steps: usize,
     pub device: Device,
 }
 
@@ -31,97 +42,95 @@ where
             policy_updater_config: Default::default(),
             critic_config: Default::default(),
             critic_updater_config: Default::default(),
+            min_batch_steps: 10_000,
             device: Device::Cpu,
         }
     }
 }
 
-/*
-impl<PB, PUB, CB, CUB, OS, AS> BuildBatchUpdateActor<OS, AS> for ActorCriticConfig<PB, PUB, CB, CUB>
+impl<PB, PUB, CB, CUB, OS, AS> BuildAgent<OS, AS> for ActorCriticConfig<PB, PUB, CB, CUB>
 where
-    PB: BuildPolicy,
+    OS: EncoderFeatureSpace + 'static,
+    AS: ParameterizedDistributionSpace<Tensor> + 'static,
+    PB: BuildPolicy + Clone,
+    PB::Policy: IterativeModule + Policy, // TODO: Rework Policy trait
     PUB: BuildPolicyUpdater<AS>,
+    PUB::Updater: UpdatePolicy<AS>,
     CB: BuildCritic,
+    CB::Critic: Critic,
     CUB: BuildCriticUpdater,
-    OS: EncoderFeatureSpace,
-    AS: ReprSpace<Tensor> + ParameterizedDistributionSpace<Tensor>,
+    CUB::Updater: UpdateCritic,
 {
     #[allow(clippy::type_complexity)]
-    type BatchUpdateActor =
-        ActorCriticAgent<OS, AS, PB::Policy, PUB::Updater, CB::Critic, CUB::Updater>;
+    type Agent = ActorCriticAgent<OS, AS, PB, PB::Policy, PUB::Updater, CB::Critic, CUB::Updater>;
 
-    fn build_batch_update_actor(
+    fn build_agent(
         &self,
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
-        _seed: u64,
-    ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
+        _: &mut Prng,
+    ) -> Result<Self::Agent, BuildAgentError> {
         Ok(ActorCriticAgent::new(env, self))
     }
 }
-*/
 
 /// Actor-critic agent.
-#[derive(Debug)]
-pub struct ActorCriticAgent<OS, AS, P, PU, C, CU>
+pub struct ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
 where
-    OS: Space,
-    AS: Space,
+    OS: EncoderFeatureSpace,
 {
-    /// Environment observation space
-    pub observation_space: NonEmptyFeatures<OS>,
+    shared: Arc<ActorCriticShared<OS, AS>>,
+    min_batch_steps: usize,
+    discount_factor: f64,
 
-    /// Environment action space
-    pub action_space: AS,
-
-    /// Amount by which future rewards are discounted
-    pub discount_factor: f64,
-
-    /// Device on which model variables are stored.
-    pub device: Device,
-
-    /// The policy module (the "actor").
-    pub policy: P,
-
-    /// The policy updater.
-    ///
-    /// Performs a policy update given history data.
-    pub policy_updater: PU,
-
-    /// The primary policy variables.
-    ///
-    /// Used for updating `cpu_policy_variables`.
+    policy_config: PB,
+    policy: P,
     policy_variables: VarStore,
+    policy_updater: PU,
 
-    /// A copy of the policy on the CPU for faster actions.
-    ///
-    /// Exists if the primary policy is not already on the CPU.
-    cpu_policy: Option<P>,
+    critic: C,
+    critic_updater: CU,
 
-    /// The variables used by the CPU policy.
-    ///
-    /// Exists if cpu_policy exists.
-    cpu_policy_variables: Option<VarStore>,
-
-    /// The critic module.
-    pub critic: C,
-
-    /// The critic updater.
-    ///
-    /// Performs a critic update given history data.
-    pub critic_updater: CU,
+    device: Device,
 }
 
-impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
+impl<OS, AS, PB, P, PU, C, CU> Debug for ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
 where
-    OS: Space + NumFeatures,
-    AS: ParameterizedDistributionSpace<Tensor>,
+    OS: EncoderFeatureSpace + Debug,
+    OS::Encoder: Debug,
+    AS: Debug,
+    PB: Debug,
+    P: Debug,
+    PU: Debug,
+    C: Debug,
+    CU: Debug,
 {
-    pub fn new<E, PB, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ActorCriticAgent")
+            .field("shared", &self.shared)
+            .field("min_batch_steps", &self.min_batch_steps)
+            .field("discount_factor", &self.discount_factor)
+            .field("policy_config", &self.policy_config)
+            .field("policy", &self.policy)
+            .field("policy_variables", &self.policy_variables)
+            .field("policy_updater", &self.policy_updater)
+            .field("critic", &self.critic)
+            .field("critic_updater", &self.critic_updater)
+            .field("device", &self.device)
+            .finish()
+    }
+}
+
+impl<OS, AS, PB, P, PU, C, CU> ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
+where
+    OS: EncoderFeatureSpace,
+    AS: ParameterizedDistributionSpace<Tensor>,
+    PB: BuildPolicy<Policy = P> + Clone,
+    C: Critic,
+{
+    pub fn new<E, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
-        PB: BuildPolicy<Policy = P>,
         PUB: BuildPolicyUpdater<AS, Updater = PU>,
-        C: Critic,
         CB: BuildCritic<Critic = C>,
         CUB: BuildCriticUpdater<Updater = CU>,
     {
@@ -138,20 +147,6 @@ where
             .policy_updater_config
             .build_policy_updater(&policy_variables);
 
-        // A copy of the policy on the CPU for faster actions
-        let (cpu_policy, cpu_policy_variables) = if config.device != Device::Cpu {
-            let mut cpu_policy_variables = VarStore::new(Device::Cpu);
-            let cpu_policy = config.policy_config.build_policy(
-                &cpu_policy_variables.root(),
-                observation_space.num_features(),
-                action_space.num_distribution_params(),
-            );
-            cpu_policy_variables.copy(&policy_variables).unwrap();
-            (Some(cpu_policy), Some(cpu_policy_variables))
-        } else {
-            (None, None)
-        };
-
         let critic_variables = VarStore::new(config.device);
         let critic = config
             .critic_config
@@ -162,62 +157,91 @@ where
             .build_critic_updater(&critic_variables);
 
         Self {
-            observation_space,
-            action_space,
+            shared: Arc::new(ActorCriticShared {
+                observation_encoder: observation_space.encoder(),
+                observation_space,
+                action_space,
+            }),
+            min_batch_steps: config.min_batch_steps,
             discount_factor,
-            device: config.device,
+            policy_config: config.policy_config.clone(),
             policy,
-            policy_updater,
             policy_variables,
-            cpu_policy,
-            cpu_policy_variables,
+            policy_updater,
             critic,
             critic_updater,
+            device: config.device,
         }
     }
 }
 
-/*
-impl<OS, AS, P, PU, C, CU> Actor<OS::Element, AS::Element>
-    for ActorCriticAgent<OS, AS, P, PU, C, CU>
+impl<OS, AS, PB, P, PU, C, CU> Agent<OS::Element, AS::Element>
+    for ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
 where
-    OS: EncoderFeatureSpace,
-    AS: ParameterizedDistributionSpace<Tensor>,
-    P: StatefulIterativeModule,
+    OS: EncoderFeatureSpace + 'static,
+    AS: ParameterizedDistributionSpace<Tensor> + 'static,
+    PB: BuildPolicy<Policy = P>,
+    P: IterativeModule + Policy,
+    PU: UpdatePolicy<AS>,
+    C: Critic,
+    CU: UpdateCritic,
 {
-    fn act(&mut self, observation: &OS::Element) -> AS::Element {
-        let _no_grad = tch::no_grad_guard();
-        let observation_features = self.observation_space.features(observation);
+    type Actor = ActorCriticActor<OS, AS, P>;
 
-        let policy = self.cpu_policy.as_mut().unwrap_or(&mut self.policy);
-        let output = policy.step(&observation_features);
-        self.action_space.sample_element(&output)
-    }
+    fn actor(&self, _: ActorMode) -> Self::Actor {
+        // The actor policy is on the CPU for fast non-batch steps.
+        // Tensors do not implement Sync so a copy is created instead.
+        // TODO: Implement Module::shallow_clone instead of copying
+        let mut actor_policy_variables = VarStore::new(Device::Cpu);
+        let policy = self.policy_config.build_policy(
+            &actor_policy_variables.root(),
+            self.shared.observation_space.num_features(),
+            self.shared.action_space.num_distribution_params(),
+        );
+        actor_policy_variables.copy(&self.policy_variables).unwrap();
 
-    fn reset(&mut self) {
-        self.cpu_policy.as_mut().unwrap_or(&mut self.policy).reset();
+        ActorCriticActor {
+            shared: Arc::clone(&self.shared),
+            policy,
+        }
     }
 }
 
-impl<OS, AS, P, PU, C, CU> BatchUpdate<OS::Element, AS::Element>
-    for ActorCriticAgent<OS, AS, P, PU, C, CU>
+impl<OS, AS, PB, P, PU, C, CU> BatchUpdate<OS::Element, AS::Element>
+    for ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
 where
-    OS: EncoderFeatureSpace,
-    AS: ParameterizedDistributionSpace<Tensor>,
+    OS: EncoderFeatureSpace + 'static,
+    AS: ReprSpace<Tensor> + 'static,
     P: Policy,
     PU: UpdatePolicy<AS>,
     C: Critic,
     CU: UpdateCritic,
 {
-    fn batch_update(
-        &mut self,
-        history: &mut dyn HistoryBuffer<OS::Element, AS::Element>,
-        logger: &mut dyn TimeSeriesLogger,
-    ) {
+    type HistoryBuffer = SimpleBuffer<OS::Element, AS::Element>;
+
+    fn batch_size_hint(&self) -> BufferCapacityBound {
+        BufferCapacityBound {
+            min_steps: self.min_batch_steps,
+            min_episodes: 0,
+            min_incomplete_episode_len: Some(100),
+        }
+    }
+
+    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
+        SimpleBuffer::new(capacity)
+    }
+
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    where
+        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+        Self::HistoryBuffer: 'a,
+    {
+        // TODO: Avoid collecting buffers into a vec
+        let buffers: Vec<_> = buffers.into_iter().collect();
         let features = LazyPackedHistoryFeatures::new(
-            history.episodes(),
-            &self.observation_space,
-            &self.action_space,
+            buffers.iter().flat_map(|b| b.episodes()),
+            &self.shared.observation_space,
+            &self.shared.action_space,
             self.discount_factor,
             self.device,
         );
@@ -237,7 +261,7 @@ where
             &self.policy,
             &self.critic,
             &features,
-            &self.action_space,
+            &self.shared.action_space,
             &mut policy_logger,
         );
         if let Some(entropy) = policy_stats.entropy {
@@ -248,16 +272,70 @@ where
         self.critic_updater
             .update_critic(&self.critic, &features, &mut critic_logger);
 
-        // Copy the updated variables to the CPU policy if there is one
-        if let Some(ref mut cpu_policy_variables) = self.cpu_policy_variables {
-            cpu_policy_variables
-                .copy(&self.policy_variables)
-                .expect("Variable mismatch between main policy and CPU policy");
+        // Empty the buffers
+        for buffer in buffers {
+            buffer.clear()
         }
 
         logger.end_event(Event::AgentOptPeriod).unwrap();
     }
 }
-*/
 
-impl<OS: Space, AS: Space, P, PU, C, CU> SetActorMode for ActorCriticAgent<OS, AS, P, PU, C, CU> {}
+pub struct ActorCriticActor<OS: EncoderFeatureSpace, AS, P> {
+    shared: Arc<ActorCriticShared<OS, AS>>,
+    policy: P,
+}
+
+impl<OS, AS, P> Actor<OS::Element, AS::Element> for ActorCriticActor<OS, AS, P>
+where
+    OS: EncoderFeatureSpace,
+    AS: ParameterizedDistributionSpace<Tensor>,
+    P: IterativeModule,
+{
+    type EpisodeState = P::State;
+
+    fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {
+        self.policy.initial_state(1)
+    }
+
+    fn act(
+        &self,
+        state: &mut Self::EpisodeState,
+        observation: &OS::Element,
+        _: &mut Prng,
+    ) -> AS::Element {
+        let _no_grad = tch::no_grad_guard();
+        let input = self
+            .shared
+            .observation_space
+            .encoder_features::<Tensor>(observation, &self.shared.observation_encoder)
+            .unsqueeze(0);
+        let (output, new_state) = self.policy.step(&input, state);
+        *state = new_state;
+        self.shared
+            .action_space
+            .sample_element(&output.squeeze_dim(0))
+    }
+}
+
+/// Shared data between [`ActorCriticAgent`] and [`ActorCriticActor`].
+pub struct ActorCriticShared<OS: EncoderFeatureSpace, AS> {
+    observation_space: NonEmptyFeatures<OS>,
+    observation_encoder: <NonEmptyFeatures<OS> as EncoderFeatureSpace>::Encoder,
+    action_space: AS,
+}
+
+impl<OS, AS> Debug for ActorCriticShared<OS, AS>
+where
+    OS: EncoderFeatureSpace + Debug,
+    OS::Encoder: Debug,
+    AS: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ActorCriticShared")
+            .field("observation_space", &self.observation_space)
+            .field("observation_encoder", &self.observation_encoder)
+            .field("action_space", &self.action_space)
+            .finish()
+    }
+}

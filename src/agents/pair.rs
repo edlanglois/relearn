@@ -1,116 +1,72 @@
 use super::{
-    Actor, ActorMode, AsyncUpdate, BatchUpdate, BuildAgent, BuildAgentError, PureActor,
-    SetActorMode, SynchronousUpdate, WriteHistoryBuffer,
+    Actor, ActorMode, Agent, BatchUpdate, BufferCapacityBound, BuildAgent, BuildAgentError,
+    WriteHistoryBuffer,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
 use crate::logging::TimeSeriesLogger;
-use crate::simulation::{PartialStep, TransientStep};
+use crate::simulation::PartialStep;
 use crate::spaces::{Space, TupleSpace2};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use crate::Prng;
 
-/// A pair of agents for a two-agent environment.
+/// A pair of agents / actors / configs for a two-agent environment.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct AgentPair<T, U>(pub T, pub U);
+pub struct AgentPair<T0, T1>(pub T0, pub T1);
 
-impl<T, U, O1, O2, A1, A2> PureActor<(O1, O2), (A1, A2)> for AgentPair<T, U>
+impl<T0, T1, O0, O1, A0, A1> Agent<(O0, O1), (A0, A1)> for AgentPair<T0, T1>
 where
-    T: PureActor<O1, A1>,
-    U: PureActor<O2, A2>,
+    T0: Agent<O0, A0>,
+    T1: Agent<O1, A1>,
+    // Compiler bug <https://github.com/rust-lang/rust/issues/85451>
+    T0::HistoryBuffer: 'static,
+    T1::HistoryBuffer: 'static,
 {
-    type State = (T::State, U::State);
+    type Actor = AgentPair<T0::Actor, T1::Actor>;
 
-    fn initial_state(&self, seed: u64) -> Self::State {
-        let mut rng = StdRng::seed_from_u64(seed);
+    fn actor(&self, mode: ActorMode) -> Self::Actor {
+        AgentPair(self.0.actor(mode), self.1.actor(mode))
+    }
+}
+
+impl<T0, T1, O0, O1, A0, A1> Actor<(O0, O1), (A0, A1)> for AgentPair<T0, T1>
+where
+    T0: Actor<O0, A0>,
+    T1: Actor<O1, A1>,
+{
+    type EpisodeState = (T0::EpisodeState, T1::EpisodeState);
+
+    fn new_episode_state(&self, rng: &mut Prng) -> Self::EpisodeState {
+        (self.0.new_episode_state(rng), self.1.new_episode_state(rng))
+    }
+
+    fn act(
+        &self,
+        episode_state: &mut Self::EpisodeState,
+        observation: &(O0, O1),
+        rng: &mut Prng,
+    ) -> (A0, A1) {
         (
-            self.0.initial_state(rng.gen()),
-            self.1.initial_state(rng.gen()),
+            self.0.act(&mut episode_state.0, &observation.0, rng),
+            self.1.act(&mut episode_state.1, &observation.1, rng),
         )
     }
-
-    fn reset_state(&self, state: &mut Self::State) {
-        self.0.reset_state(&mut state.0);
-        self.1.reset_state(&mut state.1);
-    }
-
-    fn act(&self, state: &mut Self::State, observation: &(O1, O2)) -> (A1, A2) {
-        (
-            self.0.act(&mut state.0, &observation.0),
-            self.1.act(&mut state.1, &observation.1),
-        )
-    }
 }
 
-impl<T, U, O1, O2, A1, A2> Actor<(O1, O2), (A1, A2)> for AgentPair<T, U>
+impl<T0, T1, O0, O1, A0, A1> BatchUpdate<(O0, O1), (A0, A1)> for AgentPair<T0, T1>
 where
-    T: Actor<O1, A1>,
-    U: Actor<O2, A2>,
+    T0: BatchUpdate<O0, A0>,
+    T1: BatchUpdate<O1, A1>,
+    // Compiler bug <https://github.com/rust-lang/rust/issues/85451>
+    T0::HistoryBuffer: 'static,
+    T1::HistoryBuffer: 'static,
 {
-    fn act(&mut self, observation: &(O1, O2)) -> (A1, A2) {
-        (self.0.act(&observation.0), self.1.act(&observation.1))
+    type HistoryBuffer = HistoryBufferPair<T0::HistoryBuffer, T1::HistoryBuffer>;
+
+    fn batch_size_hint(&self) -> BufferCapacityBound {
+        self.0.batch_size_hint().max(self.1.batch_size_hint())
     }
 
-    fn reset(&mut self) {
-        self.0.reset();
-        self.1.reset();
-    }
-}
-
-impl<T, U, O1, O2, A1, A2> SynchronousUpdate<(O1, O2), (A1, A2)> for AgentPair<T, U>
-where
-    T: SynchronousUpdate<O1, A1>,
-    U: SynchronousUpdate<O2, A2>,
-{
-    fn update(
-        &mut self,
-        step: TransientStep<(O1, O2), (A1, A2)>,
-        logger: &mut dyn TimeSeriesLogger,
-    ) {
-        let (step1, step2) = split_step(step);
-        self.0.update(step1, logger);
-        self.1.update(step2, logger);
-    }
-}
-
-impl<T, U> AsyncUpdate for AgentPair<T, U>
-where
-    T: AsyncUpdate,
-    U: AsyncUpdate,
-{
-}
-
-pub struct HistoryBufferPair<B1, B2>(pub B1, pub B2);
-
-impl<B1, B2, O1, O2, A1, A2> WriteHistoryBuffer<(O1, O2), (A1, A2)> for HistoryBufferPair<B1, B2>
-where
-    B1: WriteHistoryBuffer<O1, A1>,
-    B2: WriteHistoryBuffer<O2, A2>,
-{
-    fn push(&mut self, step: PartialStep<(O1, O2), (A1, A2)>) -> bool {
-        // wait until both buffers are full
-        let (step1, step2) = split_partial_step(step);
-        let full1 = self.0.push(step1);
-        let full2 = self.1.push(step2);
-        full1 && full2
-    }
-
-    fn clear(&mut self) {
-        self.0.clear();
-        self.1.clear();
-    }
-}
-
-impl<T, U, O1, O2, A1, A2> BatchUpdate<(O1, O2), (A1, A2)> for AgentPair<T, U>
-where
-    T: BatchUpdate<O1, A1>,
-    U: BatchUpdate<O2, A2>,
-    // Compiler bug https://github.com/rust-lang/rust/issues/85451
-    T::HistoryBuffer: 'static,
-    U::HistoryBuffer: 'static,
-{
-    type HistoryBuffer = HistoryBufferPair<T::HistoryBuffer, U::HistoryBuffer>;
-
-    fn new_buffer(&self) -> Self::HistoryBuffer {
-        HistoryBufferPair(self.0.new_buffer(), self.1.new_buffer())
+    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
+        HistoryBufferPair(self.0.buffer(capacity), self.1.buffer(capacity))
     }
 
     fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
@@ -129,30 +85,26 @@ where
     }
 }
 
-#[allow(clippy::missing_const_for_fn)]
-fn split_step<O1, O2, A1, A2>(
-    step: TransientStep<(O1, O2), (A1, A2)>,
-) -> (TransientStep<O1, A1>, TransientStep<O2, A2>) {
-    let (o1, o2) = step.observation;
-    let (a1, a2) = step.action;
-    let (n1, n2) = match step.next {
-        Successor::Continue((no1, no2)) => (Successor::Continue(no1), Successor::Continue(no2)),
-        Successor::Terminate => (Successor::Terminate, Successor::Terminate),
-        Successor::Interrupt((no1, no2)) => (Successor::Interrupt(no1), Successor::Interrupt(no2)),
-    };
-    let step1 = TransientStep {
-        observation: o1,
-        action: a1,
-        reward: step.reward,
-        next: n1,
-    };
-    let step2 = TransientStep {
-        observation: o2,
-        action: a2,
-        reward: step.reward,
-        next: n2,
-    };
-    (step1, step2)
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct HistoryBufferPair<B0, B1>(pub B0, pub B1);
+
+impl<B0, B1, O0, O1, A0, A1> WriteHistoryBuffer<(O0, O1), (A0, A1)> for HistoryBufferPair<B0, B1>
+where
+    B0: WriteHistoryBuffer<O0, A0>,
+    B1: WriteHistoryBuffer<O1, A1>,
+{
+    fn push(&mut self, step: PartialStep<(O0, O1), (A0, A1)>) -> bool {
+        // wait until both buffers are full
+        let (step1, step2) = split_partial_step(step);
+        let full1 = self.0.push(step1);
+        let full2 = self.1.push(step2);
+        full1 && full2
+    }
+
+    fn clear(&mut self) {
+        self.0.clear();
+        self.1.clear();
+    }
 }
 
 #[allow(clippy::missing_const_for_fn)]
@@ -181,14 +133,29 @@ fn split_partial_step<O1, O2, A1, A2>(
     (step1, step2)
 }
 
-impl<T, U> SetActorMode for AgentPair<T, U>
+impl<T0, T1, OS0, OS1, AS0, AS1> BuildAgent<TupleSpace2<OS0, OS1>, TupleSpace2<AS0, AS1>>
+    for AgentPair<T0, T1>
 where
-    T: SetActorMode,
-    U: SetActorMode,
+    T0: BuildAgent<OS0, AS0> + 'static,
+    T1: BuildAgent<OS1, AS1> + 'static,
+    OS0: Space + Clone + 'static,
+    OS1: Space + Clone + 'static,
+    AS0: Space + Clone + 'static,
+    AS1: Space + Clone + 'static,
 {
-    fn set_actor_mode(&mut self, mode: ActorMode) {
-        self.0.set_actor_mode(mode);
-        self.1.set_actor_mode(mode);
+    type Agent = AgentPair<T0::Agent, T1::Agent>;
+    fn build_agent(
+        &self,
+        env: &dyn EnvStructure<
+            ObservationSpace = TupleSpace2<OS0, OS1>,
+            ActionSpace = TupleSpace2<AS0, AS1>,
+        >,
+        rng: &mut Prng,
+    ) -> Result<Self::Agent, BuildAgentError> {
+        let (env1, env2) = split_env_structure(env);
+        let agent1 = self.0.build_agent(&env1, rng)?;
+        let agent2 = self.1.build_agent(&env2, rng)?;
+        Ok(AgentPair(agent1, agent2))
     }
 }
 
@@ -214,60 +181,4 @@ where
     )
 }
 
-impl<TB, UB, OS1, OS2, AS1, AS2> BuildAgent<TupleSpace2<OS1, OS2>, TupleSpace2<AS1, AS2>>
-    for AgentPair<TB, UB>
-where
-    TB: BuildAgent<OS1, AS1>,
-    UB: BuildAgent<OS2, AS2>,
-    OS1: Space + Clone,
-    OS2: Space + Clone,
-    AS1: Space + Clone,
-    AS2: Space + Clone,
-{
-    type Agent = AgentPair<TB::Agent, UB::Agent>;
-    fn build_agent(
-        &self,
-        env: &dyn EnvStructure<
-            ObservationSpace = TupleSpace2<OS1, OS2>,
-            ActionSpace = TupleSpace2<AS1, AS2>,
-        >,
-        seed: u64,
-    ) -> Result<Self::Agent, BuildAgentError> {
-        let mut seed_rng = StdRng::seed_from_u64(seed);
-        let (env1, env2) = split_env_structure(env);
-        let agent1 = self.0.build_agent(&env1, seed_rng.gen())?;
-        let agent2 = self.1.build_agent(&env2, seed_rng.gen())?;
-        Ok(AgentPair(agent1, agent2))
-    }
-}
-
-// Need to implement BatchUpdate for AgentPair first
-/*
-impl<TB, UB, OS1, OS2, AS1, AS2> BuildBatchUpdateActor<TupleSpace2<OS1, OS2>, TupleSpace2<AS1, AS2>>
-    for AgentPair<TB, UB>
-where
-    TB: BuildBatchUpdateActor<OS1, AS1>,
-    UB: BuildBatchUpdateActor<OS2, AS2>,
-    OS1: Space + Clone,
-    OS2: Space + Clone,
-    AS1: Space + Clone,
-    AS2: Space + Clone,
-{
-    type BatchUpdateActor = AgentPair<TB::BatchUpdateActor, UB::BatchUpdateActor>;
-
-    fn build_batch_update_actor(
-        &self,
-        env: &dyn EnvStructure<
-            ObservationSpace = TupleSpace2<OS1, OS2>,
-            ActionSpace = TupleSpace2<AS1, AS2>,
-        >,
-        seed: u64,
-    ) -> Result<Self::BatchUpdateActor, BuildAgentError> {
-        let mut seed_rng = StdRng::seed_from_u64(seed);
-        let (env1, env2) = split_env_structure(env);
-        let actor1 = self.0.build_batch_update_actor(&env1, seed_rng.gen())?;
-        let actor1 = self.1.build_batch_update_actor(&env2, seed_rng.gen())?;
-        Ok(AgentPair(actor1, actor2))
-    }
-}
-*/
+// TODO tests

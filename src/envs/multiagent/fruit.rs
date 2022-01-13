@@ -1,11 +1,12 @@
 //! Fruit collection gridworlds.
-use crate::envs::{CloneBuild, EnvStructure, Pomdp, Successor};
+use crate::envs::{CloneBuild, EnvStructure, Environment, Successor};
 use crate::logging::Logger;
 use crate::spaces::{
     ArraySpace, BooleanSpace, BoxSpace, FiniteSpace, IndexSpace, IndexedTypeSpace, PowerSpace,
     ProductSpace, Space, TupleSpace2,
 };
 use crate::utils::vector::Vector;
+use crate::Prng;
 use enum_map::{enum_map, Enum, EnumMap};
 use rand::distributions::Standard;
 use rand::prelude::*;
@@ -320,14 +321,14 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> EnvStruct
     }
 }
 
-impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Pomdp
+impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Environment
     for FruitGame<W, H, VW, VH>
 {
     type State = FruitGameState<W, H>;
     type Observation = <JointObsSpace<VW, VH> as Space>::Element;
     type Action = (Move, Move);
 
-    fn initial_state(&self, rng: &mut StdRng) -> Self::State {
+    fn initial_state(&self, rng: &mut Prng) -> Self::State {
         let mut cells = Box::new([[None; W]; H]);
         let cells_slice = cells.flat_mut();
         let num_cells = cells_slice.len();
@@ -362,7 +363,7 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Pomdp
         }
     }
 
-    fn observe(&self, state: &Self::State, _rng: &mut StdRng) -> Self::Observation {
+    fn observe(&self, state: &Self::State, _rng: &mut Prng) -> Self::Observation {
         state.observe()
     }
 
@@ -370,7 +371,7 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Pomdp
         &self,
         mut state: Self::State,
         action: &Self::Action,
-        _rng: &mut StdRng,
+        _rng: &mut Prng,
         logger: &mut dyn Logger,
     ) -> (Successor<Self::State>, f64) {
         let (principal_action, assistant_action) = *action;
@@ -400,6 +401,6 @@ mod tests {
 
     #[test]
     fn run_default() {
-        testing::run_pomdp(FruitGame::<5, 5, 5, 5>::new(4), 1000, 0);
+        testing::check_structured_env(&FruitGame::<5, 5, 5, 5>::new(4), 1000, 0);
     }
 }

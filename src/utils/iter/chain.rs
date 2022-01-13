@@ -7,7 +7,7 @@ use std::iter::{Chain, FusedIterator};
 /// This implementation panics in `ExactSizeIterator::len` if the combined length is larger than
 /// `usize::MAX`. `SizedChain::size_hint` will return `None` as an upper bound in that case, which
 /// is technically a violation of the conditions of `ExactSizeIterator` but returning `None` when
-/// `Some` is unlikely to cause any trouble other than a panic.
+/// expecting `Some` is unlikely to cause any trouble other than a panic.
 #[derive(Debug, Clone)]
 pub struct SizedChain<A, B> {
     chain: Chain<A, B>,

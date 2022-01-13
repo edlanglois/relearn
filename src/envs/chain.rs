@@ -1,7 +1,8 @@
 //! Chain environment
-use super::{CloneBuild, EnvStructure, Mdp, Successor};
+use super::{CloneBuild, EnvStructure, Environment, Successor};
 use crate::logging::Logger;
 use crate::spaces::{IndexSpace, IndexedTypeSpace};
+use crate::Prng;
 use rand::prelude::*;
 use relearn_derive::Indexed;
 
@@ -61,26 +62,31 @@ impl EnvStructure for Chain {
     }
 }
 
-impl Mdp for Chain {
+impl Environment for Chain {
     type State = usize;
+    type Observation = usize;
     type Action = Move;
 
-    fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
+    fn initial_state(&self, _: &mut Prng) -> Self::State {
         0
+    }
+
+    fn observe(&self, state: &Self::State, _: &mut Prng) -> Self::Observation {
+        *state
     }
 
     fn step(
         &self,
         state: Self::State,
         action: &Self::Action,
-        rng: &mut StdRng,
-        _logger: &mut dyn Logger,
+        rng: &mut Prng,
+        _: &mut dyn Logger,
     ) -> (Successor<Self::State>, f64) {
         let mut action = *action;
-        if rng.gen::<f64>() < 0.2 {
-            action = action.swap();
+        if rng.gen::<f32>() < 0.2 {
+            action = action.invert();
         }
-        let (state, reward) = match action {
+        let (next_state, reward) = match action {
             Move::Left => (0, 2.0),
             Move::Right => {
                 if state == self.size - 1 {
@@ -90,7 +96,7 @@ impl Mdp for Chain {
                 }
             }
         };
-        (Successor::Continue(state), reward)
+        (Successor::Continue(next_state), reward)
     }
 }
 
@@ -101,7 +107,7 @@ pub enum Move {
 }
 
 impl Move {
-    const fn swap(self) -> Self {
+    const fn invert(self) -> Self {
         match self {
             Self::Left => Self::Right,
             Self::Right => Self::Left,
@@ -116,6 +122,6 @@ mod tests {
 
     #[test]
     fn run_default() {
-        testing::run_pomdp(Chain::default(), 1000, 0);
+        testing::check_structured_env(&Chain::default(), 1000, 0);
     }
 }

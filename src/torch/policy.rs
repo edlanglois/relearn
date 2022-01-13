@@ -1,23 +1,15 @@
 //! Torch policy module
-use super::{
-    backends::CudnnSupport,
-    modules::BuildModule,
-    seq_modules::{SequenceModule, StatefulIterativeModule},
-};
+use super::{backends::CudnnSupport, modules::BuildModule, seq_modules::SequenceModule};
 use tch::nn::Path;
 use tch::Tensor;
 
 /// Policy module
-///
-/// A policy is a neural network on sequences that supports both batch and iterative processing.
-pub trait Policy: SequenceModule + StatefulIterativeModule + CudnnSupport {}
-impl<T: SequenceModule + StatefulIterativeModule + CudnnSupport + ?Sized> Policy for T {}
+pub trait Policy: SequenceModule + CudnnSupport {}
+impl<T: SequenceModule + CudnnSupport + ?Sized> Policy for T {}
 
 box_impl_sequence_module!(dyn Policy);
-box_impl_stateful_iterative_module!(dyn Policy);
 box_impl_cudnn_support!(dyn Policy);
 box_impl_sequence_module!(dyn Policy + Send);
-box_impl_stateful_iterative_module!(dyn Policy + Send);
 box_impl_cudnn_support!(dyn Policy + Send);
 
 /// Build a [`Policy`] instance.

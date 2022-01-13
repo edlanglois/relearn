@@ -3,13 +3,12 @@
 //! More agents can be found in [`crate::torch::agents`].
 
 mod bandits;
-mod batch;
 pub mod buffers;
-mod finite;
+pub mod finite;
 mod meta;
 mod pair;
 mod random;
-mod stateful;
+mod serial;
 mod tabular;
 #[cfg(test)]
 pub mod testing;
@@ -17,149 +16,160 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
-pub use batch::{
-    AsyncUpdate, BatchedUpdates, BatchedUpdatesConfig, SerialBatchAgent, SerialBatchConfig,
-};
-pub use buffers::{HistoryBuffer, WriteHistoryBuffer};
-use finite::{BuildIndexAgent, FiniteSpaceAgent};
+pub use buffers::{BufferCapacityBound, WriteHistoryBuffer};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
 pub use random::{RandomAgent, RandomAgentConfig};
-pub use stateful::{PureAsActor, PureAsActorConfig};
+pub use serial::SerialActorAgent;
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
 use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
-use crate::simulation::TransientStep;
 use crate::spaces::Space;
+use crate::Prng;
 use tch::TchError;
 use thiserror::Error;
 
-/// An actor with explicit episodic state.
-pub trait PureActor<O, A> {
-    type State;
-
-    /// Create a new episodic state object.
-    fn initial_state(&self, seed: u64) -> Self::State;
-
-    /// Reset the state for a new episode.
-    ///
-    /// Pseudo-random number generators may be left unchanged
-    /// since they do not represent stored memory.
-    fn reset_state(&self, state: &mut Self::State);
-
-    /// Choose an action in the environment.
-    fn act(&self, state: &mut Self::State, observation: &O) -> A;
-}
-
-impl<T, O, A> PureActor<O, A> for &'_ T
-where
-    T: PureActor<O, A> + ?Sized,
-{
-    type State = T::State;
-    fn initial_state(&self, seed: u64) -> Self::State {
-        T::initial_state(self, seed)
-    }
-    fn reset_state(&self, state: &mut Self::State) {
-        T::reset_state(self, state)
-    }
-    fn act(&self, state: &mut Self::State, observation: &O) -> A {
-        T::act(self, state, observation)
-    }
-}
-
-impl<T, O, A> PureActor<O, A> for Box<T>
-where
-    T: PureActor<O, A> + ?Sized,
-{
-    type State = T::State;
-    fn initial_state(&self, seed: u64) -> Self::State {
-        T::initial_state(self, seed)
-    }
-    fn reset_state(&self, state: &mut Self::State) {
-        T::reset_state(self, state)
-    }
-    fn act(&self, state: &mut Self::State, observation: &O) -> A {
-        T::act(self, state, observation)
-    }
-}
-
-/// An actor that produces actions in response to a sequence of observations.
+/// A reinforcement learning agent. Provides actors for environments and learns from the results.
 ///
-/// The action selection process may depend on the history of observations and actions within an
-/// episode.
-pub trait Actor<O, A> {
-    /// Choose an action in the environment.
+/// Generic over the observation type `O` and the action type `A`.
+///
+/// The associated `Actor` objects should be treated as though they contain references to this
+/// `Agent` (this can be enforced at compile-time once [Generic Associated Types][GAT] are stable).
+/// For example, attempting to update `Agent` may panic if any `Actor`s exist.
+/// Currently, actors can use [`Arc`](std::sync::Arc) to reference the model without explicit
+/// lifetimes.
+///
+/// [GAT]: https://rust-lang.github.io/rfcs/1598-generic_associated_types.html
+pub trait Agent<O, A>: BatchUpdate<O, A> {
+    /// Produces actions for a sequence of environment observations.
+    type Actor: Actor<O, A>;
+
+    /// Create a new [`Actor`] with the given behaviour mode.
     ///
-    /// This must be called sequentially within an episode,
-    /// allowing the actor to internally maintain a history of the episode
-    /// that informs its actions.
-    fn act(&mut self, observation: &O) -> A;
-
-    /// Reset the actor for a new episode.
-    fn reset(&mut self);
+    /// # Implementation Note
+    /// When training, new actors need to be created every time the model is changed. As such, this
+    /// method should be reasonably efficient, but it is not called in such a tight loop that
+    /// efficiency is critical.
+    fn actor(&self, mode: ActorMode) -> Self::Actor;
 }
 
-impl<T, O, A> Actor<O, A> for &'_ mut T
-where
-    T: Actor<O, A> + ?Sized,
-{
-    fn act(&mut self, observation: &O) -> A {
-        T::act(self, observation)
-    }
-
-    fn reset(&mut self) {
-        T::reset(self)
-    }
+/// Implement `Agent<O, A>` for a deref-able wrapper type generic over `T: Agent<O, A> + ?Sized`.
+macro_rules! impl_wrapped_agent {
+    ($wrapper:ty) => {
+        impl<T, O, A> Agent<O, A> for $wrapper
+        where
+            T: Agent<O, A> + ?Sized,
+        {
+            type Actor = T::Actor;
+            fn actor(&self, mode: ActorMode) -> Self::Actor {
+                T::actor(self, mode)
+            }
+        }
+    };
 }
+impl_wrapped_agent!(&'_ mut T);
+impl_wrapped_agent!(Box<T>);
 
-impl<T, O, A> Actor<O, A> for Box<T>
-where
-    T: Actor<O, A> + ?Sized,
-{
-    fn act(&mut self, observation: &O) -> A {
-        T::act(self, observation)
-    }
+/// Take actions in an environment.
+///
+/// The actions may depend on the action-observation history within an episode
+/// but not across episodes. This is managed with an explicit `EpisodeState` associated type.
+///
+/// # Design Discussion
+/// ## Episode State
+/// If [Generic Associated Types][GAT] were stable, an alternate strategy would be to have
+/// a self-contaned `EpisodeActor<'a>` associated type with an `act(&mut self, observation: &O)`
+/// method. However, this would make it challenging to store both an `Actor` and its `EpisodeActor`
+/// together (if wanting a single object to act over multiple sequential episodes).
+/// As such, the current `EpisodeState` strategy might still be preferable.
+///
+/// Another strategy (allowed without GAT) is for the `Actor` to internally manage episode state
+/// and provide a `reset()` method for resetting between episodes. This lacks the benefit of being
+/// able to guarantee independence between episodes via the type system.
+///
+/// ## Random State
+/// The actor is not responsible for managing its own pseudo-random state.
+/// This avoids having to frequently re-initialize the random number generator on each episode and
+/// simplifies episode state definitions.
+///
+/// [GAT]: https://rust-lang.github.io/rfcs/1598-generic_associated_types.html
+pub trait Actor<O: ?Sized, A> {
+    /// Stores state for each episode.
+    type EpisodeState;
 
-    fn reset(&mut self) {
-        T::reset(self)
-    }
-}
+    /// Create episode state for the start of a new episode.
+    fn new_episode_state(&self, rng: &mut Prng) -> Self::EpisodeState;
 
-/// Update an agent with the immediate result of an action (synchronous update).
-pub trait SynchronousUpdate<O, A> {
-    /// Update the agent based on the most recent action.
+    /// Select an action in response to an observation.
     ///
-    /// Must be called immediately after the corresponding call to `act`,
-    /// before any other calls to the agent's methods.
-    /// This allows the agent to internally cache any information used in selecting the action
-    /// that would also be useful for updating on the result.
-    fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger);
+    /// May depend on and update the episode state.
+    /// The observation, the selected action, and any other internal state may be stored into
+    /// `episode_state`.
+    fn act(&self, episode_state: &mut Self::EpisodeState, observation: &O, rng: &mut Prng) -> A;
 }
-
-impl<T, O, A> SynchronousUpdate<O, A> for &'_ mut T
-where
-    T: SynchronousUpdate<O, A> + ?Sized,
-{
-    fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
-        T::update(self, step, logger)
-    }
+/// Implement `Actor<O, A>` for a deref-able wrapper type generic over `T: Actor<O, A> + ?Sized`.
+macro_rules! impl_wrapped_actor {
+    ($wrapper:ty) => {
+        impl<T, O, A> Actor<O, A> for $wrapper
+        where
+            T: Actor<O, A> + ?Sized,
+            O: ?Sized,
+        {
+            type EpisodeState = T::EpisodeState;
+            fn new_episode_state(&self, rng: &mut Prng) -> Self::EpisodeState {
+                T::new_episode_state(self, rng)
+            }
+            fn act(
+                &self,
+                episode_state: &mut Self::EpisodeState,
+                observation: &O,
+                rng: &mut Prng,
+            ) -> A {
+                T::act(self, episode_state, observation, rng)
+            }
+        }
+    };
 }
+impl_wrapped_actor!(&'_ T);
+impl_wrapped_actor!(Box<T>);
 
-impl<T, O, A> SynchronousUpdate<O, A> for Box<T>
-where
-    T: SynchronousUpdate<O, A> + ?Sized,
-{
-    fn update(&mut self, step: TransientStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
-        T::update(self, step, logger)
-    }
+/// Behaviour mode of an actor.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ActorMode {
+    /// Training mode
+    ///
+    /// A training-mode actor expects that its actions will be used as the basis for training data.
+    /// It may take explicitly exploratory actions that are sub-optimal within an episode (given
+    /// the agent's current knowledge or abilities) but that potentially allow for better
+    /// strategies to be discovered when learning over the course of multiple episodes.
+    Training,
+
+    /// Evaluation mode
+    ///
+    /// An evaluation-mode actor attempts to maximize reward to the best of its ability in each
+    /// episode. The actor may learn within an episode, including taking exploratory actions that
+    /// it expects to yeild improved performace _within that episode_ but should assume that no
+    /// agent updates will be performed with resulting data.
+    Evaluation,
 }
 
 /// Update an agent with steps collected into history buffers.
 pub trait BatchUpdate<O, A> {
     type HistoryBuffer: WriteHistoryBuffer<O, A>;
 
-    /// Create a new history buffer.
-    fn new_buffer(&self) -> Self::HistoryBuffer;
+    /// Requested total capacity of all buffers used on `batch_update`.
+    ///
+    /// This bound may be increased by the caller or divided across multiple buffers.
+    /// For example, to facilitate efficient multithread collection.
+    /// The caller may also ignore the bound entirely and create buffers of any size but doing so
+    /// can negatively impact learning performance.
+    fn batch_size_hint(&self) -> BufferCapacityBound;
+
+    /// Create a new history buffer, with capacity at least the given bound if possible.
+    ///
+    /// The caller should try to ensure that the total capacity of all buffers is at least at large
+    /// as the bound given by [`BatchUpdate::batch_size_hint`].
+    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer;
 
     /// Update the agent from a collection of history buffers.
     ///
@@ -167,130 +177,56 @@ pub trait BatchUpdate<O, A> {
     /// Any data left in the buffer should remain for the next call to `batch_update`.
     ///
     /// All new data inserted into the buffers since the last call must be on-policy.
+    ///
+    /// The buffers can be of any size but callers should try to match (ideally) or exceed the size
+    /// given by [`BatchUpdate::batch_size_hint`].
     fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
     where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a;
 }
 
-impl<T, O, A> BatchUpdate<O, A> for &'_ mut T
-where
-    T: BatchUpdate<O, A>,
-{
-    type HistoryBuffer = T::HistoryBuffer;
-    fn new_buffer(&self) -> Self::HistoryBuffer {
-        T::new_buffer(self)
-    }
-    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
-    where
-        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
-        Self::HistoryBuffer: 'a,
-    {
-        T::batch_update(self, buffers, logger)
-    }
+/// Implement `BatchUpdate<O, A>` for a deref-able wrapper over `T: BatchUpdate<O, A> + ?Sized`.
+macro_rules! impl_wrapped_batch_update {
+    ($wrapper:ty) => {
+        impl<T, O, A> BatchUpdate<O, A> for $wrapper
+        where
+            T: BatchUpdate<O, A> + ?Sized,
+        {
+            type HistoryBuffer = T::HistoryBuffer;
+            fn batch_size_hint(&self) -> BufferCapacityBound {
+                T::batch_size_hint(self)
+            }
+            fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
+                T::buffer(self, capacity)
+            }
+            fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+            where
+                I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+                Self::HistoryBuffer: 'a,
+            {
+                T::batch_update(self, buffers, logger)
+            }
+        }
+    };
 }
-impl<T, O, A> BatchUpdate<O, A> for Box<T>
-where
-    T: BatchUpdate<O, A>,
-{
-    type HistoryBuffer = T::HistoryBuffer;
-    fn new_buffer(&self) -> Self::HistoryBuffer {
-        T::new_buffer(self)
-    }
-    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
-    where
-        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
-        Self::HistoryBuffer: 'a,
-    {
-        T::batch_update(self, buffers, logger)
-    }
-}
-
-/// Make a new actor instance with the same model.
-///
-/// The new actor can include references to self.
-pub trait MakeActor<'a, O, A> {
-    type Actor: Actor<O, A> + Send;
-    fn make_actor(&'a self, seed: u64) -> Self::Actor;
-}
-
-pub trait BuildBatchAgent<OS: Space, AS: Space> {
-    type BatchAgent: BatchUpdate<OS::Element, AS::Element> + SetActorMode;
-
-    /// Build a new batch agent for the given environment structure ([`EnvStructure`]).
-    ///
-    /// The agent is built in [`ActorMode::Training`].
-    fn build_batch_agent(
-        &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
-        seed: u64,
-    ) -> Result<Self::BatchAgent, BuildAgentError>;
-}
-
-/// The behaviour mode of an [`Actor`].
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum ActorMode {
-    /// The actor expects to receive reward feedback on its actions.
-    ///
-    /// May take explicitly exploratory actions that are sub-optimal within an episode
-    /// (given the agent's current knowledge) but potentially allow for better strategies to be
-    /// discovered over the course of multiple episodes.
-    Training,
-
-    /// The actor does not expect reward feedback and should maximize return within each episode.
-    ///
-    /// The actor may learn within an episode, including taking exploratory actions that it expects
-    /// to support improved performance _within that episode_.
-    ///
-    /// This could also be called "greedy" but that term might suggest that a history-based agent
-    /// should not attempt to explore and learn within an episode.
-    ///
-    /// [`Agent::update`] should not be called on an agent in release mode.
-    /// The agent is free to either ignore the update or perform an update.
-    Release,
-}
-
-/// Supports setting the actor mode.
-///
-/// Unless explicitly specified during initialization,
-/// actors must start in [`ActorMode::Training`] mode.
-pub trait SetActorMode {
-    /// Set the actor mode.
-    fn set_actor_mode(&mut self, _mode: ActorMode) {
-        // The default implementation just ignores the mode.
-        // Many actors only have a single kind of behaviour.
-    }
-}
-
-impl<T: SetActorMode + ?Sized> SetActorMode for &'_ mut T {
-    fn set_actor_mode(&mut self, mode: ActorMode) {
-        T::set_actor_mode(self, mode)
-    }
-}
-
-impl<T: SetActorMode + ?Sized> SetActorMode for Box<T> {
-    fn set_actor_mode(&mut self, mode: ActorMode) {
-        T::set_actor_mode(self, mode)
-    }
-}
+impl_wrapped_batch_update!(&'_ mut T);
+impl_wrapped_batch_update!(Box<T>);
 
 /// Build an agent instance for a given environment structure.
 pub trait BuildAgent<OS: Space, AS: Space> {
     /// Type of agent to build
-    type Agent: SynchronousUpdate<OS::Element, AS::Element> + SetActorMode;
+    type Agent: Agent<OS::Element, AS::Element>;
 
     /// Build an agent for the given environment structure ([`EnvStructure`]).
     ///
-    /// The agent is built in [`ActorMode::Training`].
-    ///
     /// # Args
-    /// * `env`  - The structure of the environment in which the agent is to operate.
-    /// * `seed` - A number used to seed the agent's random state,
-    ///            for those agents that use deterministic pseudo-random number generation.
+    /// * `env` - The structure of the environment in which the agent is to operate.
+    /// * `rng` - Used for seeding the agent's pseudo-random internal parameters, if any.
     fn build_agent(
         &self,
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
-        seed: u64,
+        rng: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError>;
 }
 

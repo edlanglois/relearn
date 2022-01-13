@@ -1,16 +1,19 @@
 //! Thompson sampling bandit agent
 use super::super::{
-    ActorMode, AsyncUpdate, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, MakeActor,
-    PureActor, PureAsActor, SetActorMode, SynchronousUpdate,
+    buffers::SimpleBuffer, finite::FiniteSpaceAgent, Actor, ActorMode, Agent, BatchUpdate,
+    BufferCapacityBound, BuildAgent, BuildAgentError,
 };
+use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
-use crate::simulation::TransientStep;
+use crate::simulation::PartialStep;
+use crate::spaces::FiniteSpace;
 use crate::utils::iter::ArgMaxBy;
+use crate::Prng;
 use ndarray::{Array, Array2, Axis};
 use rand::distributions::Distribution;
-use rand::prelude::*;
 use rand_distr::Beta;
 use std::fmt;
+use std::sync::Arc;
 
 /// Configuration for [`BetaThompsonSamplingAgent`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -32,23 +35,30 @@ impl Default for BetaThompsonSamplingAgentConfig {
     }
 }
 
-impl BuildIndexAgent for BetaThompsonSamplingAgentConfig {
-    type Agent = BaseBetaThompsonSamplingAgent;
+impl<OS, AS> BuildAgent<OS, AS> for BetaThompsonSamplingAgentConfig
+where
+    OS: FiniteSpace + Clone + 'static,
+    AS: FiniteSpace + Clone + 'static,
+{
+    type Agent = BetaThompsonSamplingAgent<OS, AS>;
 
-    fn build_index_agent(
+    fn build_agent(
         &self,
-        num_observations: usize,
-        num_actions: usize,
-        reward_range: (f64, f64),
-        _discount_factor: f64,
-        _seed: u64,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        _: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
-        Ok(BaseBetaThompsonSamplingAgent::new(
-            num_observations,
-            num_actions,
-            reward_range,
-            self.num_samples,
-        ))
+        let observation_space = env.observation_space();
+        let action_space = env.action_space();
+        Ok(FiniteSpaceAgent {
+            agent: BaseBetaThompsonSamplingAgent::new(
+                observation_space.size(),
+                action_space.size(),
+                env.reward_range(),
+                self.num_samples,
+            ),
+            observation_space,
+            action_space,
+        })
     }
 }
 
@@ -59,18 +69,16 @@ pub type BetaThompsonSamplingAgent<OS, AS> =
 /// Base Thompson sampling agent for Bernoulli rewards with a Beta prior.
 ///
 /// Implemented only for index action and observation spaces.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct BaseBetaThompsonSamplingAgent {
     /// Reward is partitioned into high/low separated by this threshold.
     pub reward_threshold: f64,
     /// Number of posterior samples to draw.
     /// Takes the action with the highest mean sampled value.
     pub num_samples: usize,
-    /// Mode of actor behaviour
-    pub mode: ActorMode,
 
     /// Count of low and high rewards for each observation-action pair.
-    low_high_reward_counts: Array2<(u64, u64)>,
+    low_high_reward_counts: Arc<Array2<(u64, u64)>>,
 }
 
 impl BaseBetaThompsonSamplingAgent {
@@ -82,11 +90,11 @@ impl BaseBetaThompsonSamplingAgent {
     ) -> Self {
         let (reward_min, reward_max) = reward_range;
         let reward_threshold = (reward_min + reward_max) / 2.0;
-        let low_high_reward_counts = Array::from_elem((num_observations, num_actions), (1, 1));
+        let low_high_reward_counts =
+            Arc::new(Array::from_elem((num_observations, num_actions), (1, 1)));
         Self {
             reward_threshold,
             num_samples,
-            mode: ActorMode::Training,
             low_high_reward_counts,
         }
     }
@@ -103,74 +111,10 @@ impl fmt::Display for BaseBetaThompsonSamplingAgent {
 }
 
 impl BaseBetaThompsonSamplingAgent {
-    /// Take a training-mode action.
-    fn act_training(&self, obs_idx: usize, rng: &mut StdRng) -> usize {
-        let num_samples = self.num_samples;
-        self.low_high_reward_counts
-            .index_axis(Axis(0), obs_idx)
-            .mapv(|(beta, alpha)| -> f64 {
-                // Explanation for the rng reference:
-                // sample_iter takes its argument by value rather than by reference.
-                // We cannot pass the rng into sample_iter because it needs to stay with self.
-                // However, (&mut rng) also implements Rng.
-                // We cannot directly use &mut self.rng in the closure because that would borrow
-                // self. Nor can we create a copy like we do for num_samples.
-                // So we create `rng` as a reference.
-                // We cannot directly pass in `rng` because that would move it out of `rng` and
-                // it needs to be available for multiple function calls.
-                //
-                // Therefore, the solution is to dereference rng first so that we have back the
-                // original rng (without naming `self` within the closure) and then reference it
-                // again in the closure so that the reference is created local to the closure and
-                // can be safely moved.
-                Beta::new(alpha as f64, beta as f64)
-                    .unwrap()
-                    .sample_iter(&mut *rng)
-                    .take(num_samples)
-                    .sum()
-            })
-            .into_iter()
-            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
-            .expect("Empty action space")
-    }
-
-    /// Take a release-mode (greedy) action.
-    fn act_release(&self, obs_idx: usize) -> usize {
-        // Take the action with highest posterior mean
-        // Counts are initalized to 1 so there is no risk of 0/0
-        self.low_high_reward_counts
-            .index_axis(Axis(0), obs_idx)
-            .mapv(|(beta, alpha)| alpha as f64 / (alpha + beta) as f64)
-            .into_iter()
-            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
-            .expect("Empty action space")
-    }
-}
-
-impl PureActor<usize, usize> for BaseBetaThompsonSamplingAgent {
-    type State = StdRng;
-
-    #[inline]
-    fn initial_state(&self, seed: u64) -> Self::State {
-        StdRng::seed_from_u64(seed)
-    }
-
-    #[inline]
-    fn reset_state(&self, _state: &mut Self::State) {}
-
-    #[inline]
-    fn act(&self, rng: &mut Self::State, observation: &usize) -> usize {
-        match self.mode {
-            ActorMode::Training => self.act_training(*observation, rng),
-            ActorMode::Release => self.act_release(*observation),
-        }
-    }
-}
-
-impl SynchronousUpdate<usize, usize> for BaseBetaThompsonSamplingAgent {
-    fn update(&mut self, step: TransientStep<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
-        let reward_count = self
-            .low_high_reward_counts
+    /// Update based on an on-policy or off-policy step.
+    fn step_update(&mut self, step: PartialStep<usize, usize>) {
+        let reward_count = Arc::get_mut(&mut self.low_high_reward_counts)
+            .expect("cannot update agent while actors exist")
             .get_mut((step.observation, step.action))
             .unwrap();
         if step.reward > self.reward_threshold {
@@ -181,33 +125,91 @@ impl SynchronousUpdate<usize, usize> for BaseBetaThompsonSamplingAgent {
     }
 }
 
-impl AsyncUpdate for BaseBetaThompsonSamplingAgent {}
+impl Agent<usize, usize> for BaseBetaThompsonSamplingAgent {
+    type Actor = BaseBetaThompsonSamplingActor;
 
-impl<'a> MakeActor<'a, usize, usize> for BaseBetaThompsonSamplingAgent {
-    type Actor = PureAsActor<&'a Self, usize, usize>;
-    fn make_actor(&'a self, seed: u64) -> Self::Actor {
-        PureAsActor::new(self, seed)
+    fn actor(&self, mode: ActorMode) -> Self::Actor {
+        BaseBetaThompsonSamplingActor {
+            mode,
+            num_samples: self.num_samples,
+            low_high_reward_counts: Arc::clone(&self.low_high_reward_counts),
+        }
     }
 }
 
-impl SetActorMode for BaseBetaThompsonSamplingAgent {
-    fn set_actor_mode(&mut self, mode: ActorMode) {
-        self.mode = mode
+impl BatchUpdate<usize, usize> for BaseBetaThompsonSamplingAgent {
+    type HistoryBuffer = SimpleBuffer<usize, usize>;
+
+    fn batch_size_hint(&self) -> BufferCapacityBound {
+        BufferCapacityBound {
+            min_steps: 1,
+            min_incomplete_episode_len: Some(0),
+            ..BufferCapacityBound::default()
+        }
+    }
+
+    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
+        SimpleBuffer::new(capacity)
+    }
+
+    fn batch_update<'a, I>(&mut self, buffers: I, _logger: &mut dyn TimeSeriesLogger)
+    where
+        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+        Self::HistoryBuffer: 'a,
+    {
+        for buffer in buffers {
+            for step in buffer.drain_steps() {
+                self.step_update(step)
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BaseBetaThompsonSamplingActor {
+    mode: ActorMode,
+    num_samples: usize,
+    low_high_reward_counts: Arc<Array2<(u64, u64)>>,
+}
+
+impl Actor<usize, usize> for BaseBetaThompsonSamplingActor {
+    type EpisodeState = ();
+
+    fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {}
+
+    fn act(&self, _: &mut Self::EpisodeState, observation: &usize, rng: &mut Prng) -> usize {
+        match self.mode {
+            ActorMode::Training => self
+                .low_high_reward_counts
+                .index_axis(Axis(0), *observation)
+                .mapv(|(beta, alpha)| -> f64 {
+                    Beta::new(alpha as f64, beta as f64)
+                        .unwrap()
+                        .sample_iter(&mut *rng)
+                        .take(self.num_samples)
+                        .sum()
+                })
+                .into_iter()
+                .argmax_by(|a, b| a.partial_cmp(b).unwrap())
+                .expect("empty action space"),
+            ActorMode::Evaluation => self
+                .low_high_reward_counts
+                .index_axis(Axis(0), *observation)
+                .mapv(|(beta, alpha)| alpha as f64 / (alpha + beta) as f64)
+                .into_iter()
+                .argmax_by(|a, b| a.partial_cmp(b).unwrap())
+                .expect("empty action space"),
+        }
     }
 }
 
 #[cfg(test)]
 mod beta_thompson_sampling {
-    use super::super::super::{testing, BuildAgent};
+    use super::super::super::testing;
     use super::*;
 
     #[test]
     fn learns_determinstic_bandit() {
-        let config = BetaThompsonSamplingAgentConfig::default();
-        testing::pure_train_deterministic_bandit(
-            |env| config.build_agent(env, 0).unwrap(),
-            1000,
-            0.9,
-        );
+        testing::train_deterministic_bandit(&BetaThompsonSamplingAgentConfig::default(), 1000, 0.9);
     }
 }

@@ -1,6 +1,7 @@
-use super::{CloneBuild, EnvStructure, Pomdp, Successor};
+use super::{CloneBuild, EnvStructure, Environment, Successor};
 use crate::logging::Logger;
 use crate::spaces::IndexSpace;
+use crate::Prng;
 use rand::prelude::*;
 
 /// Memory Game Environment
@@ -71,18 +72,18 @@ impl EnvStructure for MemoryGame {
     }
 }
 
-impl Pomdp for MemoryGame {
+impl Environment for MemoryGame {
     /// `(current_state, initial_state)`
     type State = (usize, usize);
     type Observation = usize;
     type Action = usize;
 
-    fn initial_state(&self, rng: &mut StdRng) -> Self::State {
+    fn initial_state(&self, rng: &mut Prng) -> Self::State {
         let state = rng.gen_range(0..self.num_actions);
         (state, state)
     }
 
-    fn observe(&self, state: &Self::State, _rng: &mut StdRng) -> Self::Observation {
+    fn observe(&self, state: &Self::State, _rng: &mut Prng) -> Self::Observation {
         let (current_state, _initial_state) = *state;
         current_state
     }
@@ -91,8 +92,8 @@ impl Pomdp for MemoryGame {
         &self,
         state: Self::State,
         action: &Self::Action,
-        _rng: &mut StdRng,
-        _logger: &mut dyn Logger,
+        _: &mut Prng,
+        _: &mut dyn Logger,
     ) -> (Successor<Self::State>, f64) {
         let (current_state, initial_state) = state;
         if current_state == self.num_actions + self.history_len - 1 {
@@ -116,6 +117,6 @@ mod tests {
 
     #[test]
     fn run_default() {
-        testing::run_pomdp(MemoryGame::default(), 1000, 0);
+        testing::check_structured_env(&MemoryGame::default(), 1000, 0);
     }
 }

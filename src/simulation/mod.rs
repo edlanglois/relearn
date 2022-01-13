@@ -1,26 +1,14 @@
 //! Simulating agent-environment interaction
-pub mod hooks;
 mod steps;
 
-pub use hooks::{BuildSimulationHook, SimulationHook};
-pub use steps::{ActorSteps, SimulationSummary};
+pub use steps::{SimulationSummary, SimulatorSteps};
 
-use crate::agents::{
-    Actor, BatchUpdate, BuildAgentError, MakeActor, SynchronousUpdate, WriteHistoryBuffer,
-};
-use crate::envs::{BuildEnv, BuildEnvError, Environment, Successor};
+use crate::agents::{ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
+use crate::envs::{Environment, Successor};
 use crate::logging::TimeSeriesLogger;
-use rand::{rngs::StdRng, Rng, SeedableRng};
-use thiserror::Error;
-
-/// Error initializing or running a simulation.
-#[derive(Error, Debug)]
-pub enum SimulationError {
-    #[error("error building agent")]
-    BuildAgent(#[from] BuildAgentError),
-    #[error("error building environment")]
-    BuildEnv(#[from] BuildEnvError),
-}
+use crate::Prng;
+use rand::SeedableRng;
+use std::iter;
 
 /// Description of an environment step.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -77,117 +65,165 @@ impl<O: Clone, A> TransientStep<'_, O, A> {
 /// Using this can help avoid copying the observation.
 pub type PartialStep<O, A> = Step<O, A, ()>;
 
-/// Run an agent-environment simulation.
-///
-/// Note that `Environment`, `SynchronousUpdate`, etc. are also implemented for mutable references
-/// so this function can be called either with owned objects or with references.
-///
-/// # Args
-/// * `environment` - The environment to simulate.
-/// * `agent` - The agent to simulate.
-/// * `hook` - A simulation hook run on each step. Controls when the simulation stops.
-/// * `logger` - The logger to use.
-pub fn run_agent<E, A, H, L>(environment: E, agent: A, mut hook: H, mut logger: L) -> A
-where
-    E: Environment,
-    A: Actor<E::Observation, E::Action> + SynchronousUpdate<E::Observation, E::Action>,
-    H: SimulationHook<E::Observation, E::Action>,
-    L: TimeSeriesLogger,
+/// Train a batch learning agent in this thread.
+pub fn train_serial<T, E>(
+    agent: &mut T,
+    environment: &E,
+    num_periods: usize,
+    rng_env: &mut Prng,
+    rng_agent: &mut Prng,
+    logger: &mut dyn TimeSeriesLogger,
+) where
+    T: Agent<E::Observation, E::Action> + ?Sized,
+    E: Environment + ?Sized,
 {
-    if !hook.start(&mut logger) {
-        return agent;
+    let mut buffer = agent.buffer(agent.batch_size_hint());
+    for _ in 0..num_periods {
+        let ready = buffer.extend_until_ready(SimulatorSteps::new(
+            environment,
+            agent.actor(ActorMode::Training),
+            &mut *rng_env,
+            &mut *rng_agent,
+            &mut *logger,
+        ));
+        assert!(ready);
+        agent.batch_update(iter::once(&mut buffer), logger);
     }
-    let mut sim = environment.run(agent, logger);
-    while sim.step_with(|_, agent, step, logger| {
-        let continue_ = hook.call(&step, logger);
-        agent.update(step, logger);
-        continue_
-    }) {}
-    sim.actor
 }
 
-/// Train a batch agent in parallel.
-pub fn train_parallel<T, EC>(
+/// Train a batch learning agent in this thread with a callback function evaluated on each step.
+pub fn train_serial_callback<T, E, F>(
     agent: &mut T,
-    env_config: &EC,
-    num_epochs: usize,
-    num_threads: usize,
-    seed: u64,
+    environment: &E,
+    mut f: F,
+    num_periods: usize,
+    rng_env: &mut Prng,
+    rng_agent: &mut Prng,
     logger: &mut dyn TimeSeriesLogger,
-) -> Result<(), SimulationError>
-where
-    EC: BuildEnv + ?Sized,
-    EC::Environment: Send,
-    T: BatchUpdate<EC::Observation, EC::Action>,
-    for<'a> T: MakeActor<'a, EC::Observation, EC::Action>,
+) where
+    T: Agent<E::Observation, E::Action> + ?Sized,
+    E: Environment + ?Sized,
+    F: FnMut(&PartialStep<E::Observation, E::Action>),
+{
+    let mut buffer = agent.buffer(agent.batch_size_hint());
+    for _ in 0..num_periods {
+        let ready = buffer.extend_until_ready(
+            SimulatorSteps::new(
+                environment,
+                agent.actor(ActorMode::Training),
+                &mut *rng_env,
+                &mut *rng_agent,
+                &mut *logger,
+            )
+            .map(|step| {
+                f(&step);
+                step
+            }),
+        );
+        assert!(ready);
+        agent.batch_update(iter::once(&mut buffer), logger);
+    }
+}
+
+/// Configuration for [`train_parallel`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct TrainParallelConfig {
+    /// Number of data-collection-batch-update loops.
+    pub num_periods: usize,
+    /// Number of simulation threads.
+    pub num_threads: usize,
+    /// Minimum step capacity of each worker buffer.
+    pub min_workers_steps: usize,
+}
+
+/// Train a batch learning agent in parallel across several threads.
+pub fn train_parallel<T, E>(
+    agent: &mut T,
+    environment: &E,
+    config: &TrainParallelConfig,
+    rng_env: &mut Prng,
+    rng_agent: &mut Prng,
+    logger: &mut dyn TimeSeriesLogger,
+) where
+    E: Environment + Sync + ?Sized,
+    T: Agent<E::Observation, E::Action> + ?Sized,
+    T::Actor: Send,
     T::HistoryBuffer: Send,
 {
-    let mut seed_rng = StdRng::seed_from_u64(seed);
-    let mut buffers: Vec<_> = (0..num_threads).map(|_| agent.new_buffer()).collect();
+    let capacity = agent
+        .batch_size_hint()
+        .divide(config.num_threads)
+        .with_steps_at_least(config.min_workers_steps);
+    let mut buffers: Vec<_> = (0..config.num_threads)
+        .map(|_| agent.buffer(capacity))
+        .collect();
+    let mut thread_rngs: Vec<_> = (0..config.num_threads)
+        .map(|_| {
+            (
+                Prng::from_rng(&mut *rng_env).expect("Prng should be infallible"),
+                Prng::from_rng(&mut *rng_agent).expect("Prng should be infallible"),
+            )
+        })
+        .collect();
 
-    for _ in 0..num_epochs {
-        crossbeam::scope(|scope| -> Result<(), SimulationError> {
-            // Send a buffer to each thread to be filled
+    for _ in 0..config.num_periods {
+        crossbeam::scope(|scope| {
             let mut threads = Vec::new();
-            for mut buffer in buffers.drain(..) {
-                let env = env_config.build_env(seed_rng.gen())?;
-                let actor = agent.make_actor(seed_rng.gen());
+            for (buffer, rngs) in buffers.iter_mut().zip(&mut thread_rngs) {
+                let actor = agent.actor(ActorMode::Training);
                 threads.push(scope.spawn(move |_scope| {
-                    let full = buffer.extend(env.run(actor, ()));
-                    assert!(full);
-                    buffer
+                    let ready = buffer.extend_until_ready(SimulatorSteps::new(
+                        environment,
+                        actor,
+                        &mut rngs.0,
+                        &mut rngs.1,
+                        (),
+                    ));
+                    assert!(ready);
                 }));
             }
 
-            buffers.extend(threads.into_iter().map(|t| t.join().unwrap()));
-            Ok(())
+            for thread in threads {
+                thread.join().unwrap()
+            }
         })
-        .unwrap()?;
+        .unwrap();
 
         agent.batch_update(&mut buffers, logger);
     }
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agents::{
-        buffers::SimpleBufferConfig, testing, BatchedUpdatesConfig, BuildBatchAgent, PureAsActor,
-        TabularQLearningAgentConfig,
-    };
+    use crate::agents::{testing, BuildAgent, TabularQLearningAgentConfig};
     use crate::envs::DeterministicBandit;
 
     #[test]
     fn train_parallel_tabular_q_bandit() {
-        let env_config = DeterministicBandit::from_values(vec![0.0, 1.0]);
-        let inner_agent_config = TabularQLearningAgentConfig::default();
-        let history_buffer_config = SimpleBufferConfig::with_threshold(100);
-        let agent_config = BatchedUpdatesConfig {
-            agent_config: inner_agent_config,
-            history_buffer_config,
+        let config = TrainParallelConfig {
+            num_periods: 10,
+            num_threads: 4,
+            min_workers_steps: 100,
         };
-        let num_epochs = 10;
-        let num_threads = 4;
-        let seed = 0;
+        let mut rng_env = Prng::seed_from_u64(0);
+        let mut rng_actor = Prng::seed_from_u64(1);
         let mut logger = ();
 
-        let env = env_config.build_env(0).unwrap();
-        let mut agent = agent_config.build_batch_agent(&env, 1).unwrap();
+        let env = DeterministicBandit::from_values(vec![0.0, 1.0]);
+        let mut agent = TabularQLearningAgentConfig::default()
+            .build_agent(&env, &mut rng_actor)
+            .unwrap();
+
         train_parallel(
             &mut agent,
-            &env_config,
-            num_epochs,
-            num_threads,
-            seed,
+            &env,
+            &config,
+            &mut rng_env,
+            &mut rng_actor,
             &mut logger,
-        )
-        .unwrap();
-
-        testing::eval_deterministic_bandit(
-            PureAsActor::new(agent, 1),
-            &mut env_config.build_env(2).unwrap(),
-            0.9,
         );
+
+        testing::eval_deterministic_bandit(agent.actor(ActorMode::Evaluation), &env, 0.9);
     }
 }

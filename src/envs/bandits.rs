@@ -1,8 +1,9 @@
 //! Multi-armed bandit environments
-use super::{CloneBuild, EnvStructure, Mdp, PomdpDistribution, Successor};
+use super::{CloneBuild, EnvDistribution, EnvStructure, Environment, Successor};
 use crate::logging::Logger;
 use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
+use crate::Prng;
 use rand::distributions::{Distribution, Uniform};
 use rand::prelude::*;
 use std::borrow::Borrow;
@@ -38,7 +39,7 @@ impl<D: Bounded<f64>> EnvStructure for Bandit<D> {
     fn reward_range(&self) -> (f64, f64) {
         self.distributions
             .iter()
-            .map(|d| d.bounds())
+            .map(Bounded::bounds)
             .reduce(|(a_min, a_max), (b_min, b_max)| (a_min.min(b_min), a_max.max(b_max)))
             .expect("No arms on the bandit")
     }
@@ -48,17 +49,20 @@ impl<D: Bounded<f64>> EnvStructure for Bandit<D> {
     }
 }
 
-impl<D: Distribution<f64> + Bounded<f64>> Mdp for Bandit<D> {
+impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
     type State = ();
+    type Observation = ();
     type Action = usize;
 
-    fn initial_state(&self, _rng: &mut StdRng) -> Self::State {}
+    fn initial_state(&self, _: &mut Prng) -> Self::State {}
+
+    fn observe(&self, _: &Self::State, _: &mut Prng) -> Self::State {}
 
     fn step(
         &self,
         _state: Self::State,
         action: &Self::Action,
-        rng: &mut StdRng,
+        rng: &mut Prng,
         _logger: &mut dyn Logger,
     ) -> (Successor<Self::State>, f64) {
         let reward = self.distributions[*action].sample(rng);
@@ -154,10 +158,10 @@ impl EnvStructure for UniformBernoulliBandits {
     }
 }
 
-impl PomdpDistribution for UniformBernoulliBandits {
-    type Pomdp = BernoulliBandit;
+impl EnvDistribution for UniformBernoulliBandits {
+    type Environment = BernoulliBandit;
 
-    fn sample_pomdp(&self, rng: &mut StdRng) -> Self::Pomdp {
+    fn sample_environment(&self, rng: &mut Prng) -> Self::Environment {
         BernoulliBandit::uniform(self.num_arms, rng)
     }
 }
@@ -206,10 +210,10 @@ impl EnvStructure for OneHotBandits {
     }
 }
 
-impl PomdpDistribution for OneHotBandits {
-    type Pomdp = DeterministicBandit;
+impl EnvDistribution for OneHotBandits {
+    type Environment = DeterministicBandit;
 
-    fn sample_pomdp(&self, rng: &mut StdRng) -> Self::Pomdp {
+    fn sample_environment(&self, rng: &mut Prng) -> Self::Environment {
         let mut means = vec![0.0; self.num_arms];
         let index = rng.gen_range(0..self.num_arms);
         means[index] = 1.0;
@@ -225,7 +229,7 @@ mod bernoulli_bandit {
     #[test]
     fn run() {
         let env = BernoulliBandit::from_means(vec![0.2, 0.8]).unwrap();
-        testing::run_pomdp(env, 1000, 0);
+        testing::check_structured_env(&env, 1000, 0);
     }
 
     #[test]
@@ -265,7 +269,7 @@ mod deterministic_bandit {
     #[test]
     fn run() {
         let env = DeterministicBandit::from_values(vec![0.2, 0.8]);
-        testing::run_pomdp(env, 1000, 0);
+        testing::check_structured_env(&env, 1000, 0);
     }
 
     #[test]
@@ -290,8 +294,8 @@ mod uniform_determistic_bandits {
     fn run_sample() {
         let env_dist = UniformBernoulliBandits::new(3);
         let mut rng = StdRng::seed_from_u64(284);
-        let env = env_dist.sample_pomdp(&mut rng);
-        testing::run_pomdp(env, 1000, 286);
+        let env = env_dist.sample_environment(&mut rng);
+        testing::check_structured_env(&env, 1000, 286);
     }
 
     #[test]
@@ -311,8 +315,8 @@ mod needle_haystack_bandits {
     fn run_sample() {
         let env_dist = OneHotBandits::new(3);
         let mut rng = StdRng::seed_from_u64(284);
-        let env = env_dist.sample_pomdp(&mut rng);
-        testing::run_pomdp(env, 1000, 286);
+        let env = env_dist.sample_environment(&mut rng);
+        testing::check_structured_env(&env, 1000, 286);
     }
 
     #[test]

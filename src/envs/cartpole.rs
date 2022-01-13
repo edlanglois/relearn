@@ -1,10 +1,8 @@
-use super::{BuildEnvError, BuildPomdp, EnvStructure, Pomdp, Successor};
+use super::{BuildEnv, BuildEnvError, EnvStructure, Environment, Successor};
 use crate::logging::Logger;
-use crate::spaces::{Indexed, IndexedTypeSpace, IntervalSpace, TupleSpace4};
-use rand::{
-    distributions::{Distribution, Uniform},
-    rngs::StdRng,
-};
+use crate::spaces::{Indexed, IndexedTypeSpace, IntervalSpace};
+use crate::Prng;
+use rand::distributions::{Distribution, Uniform};
 
 /// Configuration for the [`CartPole`] environment.
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
@@ -15,15 +13,14 @@ pub struct CartPoleConfig {
     pub env_config: EnvironmentParams,
 }
 
-impl BuildPomdp for CartPoleConfig {
-    type State = CartPoleState;
-    type Observation = (f64, f64, f64, f64);
+impl BuildEnv for CartPoleConfig {
+    type Observation = CartPolePhysicalState;
     type Action = Push;
-    type ObservationSpace = TupleSpace4<IntervalSpace, IntervalSpace, IntervalSpace, IntervalSpace>;
+    type ObservationSpace = CartPolePhysicalStateSpace;
     type ActionSpace = IndexedTypeSpace<Push>;
-    type Pomdp = CartPole;
+    type Environment = CartPole;
 
-    fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {
+    fn build_env(&self, _: &mut Prng) -> Result<Self::Environment, BuildEnvError> {
         Ok(CartPole::new(self.physics_config, self.env_config))
     }
 }
@@ -64,19 +61,18 @@ pub enum Push {
 }
 
 impl EnvStructure for CartPole {
-    /// `(cart_position, cart_velocity, pole_angle, pole_angular_velocity)`
-    type ObservationSpace = TupleSpace4<IntervalSpace, IntervalSpace, IntervalSpace, IntervalSpace>;
+    type ObservationSpace = CartPolePhysicalStateSpace;
     type ActionSpace = IndexedTypeSpace<Push>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         let max_pos = self.env.max_pos;
         let max_angle = self.env.max_angle;
-        TupleSpace4(
-            IntervalSpace::new(-max_pos, max_pos),     // cart_position
-            IntervalSpace::default(),                  // cart_velocity
-            IntervalSpace::new(-max_angle, max_angle), // pole_angle
-            IntervalSpace::default(),                  // pole_angular_velocity
-        )
+        CartPolePhysicalStateSpace {
+            cart_position: IntervalSpace::new(-max_pos, max_pos),
+            cart_velocity: IntervalSpace::default(),
+            pole_angle: IntervalSpace::new(-max_angle, max_angle),
+            pole_angular_velocity: IntervalSpace::default(),
+        }
     }
 
     fn action_space(&self) -> Self::ActionSpace {
@@ -92,46 +88,42 @@ impl EnvStructure for CartPole {
     }
 }
 
-// Also an MDP but `cached_normal_velocity_is_positive` prevents implementing as such.
-impl Pomdp for CartPole {
-    type State = CartPoleState;
-    type Observation = (f64, f64, f64, f64);
+impl Environment for CartPole {
+    type State = CartPoleInternalState;
+    type Observation = CartPolePhysicalState;
     type Action = Push;
 
-    fn initial_state(&self, rng: &mut StdRng) -> Self::State {
+    fn initial_state(&self, rng: &mut Prng) -> Self::State {
         // All parameters are sampled from the same range of values
         let dist = Uniform::new_inclusive(-0.05, 0.05);
-        CartPoleState {
-            cart_position: dist.sample(rng),
-            cart_velocity: dist.sample(rng),
-            pole_angle: dist.sample(rng),
-            pole_angular_velocity: dist.sample(rng),
+        CartPoleInternalState {
+            physical: CartPolePhysicalState {
+                cart_position: dist.sample(rng),
+                cart_velocity: dist.sample(rng),
+                pole_angle: dist.sample(rng),
+                pole_angular_velocity: dist.sample(rng),
+            },
             cached_normal_velocity_is_positive: true,
         }
     }
 
-    fn observe(&self, state: &Self::State, _rng: &mut StdRng) -> Self::Observation {
+    fn observe(&self, state: &Self::State, _: &mut Prng) -> Self::Observation {
         assert!(
-            state.cart_position >= -self.env.max_pos
-                && state.cart_position <= self.env.max_pos
-                && state.pole_angle >= -self.env.max_angle
-                && state.pole_angle <= self.env.max_angle,
+            state.physical.cart_position >= -self.env.max_pos
+                && state.physical.cart_position <= self.env.max_pos
+                && state.physical.pole_angle >= -self.env.max_angle
+                && state.physical.pole_angle <= self.env.max_angle,
             "out-of-bounds state should not have been produced"
         );
-        (
-            state.cart_position,
-            state.cart_velocity,
-            state.pole_angle,
-            state.pole_angular_velocity,
-        )
+        state.physical
     }
 
     fn step(
         &self,
         state: Self::State,
         action: &Self::Action,
-        _rng: &mut StdRng,
-        _logger: &mut dyn Logger,
+        _: &mut Prng,
+        _: &mut dyn Logger,
     ) -> (Successor<Self::State>, f64) {
         let applied_force = match action {
             Push::Left => -self.env.action_force,
@@ -139,8 +131,8 @@ impl Pomdp for CartPole {
         };
         let next_state = self.phys.next_state(&state, applied_force);
         let reward = 1.0;
-        let terminal = next_state.cart_position.abs() > self.env.max_pos
-            || next_state.pole_angle.abs() > self.env.max_angle;
+        let terminal = next_state.physical.cart_position.abs() > self.env.max_pos
+            || next_state.physical.pole_angle.abs() > self.env.max_angle;
         // The OpenAI gym version returns the state as well as setting the done flag
         // but the gym API does not distinguish between the episode stopping with or without the
         // hypothetical potential for future rewards.
@@ -252,7 +244,7 @@ impl From<PhysicalConstants> for InternalPhysicalConstants {
 
 /// Physical state of the [`CartPole`] environment.
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct CartPoleState {
+pub struct CartPolePhysicalState {
     /// Cart position from the track midpoint (m).
     pub cart_position: f64,
     /// Cart velocity (m/s).
@@ -261,6 +253,28 @@ pub struct CartPoleState {
     pub pole_angle: f64,
     /// Pole angular velocity about the hinge (radians / s).
     pub pole_angular_velocity: f64,
+}
+
+/// [`CartPole`] physical state space.
+#[derive(Debug, Copy, Clone, PartialEq, ProductSpace)]
+#[element(CartPolePhysicalState)]
+pub struct CartPolePhysicalStateSpace {
+    /// Cart position from the track midpoint (m).
+    pub cart_position: IntervalSpace,
+    /// Cart velocity (m/s).
+    pub cart_velocity: IntervalSpace,
+    /// Angle of the pole from vertical (radians).
+    pub pole_angle: IntervalSpace,
+    /// Pole angular velocity about the hinge (radians / s).
+    pub pole_angular_velocity: IntervalSpace,
+}
+
+/// State of the [`CartPole`] environment.
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct CartPoleInternalState {
+    /// Physical state.
+    physical: CartPolePhysicalState,
+
     /// Cached sign of normal_force * cart_velocity.
     ///
     /// This is an intermediate term in the dynamics equations.
@@ -275,20 +289,27 @@ pub struct CartPoleState {
 
 impl InternalPhysicalConstants {
     /// Simulate the state for one time step with an applied force on the cart (in N).
-    pub fn next_state(&self, state: &CartPoleState, applied_force: f64) -> CartPoleState {
+    pub fn next_state(
+        &self,
+        state: &CartPoleInternalState,
+        applied_force: f64,
+    ) -> CartPoleInternalState {
         // Reference:
         // "Correct equations for the dynamics of the cart-pole system" by Florian (2005)
+
+        // Physical state
+        let phys = &state.physical;
 
         let mut signed_cart_friction = if state.cached_normal_velocity_is_positive {
             self.c.friction_cart
         } else {
             -self.c.friction_cart
         };
-        let (sin_angle, cos_angle) = state.pole_angle.sin_cos();
-        let angular_velocity_squared = state.pole_angular_velocity * state.pole_angular_velocity;
+        let (sin_angle, cos_angle) = phys.pole_angle.sin_cos();
+        let angular_velocity_squared = phys.pole_angular_velocity * phys.pole_angular_velocity;
 
         let mut angular_acceleration = self.angular_acceleration(
-            state,
+            phys,
             applied_force,
             signed_cart_friction,
             angular_velocity_squared,
@@ -301,13 +322,13 @@ impl InternalPhysicalConstants {
             sin_angle,
             cos_angle,
         );
-        let normal_velocity_is_positive = (normal_force * state.cart_velocity).is_sign_positive();
+        let normal_velocity_is_positive = (normal_force * phys.cart_velocity).is_sign_positive();
 
         if normal_velocity_is_positive != state.cached_normal_velocity_is_positive {
             // Re-calculate angular acceleration and normal force with the new signed friction
             signed_cart_friction = -signed_cart_friction;
             angular_acceleration = self.angular_acceleration(
-                state,
+                phys,
                 applied_force,
                 signed_cart_friction,
                 angular_velocity_squared,
@@ -334,17 +355,19 @@ impl InternalPhysicalConstants {
         let cart_acceleration = net_force * self.inv_total_mass;
 
         // Update state with semi-implicit euler integration
-        let cart_velocity = state.cart_velocity + self.c.time_step * cart_acceleration;
-        let cart_position = state.cart_position + self.c.time_step * cart_velocity;
+        let cart_velocity = phys.cart_velocity + self.c.time_step * cart_acceleration;
+        let cart_position = phys.cart_position + self.c.time_step * cart_velocity;
         let pole_angular_velocity =
-            state.pole_angular_velocity + self.c.time_step * angular_acceleration;
-        let pole_angle = state.pole_angle + self.c.time_step * state.pole_angular_velocity;
+            phys.pole_angular_velocity + self.c.time_step * angular_acceleration;
+        let pole_angle = phys.pole_angle + self.c.time_step * phys.pole_angular_velocity;
 
-        CartPoleState {
-            cart_velocity,
-            cart_position,
-            pole_angular_velocity,
-            pole_angle,
+        CartPoleInternalState {
+            physical: CartPolePhysicalState {
+                cart_velocity,
+                cart_position,
+                pole_angular_velocity,
+                pole_angle,
+            },
             cached_normal_velocity_is_positive: normal_velocity_is_positive,
         }
     }
@@ -360,7 +383,7 @@ impl InternalPhysicalConstants {
     /// * `cos_angle`                - `cos(pole_angle)`.
     fn angular_acceleration(
         &self,
-        state: &CartPoleState,
+        state: &CartPolePhysicalState,
         applied_force: f64,
         signed_cart_friction: f64,
         angular_velocity_squared: f64,
@@ -416,6 +439,6 @@ mod tests {
 
     #[test]
     fn run_default() {
-        testing::run_pomdp(CartPole::default(), 1000, 0);
+        testing::check_structured_env(&CartPole::default(), 1000, 0);
     }
 }

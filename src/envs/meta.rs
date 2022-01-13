@@ -1,14 +1,11 @@
 //! Meta reinforcement learning environment.
 use super::{
-    BuildEnv, BuildEnvDist, BuildEnvError, BuildPomdp, BuildPomdpDist, EnvDistribution,
-    EnvStructure, Environment, Pomdp, PomdpDistribution, Successor,
+    BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment, Successor,
 };
 use crate::logging::Logger;
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
+use crate::Prng;
 use rand::rngs::StdRng;
-use rand::SeedableRng;
-
-// # MetaPomdp
 
 /// A meta reinforcement learning environment that treats RL itself as an environment.
 ///
@@ -20,7 +17,8 @@ use rand::SeedableRng;
 /// The step metadata from the inner environment are embedded as observations.
 ///
 /// # Observations
-/// A [`MetaObservation`].
+/// A [`MetaObservation`]. Consists of the inner observation, the previous step action and reward,
+/// and whether the inner episode is done.
 ///
 /// # Actions
 /// The action space is the same as the action space of the inner environments.
@@ -37,23 +35,20 @@ use rand::SeedableRng;
 /// an inner environment state, an episode index within the trial, and details of the most recent
 /// inner step within the episode.
 ///
-/// # Related
-/// See [`MetaEnv`] for meta [`Environment`] instead of meta [`Pomdp`].
-///
 /// # Reference
 /// This meta environment design is roughly consistent with the structure used in the paper
 /// "[RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning][rl2]" by Duan et al.
 ///
 /// [rl2]: https://arxiv.org/pdf/1611.02779
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct MetaPomdp<E> {
+pub struct MetaEnv<E> {
     /// Environment distribution from which each trial's episode is sampled.
     pub env_distribution: E,
     /// Number of inner episodes per trial.
     pub episodes_per_trial: usize,
 }
 
-impl<E> MetaPomdp<E> {
+impl<E> MetaEnv<E> {
     pub const fn new(env_distribution: E, episodes_per_trial: usize) -> Self {
         Self {
             env_distribution,
@@ -62,7 +57,7 @@ impl<E> MetaPomdp<E> {
     }
 }
 
-impl<E: Default> Default for MetaPomdp<E> {
+impl<E: Default> Default for MetaEnv<E> {
     fn default() -> Self {
         Self {
             env_distribution: E::default(),
@@ -71,27 +66,26 @@ impl<E: Default> Default for MetaPomdp<E> {
     }
 }
 
-impl<EB> BuildPomdp for MetaPomdp<EB>
+impl<EC> BuildEnv for MetaEnv<EC>
 where
-    EB: BuildPomdpDist,
-    EB::Action: Copy,
+    EC: BuildEnvDist,
+    EC::Action: Copy,
 {
-    type State = <Self::Pomdp as Pomdp>::State;
-    type Observation = <Self::Pomdp as Pomdp>::Observation;
-    type Action = <Self::Pomdp as Pomdp>::Action;
-    type ObservationSpace = <Self::Pomdp as EnvStructure>::ObservationSpace;
-    type ActionSpace = <Self::Pomdp as EnvStructure>::ActionSpace;
-    type Pomdp = MetaPomdp<EB::PomdpDistribution>;
+    type Observation = <Self::Environment as Environment>::Observation;
+    type Action = <Self::Environment as Environment>::Action;
+    type ObservationSpace = <Self::Environment as EnvStructure>::ObservationSpace;
+    type ActionSpace = <Self::Environment as EnvStructure>::ActionSpace;
+    type Environment = MetaEnv<EC::EnvDistribution>;
 
-    fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {
-        Ok(MetaPomdp::new(
-            self.env_distribution.build_pomdp_dist(),
+    fn build_env(&self, _: &mut Prng) -> Result<Self::Environment, BuildEnvError> {
+        Ok(MetaEnv::new(
+            self.env_distribution.build_env_dist(),
             self.episodes_per_trial,
         ))
     }
 }
 
-impl<E> EnvStructure for MetaPomdp<E>
+impl<E> EnvStructure for MetaEnv<E>
 where
     E: EnvStructure,
 {
@@ -112,19 +106,21 @@ where
     }
 }
 
-impl<E> Pomdp for MetaPomdp<E>
+impl<E> Environment for MetaEnv<E>
 where
-    E: PomdpDistribution,
-    <E::Pomdp as Pomdp>::Action: Copy,
+    E: EnvDistribution,
+    <E::Environment as Environment>::Action: Copy,
 {
-    type State = MetaState<E::Pomdp>;
-    type Observation =
-        MetaObservation<<E::Pomdp as Pomdp>::Observation, <E::Pomdp as Pomdp>::Action>;
-    type Action = <E::Pomdp as Pomdp>::Action;
+    type State = MetaState<E::Environment>;
+    type Observation = MetaObservation<
+        <E::Environment as Environment>::Observation,
+        <E::Environment as Environment>::Action,
+    >;
+    type Action = <E::Environment as Environment>::Action;
 
     fn initial_state(&self, rng: &mut StdRng) -> Self::State {
         // Sample a new inner environment.
-        let inner_env = self.env_distribution.sample_pomdp(rng);
+        let inner_env = self.env_distribution.sample_environment(rng);
         let inner_state = inner_env.initial_state(rng);
         MetaState {
             inner_env,
@@ -174,8 +170,8 @@ where
                     new_state.episode_index += 1;
                     if new_state.episode_index >= self.episodes_per_trial {
                         // Completed the last inner episode of the trial.
-                        // This is treated as an abrupt cut-off of a theorically infinite sequence of
-                        // inner episodes so the meta state is not treated as terminal.
+                        // This is treated as an abrupt cut-off of a theorically infinite sequence
+                        // of inner episodes so the meta state is not treated as terminal.
                         return (Successor::Interrupt(new_state), inner_step_reward);
                     }
                 }
@@ -194,181 +190,6 @@ where
                 };
                 (Successor::Continue(state), 0.0)
             }
-        }
-    }
-}
-
-// # MetaEnv
-
-/// Configuration for [`MetaEnv`]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct MetaEnvConfig<EB> {
-    /// Environment distribution configuration
-    pub env_dist_config: EB,
-    /// Number of episodes per trial
-    pub num_episodes_per_trial: usize,
-}
-
-impl<EB> MetaEnvConfig<EB> {
-    pub const fn new(env_dist_config: EB, num_episodes_per_trial: usize) -> Self {
-        Self {
-            env_dist_config,
-            num_episodes_per_trial,
-        }
-    }
-}
-
-impl<EB: Default> Default for MetaEnvConfig<EB> {
-    fn default() -> Self {
-        Self {
-            env_dist_config: EB::default(),
-            num_episodes_per_trial: 10,
-        }
-    }
-}
-
-impl<EB> BuildEnv for MetaEnvConfig<EB>
-where
-    EB: BuildEnvDist,
-    EB::Action: Copy,
-{
-    type Observation = <Self::ObservationSpace as Space>::Element;
-    type Action = <Self::ActionSpace as Space>::Element;
-    type ObservationSpace = <Self::Environment as EnvStructure>::ObservationSpace;
-    type ActionSpace = <Self::Environment as EnvStructure>::ActionSpace;
-    type Environment = MetaEnv<EB::EnvDistribution>;
-
-    fn build_env(&self, seed: u64) -> Result<Self::Environment, BuildEnvError> {
-        Ok(MetaEnv::new(
-            self.env_dist_config.build_env_dist(),
-            self.num_episodes_per_trial,
-            seed,
-        ))
-    }
-}
-
-/// A meta reinforcement learning environment with internal state.
-///
-/// See [`MetaPomdp`] for more information.
-/// This is implemented in the same way but for [`Environment`] instead of [`Pomdp`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MetaEnv<E: EnvDistribution> {
-    /// Environment distribution from which each trial's episode is sampled.
-    pub env_distribution: E,
-    /// Number of inner episodes per trial.
-    pub episodes_per_trial: usize,
-
-    // State
-    /// An instance of the inner environment.
-    ///
-    /// Is `None` between trials when a call to `reset()` is expected.
-    env: Option<E::Environment>,
-    /// The inner episode index within the current trial.
-    episode_index: usize,
-    /// Whether the previous step ended the inner episode.
-    inner_episode_done: bool,
-    /// Random state for sampling new inner environments.
-    rng: StdRng,
-}
-
-impl<E: EnvDistribution> MetaEnv<E> {
-    pub fn new(env_distribution: E, episodes_per_trial: usize, seed: u64) -> Self {
-        Self {
-            env_distribution,
-            episodes_per_trial,
-            env: None,
-            episode_index: 0,
-            inner_episode_done: false,
-            rng: StdRng::seed_from_u64(seed),
-        }
-    }
-}
-
-impl<E: EnvDistribution + EnvStructure> EnvStructure for MetaEnv<E> {
-    type ObservationSpace = MetaObservationSpace<E::ObservationSpace, E::ActionSpace>;
-    type ActionSpace = E::ActionSpace;
-
-    fn observation_space(&self) -> Self::ObservationSpace {
-        MetaObservationSpace::from_inner_env(&self.env_distribution)
-    }
-    fn action_space(&self) -> Self::ActionSpace {
-        self.env_distribution.action_space()
-    }
-    fn reward_range(&self) -> (f64, f64) {
-        self.env_distribution.reward_range()
-    }
-    fn discount_factor(&self) -> f64 {
-        self.env_distribution.discount_factor()
-    }
-}
-
-impl<E> Environment for MetaEnv<E>
-where
-    E: EnvDistribution,
-    <E::Environment as Environment>::Action: Copy,
-{
-    type Observation = MetaObservation<
-        <E::Environment as Environment>::Observation,
-        <E::Environment as Environment>::Action,
-    >;
-    type Action = <E::Environment as Environment>::Action;
-
-    fn step(
-        &mut self,
-        action: &Self::Action,
-        logger: &mut dyn Logger,
-    ) -> (Successor<Self::Observation>, f64) {
-        let env = self.env.as_mut().expect("Must call reset() first");
-
-        if self.inner_episode_done {
-            // Ignore the action and start a new inner episode
-            let inner_observation = env.reset();
-            self.inner_episode_done = false;
-            let observation = MetaObservation {
-                inner_observation: Some(inner_observation),
-                prev_step: None,
-                episode_done: false,
-            };
-            (Successor::Continue(observation), 0.0)
-        } else {
-            // Take a step in the inner episode
-            let (inner_successor, reward) = env.step(action, logger);
-            self.inner_episode_done = inner_successor.episode_done();
-            let observation = MetaObservation {
-                inner_observation: inner_successor.into_inner(),
-                prev_step: Some(InnerStepObs {
-                    action: *action,
-                    reward,
-                }),
-                episode_done: self.inner_episode_done,
-            };
-
-            if self.inner_episode_done {
-                self.episode_index += 1;
-                if self.episode_index >= self.episodes_per_trial {
-                    // Completed the last inner episode of the trial.
-                    // This is treated as an abrupt cut-off of a theorically infinite sequence of
-                    // inner episodes so the meta state is not treated as terminal.
-                    self.env = None;
-                    return (Successor::Interrupt(observation), reward);
-                }
-            }
-
-            (Successor::Continue(observation), reward)
-        }
-    }
-
-    fn reset(&mut self) -> Self::Observation {
-        // Start a new trial
-        let mut env = self.env_distribution.sample_environment(&mut self.rng);
-        let inner_observation = env.reset();
-        self.env = Some(env);
-        self.episode_index = 0;
-        self.inner_episode_done = false;
-        MetaObservation {
-            inner_observation: Some(inner_observation),
-            prev_step: None,
-            episode_done: false,
         }
     }
 }
@@ -427,7 +248,7 @@ pub struct MetaObservation<O, A> {
     pub episode_done: bool,
 }
 
-/// [`MetaPomdp`] observation space for element [`MetaObservation`].
+/// [`MetaEnv`] observation space for element [`MetaObservation`].
 #[derive(Debug, Copy, Clone, PartialEq, ProductSpace)]
 #[element(MetaObservation<OS::Element, AS::Element>)]
 pub struct MetaObservationSpace<OS, AS> {
@@ -450,9 +271,9 @@ impl<OS, AS> MetaObservationSpace<OS, AS> {
     }
 }
 
-/// The state of a [`MetaPomdp`].
+/// The state of a [`MetaEnv`].
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct MetaState<E: Pomdp> {
+pub struct MetaState<E: Environment> {
     /// An instance of the inner environment (sampled for this trial).
     inner_env: E,
     /// The upcoming inner environment state.
@@ -463,15 +284,14 @@ pub struct MetaState<E: Pomdp> {
     prev_step_obs: Option<InnerStepObs<E::Action>>,
 }
 
-/// Wrapper that provides the inner environment structure of a meta environment.
+/// Wrapper that provides the inner environment structure of a meta environment ([`MetaEnv`]).
 ///
-/// # Usage
-/// Wraps a meta-environment structure (e.g. [`MetaPomdp`], [`MetaEnv`]),
+/// # Example
 ///
-///     use relearn::envs::{InnerEnvStructure, MetaPomdp, OneHotBandits, StoredEnvStructure};
+///     use relearn::envs::{InnerEnvStructure, MetaEnv, OneHotBandits, StoredEnvStructure};
 ///
 ///     let base_env = OneHotBandits::default();
-///     let meta_env = MetaPomdp::new(base_env, 10);
+///     let meta_env = MetaEnv::new(base_env, 10);
 ///
 ///     let base_structure = StoredEnvStructure::from(&base_env);
 ///     let meta_inner_structure = StoredEnvStructure::from(&InnerEnvStructure::new(&meta_env));
@@ -516,34 +336,23 @@ where
 mod meta_env_bandits {
     use super::super::testing;
     use super::*;
-
-    #[test]
-    fn build_meta_pomdp() {
-        let config = MetaPomdp::new(testing::RoundRobinDeterministicBandits::new(2), 3);
-        let _pomdp = config.build_pomdp().unwrap();
-    }
+    use rand::SeedableRng;
 
     #[test]
     fn build_meta_env() {
-        let config = MetaEnvConfig::new(testing::RoundRobinDeterministicBandits::new(2), 3);
-        let _env = config.build_env(0);
-    }
-
-    #[test]
-    fn run_meta_pomdp() {
-        let env = MetaPomdp::new(testing::RoundRobinDeterministicBandits::new(2), 3);
-        testing::run_pomdp(env, 1000, 0);
+        let config = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3);
+        let _env = config.build_env(&mut Prng::seed_from_u64(0)).unwrap();
     }
 
     #[test]
     fn run_meta_env() {
-        let mut env = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3, 0);
-        testing::run_env(&mut env, 1000, 0);
+        let env = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3);
+        testing::check_structured_env(&env, 1000, 0);
     }
 
     #[test]
-    fn meta_pomdp_expected_steps() {
-        let env = MetaPomdp::new(testing::RoundRobinDeterministicBandits::new(2), 3);
+    fn meta_env_expected_steps() {
+        let env = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3);
         let mut rng = StdRng::seed_from_u64(0);
 
         // Trial 0; Ep 0; Init
@@ -667,128 +476,6 @@ mod meta_env_bandits {
                 }),
                 episode_done: true
             }
-        );
-    }
-
-    #[test]
-    fn meta_env_expected_steps() {
-        let mut env = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3, 0);
-
-        // Trial 0; Ep 0; Init
-        let observation = env.reset();
-        assert_eq!(
-            observation,
-            MetaObservation {
-                inner_observation: Some(()),
-                prev_step: None,
-                episode_done: false
-            }
-        );
-
-        // Trial 0; Ep 0; Step 0
-        // Take action 0 and get 1 reward
-        // Inner state is terminal.
-        let (successor, reward) = env.step(&0, &mut ());
-        assert_eq!(reward, 1.0);
-        assert_eq!(
-            successor,
-            Successor::Continue(MetaObservation {
-                inner_observation: None,
-                prev_step: Some(InnerStepObs {
-                    action: 0,
-                    reward: 1.0
-                }),
-                episode_done: true
-            })
-        );
-
-        // Trial 0; Ep 1; Init.
-        // The action is ignored and a new inner episode is started.
-        let (successor, reward) = env.step(&0, &mut ());
-        assert_eq!(reward, 0.0);
-        assert_eq!(
-            successor,
-            Successor::Continue(MetaObservation {
-                inner_observation: Some(()),
-                prev_step: None,
-                episode_done: false
-            })
-        );
-
-        // Trial 0; Ep 1; Step 0
-        // Take action 1 and get 0 reward
-        // Inner state is terminal
-        let (successor, reward) = env.step(&1, &mut ());
-        assert_eq!(reward, 0.0);
-        assert_eq!(
-            successor,
-            Successor::Continue(MetaObservation {
-                inner_observation: None,
-                prev_step: Some(InnerStepObs {
-                    action: 1,
-                    reward: 0.0
-                }),
-                episode_done: true
-            })
-        );
-
-        // Trial 0; Ep 2; Init.
-        // The action is ignored and a new inner episode is started.
-        let (successor, reward) = env.step(&1, &mut ());
-        assert_eq!(reward, 0.0);
-        assert_eq!(
-            successor,
-            Successor::Continue(MetaObservation {
-                inner_observation: Some(()),
-                prev_step: None,
-                episode_done: false
-            })
-        );
-
-        // Trial 0; Ep 2; Step 0
-        // Take action 0 and get 1 reward
-        // The inner state is terminal.
-        // This inner episode was the last in the trial so the trial is done.
-        let (successor, reward) = env.step(&0, &mut ());
-        assert_eq!(reward, 1.0);
-        assert_eq!(
-            successor,
-            Successor::Interrupt(MetaObservation {
-                inner_observation: None,
-                prev_step: Some(InnerStepObs {
-                    action: 0,
-                    reward: 1.0
-                }),
-                episode_done: true
-            })
-        );
-
-        // Trial 1; Ep 1; Init.
-        let observation = env.reset();
-        assert_eq!(
-            observation,
-            MetaObservation {
-                inner_observation: Some(()),
-                prev_step: None,
-                episode_done: false
-            }
-        );
-
-        // Trial 1; Ep 0; Step 0
-        // Take action 0 and get 0 reward, since now 1 is the target action
-        // Inner state is terminal.
-        let (successor, reward) = env.step(&0, &mut ());
-        assert_eq!(reward, 0.0);
-        assert_eq!(
-            successor,
-            Successor::Continue(MetaObservation {
-                inner_observation: None,
-                prev_step: Some(InnerStepObs {
-                    action: 0,
-                    reward: 0.0
-                }),
-                episode_done: true
-            })
         );
     }
 }

@@ -1,5 +1,5 @@
 //! Implement sequence module traits for feed-forward modules.
-use super::{IterativeModule, SequenceModule, StatefulIterativeModule};
+use super::{IterativeModule, SequenceModule};
 use tch::{nn::Module, Tensor};
 
 impl<M: Module> SequenceModule for M {
@@ -20,14 +20,6 @@ impl<M: Module> IterativeModule for M {
     fn step(&self, input: &Tensor, _state: &Self::State) -> (Tensor, Self::State) {
         (input.apply(self), ())
     }
-}
-
-impl<M: Module> StatefulIterativeModule for M {
-    fn step(&mut self, input: &Tensor) -> Tensor {
-        input.apply(self)
-    }
-
-    fn reset(&mut self) {}
 }
 
 #[cfg(test)]

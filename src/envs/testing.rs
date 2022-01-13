@@ -1,39 +1,29 @@
 //! Environment testing utilities
 use super::{
-    CloneBuild, DeterministicBandit, EnvDistribution, EnvStructure, IntoEnv, Pomdp,
-    PomdpDistribution, StoredEnvStructure, StructuredEnvironment,
+    CloneBuild, DeterministicBandit, EnvDistribution, EnvStructure, Environment,
+    StoredEnvStructure, StructuredEnvironment, Successor,
 };
-use crate::agents::{PureAsActor, RandomAgent};
-use crate::simulation::hooks::{ClosureHook, StepLimit};
-use crate::simulation::{self, TransientStep};
+use crate::agents::{ActorMode, Agent, RandomAgent};
 use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space, SubsetOrd};
+use crate::Prng;
 use rand::{rngs::StdRng, SeedableRng};
 use std::cell::Cell;
 use std::fmt::Debug;
 
-/// Run a [POMDP](Pomdp) and check that invariants are satisfied.
-pub fn run_pomdp<E>(pomdp: E, num_steps: u64, seed: u64)
-where
-    E: EnvStructure,
-    E: Pomdp<
-        Observation = <E::ObservationSpace as Space>::Element,
-        Action = <E::ActionSpace as Space>::Element,
-    >,
-    E::ObservationSpace: Debug,
-    E::Observation: Debug + Clone,
-    E::ActionSpace: Debug + SampleSpace,
-    E::Action: Debug,
-{
-    run_env(&mut pomdp.into_env(seed), num_steps, seed + 1)
-}
-
-/// Run a stateful environment and check that invariants are satisfied.
-pub fn run_env<E>(env: &mut E, num_steps: u64, seed: u64)
+/// Run a [`StructuredEnvironment`] and check that invariants are satisfied.
+///
+/// Checks that
+/// * Rewards are contained in `env.reward_range()`
+/// * `env.discount_factor()` is in the range `[0, 1]`.
+/// * Observations are contained in `env.observation_space()`.
+/// * Randomly sampled actions from `env.action_space()` are tolerated.
+///
+pub fn check_structured_env<E>(env: &E, num_steps: usize, seed: u64)
 where
     E: StructuredEnvironment,
     E::ObservationSpace: Debug,
     E::Observation: Debug + Clone,
-    E::ActionSpace: Debug + SampleSpace,
+    E::ActionSpace: Debug + SampleSpace + Clone,
     E::Action: Debug,
 {
     let observation_space = env.observation_space();
@@ -49,23 +39,21 @@ where
         return;
     }
 
-    let agent = PureAsActor::new(RandomAgent::new(action_space), seed);
-    simulation::run_agent(
-        env,
-        agent,
-        (
-            ClosureHook::from(|step: &TransientStep<_, _>| -> bool {
-                assert!(step.reward >= min_reward);
-                assert!(step.reward <= max_reward);
-                if let Some(obs) = step.next.as_ref().into_inner() {
-                    assert!(observation_space.contains(obs));
-                }
-                true
-            }),
-            StepLimit::new(num_steps),
-        ),
+    let agent = RandomAgent::new(action_space);
+    env.run(
+        Agent::<E::Observation, _>::actor(&agent, ActorMode::Evaluation),
+        seed,
         (),
-    );
+    )
+    .take(num_steps)
+    .for_each(|step| {
+        assert!(step.reward >= min_reward);
+        assert!(step.reward <= max_reward);
+        assert!(observation_space.contains(&step.observation));
+        if let Successor::Interrupt(next_obs) = &step.next {
+            assert!(observation_space.contains(next_obs));
+        }
+    });
 }
 
 /// Test that the [`EnvStructure`] of an [`EnvDistribution`] is a superset of its sampled envs.
@@ -155,10 +143,10 @@ impl EnvStructure for RoundRobinDeterministicBandits {
     }
 }
 
-impl PomdpDistribution for RoundRobinDeterministicBandits {
-    type Pomdp = DeterministicBandit;
+impl EnvDistribution for RoundRobinDeterministicBandits {
+    type Environment = DeterministicBandit;
 
-    fn sample_pomdp(&self, _rng: &mut StdRng) -> Self::Pomdp {
+    fn sample_environment(&self, _: &mut Prng) -> Self::Environment {
         let mut values = vec![0.0; self.num_arms];
         let good_arm = self.good_arm.get();
         values[good_arm] = 1.0;

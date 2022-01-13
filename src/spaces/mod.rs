@@ -303,7 +303,7 @@ pub trait EncoderFeatureSpace: Space + NumFeatures {
 
     /// Construct an encoder to help with encoding.
     ///
-    /// The encoder is only valid for while the space is not mutated.
+    /// The encoder is only valid while the space is not mutated.
     /// Using the encoder with a modified space may produce incorrect results or panics,
     /// but not memory safety issues.
     fn encoder(&self) -> Self::Encoder;
@@ -505,7 +505,7 @@ pub trait FeatureSpace: Space + NumFeatures {
     /// If the slice is not large enough to fit the feature vector.
     fn features_out<F: Float>(&self, element: &Self::Element, out: &mut [F], zeroed: bool);
 
-    /// Encode the featurE Vector of an element into an array.
+    /// Encode the feature Vector of an element into an array.
     fn features<T>(&self, element: &Self::Element) -> T
     where
         T: BuildFromArray1D,
@@ -605,6 +605,7 @@ pub trait ParameterizedDistributionSpace<T, T2 = T>: ReprSpace<T, T2> {
     /// Size of the parameter vector for which elements are sampled.
     fn num_distribution_params(&self) -> usize;
 
+    // TODO Take Prng?
     /// Sample a single element given a parameter vector.
     ///
     /// # Args

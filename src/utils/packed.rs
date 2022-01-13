@@ -110,7 +110,7 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.sequences.iter().map(|s| s.len()).sum();
+        let len = self.sequences.iter().map(ExactSizeIterator::len).sum();
         (len, Some(len))
     }
 }

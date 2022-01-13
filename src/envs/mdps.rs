@@ -1,9 +1,10 @@
 //! Generic Markov Decision Processes
-use super::{CloneBuild, EnvStructure, Mdp, PomdpDistribution, Successor};
+use super::{CloneBuild, EnvDistribution, EnvStructure, Environment, Successor};
 use crate::logging::Logger;
 use crate::spaces::IndexSpace;
+use crate::Prng;
 use ndarray::{Array2, Axis};
-use rand::{distributions::Distribution, rngs::StdRng};
+use rand::distributions::Distribution;
 use rand_distr::{Dirichlet, Normal, WeightedAliasIndex};
 
 /// An MDP with transition and reward functions stored in lookup tables.
@@ -48,24 +49,29 @@ impl<T, R> EnvStructure for TabularMdp<T, R> {
     }
 }
 
-impl<T, R> Mdp for TabularMdp<T, R>
+impl<T, R> Environment for TabularMdp<T, R>
 where
     T: Distribution<usize>,
     R: Distribution<f64>,
 {
     type State = usize;
+    type Observation = usize;
     type Action = usize;
 
-    fn initial_state(&self, _rng: &mut StdRng) -> Self::State {
+    fn initial_state(&self, _: &mut Prng) -> Self::State {
         0
+    }
+
+    fn observe(&self, state: &Self::State, _: &mut Prng) -> Self::Observation {
+        *state
     }
 
     fn step(
         &self,
         state: Self::State,
         action: &Self::Action,
-        rng: &mut StdRng,
-        _logger: &mut dyn Logger,
+        rng: &mut Prng,
+        _: &mut dyn Logger,
     ) -> (Successor<Self::State>, f64) {
         let (successor_distribution, reward_distribution) = &self.transitions[(state, *action)];
         let next_state = successor_distribution.sample(rng);
@@ -129,11 +135,11 @@ impl EnvStructure for DirichletRandomMdps {
     }
 }
 
-impl PomdpDistribution for DirichletRandomMdps {
-    type Pomdp = TabularMdp;
+impl EnvDistribution for DirichletRandomMdps {
+    type Environment = TabularMdp;
 
     #[allow(clippy::cast_possible_truncation)]
-    fn sample_pomdp(&self, rng: &mut StdRng) -> Self::Pomdp {
+    fn sample_environment(&self, rng: &mut Prng) -> Self::Environment {
         // Sample f32 values to save space since the precision of f64 shouldn't be necessary
         let dynamics_prior = Dirichlet::new_with_size(
             self.transition_prior_dirichlet_alpha as f32,
@@ -164,9 +170,9 @@ mod dirichlet_random_mdps {
     #[test]
     fn run_sample() {
         let env_dist = DirichletRandomMdps::default();
-        let mut rng = StdRng::seed_from_u64(168);
-        let env = env_dist.sample_pomdp(&mut rng);
-        testing::run_pomdp(env, 1000, 170);
+        let mut rng = Prng::seed_from_u64(168);
+        let env = env_dist.sample_environment(&mut rng);
+        testing::check_structured_env(&env, 1000, 170);
     }
 
     #[test]

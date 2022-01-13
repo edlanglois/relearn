@@ -1,10 +1,8 @@
 //! Logging statistics from simulation runs
 mod cli;
-pub mod forwarding;
 mod multithread;
 
 pub use cli::{CLILogger, CLILoggerConfig};
-pub use forwarding::ForwardingLogger;
 pub use multithread::BuildThreadLogger;
 
 use enum_map::Enum;

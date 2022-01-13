@@ -321,7 +321,7 @@ mod tests {
         let u = ExclusiveTensor::<f32, _>::ones([2, 4, 3]);
         let view = u.array_view();
         assert_eq!(view.dim(), (2, 4, 3));
-        assert_eq!(view, Array::ones((2, 4, 3)));
+        assert_eq!(view, Array::<f32, _>::ones((2, 4, 3)));
     }
 
     #[test]

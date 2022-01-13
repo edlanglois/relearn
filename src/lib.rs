@@ -124,9 +124,13 @@ pub mod spaces;
 pub mod torch;
 pub mod utils;
 
-pub use agents::{Actor, BuildAgent, SynchronousUpdate};
-pub use envs::{BuildEnv, EnvStructure, Environment, StructuredEnvironment};
-pub use simulation::{run_agent, Step};
+pub use agents::{Actor, Agent, BatchUpdate, BuildAgent};
+pub use envs::{BuildEnv, EnvStructure, Environment};
+pub use simulation::{train_parallel, train_serial, Step};
+
+/// Pseudo-random number generator type used by agents and environments in this crate.
+// Note: Using a cryptographically secure PRNG avoids potential correlations in Prng::from_rng
+pub type Prng = rand::rngs::StdRng;
 
 #[allow(unused_imports)]
 #[macro_use]

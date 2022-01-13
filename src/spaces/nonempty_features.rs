@@ -80,7 +80,7 @@ impl<S: NumFeatures> NumFeatures for NonEmptyFeatures<S> {
 }
 
 /// Feature encoder for [`NonEmptyFeatures`]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct NonEmptyFeaturesEncoder<T> {
     inner_encoder: T,
     inner_is_empty: bool,

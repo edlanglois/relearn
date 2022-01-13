@@ -4,11 +4,9 @@ mod rnn;
 mod stacked;
 #[cfg(test)]
 pub mod testing;
-mod with_state;
 
 pub use rnn::{Gru, GruConfig, Lstm, LstmConfig};
 pub use stacked::{Stacked, StackedConfig};
-pub use with_state::{WithState, WithStateConfig};
 
 use super::modules::{BuildModule, MlpConfig};
 use tch::{IndexOp, Tensor};
@@ -89,23 +87,6 @@ pub trait IterativeModule {
     /// * `output` - The output tensor. Has shape `[BATCH_SIZE, NUM_OUT_FEATURES]`
     /// * `state` - A new value for the hidden state.
     fn step(&self, input: &Tensor, state: &Self::State) -> (Tensor, Self::State);
-}
-
-/// A network module that operates iterative on a sequence of data and stores its own state.
-pub trait StatefulIterativeModule {
-    /// Apply one step of the module.
-    ///
-    /// # Args
-    /// * `input` - The input for one step. A tensor with shape `[NUM_INPUT_FEATURES]`
-    ///
-    /// # Returns
-    /// The output tensor. Has shape `[NUM_OUT_FEATURES]`
-    fn step(&mut self, input: &Tensor) -> Tensor;
-
-    /// Reset the inner state for the start of a new sequence.
-    ///
-    /// It is not necessary to call this at the start of the first sequence.
-    fn reset(&mut self);
 }
 
 /// Helper function to implement [`SequenceModule::seq_serial`] from a single-sequence closure.

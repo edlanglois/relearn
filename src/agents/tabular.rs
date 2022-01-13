@@ -1,15 +1,19 @@
 //! Tabular agents
 use super::{
-    ActorMode, AsyncUpdate, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, MakeActor,
-    PureActor, PureAsActor, SetActorMode, SynchronousUpdate,
+    buffers::{for_each_transient_step, SimpleBuffer},
+    finite::FiniteSpaceAgent,
+    Actor, ActorMode, Agent, BatchUpdate, BufferCapacityBound, BuildAgent, BuildAgentError,
 };
+use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
+use crate::spaces::FiniteSpace;
+use crate::Prng;
 use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 use std::fmt;
+use std::sync::Arc;
 
 /// Configuration of an Epsilon-Greedy Tabular Q Learning Agent.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -30,23 +34,30 @@ impl Default for TabularQLearningAgentConfig {
     }
 }
 
-impl BuildIndexAgent for TabularQLearningAgentConfig {
-    type Agent = BaseTabularQLearningAgent;
+impl<OS, AS> BuildAgent<OS, AS> for TabularQLearningAgentConfig
+where
+    OS: FiniteSpace + Clone + 'static,
+    AS: FiniteSpace + Clone + 'static,
+{
+    type Agent = TabularQLearningAgent<OS, AS>;
 
-    fn build_index_agent(
+    fn build_agent(
         &self,
-        num_observations: usize,
-        num_actions: usize,
-        _reward_range: (f64, f64),
-        discount_factor: f64,
-        _seed: u64,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        _: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
-        Ok(BaseTabularQLearningAgent::new(
-            num_observations,
-            num_actions,
-            discount_factor,
-            self.exploration_rate,
-        ))
+        let observation_space = env.observation_space();
+        let action_space = env.action_space();
+        Ok(FiniteSpaceAgent {
+            agent: BaseTabularQLearningAgent::new(
+                observation_space.size(),
+                action_space.size(),
+                env.discount_factor(),
+                self.exploration_rate,
+            ),
+            observation_space,
+            action_space,
+        })
     }
 }
 
@@ -60,10 +71,9 @@ pub type TabularQLearningAgent<OS, AS> = FiniteSpaceAgent<BaseTabularQLearningAg
 pub struct BaseTabularQLearningAgent {
     pub discount_factor: f64,
     pub exploration_rate: f64,
-    pub mode: ActorMode,
 
     state_action_counts: Array2<u32>,
-    state_action_values: Array2<f64>,
+    state_action_values: Arc<Array2<f64>>,
 }
 
 impl BaseTabularQLearningAgent {
@@ -74,13 +84,12 @@ impl BaseTabularQLearningAgent {
         exploration_rate: f64,
     ) -> Self {
         let state_action_counts = Array::from_elem((num_observations, num_actions), 0);
-        let state_action_values = Array::from_elem((num_observations, num_actions), 0.0);
+        let state_action_values = Arc::new(Array::from_elem((num_observations, num_actions), 0.0));
         Self {
             discount_factor,
             exploration_rate,
             state_action_counts,
             state_action_values,
-            mode: ActorMode::Training,
         }
     }
 }
@@ -95,31 +104,21 @@ impl fmt::Display for BaseTabularQLearningAgent {
     }
 }
 
-impl PureActor<usize, usize> for BaseTabularQLearningAgent {
-    type State = StdRng;
+impl Agent<usize, usize> for BaseTabularQLearningAgent {
+    type Actor = BaseTabularQLearningActor;
 
-    fn initial_state(&self, seed: u64) -> Self::State {
-        StdRng::seed_from_u64(seed)
-    }
-
-    fn reset_state(&self, _state: &mut Self::State) {}
-
-    fn act(&self, rng: &mut Self::State, observation: &usize) -> usize {
-        if self.mode == ActorMode::Training && rng.gen::<f64>() < self.exploration_rate {
-            // Random exploration with probability `exploration_rate` when in training mode
-            let (_, num_actions) = self.state_action_counts.dim();
-            rng.gen_range(0..num_actions)
-        } else {
-            self.state_action_values
-                .index_axis(Axis(0), *observation)
-                .argmax()
-                .unwrap()
+    fn actor(&self, mode: ActorMode) -> Self::Actor {
+        BaseTabularQLearningActor {
+            state_action_values: Arc::clone(&self.state_action_values),
+            exploration_rate: self.exploration_rate,
+            mode,
         }
     }
 }
 
-impl SynchronousUpdate<usize, usize> for BaseTabularQLearningAgent {
-    fn update(&mut self, step: TransientStep<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
+impl BaseTabularQLearningAgent {
+    /// Update based on an on-policy or off-policy step.
+    fn step_update(&mut self, step: TransientStep<usize, usize>) {
         let discounted_next_value = match step.next.as_ref().into_inner() {
             None => 0.0,
             Some(&next_observation) => {
@@ -135,66 +134,111 @@ impl SynchronousUpdate<usize, usize> for BaseTabularQLearningAgent {
 
         let value = step.reward + discounted_next_value;
         let weight = f64::from(self.state_action_counts[idx]).recip();
-        self.state_action_values[idx] *= 1.0 - weight;
-        self.state_action_values[idx] += weight * value;
+        let state_action_values = Arc::get_mut(&mut self.state_action_values)
+            .expect("cannot update agent while actors exist");
+        state_action_values[idx] *= 1.0 - weight;
+        state_action_values[idx] += weight * value;
     }
 }
 
-impl AsyncUpdate for BaseTabularQLearningAgent {}
+impl BatchUpdate<usize, usize> for BaseTabularQLearningAgent {
+    type HistoryBuffer = SimpleBuffer<usize, usize>;
 
-impl<'a> MakeActor<'a, usize, usize> for BaseTabularQLearningAgent {
-    type Actor = PureAsActor<&'a Self, usize, usize>;
-    fn make_actor(&'a self, seed: u64) -> Self::Actor {
-        PureAsActor::new(self, seed)
+    fn batch_size_hint(&self) -> BufferCapacityBound {
+        BufferCapacityBound {
+            min_steps: 1,
+            min_incomplete_episode_len: Some(0),
+            ..BufferCapacityBound::default()
+        }
+    }
+
+    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
+        SimpleBuffer::new(capacity)
+    }
+
+    fn batch_update<'a, I>(&mut self, buffers: I, _logger: &mut dyn TimeSeriesLogger)
+    where
+        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+        Self::HistoryBuffer: 'a,
+    {
+        for buffer in buffers {
+            for_each_transient_step(buffer.drain_steps(), |step| self.step_update(step));
+        }
     }
 }
 
-impl SetActorMode for BaseTabularQLearningAgent {
-    fn set_actor_mode(&mut self, mode: ActorMode) {
-        self.mode = mode;
+#[derive(Debug, Clone, PartialEq)]
+pub struct BaseTabularQLearningActor {
+    state_action_values: Arc<Array2<f64>>,
+    exploration_rate: f64,
+    mode: ActorMode,
+}
+
+impl Actor<usize, usize> for BaseTabularQLearningActor {
+    type EpisodeState = ();
+
+    fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {}
+
+    fn act(&self, _: &mut Self::EpisodeState, observation: &usize, rng: &mut Prng) -> usize {
+        if self.mode == ActorMode::Training && rng.gen::<f64>() < self.exploration_rate {
+            let (_, num_actions) = self.state_action_values.dim();
+            rng.gen_range(0..num_actions)
+        } else {
+            self.state_action_values
+                .index_axis(Axis(0), *observation)
+                .argmax()
+                .expect("action space must be non-empty")
+        }
     }
 }
 
 #[cfg(test)]
 mod tabular_q_learning {
-    use super::super::{testing, BuildAgent, PureAsActorConfig};
+    use super::super::{testing, BuildAgent};
     use super::*;
-    use crate::envs::{DeterministicBandit, EnvStructure, Environment, IntoEnv};
+    use crate::envs::{DeterministicBandit, Environment};
     use crate::simulation;
-    use crate::simulation::hooks::{IndexedActionCounter, StepLimit};
+    use rand::SeedableRng;
 
     #[test]
     fn learns_determinstic_bandit() {
-        let config = TabularQLearningAgentConfig::default();
-        testing::pure_train_deterministic_bandit(
-            |env| config.build_agent(env, 0).unwrap(),
-            1000,
-            0.9,
-        );
+        testing::train_deterministic_bandit(&TabularQLearningAgentConfig::default(), 1000, 0.9);
     }
 
     #[test]
     fn explore_exploit() {
-        let mut env = DeterministicBandit::from_values(vec![0.0, 1.0]).into_env(0);
+        let mut env_rng = Prng::seed_from_u64(210);
+        let mut agent_rng = Prng::seed_from_u64(211);
 
-        // The initial mode explores
-        let config = PureAsActorConfig::new(TabularQLearningAgentConfig::new(0.95));
-        let mut agent = config.build_agent(&env, 0).unwrap();
-        let mut explore_hooks = (
-            IndexedActionCounter::new(env.action_space()),
-            StepLimit::new(1000),
-        );
-        simulation::run_agent(&mut env, &mut agent, &mut explore_hooks, &mut ());
-        let action_1_count = explore_hooks.0.counts[1];
-        assert!(action_1_count > 300);
-        assert!(action_1_count < 700);
+        let env = DeterministicBandit::from_values(vec![0.0, 1.0]);
+        let config = TabularQLearningAgentConfig::new(0.95);
+        let mut agent = config.build_agent(&env, &mut agent_rng).unwrap();
 
-        // Release mode exploits
-        agent.set_actor_mode(ActorMode::Release);
-        let mut action_counter = IndexedActionCounter::new(env.action_space());
-        env.run(agent, ())
+        simulation::train_serial(&mut agent, &env, 100, &mut env_rng, &mut agent_rng, &mut ());
+
+        // The training mode explores
+        let mut train_action_1_count = 0;
+        for step in (&env)
+            .run(agent.actor(ActorMode::Training), 216, ())
             .take(1000)
-            .for_each(|s| action_counter.call_(&s));
-        assert!(action_counter.counts[1] > 900);
+        {
+            if step.action == 1 {
+                train_action_1_count += 1;
+            }
+        }
+        assert!(train_action_1_count > 300);
+        assert!(train_action_1_count < 700);
+
+        // Evaluation mode exploits
+        let mut eval_action_1_count = 0;
+        for step in (&env)
+            .run(agent.actor(ActorMode::Evaluation), 224, ())
+            .take(1000)
+        {
+            if step.action == 1 {
+                eval_action_1_count += 1;
+            }
+        }
+        assert!(eval_action_1_count > 900);
     }
 }

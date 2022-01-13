@@ -2,18 +2,13 @@ mod step_limit;
 
 pub use step_limit::{StepLimit, WithStepLimit};
 
-use super::{BuildEnvError, BuildPomdp, BuildPomdpDist, EnvStructure, Pomdp, PomdpDistribution};
+use super::{BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment};
 use crate::spaces::Space;
-use rand::rngs::StdRng;
-
-// TODO: WrappedEnv that provides Env, EnvDistribution, BuildEnv, BuildEnvDist
+use crate::Prng;
 
 /// A basic wrapped object.
 ///
 /// Consists of the inner object and the wrapper state.
-///
-/// Cannot currently be used to wrap [`Environment`](super::Environment) or
-/// [`EnvDistribution`](super::EnvDistribution).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Wrapped<T, W> {
     /// Wrapped object
@@ -50,58 +45,64 @@ impl<T: EnvStructure, W> EnvStructure for Wrapped<T, W> {
     }
 }
 
-impl<T, W> PomdpDistribution for Wrapped<T, W>
+impl<EC, W> BuildEnv for Wrapped<EC, W>
 where
-    T: PomdpDistribution,
+    EC: BuildEnv,
     W: Clone,
-    Wrapped<T::Pomdp, W>: Pomdp<
-        // State = <T::Pomdp as Pomdp>::State,
-        Observation = <T::Pomdp as Pomdp>::Observation,
-        Action = <T::Pomdp as Pomdp>::Action,
+    Wrapped<EC::Environment, W>: Environment<Observation = EC::Observation, Action = EC::Action>,
+{
+    type Observation = <Self::Environment as Environment>::Observation;
+    type Action = <Self::Environment as Environment>::Action;
+    type ObservationSpace = <Self::Environment as EnvStructure>::ObservationSpace;
+    type ActionSpace = <Self::Environment as EnvStructure>::ActionSpace;
+    type Environment = Wrapped<EC::Environment, W>;
+
+    fn build_env(&self, rng: &mut Prng) -> Result<Self::Environment, BuildEnvError> {
+        Ok(Wrapped {
+            inner: self.inner.build_env(rng)?,
+            wrapper: self.wrapper.clone(),
+        })
+    }
+}
+
+impl<ED, W> EnvDistribution for Wrapped<ED, W>
+where
+    ED: EnvDistribution,
+    W: Clone,
+    Wrapped<ED::Environment, W>: Environment<
+        Observation = <ED::Environment as Environment>::Observation,
+        Action = <ED::Environment as Environment>::Action,
     >,
 {
-    type Pomdp = Wrapped<T::Pomdp, W>;
+    type Environment = Wrapped<ED::Environment, W>;
 
-    fn sample_pomdp(&self, rng: &mut StdRng) -> Self::Pomdp {
-        Wrapped::new(self.inner.sample_pomdp(rng), self.wrapper.clone())
+    fn sample_environment(&self, rng: &mut Prng) -> Self::Environment {
+        Wrapped {
+            inner: self.inner.sample_environment(rng),
+            wrapper: self.wrapper.clone(),
+        }
     }
 }
 
-impl<B, W> BuildPomdp for Wrapped<B, W>
+impl<EDC, W> BuildEnvDist for Wrapped<EDC, W>
 where
-    B: BuildPomdp,
+    EDC: BuildEnvDist,
     W: Clone,
-    Wrapped<B::Pomdp, W>: Pomdp<Observation = B::Observation, Action = B::Action>,
-{
-    type State = <Self::Pomdp as Pomdp>::State;
-    type Observation = <Self::Pomdp as Pomdp>::Observation;
-    type Action = <Self::Pomdp as Pomdp>::Action;
-    type ObservationSpace = <Self::Pomdp as EnvStructure>::ObservationSpace;
-    type ActionSpace = <Self::Pomdp as EnvStructure>::ActionSpace;
-    type Pomdp = Wrapped<B::Pomdp, W>;
-
-    fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {
-        Ok(Wrapped::new(
-            self.inner.build_pomdp()?,
-            self.wrapper.clone(),
-        ))
-    }
-}
-
-impl<B, W> BuildPomdpDist for Wrapped<B, W>
-where
-    B: BuildPomdpDist,
-    W: Clone,
-    Wrapped<<B::PomdpDistribution as PomdpDistribution>::Pomdp, W>:
-        Pomdp<Observation = B::Observation, Action = B::Action>,
+    Wrapped<EDC::EnvDistribution, W>: EnvDistribution<
+        ObservationSpace = <EDC::EnvDistribution as EnvStructure>::ObservationSpace,
+        ActionSpace = <EDC::EnvDistribution as EnvStructure>::ActionSpace,
+    >,
 {
     type Observation = <Self::ObservationSpace as Space>::Element;
     type Action = <Self::ActionSpace as Space>::Element;
-    type ObservationSpace = <Self::PomdpDistribution as EnvStructure>::ObservationSpace;
-    type ActionSpace = <Self::PomdpDistribution as EnvStructure>::ActionSpace;
-    type PomdpDistribution = Wrapped<B::PomdpDistribution, W>;
+    type ObservationSpace = <Self::EnvDistribution as EnvStructure>::ObservationSpace;
+    type ActionSpace = <Self::EnvDistribution as EnvStructure>::ActionSpace;
+    type EnvDistribution = Wrapped<EDC::EnvDistribution, W>;
 
-    fn build_pomdp_dist(&self) -> Self::PomdpDistribution {
-        Wrapped::new(self.inner.build_pomdp_dist(), self.wrapper.clone())
+    fn build_env_dist(&self) -> Self::EnvDistribution {
+        Wrapped {
+            inner: self.inner.build_env_dist(),
+            wrapper: self.wrapper.clone(),
+        }
     }
 }

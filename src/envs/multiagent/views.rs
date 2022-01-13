@@ -1,7 +1,7 @@
-use crate::envs::{BuildEnvError, BuildPomdp, EnvStructure, Environment, Pomdp, Successor};
+use crate::envs::{BuildEnv, BuildEnvError, EnvStructure, Environment, Successor};
 use crate::logging::Logger;
 use crate::spaces::{Space, TupleSpace2};
-use rand::rngs::StdRng;
+use crate::Prng;
 
 /// Wraps a two-player game as a one-player game for the first player.
 ///
@@ -17,9 +17,9 @@ impl<E> FirstPlayerView<E> {
     }
 }
 
-impl<E, OS1, OS2, AS1, AS2> BuildPomdp for FirstPlayerView<E>
+impl<E, OS1, OS2, AS1, AS2> BuildEnv for FirstPlayerView<E>
 where
-    E: BuildPomdp<
+    E: BuildEnv<
         // Observation and Action values are implied {Observation,Action}Space
         // values but are not inferred automatically.
         Observation = (OS1::Element, OS2::Element),
@@ -33,16 +33,15 @@ where
     AS2: Space,
     AS2::Element: Default,
 {
-    type State = E::State;
     type Observation = OS1::Element;
     type Action = AS1::Element;
     type ObservationSpace = OS1;
     type ActionSpace = AS1;
-    type Pomdp = FirstPlayerView<E::Pomdp>;
+    type Environment = FirstPlayerView<E::Environment>;
 
-    fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {
+    fn build_env(&self, rng: &mut Prng) -> Result<Self::Environment, BuildEnvError> {
         Ok(FirstPlayerView {
-            inner: self.inner.build_pomdp()?,
+            inner: self.inner.build_env(rng)?,
         })
     }
 }
@@ -70,9 +69,9 @@ where
     }
 }
 
-impl<E, O1, O2, A1, A2> Pomdp for FirstPlayerView<E>
+impl<E, O1, O2, A1, A2> Environment for FirstPlayerView<E>
 where
-    E: Pomdp<Observation = (O1, O2), Action = (A1, A2)>,
+    E: Environment<Observation = (O1, O2), Action = (A1, A2)>,
     A1: Clone,
     A2: Default,
 {
@@ -80,11 +79,11 @@ where
     type Observation = O1;
     type Action = A1;
 
-    fn initial_state(&self, rng: &mut StdRng) -> Self::State {
+    fn initial_state(&self, rng: &mut Prng) -> Self::State {
         self.inner.initial_state(rng)
     }
 
-    fn observe(&self, state: &Self::State, rng: &mut StdRng) -> Self::Observation {
+    fn observe(&self, state: &Self::State, rng: &mut Prng) -> Self::Observation {
         self.inner.observe(state, rng).0
     }
 
@@ -92,36 +91,11 @@ where
         &self,
         state: Self::State,
         action: &Self::Action,
-        rng: &mut StdRng,
+        rng: &mut Prng,
         logger: &mut dyn Logger,
     ) -> (Successor<Self::State>, f64) {
         let joint_action = (action.clone(), Default::default());
         self.inner.step(state, &joint_action, rng, logger)
-    }
-}
-
-impl<E, O1, O2, A1, A2> Environment for FirstPlayerView<E>
-where
-    E: Environment<Observation = (O1, O2), Action = (A1, A2)>,
-    A1: Clone,
-    A2: Default,
-{
-    type Observation = O1;
-    type Action = A1;
-
-    fn step(
-        &mut self,
-        action: &Self::Action,
-        logger: &mut dyn Logger,
-    ) -> (Successor<Self::Observation>, f64) {
-        let joint_action = (action.clone(), Default::default());
-        let (joint_successor, reward) = self.inner.step(&joint_action, logger);
-        let successor = joint_successor.map(|(o1, _)| o1);
-        (successor, reward)
-    }
-
-    fn reset(&mut self) -> Self::Observation {
-        self.inner.reset().0
     }
 }
 
@@ -139,9 +113,9 @@ impl<E> SecondPlayerView<E> {
     }
 }
 
-impl<E, OS1, OS2, AS1, AS2> BuildPomdp for SecondPlayerView<E>
+impl<E, OS1, OS2, AS1, AS2> BuildEnv for SecondPlayerView<E>
 where
-    E: BuildPomdp<
+    E: BuildEnv<
         // Observation and Action values are implied {Observation,Action}Space
         // values but are not inferred automatically.
         Observation = (OS1::Element, OS2::Element),
@@ -155,16 +129,15 @@ where
     AS1::Element: Default,
     AS2: Space,
 {
-    type State = E::State;
     type Observation = OS2::Element;
     type Action = AS2::Element;
     type ObservationSpace = OS2;
     type ActionSpace = AS2;
-    type Pomdp = SecondPlayerView<E::Pomdp>;
+    type Environment = SecondPlayerView<E::Environment>;
 
-    fn build_pomdp(&self) -> Result<Self::Pomdp, BuildEnvError> {
+    fn build_env(&self, rng: &mut Prng) -> Result<Self::Environment, BuildEnvError> {
         Ok(SecondPlayerView {
-            inner: self.inner.build_pomdp()?,
+            inner: self.inner.build_env(rng)?,
         })
     }
 }
@@ -192,9 +165,9 @@ where
     }
 }
 
-impl<E, O1, O2, A1, A2> Pomdp for SecondPlayerView<E>
+impl<E, O1, O2, A1, A2> Environment for SecondPlayerView<E>
 where
-    E: Pomdp<Observation = (O1, O2), Action = (A1, A2)>,
+    E: Environment<Observation = (O1, O2), Action = (A1, A2)>,
     A1: Default,
     A2: Clone,
 {
@@ -202,11 +175,11 @@ where
     type Observation = O2;
     type Action = A2;
 
-    fn initial_state(&self, rng: &mut StdRng) -> Self::State {
+    fn initial_state(&self, rng: &mut Prng) -> Self::State {
         self.inner.initial_state(rng)
     }
 
-    fn observe(&self, state: &Self::State, rng: &mut StdRng) -> Self::Observation {
+    fn observe(&self, state: &Self::State, rng: &mut Prng) -> Self::Observation {
         self.inner.observe(state, rng).1
     }
 
@@ -214,35 +187,10 @@ where
         &self,
         state: Self::State,
         action: &Self::Action,
-        rng: &mut StdRng,
+        rng: &mut Prng,
         logger: &mut dyn Logger,
     ) -> (Successor<Self::State>, f64) {
         let joint_action = (Default::default(), action.clone());
         self.inner.step(state, &joint_action, rng, logger)
-    }
-}
-
-impl<E, O1, O2, A1, A2> Environment for SecondPlayerView<E>
-where
-    E: Environment<Observation = (O1, O2), Action = (A1, A2)>,
-    A1: Default,
-    A2: Clone,
-{
-    type Observation = O2;
-    type Action = A2;
-
-    fn step(
-        &mut self,
-        action: &Self::Action,
-        logger: &mut dyn Logger,
-    ) -> (Successor<Self::Observation>, f64) {
-        let joint_action = (Default::default(), action.clone());
-        let (joint_successor, reward) = self.inner.step(&joint_action, logger);
-        let successor = joint_successor.map(|(_, o2)| o2);
-        (successor, reward)
-    }
-
-    fn reset(&mut self) -> Self::Observation {
-        self.inner.reset().1
     }
 }

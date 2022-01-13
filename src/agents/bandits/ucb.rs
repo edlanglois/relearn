@@ -1,14 +1,18 @@
 //! Upper confidence bound bandit agent.
 use super::super::{
-    ActorMode, AsyncUpdate, BuildAgentError, BuildIndexAgent, FiniteSpaceAgent, MakeActor,
-    PureActor, PureAsActor, SetActorMode, SynchronousUpdate,
+    buffers::SimpleBuffer, finite::FiniteSpaceAgent, Actor, ActorMode, Agent, BatchUpdate,
+    BufferCapacityBound, BuildAgent, BuildAgentError,
 };
+use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
-use crate::simulation::TransientStep;
+use crate::simulation::PartialStep;
+use crate::spaces::FiniteSpace;
 use crate::utils::iter::ArgMaxBy;
+use crate::Prng;
 use ndarray::{Array, Array1, Array2, Axis};
 use std::f64;
 use std::fmt;
+use std::sync::Arc;
 
 /// Configuration for a [`UCB1Agent`]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -32,30 +36,37 @@ impl Default for UCB1AgentConfig {
     }
 }
 
-impl BuildIndexAgent for UCB1AgentConfig {
-    type Agent = BaseUCB1Agent;
+impl<OS, AS> BuildAgent<OS, AS> for UCB1AgentConfig
+where
+    OS: FiniteSpace + Clone + 'static,
+    AS: FiniteSpace + Clone + 'static,
+{
+    type Agent = UCB1Agent<OS, AS>;
 
-    fn build_index_agent(
+    fn build_agent(
         &self,
-        num_observations: usize,
-        num_actions: usize,
-        reward_range: (f64, f64),
-        _discount_factor: f64,
-        _seed: u64,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        _: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
-        BaseUCB1Agent::new(
-            num_observations,
-            num_actions,
-            reward_range,
-            self.exploration_rate,
-        )
+        let observation_space = env.observation_space();
+        let action_space = env.action_space();
+        Ok(FiniteSpaceAgent {
+            agent: Arc::new(BaseUCB1Agent::new(
+                observation_space.size(),
+                action_space.size(),
+                env.reward_range(),
+                self.exploration_rate,
+            )?),
+            observation_space,
+            action_space,
+        })
     }
 }
 
 /// A UCB1 Agent
 ///
 /// Applies UCB1 (Auer 2002) independently to each state.
-pub type UCB1Agent<OS, AS> = FiniteSpaceAgent<BaseUCB1Agent, OS, AS>;
+pub type UCB1Agent<OS, AS> = FiniteSpaceAgent<Arc<BaseUCB1Agent>, OS, AS>;
 
 /// Base UCB1 Agent
 ///
@@ -68,9 +79,6 @@ pub struct BaseUCB1Agent {
     /// A value of 0.2 is recommended by Audibert and Munos in their ICML
     /// tutorial Introduction to Bandits: Algorithms and Theory (2011).
     pub exploration_rate: f64,
-
-    /// Mode of actor behaviour
-    pub mode: ActorMode,
 
     // Parameters to scale the reward to [0, 1]
     reward_scale_factor: f64,
@@ -107,7 +115,6 @@ impl BaseUCB1Agent {
 
         Ok(Self {
             exploration_rate,
-            mode: ActorMode::Training,
             reward_scale_factor,
             reward_shift,
             state_action_mean_reward,
@@ -124,52 +131,8 @@ impl fmt::Display for BaseUCB1Agent {
 }
 
 impl BaseUCB1Agent {
-    /// Take a training-mode action.
-    fn act_training(&self, obs_idx: usize) -> usize {
-        let log_squared_visit_count = 2.0 * (self.state_visit_count[obs_idx] as f64).ln();
-        let ucb = self
-            .state_action_count
-            .index_axis(Axis(0), obs_idx)
-            .mapv(|action_count| {
-                (log_squared_visit_count / (action_count as f64)).sqrt() * self.exploration_rate
-            })
-            + self.state_action_mean_reward.index_axis(Axis(0), obs_idx);
-        ucb.into_iter()
-            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
-            .expect("Empty action space")
-    }
-
-    /// Take a release-mode (greedy) action.
-    fn act_release(&self, obs_idx: usize) -> usize {
-        // Take the action with the largest action count
-        self.state_action_count
-            .index_axis(Axis(0), obs_idx)
-            .into_iter()
-            .argmax_by(|a, b| a.partial_cmp(b).unwrap())
-            .expect("Empty action space")
-    }
-}
-
-impl PureActor<usize, usize> for BaseUCB1Agent {
-    type State = ();
-
-    #[inline]
-    fn initial_state(&self, _seed: u64) -> Self::State {}
-
-    #[inline]
-    fn reset_state(&self, _state: &mut Self::State) {}
-
-    #[inline]
-    fn act(&self, _: &mut Self::State, observation: &usize) -> usize {
-        match self.mode {
-            ActorMode::Training => self.act_training(*observation),
-            ActorMode::Release => self.act_release(*observation),
-        }
-    }
-}
-
-impl SynchronousUpdate<usize, usize> for BaseUCB1Agent {
-    fn update(&mut self, step: TransientStep<usize, usize>, _logger: &mut dyn TimeSeriesLogger) {
+    /// Update based on an on-policy or off-policy step.
+    fn step_update(&mut self, step: PartialStep<usize, usize>) {
         let scaled_reward = (step.reward + self.reward_shift) * self.reward_scale_factor;
 
         self.state_visit_count[step.observation] += 1;
@@ -186,33 +149,98 @@ impl SynchronousUpdate<usize, usize> for BaseUCB1Agent {
     }
 }
 
-impl AsyncUpdate for BaseUCB1Agent {}
+impl Agent<usize, usize> for Arc<BaseUCB1Agent> {
+    type Actor = BaseUCB1Actor;
 
-impl<'a> MakeActor<'a, usize, usize> for BaseUCB1Agent {
-    type Actor = PureAsActor<&'a Self, usize, usize>;
-    fn make_actor(&'a self, seed: u64) -> Self::Actor {
-        PureAsActor::new(self, seed)
+    fn actor(&self, mode: ActorMode) -> Self::Actor {
+        BaseUCB1Actor {
+            agent: self.clone(), // Arc clone
+            mode,
+        }
     }
 }
 
-impl SetActorMode for BaseUCB1Agent {
-    fn set_actor_mode(&mut self, mode: ActorMode) {
-        self.mode = mode
+impl BatchUpdate<usize, usize> for Arc<BaseUCB1Agent> {
+    type HistoryBuffer = SimpleBuffer<usize, usize>;
+
+    fn batch_size_hint(&self) -> BufferCapacityBound {
+        BufferCapacityBound {
+            min_steps: 1,
+            min_incomplete_episode_len: Some(0),
+            ..BufferCapacityBound::default()
+        }
+    }
+
+    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
+        SimpleBuffer::new(capacity)
+    }
+
+    fn batch_update<'a, I>(&mut self, buffers: I, _logger: &mut dyn TimeSeriesLogger)
+    where
+        I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
+        Self::HistoryBuffer: 'a,
+    {
+        let agent = Self::get_mut(self).expect("cannot update agent while actors exist");
+        for buffer in buffers {
+            for step in buffer.drain_steps() {
+                agent.step_update(step)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BaseUCB1Actor {
+    agent: Arc<BaseUCB1Agent>,
+    mode: ActorMode,
+}
+
+impl Actor<usize, usize> for BaseUCB1Actor {
+    type EpisodeState = ();
+    fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {}
+
+    fn act(&self, _: &mut Self::EpisodeState, obs: &usize, _: &mut Prng) -> usize {
+        match self.mode {
+            ActorMode::Training => {
+                // Maximize upper confidence bound
+                let log_squared_visit_count =
+                    2.0 * (self.agent.state_visit_count[*obs] as f64).ln();
+                let ucb = self
+                    .agent
+                    .state_action_count
+                    .index_axis(Axis(0), *obs)
+                    .mapv(|action_count| {
+                        (log_squared_visit_count / (action_count as f64)).sqrt()
+                            * self.agent.exploration_rate
+                    })
+                    + self
+                        .agent
+                        .state_action_mean_reward
+                        .index_axis(Axis(0), *obs);
+                ucb.into_iter()
+                    .argmax_by(|a, b| a.partial_cmp(b).unwrap())
+                    .expect("empty action space")
+            }
+            ActorMode::Evaluation => {
+                // Maximize action count
+                self.agent
+                    .state_action_count
+                    .index_axis(Axis(0), *obs)
+                    .into_iter()
+                    .argmax_by(|a, b| a.partial_cmp(b).unwrap())
+                    .expect("empty action space")
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod ucb1_agent {
-    use super::super::super::{testing, BuildAgent};
+    use super::super::super::testing;
     use super::*;
 
     #[test]
     fn learns_determinstic_bandit() {
-        let config = UCB1AgentConfig::default();
-        testing::pure_train_deterministic_bandit(
-            |env| config.build_agent(env, 0).unwrap(),
-            1000,
-            0.9,
-        );
+        testing::train_deterministic_bandit(&UCB1AgentConfig::default(), 1000, 0.9);
     }
 }
