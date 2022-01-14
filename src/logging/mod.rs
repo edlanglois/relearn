@@ -87,7 +87,7 @@ impl From<String> for Loggable {
 }
 
 /// Log named values
-pub trait Logger {
+pub trait Logger: Send {
     /// Log a value
     ///
     /// # Args
@@ -142,7 +142,7 @@ impl<T: Logger + ?Sized> LoggerHelper for T {}
 /// # Values
 /// Logged values must be of type [`Loggable`].
 /// The same variant must be used every time a value is logged for the same name.
-pub trait TimeSeriesLogger {
+pub trait TimeSeriesLogger: Send {
     /// Log a value associated with the active instance of an event.
     ///
     /// # Args
@@ -264,6 +264,7 @@ impl<'a> Logger for TimeSeriesEventLogger<'a> {
 }
 
 /// Wraps a logger by adding a scope (prefix) to all ids.
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ScopedLogger<'a, L: 'a + ?Sized> {
     logger: &'a mut L,
     prefix: Id,

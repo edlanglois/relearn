@@ -50,17 +50,17 @@ where
     }
 }
 
-impl<E, A, R, L> SimulatorSteps<E, A, R, L>
+impl<E, T, R, L> SimulatorSteps<E, T, R, L>
 where
     E: Environment,
-    A: Actor<E::Observation, E::Action>,
+    T: Actor<E::Observation, E::Action>,
     R: BorrowMut<Prng>,
     L: TimeSeriesLogger,
 {
     /// Execute one environment step then evaluate a closure on the resulting state.
-    pub fn step_with<F, T>(&mut self, f: F) -> T
+    pub fn step_with<F, U>(&mut self, f: F) -> U
     where
-        F: FnOnce(&mut E, &mut A, TransientStep<E::Observation, E::Action>, &mut L) -> T,
+        F: FnOnce(&mut E, &mut T, TransientStep<E::Observation, E::Action>, &mut L) -> U,
     {
         let (env_state, observation, mut actor_state) = match self.state.take() {
             Some(state) => (state.env, state.observation, state.actor),
@@ -109,19 +109,22 @@ where
 
         f(&mut self.env, &mut self.actor, step, &mut self.logger)
     }
+
+    pub fn with_step_logging(self) -> LoggedSimulatorSteps<E, T, R, L> {
+        LoggedSimulatorSteps::new(self)
+    }
 }
 
-impl<E, A, R, L> Iterator for SimulatorSteps<E, A, R, L>
+impl<E, T, R, L> Iterator for SimulatorSteps<E, T, R, L>
 where
     E: Environment,
-    A: Actor<E::Observation, E::Action>,
+    T: Actor<E::Observation, E::Action>,
     R: BorrowMut<Prng>,
     L: TimeSeriesLogger,
 {
     /// Cannot return a `TransientStep` without Generic Associated Types
     type Item = PartialStep<E::Observation, E::Action>;
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.step_with(|_, _, s, _| s.into_partial()))
     }
@@ -142,86 +145,66 @@ where
 {
 }
 
-/* XXX
-/// An iterator of mapped environment-actor steps.
-///
-/// Created by `SimulatorSteps::map_steps`.
-/// This allows mapping transient steps, while `<SimulatorSteps as Iterator>::map` maps partial
-/// steps.
-pub struct SimulatorMappedSteps<E, A, R, L, F> {
-    simulator: SimulatorSteps<E, A, R, L>,
-    f: F,
-}
-
-impl<E, A, R, L, F, U> Iterator for SimulatorMappedSteps<E, A, R, L, F>
+/// Simulator steps with logging
+pub struct LoggedSimulatorSteps<E, T, R, L>
 where
     E: Environment,
-    A: Actor<E::Observation, E::Action>,
-    R: BorrowMut<Prng>,
-    L: TimeSeriesLogger,
-    F: FnMut(&TransientStep<E::Observation, E::Action>) -> U,
+    T: Actor<E::Observation, E::Action>,
 {
-    type Item = U;
-}
-*/
-
-/* XXX
-pub struct TrainingSimulatorSteps<E, T, R, L>
-where
-    E: Environment,
-    T: BatchUpdate<E::Observation, E::Action>,
-{
-    steps: SimulatorSteps<E, T, R, L>,
-    buffer: T::HistoryBuffer,
-}
-*/
-
-/*
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct TrainingSimulatorSteps<E, T, R, L>
-where
-    E: Environment,
-    T: Agent<E::Observation, E::Action>,
-{
-    steps: SimulatorSteps<E, SerialActorAgent<T, E::Observation, E::Action>, R, L>,
+    simulator: SimulatorSteps<E, T, R, L>,
+    episode_reward: f64,
+    episode_length: u64,
 }
 
-impl<E, T, R, L> TrainingSimulatorSteps<E, T, R, L>
+impl<E, T, R, L> LoggedSimulatorSteps<E, T, R, L>
 where
     E: Environment,
-    T: Agent<E::Observation, E::Action>,
+    T: Actor<E::Observation, E::Action>,
 {
-    pub fn new(env: E, agent: T, rng_env: R, rng_actor: R, logger: L) -> Self {
+    pub fn new(simulator: SimulatorSteps<E, T, R, L>) -> Self {
         Self {
-            steps: SimulatorSteps::new(
-                env,
-                SerialActorAgent::new(agent),
-                rng_env,
-                rng_actor,
-                logger,
-            ),
+            simulator,
+            episode_reward: 0.0,
+            episode_length: 0,
         }
     }
-
-    /// Execute one environment step then evaluate a closure on the resulting state.
-    pub fn step_with<F, T>(&mut self, f: F) -> T
-    where
-        F: FnOnce(&mut E, &mut A, TransientStep<E::Observation, E::Action>, &mut L) -> T,
-
 }
 
-impl<E, T, R, L> Iterator for TrainingSimulatorSteps<E, T, R, L>
+impl<E, T, R, L> Iterator for LoggedSimulatorSteps<E, T, R, L>
 where
     E: Environment,
-    T: Agent<E::Observation, E::Action>,
+    T: Actor<E::Observation, E::Action>,
+    R: BorrowMut<Prng>,
+    L: TimeSeriesLogger,
 {
+    /// Cannot return a `TransientStep` without Generic Associated Types
     type Item = PartialStep<E::Observation, E::Action>;
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.step_with(|_, agent, step, logger| {
-            let step = step.into_partial();
-            agent.update(step.into_partial(), logger)))
+        Some(self.simulator.step_with(|_, _, step, logger| {
+            logger
+                .log(Event::EnvStep, "reward", step.reward.into())
+                .unwrap();
+            logger.end_event(Event::EnvStep).unwrap();
+            self.episode_reward += step.reward;
+            if step.next.episode_done() {
+                logger
+                    .log(Event::EnvEpisode, "ep_reward", self.episode_reward.into())
+                    .unwrap();
+                logger
+                    .log(
+                        Event::EnvEpisode,
+                        "ep_length",
+                        (self.episode_length as f64).into(),
+                    )
+                    .unwrap();
+                logger.end_event(Event::EnvEpisode).unwrap();
+                self.episode_reward = 0.0;
+                self.episode_length = 0;
+            }
+
+            step.into_partial()
+        }))
     }
 
     #[inline]
@@ -230,7 +213,6 @@ where
         (usize::MAX, None)
     }
 }
-*/
 
 /// Basic summary statistics of a simulation
 #[derive(Debug, Default, Copy, Clone, PartialEq)]

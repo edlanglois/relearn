@@ -79,13 +79,16 @@ pub fn train_serial<T, E>(
 {
     let mut buffer = agent.buffer(agent.batch_size_hint());
     for _ in 0..num_periods {
-        let ready = buffer.extend_until_ready(SimulatorSteps::new(
-            environment,
-            agent.actor(ActorMode::Training),
-            &mut *rng_env,
-            &mut *rng_agent,
-            &mut *logger,
-        ));
+        let ready = buffer.extend_until_ready(
+            SimulatorSteps::new(
+                environment,
+                agent.actor(ActorMode::Training),
+                &mut *rng_env,
+                &mut *rng_agent,
+                &mut *logger,
+            )
+            .with_step_logging(),
+        );
         assert!(ready);
         agent.batch_update(iter::once(&mut buffer), logger);
     }
@@ -115,6 +118,7 @@ pub fn train_serial_callback<T, E, F>(
                 &mut *rng_agent,
                 &mut *logger,
             )
+            .with_step_logging()
             .map(|step| {
                 f(&step);
                 step
@@ -169,16 +173,22 @@ pub fn train_parallel<T, E>(
     for _ in 0..config.num_periods {
         crossbeam::scope(|scope| {
             let mut threads = Vec::new();
+            // Send the logger to the first thread
+            let mut send_logger = Some(&mut *logger);
             for (buffer, rngs) in buffers.iter_mut().zip(&mut thread_rngs) {
                 let actor = agent.actor(ActorMode::Training);
+                let thread_logger = send_logger.take();
                 threads.push(scope.spawn(move |_scope| {
-                    let ready = buffer.extend_until_ready(SimulatorSteps::new(
-                        environment,
-                        actor,
-                        &mut rngs.0,
-                        &mut rngs.1,
-                        (),
-                    ));
+                    let ready = buffer.extend_until_ready(
+                        SimulatorSteps::new(
+                            environment,
+                            actor,
+                            &mut rngs.0,
+                            &mut rngs.1,
+                            thread_logger.unwrap_or(&mut ()),
+                        )
+                        .with_step_logging(),
+                    );
                     assert!(ready);
                 }));
             }

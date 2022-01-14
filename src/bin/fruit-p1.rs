@@ -31,9 +31,8 @@ fn main() {
     let training_config = TrainParallelConfig {
         num_periods: 200,
         num_threads: num_cpus::get(),
-        min_workers_steps: 10_000,
+        min_workers_steps: 10,
     };
-
     let mut rng = Prng::seed_from_u64(0);
     let env = env_config.build_env(&mut rng).unwrap();
     let mut agent = agent_config.build_agent(&env, &mut rng).unwrap();
