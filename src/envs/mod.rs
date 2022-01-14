@@ -20,7 +20,7 @@ pub use chain::Chain;
 pub use mdps::DirichletRandomMdps;
 pub use memory::MemoryGame;
 pub use meta::{InnerEnvStructure, MetaEnv, MetaObservation, MetaObservationSpace, MetaState};
-pub use multiagent::fruit::FruitGame;
+pub use multiagent::fruit::{self, FruitGame};
 pub use multiagent::views::{FirstPlayerView, SecondPlayerView};
 pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 

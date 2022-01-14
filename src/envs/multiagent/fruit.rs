@@ -12,6 +12,7 @@ use rand::distributions::Standard;
 use rand::prelude::*;
 use relearn_derive::Indexed;
 use slice_of_array::SliceFlatExt;
+use std::fmt::{self, Display};
 
 /// Cell contents
 pub type Cell = Option<Fruit>;
@@ -34,6 +35,21 @@ impl From<Cell> for CellView {
             Some(Fruit::Apple) => Self::Apple,
             Some(Fruit::Cherry) => Self::Cherry,
         }
+    }
+}
+
+impl Display for CellView {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Empty => ' ',
+                Self::Apple => 'A',
+                Self::Cherry => 'C',
+                Self::OtherAgent => 'O',
+            }
+        )
     }
 }
 
@@ -179,6 +195,26 @@ pub struct PrincipalObs<const W: usize, const H: usize> {
     pub position: [usize; 2],
     /// Whether the goal is apple (true) or cherry (false).
     pub goal_is_apple: bool,
+}
+
+impl<const W: usize, const H: usize> Display for PrincipalObs<W, H> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let [i, j] = &self.position;
+        writeln!(
+            f,
+            "[{}] ({} {})",
+            if self.goal_is_apple { 'A' } else { 'C' },
+            i,
+            j
+        )?;
+        for row in self.visible_grid.iter() {
+            for cell in row {
+                write!(f, "{}", cell)?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
 }
 
 /// Observation space for the principal

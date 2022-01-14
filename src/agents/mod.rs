@@ -18,6 +18,7 @@ pub use bandits::{
 };
 pub use buffers::{BufferCapacityBound, WriteHistoryBuffer};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
+pub use pair::AgentPair;
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use serial::SerialActorAgent;
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
