@@ -12,10 +12,17 @@ use tch::{nn::Path, Tensor};
 /// The score may depend on past states and actions in the trajectory and on future rewards.
 /// Higher scores represent better outcomes than lower scores.
 ///
+/// # Terminology
 /// This use of "Critic" is prehaps more expansive than the typical use:
 /// it does not just refer to a runtime evaluator of expected future reward given the observed
 /// trajectory so far, but instead includes a retrospective evaluation of states and actions given
 /// the empirical future trajectory.
+///
+/// # Value Function
+/// Some critics use value functions to improve their value estimates.
+/// A value function is a function approximator that maps a sequence of episode history features to
+/// estimates of the expected future return of each observation or observation-action pair.
+/// May only use the past history within an episode, not from the future or across episodes.
 pub trait Critic {
     /// Whether this critic has trainable internal parameters
     fn trainable(&self) -> bool;
@@ -65,8 +72,8 @@ pub trait BuildCritic {
 ///
 /// Also known as the Monte Carlo reward-to-go.
 ///
-/// # Note
-/// Currently does not properly handle non-terminal end-of-episode.
+/// # Warning
+/// Currently does not properly handle interrupted episodes.
 /// This assumes that all episodes end with a reward of 0.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Return;

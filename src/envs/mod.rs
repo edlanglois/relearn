@@ -60,8 +60,11 @@ impl<T> StructuredEnvironment for T where
 /// A reinforcement learning environment.
 ///
 /// Formally, this is a Partially Observable Markov Decision Process (POMDP) with episodes.
-/// The concept of an episode is an abstraction on the POMDP formalism.
-/// An episode ending means that all possible future trajectories have 0 reward on each step.
+/// An episode is a sequence of environment steps starting with [`Environment::initial_state`]
+/// and ending when [`Environment::step`] returns either
+/// * [`Successor::Terminate`] meaning all possible future rewards are zero; or
+/// * [`Successor::Interrupt`] meaning the POMDP would continue with possible nonzero reward but
+///     but has been prematurely interrupted.
 ///
 /// This trait encodes the dynamics of a reinforcement learning environment.
 /// The actual state is represented by the `State` associated type.
@@ -173,7 +176,9 @@ pub trait EnvStructure {
 
     /// The space of all possible actions.
     ///
-    /// Every element in this space must be a valid action.
+    /// Every element in this space must be a valid action in all environment states (although
+    /// immediately ending the episode with negative reward is a possible outcome).
+    /// The environment may misbehave or panic for actions outside of this action space.
     fn action_space(&self) -> Self::ActionSpace;
 
     /// A lower and upper bound on possible reward values.
@@ -213,6 +218,11 @@ impl_wrapped_env_structure!(&'_ T);
 impl_wrapped_env_structure!(Box<T>);
 
 /// The successor state or outcome of an episode step.
+///
+/// The purpose of the second generic parameter `U` is to control the ownership of the following
+/// state or observation when the episode continues. By default the successor is owned but it can
+/// also be borrowed `U = &T` or omitted `U = ()`. This is useful because users might want to
+/// extract the next observation without copying.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Successor<T, U = T> {
     /// The episode continues with the given state.

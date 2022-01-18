@@ -11,6 +11,15 @@ use rand::SeedableRng;
 use std::iter;
 
 /// Description of an environment step.
+///
+/// There are a few different forms that this structure can take in terms of describing the
+/// next observation when `next` is [`Successor::Continue`].
+/// These are determined by the value of the third generic parameter `U`:
+/// * `Step<O, A>` - `U = O` - The continuing successor observation is owned.
+/// * [`TransientStep<O, A>`] - `U = &O` - The continuing successor observation is borrowed.
+/// * [`PartialStep<O, A>`] - `U = ()` - The continuing successor observation is omitted.
+///
+/// If `next` is [`Successor::Interrupt`] then the observation is owned in all cases.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Step<O, A, U = O> {
     /// The initial observation.

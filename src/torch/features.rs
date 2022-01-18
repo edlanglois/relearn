@@ -31,6 +31,15 @@ pub trait PackedHistoryFeaturesView {
     fn rewards(&self) -> &Tensor;
 
     /// Packed returns (discounted reward-to-go). A 1D f32 tensor.
+    ///
+    /// The return is the discounted sum of future rewards
+    /// (`return = sum_i { reward_i * discount_factor ** i }`)
+    /// starting from each step in the episode to the end of the episode.
+    ///
+    /// # Warning
+    /// In the case of interrupted episodes (`Successor::Terminate`), this incorrectly assumes that
+    /// all future rewards are zero.
+    // TODO: Allow specifying an estimator for terminated episodes.
     fn returns(&self) -> &Tensor;
 
     /// Discount factor for calculating returns.

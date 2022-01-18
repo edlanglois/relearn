@@ -4,6 +4,10 @@ use tch::nn::Path;
 use tch::Tensor;
 
 /// Policy module
+///
+/// A policy maps a sequence of episode history features to parameters of an action distribution
+/// for the current state. A policy may use the past within an episode but not across episodes and
+/// not from the future.
 pub trait Policy: SequenceModule + CudnnSupport {}
 impl<T: SequenceModule + CudnnSupport + ?Sized> Policy for T {}
 
