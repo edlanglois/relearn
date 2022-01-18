@@ -6,7 +6,7 @@ use crate::envs::EnvStructure;
 use crate::logging::TimeSeriesLogger;
 use crate::simulation::TransientStep;
 use crate::spaces::Space;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 
 /// Configuration for [`PureAsActor`].
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
@@ -34,7 +34,7 @@ where
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::Agent, BuildAgentError> {
-        let mut rng = StdRng::seed_from_u64(seed);
+        let mut rng = Prng::seed_from_u64(seed);
         Ok(PureAsActor::new(
             self.actor_config.build_agent(env, rng.gen())?,
             rng.gen(),
@@ -56,7 +56,7 @@ where
         env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
         seed: u64,
     ) -> Result<Self::BatchAgent, BuildAgentError> {
-        let mut rng = StdRng::seed_from_u64(seed);
+        let mut rng = Prng::seed_from_u64(seed);
         Ok(PureAsActor::new(
             self.actor_config.build_batch_agent(env, rng.gen())?,
             rng.gen(),
@@ -72,7 +72,7 @@ where
 {
     pub actor: T,
     pub state: T::State,
-    rng: StdRng,
+    rng: Prng,
 }
 
 impl<T, O, A> PureAsActor<T, O, A>
@@ -80,7 +80,7 @@ where
     T: PureActor<O, A>,
 {
     pub fn new(actor: T, seed: u64) -> Self {
-        let mut rng = StdRng::seed_from_u64(seed);
+        let mut rng = Prng::seed_from_u64(seed);
         Self {
             state: actor.initial_state(rng.gen()),
             actor,

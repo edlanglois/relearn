@@ -1,6 +1,7 @@
 //! Space test utilities
 use super::{FeatureSpace, FiniteSpace, SampleSpace};
 use crate::utils::num_array::{NumArray1D, NumArray2D};
+use crate::Prng;
 use ndarray::{ArrayBase, Data, Ix2};
 use num_traits::Float;
 use rand::prelude::*;
@@ -8,7 +9,7 @@ use std::fmt::Debug;
 
 /// Check that space contains samples it generates
 pub fn check_contains_samples<S: SampleSpace>(space: &S, num_samples: u32) {
-    let mut rng = StdRng::seed_from_u64(1);
+    let mut rng = Prng::seed_from_u64(1);
     for _ in 0..num_samples {
         let element = space.sample(&mut rng);
         assert!(space.contains(&element));
@@ -28,7 +29,7 @@ pub fn check_from_to_index_iter_size<S: FiniteSpace>(space: &S) {
 /// Check paired [`FiniteSpace::from_index`] and [`FiniteSpace::to_index`] for random valid indices
 pub fn check_from_to_index_random<S: FiniteSpace>(space: &S, num_samples: u32) {
     let size = space.size();
-    let mut rng = StdRng::seed_from_u64(2);
+    let mut rng = Prng::seed_from_u64(2);
     for _ in 0..num_samples {
         let index = rng.gen_range(0..size);
         let element = space.from_index(index).unwrap();
@@ -40,7 +41,7 @@ pub fn check_from_to_index_random<S: FiniteSpace>(space: &S, num_samples: u32) {
 
 /// Check [`FiniteSpace::from_index`] for elements sampled randomly from the space.
 pub fn check_from_index_sampled<S: FiniteSpace + SampleSpace>(space: &S, num_samples: u32) {
-    let mut rng = StdRng::seed_from_u64(3);
+    let mut rng = Prng::seed_from_u64(3);
     let size = space.size();
     for _ in 0..num_samples {
         let element = space.sample(&mut rng);

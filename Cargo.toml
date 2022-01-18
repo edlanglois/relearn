@@ -19,6 +19,7 @@ ndarray-stats = "0.5"
 num-traits = "0.2"
 num_cpus = "1.13"
 rand = "0.8"
+rand_chacha = "0.3"
 rand_distr = "0.4"
 relearn_derive = { version = "0.1.0", path = "relearn_derive" }
 slice-of-array = "=0.3.1" # pinned b/c low popularity; audit code on change

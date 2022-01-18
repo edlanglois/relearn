@@ -5,7 +5,6 @@ use super::{
 use crate::logging::Logger;
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
 use crate::Prng;
-use rand::rngs::StdRng;
 
 /// A meta reinforcement learning environment that treats RL itself as an environment.
 ///
@@ -118,7 +117,7 @@ where
     >;
     type Action = <E::Environment as Environment>::Action;
 
-    fn initial_state(&self, rng: &mut StdRng) -> Self::State {
+    fn initial_state(&self, rng: &mut Prng) -> Self::State {
         // Sample a new inner environment.
         let inner_env = self.env_distribution.sample_environment(rng);
         let inner_state = inner_env.initial_state(rng);
@@ -130,7 +129,7 @@ where
         }
     }
 
-    fn observe(&self, state: &Self::State, rng: &mut StdRng) -> Self::Observation {
+    fn observe(&self, state: &Self::State, rng: &mut Prng) -> Self::Observation {
         let inner_successor_obs = state
             .inner_successor
             .as_ref()
@@ -147,7 +146,7 @@ where
         &self,
         state: Self::State,
         action: &Self::Action,
-        rng: &mut StdRng,
+        rng: &mut Prng,
         logger: &mut dyn Logger,
     ) -> (Successor<Self::State>, f64) {
         match state.inner_successor {
@@ -353,7 +352,7 @@ mod meta_env_bandits {
     #[test]
     fn meta_env_expected_steps() {
         let env = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3);
-        let mut rng = StdRng::seed_from_u64(0);
+        let mut rng = Prng::seed_from_u64(0);
 
         // Trial 0; Ep 0; Init
         let state = env.initial_state(&mut rng);

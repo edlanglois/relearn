@@ -2,14 +2,15 @@
 use super::{Environment, Pomdp, Successor};
 use crate::envs::EnvStructure;
 use crate::logging::Logger;
-use rand::{rngs::StdRng, SeedableRng};
+use crate::Prng;
+use rand::SeedableRng;
 
 /// Wraps a [`Pomdp`] as a [`Environment`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PomdpEnv<E: Pomdp> {
     pub env: E,
     state: Option<E::State>,
-    rng: StdRng,
+    rng: Prng,
 }
 
 impl<E: Pomdp> PomdpEnv<E> {
@@ -17,7 +18,7 @@ impl<E: Pomdp> PomdpEnv<E> {
         Self {
             env,
             state: None,
-            rng: StdRng::seed_from_u64(seed),
+            rng: Prng::seed_from_u64(seed),
         }
     }
 }

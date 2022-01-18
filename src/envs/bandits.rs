@@ -237,7 +237,7 @@ mod bernoulli_bandit {
         let mean = 0.2;
         let num_samples = 10000;
         let env = BernoulliBandit::from_means(vec![mean]).unwrap();
-        let mut rng = StdRng::seed_from_u64(1);
+        let mut rng = Prng::seed_from_u64(1);
         let mut reward_1_count = 0;
         for _ in 0..num_samples {
             let (_, reward) = env.step((), &0, &mut rng, &mut ());
@@ -275,7 +275,7 @@ mod deterministic_bandit {
     #[test]
     #[allow(clippy::float_cmp)] // Expecting exact values without error
     fn rewards() {
-        let mut rng = StdRng::seed_from_u64(0);
+        let mut rng = Prng::seed_from_u64(0);
         let env = DeterministicBandit::from_values(vec![0.2, 0.8]);
         let (_, reward_0) = env.step((), &0, &mut rng, &mut ());
         assert_eq!(reward_0, 0.2);
@@ -293,7 +293,7 @@ mod uniform_determistic_bandits {
     #[test]
     fn run_sample() {
         let env_dist = UniformBernoulliBandits::new(3);
-        let mut rng = StdRng::seed_from_u64(284);
+        let mut rng = Prng::seed_from_u64(284);
         let env = env_dist.sample_environment(&mut rng);
         testing::check_structured_env(&env, 1000, 286);
     }
@@ -314,7 +314,7 @@ mod needle_haystack_bandits {
     #[test]
     fn run_sample() {
         let env_dist = OneHotBandits::new(3);
-        let mut rng = StdRng::seed_from_u64(284);
+        let mut rng = Prng::seed_from_u64(284);
         let env = env_dist.sample_environment(&mut rng);
         testing::check_structured_env(&env, 1000, 286);
     }

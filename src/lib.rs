@@ -129,8 +129,12 @@ pub use envs::{BuildEnv, EnvStructure, Environment};
 pub use simulation::{train_parallel, train_serial, Step};
 
 /// Pseudo-random number generator type used by agents and environments in this crate.
-// Note: Using a cryptographically secure PRNG avoids potential correlations in Prng::from_rng
-pub type Prng = rand::rngs::StdRng;
+///
+/// This is a cryptographically secure PRNG to ensure that [`rand::SeedableRng::from_rng`]
+/// can be used to fork random generators without concern for correlations.
+/// Cryptographic security is not otherwise important so the number of rounds used is on the low
+/// end.
+pub type Prng = rand_chacha::ChaCha8Rng;
 
 #[allow(unused_imports)]
 #[macro_use]

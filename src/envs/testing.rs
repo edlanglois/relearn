@@ -6,7 +6,7 @@ use super::{
 use crate::agents::{ActorMode, Agent, RandomAgent};
 use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space, SubsetOrd};
 use crate::Prng;
-use rand::{rngs::StdRng, SeedableRng};
+use rand::SeedableRng;
 use std::cell::Cell;
 use std::fmt::Debug;
 
@@ -67,7 +67,7 @@ where
     let env_structure = StoredEnvStructure::from(env_dist);
     let (dist_reward_min, dist_reward_max) = env_structure.reward_range;
 
-    let mut rng = StdRng::seed_from_u64(75);
+    let mut rng = Prng::seed_from_u64(75);
     for _ in 0..num_samples {
         let env = env_dist.sample_environment(&mut rng);
         assert!(

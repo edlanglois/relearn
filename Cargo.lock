@@ -749,6 +749,7 @@ dependencies = [
  "num-traits",
  "num_cpus",
  "rand",
+ "rand_chacha",
  "rand_distr",
  "relearn_derive",
  "rstest",

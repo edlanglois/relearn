@@ -36,8 +36,9 @@ use std::f64;
 /// A reinforcement learning [`Environment`] with consistent [`EnvStructure`].
 ///
 /// # Design Discussion
-/// [`EnvStructure`] is not a supertrait of [`Pomdp`] because knowing the observation and action
-/// spaces is not necessary for simulation, only the observation and action types must be known.
+/// [`EnvStructure`] is not a supertrait of [`Environment`] because knowing the observation and
+/// action spaces is not necessary for simulation, only the observation and action types must be
+/// known.
 ///
 pub trait StructuredEnvironment:
     EnvStructure
