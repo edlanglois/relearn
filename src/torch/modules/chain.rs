@@ -267,35 +267,85 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{testing, AsSeq, LstmConfig, MlpConfig};
+    use super::super::{testing, AsSeq, Gru, GruConfig, Mlp, MlpConfig};
     use super::*;
+    use rstest::{fixture, rstest};
+    use tch::{nn::VarStore, Device, Kind};
 
-    #[test]
-    fn chained_mlp_forward_gradient_descent() {
+    fn chained_mlp_config() -> ChainedConfig<MlpConfig, MlpConfig> {
         let mlp_config = MlpConfig {
             hidden_sizes: vec![16],
             ..MlpConfig::default()
         };
-        let config = ChainedConfig {
+        ChainedConfig {
             first_config: mlp_config.clone(),
             second_config: mlp_config,
             hidden_dim: 8,
             ..ChainedConfig::default()
-        };
-        testing::check_config_forward_gradient_descent(&config);
+        }
     }
 
-    #[test]
-    fn lstm_mlp_seq_packed_gradient_descent() {
-        let config = ChainedConfig {
-            first_config: LstmConfig::default(),
+    fn chained_gru_mlp_config() -> ChainedConfig<GruConfig, AsSeq<MlpConfig>> {
+        ChainedConfig {
+            first_config: GruConfig::default(),
             second_config: AsSeq::new(MlpConfig {
                 hidden_sizes: vec![16],
                 ..MlpConfig::default()
             }),
             hidden_dim: 8,
             ..ChainedConfig::default()
-        };
-        testing::check_config_seq_packed_gradient_descent(&config);
+        }
+    }
+
+    #[fixture]
+    fn chained_mlp() -> (Chained<Mlp, Mlp>, usize, usize) {
+        let in_dim = 3;
+        let out_dim = 2;
+        let vs = VarStore::new(Device::Cpu);
+        let mlp = chained_mlp_config().build_module(&vs.root(), in_dim, out_dim);
+        (mlp, in_dim, out_dim)
+    }
+
+    #[fixture]
+    fn gru_mlp() -> (Chained<Gru, AsSeq<Mlp>>, usize, usize) {
+        let in_dim = 3;
+        let out_dim = 2;
+        let vs = VarStore::new(Device::Cpu);
+        let mlp = chained_gru_mlp_config().build_module(&vs.root(), in_dim, out_dim);
+        (mlp, in_dim, out_dim)
+    }
+
+    #[rstest]
+    fn chained_mlp_forward(chained_mlp: (Chained<Mlp, Mlp>, usize, usize)) {
+        let (chained_mlp, in_dim, out_dim) = chained_mlp;
+        testing::check_forward(&chained_mlp, in_dim, out_dim, &[4], Kind::Float);
+    }
+
+    #[rstest]
+    fn gru_mlp_seq_serial(gru_mlp: (Chained<Gru, AsSeq<Mlp>>, usize, usize)) {
+        let (gru_mlp, in_dim, out_dim) = gru_mlp;
+        testing::check_seq_serial(&gru_mlp, in_dim, out_dim);
+    }
+
+    #[rstest]
+    fn gru_mlp_seq_packed(gru_mlp: (Chained<Gru, AsSeq<Mlp>>, usize, usize)) {
+        let (gru_mlp, in_dim, out_dim) = gru_mlp;
+        testing::check_seq_packed(&gru_mlp, in_dim, out_dim);
+    }
+
+    #[rstest]
+    fn gru_mlp_step(gru_mlp: (Chained<Gru, AsSeq<Mlp>>, usize, usize)) {
+        let (gru_mlp, in_dim, out_dim) = gru_mlp;
+        testing::check_step(&gru_mlp, in_dim, out_dim);
+    }
+
+    #[test]
+    fn chained_mlp_forward_gradient_descent() {
+        testing::check_config_forward_gradient_descent(&chained_mlp_config());
+    }
+
+    #[test]
+    fn gru_mlp_seq_packed_gradient_descent() {
+        testing::check_config_seq_packed_gradient_descent(&chained_gru_mlp_config());
     }
 }
