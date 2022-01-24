@@ -112,6 +112,12 @@ mod tests {
         testing::check_step(&as_seq_mlp, in_dim, out_dim);
     }
 
+    #[rstest]
+    fn as_seq_mlp_seq_packed_matches_iter_steps(as_seq_mlp: (AsSeq<Mlp>, usize, usize)) {
+        let (as_seq_mlp, in_dim, out_dim) = as_seq_mlp;
+        testing::check_seq_packed_matches_iter_steps(&as_seq_mlp, in_dim, out_dim);
+    }
+
     #[test]
     fn as_seq_mlp_forward_gradient_descent() {
         testing::check_config_forward_gradient_descent(&as_seq_mlp_config());

@@ -169,6 +169,12 @@ mod tests {
         testing::check_step(&lstm, in_dim, out_dim);
     }
 
+    #[rstest]
+    fn seq_packed_matches_iter_steps(lstm: (Lstm, usize, usize)) {
+        let (lstm, in_dim, out_dim) = lstm;
+        testing::check_seq_packed_matches_iter_steps(&lstm, in_dim, out_dim);
+    }
+
     #[test]
     fn seq_packed_gradient_descent() {
         let config = LstmConfig::default();

@@ -156,6 +156,12 @@ mod tests {
         testing::check_step(&gru, in_dim, out_dim);
     }
 
+    #[rstest]
+    fn seq_packed_matches_iter_steps(gru: (Gru, usize, usize)) {
+        let (gru, in_dim, out_dim) = gru;
+        testing::check_seq_packed_matches_iter_steps(&gru, in_dim, out_dim);
+    }
+
     #[test]
     fn seq_packed_gradient_descent() {
         let config = GruConfig::default();

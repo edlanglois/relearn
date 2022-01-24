@@ -111,6 +111,39 @@ pub fn check_step<M: IterativeModule>(module: &M, in_dim: usize, out_dim: usize)
     assert_eq!(output2.size(), vec![out_dim as i64]);
 }
 
+/// Check that [`SequenceModule::seq_packed`] output matches [`IterativeModule::step`].
+pub fn check_seq_packed_matches_iter_steps<M>(module: &M, in_dim: usize, out_dim: usize)
+where
+    M: SequenceModule + IterativeModule,
+{
+    let _no_grad_guard = tch::no_grad_guard();
+
+    let seq_len = 5;
+    let num_seqs = 2;
+    let input = Tensor::rand(
+        &[seq_len, num_seqs, in_dim as i64],
+        (Kind::Float, Device::Cpu),
+    );
+
+    let packed_input = input.reshape(&[seq_len * num_seqs, in_dim as i64]);
+    let batch_sizes = Tensor::full(&[seq_len], num_seqs, (Kind::Int64, Device::Cpu));
+    let packed_output = module.seq_packed(&packed_input, &batch_sizes);
+    let output = packed_output.reshape(&[seq_len, num_seqs, out_dim as i64]);
+
+    for i in 0..num_seqs {
+        let mut state = module.initial_state();
+        for j in 0..seq_len {
+            let step_output = module.step(&mut state, &input.i((j, i, ..)));
+            let expected = output.i((j, i, ..));
+            assert!(
+                step_output.allclose(&expected, 1e-6, 1e-6, false),
+                "seq {i}, step {j}; {step_output:?} != {:?}",
+                expected
+            );
+        }
+    }
+}
+
 /// Check that gradient descent improves the output of a forward model.
 pub fn check_config_forward_gradient_descent<MC>(config: &MC)
 where

@@ -339,6 +339,12 @@ mod tests {
         testing::check_step(&gru_mlp, in_dim, out_dim);
     }
 
+    #[rstest]
+    fn gru_mlp_seq_packed_matches_iter_steps(gru_mlp: (Chained<Gru, AsSeq<Mlp>>, usize, usize)) {
+        let (gru_mlp, in_dim, out_dim) = gru_mlp;
+        testing::check_seq_packed_matches_iter_steps(&gru_mlp, in_dim, out_dim);
+    }
+
     #[test]
     fn chained_mlp_forward_gradient_descent() {
         testing::check_config_forward_gradient_descent(&chained_mlp_config());
