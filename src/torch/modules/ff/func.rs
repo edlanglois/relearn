@@ -1,6 +1,24 @@
-//! Activation functions
-use crate::torch::backends::CudnnSupport;
-use tch::{nn, Tensor};
+use super::super::{FeedForwardModule, Module};
+use tch::Tensor;
+
+/// Module view of a feed-forward tensor function.
+pub struct Func {
+    f: fn(&Tensor) -> Tensor,
+}
+
+impl Func {
+    pub fn new(f: fn(&Tensor) -> Tensor) -> Self {
+        Self { f }
+    }
+}
+
+impl Module for Func {}
+
+impl FeedForwardModule for Func {
+    fn forward(&self, input: &Tensor) -> Tensor {
+        (self.f)(input)
+    }
+}
 
 /// Activation functions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -15,30 +33,55 @@ pub enum Activation {
     Tanh,
 }
 
-impl Activation {
-    /// Create a module encapsulating this function if not the identity.
-    pub fn maybe_module(self) -> Option<nn::Func<'static>> {
-        use Activation::*;
-        match self {
-            Identity => None,
-            _ => Some(self.module()),
-        }
-    }
-    /// Create a module encapsulating this function.
-    pub fn module(self) -> nn::Func<'static> {
-        use Activation::*;
-        match self {
-            Identity => nn::func(Tensor::shallow_clone),
-            Relu => nn::func(Tensor::relu),
-            Sigmoid => nn::func(Tensor::sigmoid),
-            Tanh => nn::func(Tensor::tanh),
-        }
+impl Default for Activation {
+    fn default() -> Self {
+        Self::Relu
     }
 }
 
-impl CudnnSupport for Activation {
-    fn has_cudnn_second_derivatives(&self) -> bool {
-        true
+impl Activation {
+    /// The function pointer for this activation function.
+    #[inline]
+    pub fn function(&self) -> fn(&Tensor) -> Tensor {
+        use Activation::*;
+        match self {
+            Identity => Tensor::shallow_clone,
+            Relu => Tensor::relu,
+            Sigmoid => Tensor::sigmoid,
+            Tanh => Tensor::tanh,
+        }
+    }
+
+    /// The function pointer for this activation function if not the identity function.
+    #[inline]
+    pub fn maybe_function(&self) -> Option<fn(&Tensor) -> Tensor> {
+        use Activation::*;
+        match self {
+            Identity => None,
+            _ => Some(self.function()),
+        }
+    }
+
+    /// Create a module for this activation function
+    #[inline]
+    pub fn module(&self) -> Func {
+        Func::new(self.function())
+    }
+
+    /// Create a module for this activation function if not the identity function.
+    #[inline]
+    pub fn maybe_module(&self) -> Option<Func> {
+        self.maybe_function().map(Func::new)
+    }
+
+    /// Apply this activation function to a tensor.
+    #[inline]
+    pub fn apply(&self, input: Tensor) -> Tensor {
+        if let Some(f) = self.maybe_function() {
+            f(&input)
+        } else {
+            input
+        }
     }
 }
 
@@ -64,7 +107,7 @@ mod activation {
     fn module_identity() {
         let x = Tensor::of_slice(&[-2.0, -1.0, 0.0, 1.0, 2.0]);
         let activation_fn = Activation::Identity.module();
-        assert_eq!(x.apply(&activation_fn), x);
+        assert_eq!(activation_fn.forward(&x), x);
     }
 
     #[test]
@@ -72,7 +115,7 @@ mod activation {
         let x = Tensor::of_slice(&[-2.0, -1.0, 0.0, 1.0, 2.0]);
         let activation_fn = Activation::Relu.module();
         let expected = Tensor::of_slice(&[0.0, 0.0, 0.0, 1.0, 2.0]);
-        assert_eq!(x.apply(&activation_fn), expected);
+        assert_eq!(activation_fn.forward(&x), expected);
     }
 
     #[rstest]
@@ -85,7 +128,7 @@ mod activation {
         #[case] upper_bound: f64,
     ) {
         let x = Tensor::of_slice(&[f64::NEG_INFINITY, -2.0, -1.0, 0.0, 1.0, 2.0, f64::INFINITY]);
-        let y = x.apply(&activation.module());
+        let y = activation.module().forward(&x);
 
         assert!(bool::from(y.greater_equal(lower_bound).all()));
         assert!(bool::from(y.less_equal(upper_bound).all()));

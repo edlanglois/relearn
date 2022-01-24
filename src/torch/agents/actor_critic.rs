@@ -1,8 +1,7 @@
 use super::super::{
     critic::{BuildCritic, Critic},
     features::LazyPackedHistoryFeatures,
-    policy::{BuildPolicy, Policy},
-    seq_modules::IterativeModule,
+    modules::{BuildModule, IterativeModule, SequenceModule},
     updaters::{BuildCriticUpdater, BuildPolicyUpdater, UpdateCritic, UpdatePolicy},
 };
 use crate::agents::buffers::{BufferCapacityBound, SimpleBuffer, WriteHistoryBuffer};
@@ -52,8 +51,8 @@ impl<PB, PUB, CB, CUB, OS, AS> BuildAgent<OS, AS> for ActorCriticConfig<PB, PUB,
 where
     OS: EncoderFeatureSpace + 'static,
     AS: ParameterizedDistributionSpace<Tensor> + 'static,
-    PB: BuildPolicy + Clone,
-    PB::Policy: IterativeModule + Policy, // TODO: Rework Policy trait
+    PB: BuildModule + Clone,
+    PB::Module: SequenceModule + IterativeModule,
     PUB: BuildPolicyUpdater<AS>,
     PUB::Updater: UpdatePolicy<AS>,
     CB: BuildCritic,
@@ -62,7 +61,7 @@ where
     CUB::Updater: UpdateCritic,
 {
     #[allow(clippy::type_complexity)]
-    type Agent = ActorCriticAgent<OS, AS, PB, PB::Policy, PUB::Updater, CB::Critic, CUB::Updater>;
+    type Agent = ActorCriticAgent<OS, AS, PB, PB::Module, PUB::Updater, CB::Critic, CUB::Updater>;
 
     fn build_agent(
         &self,
@@ -124,7 +123,7 @@ impl<OS, AS, PB, P, PU, C, CU> ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
 where
     OS: EncoderFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
-    PB: BuildPolicy<Policy = P> + Clone,
+    PB: BuildModule<Module = P> + Clone,
     C: Critic,
 {
     pub fn new<E, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
@@ -138,7 +137,7 @@ where
         let action_space = env.action_space();
 
         let policy_variables = VarStore::new(config.device);
-        let policy = config.policy_config.build_policy(
+        let policy = config.policy_config.build_module(
             &policy_variables.root(),
             observation_space.num_features(),
             action_space.num_distribution_params(),
@@ -180,8 +179,8 @@ impl<OS, AS, PB, P, PU, C, CU> Agent<OS::Element, AS::Element>
 where
     OS: EncoderFeatureSpace + 'static,
     AS: ParameterizedDistributionSpace<Tensor> + 'static,
-    PB: BuildPolicy<Policy = P>,
-    P: IterativeModule + Policy,
+    PB: BuildModule<Module = P>,
+    P: SequenceModule + IterativeModule,
     PU: UpdatePolicy<AS>,
     C: Critic,
     CU: UpdateCritic,
@@ -193,7 +192,7 @@ where
         // Tensors do not implement Sync so a copy is created instead.
         // TODO: Implement Module::shallow_clone instead of copying
         let mut actor_policy_variables = VarStore::new(Device::Cpu);
-        let policy = self.policy_config.build_policy(
+        let policy = self.policy_config.build_module(
             &actor_policy_variables.root(),
             self.shared.observation_space.num_features(),
             self.shared.action_space.num_distribution_params(),
@@ -212,7 +211,7 @@ impl<OS, AS, PB, P, PU, C, CU> BatchUpdate<OS::Element, AS::Element>
 where
     OS: EncoderFeatureSpace + 'static,
     AS: ReprSpace<Tensor> + 'static,
-    P: Policy,
+    P: SequenceModule,
     PU: UpdatePolicy<AS>,
     C: Critic,
     CU: UpdateCritic,
@@ -295,7 +294,7 @@ where
     type EpisodeState = P::State;
 
     fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {
-        self.policy.initial_state(1)
+        self.policy.initial_state()
     }
 
     fn act(
@@ -308,13 +307,9 @@ where
         let input = self
             .shared
             .observation_space
-            .encoder_features::<Tensor>(observation, &self.shared.observation_encoder)
-            .unsqueeze(0);
-        let (output, new_state) = self.policy.step(&input, state);
-        *state = new_state;
-        self.shared
-            .action_space
-            .sample_element(&output.squeeze_dim(0))
+            .encoder_features::<Tensor>(observation, &self.shared.observation_encoder);
+        let output = self.policy.step(state, &input);
+        self.shared.action_space.sample_element(&output)
     }
 }
 

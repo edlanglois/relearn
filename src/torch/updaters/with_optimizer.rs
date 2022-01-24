@@ -1,5 +1,6 @@
 use super::super::{
-    critic::Critic, features::PackedHistoryFeaturesView, optimizers::BuildOptimizer, policy::Policy,
+    critic::Critic, features::PackedHistoryFeaturesView, modules::SequenceModule,
+    optimizers::BuildOptimizer,
 };
 use super::{
     BuildCriticUpdater, BuildPolicyUpdater, PolicyStats, UpdateCritic, UpdateCriticWithOptimizer,
@@ -22,7 +23,7 @@ where
 {
     fn update_policy(
         &mut self,
-        policy: &dyn Policy,
+        policy: &dyn SequenceModule,
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         action_space: &AS,

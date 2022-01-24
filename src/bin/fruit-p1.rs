@@ -6,8 +6,8 @@ use relearn::simulation::{train_parallel, SimulationSummary, TrainParallelConfig
 use relearn::torch::{
     agents::ActorCriticConfig,
     critic::GaeConfig,
+    modules::GruMlpConfig,
     optimizers::AdamConfig,
-    seq_modules::GruMlpConfig,
     updaters::{CriticLossUpdateRule, PpoPolicyUpdateRule, WithOptimizer},
 };
 use relearn::Prng;
@@ -18,6 +18,7 @@ fn main() {
         FirstPlayerView::new(FruitGame::<5, 5, 5, 5>::default()),
         StepLimit::new(50),
     );
+
     let agent_config: ActorCriticConfig<
         GruMlpConfig,
         WithOptimizer<PpoPolicyUpdateRule, AdamConfig>,

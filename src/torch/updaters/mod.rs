@@ -22,7 +22,7 @@ pub use with_optimizer::WithOptimizer;
 
 use super::critic::Critic;
 use super::features::PackedHistoryFeaturesView;
-use super::policy::Policy;
+use super::modules::SequenceModule;
 use crate::logging::TimeSeriesLogger;
 use tch::nn::VarStore;
 
@@ -50,7 +50,7 @@ pub trait UpdatePolicy<AS: ?Sized> {
     /// * `logger` - A logger for update statistics.
     fn update_policy(
         &mut self,
-        policy: &dyn Policy,
+        policy: &dyn SequenceModule,
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         action_space: &AS,
@@ -58,8 +58,29 @@ pub trait UpdatePolicy<AS: ?Sized> {
     ) -> PolicyStats;
 }
 
-box_impl_update_policy!(dyn UpdatePolicy<AS>, AS);
-box_impl_update_policy!(dyn UpdatePolicy<AS> + Send, AS);
+/// Implement `UpdatePolicy<AS>` for a deref-able generic wrapper type.
+macro_rules! impl_wrapped_update_policy {
+    ($wrapper:ty) => {
+        impl<T, AS> UpdatePolicy<AS> for $wrapper
+        where
+            T: UpdatePolicy<AS> + ?Sized,
+            AS: ?Sized,
+        {
+            fn update_policy(
+                &mut self,
+                policy: &dyn SequenceModule,
+                critic: &dyn Critic,
+                features: &dyn PackedHistoryFeaturesView,
+                action_space: &AS,
+                logger: &mut dyn TimeSeriesLogger,
+            ) -> PolicyStats {
+                T::update_policy(self, policy, critic, features, action_space, logger)
+            }
+        }
+    };
+}
+impl_wrapped_update_policy!(&'_ mut T);
+impl_wrapped_update_policy!(Box<T>);
 
 /// A policy update rule using an external optimizer.
 pub trait UpdatePolicyWithOptimizer<O: ?Sized, AS: ?Sized> {
@@ -74,7 +95,7 @@ pub trait UpdatePolicyWithOptimizer<O: ?Sized, AS: ?Sized> {
     /// * `logger` - A logger for update statistics.
     fn update_policy_with_optimizer(
         &self,
-        policy: &dyn Policy,
+        policy: &dyn SequenceModule,
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
@@ -115,8 +136,26 @@ pub trait UpdateCritic {
     );
 }
 
-box_impl_update_critic!(dyn UpdateCritic);
-box_impl_update_critic!(dyn UpdateCritic + Send);
+/// Implement `UpdateCritic` for a deref-able generic wrapper type.
+macro_rules! impl_wrapped_update_critic {
+    ($wrapper:ty) => {
+        impl<T> UpdateCritic for $wrapper
+        where
+            T: UpdateCritic + ?Sized,
+        {
+            fn update_critic(
+                &mut self,
+                critic: &dyn Critic,
+                features: &dyn PackedHistoryFeaturesView,
+                logger: &mut dyn TimeSeriesLogger,
+            ) {
+                T::update_critic(self, critic, features, logger)
+            }
+        }
+    };
+}
+impl_wrapped_update_critic!(&'_ mut T);
+impl_wrapped_update_critic!(Box<T>);
 
 /// A critic update rule using an external optimizer.
 pub trait UpdateCriticWithOptimizer<O: ?Sized> {

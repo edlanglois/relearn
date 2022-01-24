@@ -2,8 +2,7 @@ use criterion::{
     criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration,
     Throughput,
 };
-use relearn::torch::seq_modules::{GruConfig, SequenceModule};
-use relearn::torch::BuildModule;
+use relearn::torch::modules::{BuildModule, GruConfig, SequenceModule};
 use tch::{nn::VarStore, Device, Kind, Tensor};
 
 fn gru_rnn(c: &mut Criterion) {

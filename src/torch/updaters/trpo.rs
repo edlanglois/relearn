@@ -2,8 +2,8 @@ use super::super::{
     backends::WithCudnnEnabled,
     critic::Critic,
     features::PackedHistoryFeaturesView,
+    modules::SequenceModule,
     optimizers::{OptimizerStepError, TrustRegionOptimizer},
-    policy::Policy,
 };
 use super::{PolicyStats, UpdatePolicyWithOptimizer};
 use crate::logging::{Event, TimeSeriesLogger, TimeSeriesLoggerHelper};
@@ -38,7 +38,7 @@ where
 {
     fn update_policy_with_optimizer(
         &self,
-        policy: &dyn Policy,
+        policy: &dyn SequenceModule,
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,

@@ -1,6 +1,7 @@
 //! Policy-gradient policy updater.
 use super::super::{
-    critic::Critic, features::PackedHistoryFeaturesView, optimizers::Optimizer, policy::Policy,
+    critic::Critic, features::PackedHistoryFeaturesView, modules::SequenceModule,
+    optimizers::Optimizer,
 };
 use super::{PolicyStats, UpdatePolicyWithOptimizer};
 use crate::logging::{Event, TimeSeriesLogger};
@@ -20,7 +21,7 @@ where
 {
     fn update_policy_with_optimizer(
         &self,
-        policy: &dyn Policy,
+        policy: &dyn SequenceModule,
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,

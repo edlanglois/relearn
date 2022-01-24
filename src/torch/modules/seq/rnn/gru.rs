@@ -1,7 +1,7 @@
 //! Gated Recurrent Unit
-use super::super::{seq_serial_map, IterativeModule, SequenceModule};
+use super::super::super::{IterativeModule, Module, SequenceModule};
+use super::super::seq_serial_map;
 use super::{initialize_rnn_params, CudnnRnnMode};
-use crate::torch::backends::CudnnSupport;
 use tch::{nn::Path, Device, IndexOp, Kind, Tensor};
 
 /// A single-layer Gated Recurrent Unit Network
@@ -13,6 +13,12 @@ pub struct Gru {
     hidden_size: i64,
     pub dropout: f64,
     device: Device,
+}
+
+impl Module for Gru {
+    fn has_cudnn_second_derivatives(&self) -> bool {
+        false
+    }
 }
 
 impl Gru {
@@ -44,16 +50,16 @@ impl Gru {
 impl IterativeModule for Gru {
     type State = Tensor;
 
-    fn initial_state(&self, batch_size: usize) -> Self::State {
-        Tensor::zeros(
-            &[batch_size as i64, self.hidden_size],
-            (Kind::Float, self.device),
-        )
+    fn initial_state(&self) -> Self::State {
+        let batch_size = 1;
+        Tensor::zeros(&[batch_size, self.hidden_size], (Kind::Float, self.device))
     }
 
-    fn step(&self, input: &Tensor, state: &Self::State) -> (Tensor, Self::State) {
-        let new_state = input.gru_cell(state, self.w_ih(), self.w_hh(), self.b_ih(), self.b_hh());
-        (new_state.shallow_clone(), new_state)
+    fn step(&self, state: &mut Self::State, input: &Tensor) -> Tensor {
+        *state = input
+            .unsqueeze(0) // insert a batch dimension
+            .gru_cell(state, self.w_ih(), self.w_hh(), self.b_ih(), self.b_hh());
+        state.squeeze_dim(0)
     }
 }
 
@@ -115,16 +121,10 @@ impl SequenceModule for Gru {
     }
 }
 
-impl CudnnSupport for Gru {
-    fn has_cudnn_second_derivatives(&self) -> bool {
-        false
-    }
-}
-
 #[cfg(test)]
-#[allow(clippy::module_inception)]
-mod gru {
-    use super::super::super::testing;
+mod tests {
+    use super::super::super::super::testing;
+    use super::super::GruConfig;
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{nn, Device};
@@ -139,20 +139,26 @@ mod gru {
     }
 
     #[rstest]
-    fn gru_seq_serial(gru: (Gru, usize, usize)) {
+    fn seq_serial(gru: (Gru, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_seq_serial(&gru, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_seq_packed(gru: (Gru, usize, usize)) {
+    fn seq_packed(gru: (Gru, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_seq_packed(&gru, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_step(gru: (Gru, usize, usize)) {
+    fn step(gru: (Gru, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_step(&gru, in_dim, out_dim);
+    }
+
+    #[test]
+    fn seq_packed_gradient_descent() {
+        let config = GruConfig::default();
+        testing::check_config_seq_packed_gradient_descent(&config);
     }
 }

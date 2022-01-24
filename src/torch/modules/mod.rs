@@ -1,20 +1,53 @@
-//! Torch modules
-mod activations;
-mod mlp;
+//! Neural network modules: variables and implementation for a part of a neural network.
+mod chain;
+mod ff;
+mod seq;
+#[cfg(test)]
+pub mod testing;
 
-pub use activations::Activation;
-pub use mlp::MlpConfig;
+pub use chain::{Chained, ChainedConfig};
+pub use ff::{Activation, Func, Mlp, MlpConfig};
+pub use seq::{AsSeq, Gru, GruConfig, Lstm, LstmConfig};
 
-use crate::torch::backends::CudnnSupport;
-use tch::nn::{Module, Path};
+pub type GruMlpConfig = ChainedConfig<GruConfig, AsSeq<MlpConfig>>;
+pub type LstmMlpConfig = ChainedConfig<GruConfig, AsSeq<MlpConfig>>;
 
-impl<M: Module> CudnnSupport for M {
+use tch::{nn::Path, Tensor};
+
+/// A self-contained part of a neural network.
+pub trait Module {
+    /// Whether cuDNN supports second derivatives of this module.
     fn has_cudnn_second_derivatives(&self) -> bool {
-        true
+        true // usually true
+    }
+
+    /// Chain another module after this one with an activation function in between.
+    fn chain<M>(self, other: M, activation: Activation) -> Chained<Self, M>
+    where
+        Self: Sized,
+    {
+        Chained {
+            first: self,
+            second: other,
+            activation,
+        }
     }
 }
 
-/// Build an instance of a torch module (or module-like).
+/// Implement `Module` for a deref-able wrapper type generic over `T: Module + ?Sized`.
+macro_rules! impl_wrapped_module {
+    ($wrapper:ty) => {
+        impl<T: Module + ?Sized> Module for $wrapper {
+            fn has_cudnn_second_derivatives(&self) -> bool {
+                T::has_cudnn_second_derivatives(&self)
+            }
+        }
+    };
+}
+impl_wrapped_module!(&'_ T);
+impl_wrapped_module!(Box<T>);
+
+/// Build a [`Module`]
 pub trait BuildModule {
     type Module;
 
@@ -25,4 +58,189 @@ pub trait BuildModule {
     /// * `in_dim` - Number of input feature dimensions.
     /// * `out_dim` - Nuber of output feature dimensions.
     fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module;
+
+    /// Chain another module configuration after this one with an activation function in between.
+    fn chain<MC>(
+        self,
+        other: MC,
+        hidden_dim: usize,
+        activation: Activation,
+    ) -> ChainedConfig<Self, MC>
+    where
+        Self: Sized,
+    {
+        ChainedConfig {
+            first_config: self,
+            second_config: other,
+            hidden_dim,
+            activation,
+        }
+    }
 }
+
+/// Implement [`BuildModule`] for a deref-able wrapper type generic over `T: BuildModule + ?Sized`.
+macro_rules! impl_wrapped_build_module {
+    ($wrapper:ty) => {
+        impl<T: BuildModule + ?Sized> BuildModule for $wrapper {
+            type Module = T::Module;
+
+            fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
+                T::build_module(self, vs, in_dim, out_dim)
+            }
+        }
+    };
+}
+impl_wrapped_build_module!(&'_ T);
+impl_wrapped_build_module!(Box<T>);
+
+/// A network module implementing a feed-forward transformation.
+///
+/// This is roughtly equivalent to PyTorch's [module][module] class except it is not treated as
+/// the base interface of all modules because not all modules implement the batch
+/// `Tensor -> Tensor` transformation.
+///
+/// [module]: https://pytorch.org/docs/stable/generated/torch.nn.Module.html
+pub trait FeedForwardModule: Module {
+    /// Apply a batch feed-forward transformation to a tensor.
+    ///
+    /// Applies a vector-to-vector map on the last dimension of the input tensor,
+    /// replicated over all other dimensions.
+    ///
+    /// * Input shape: `[BATCH_SHAPE.., INPUT_DIM]`.
+    /// * Output shape: `[BATCH_SHAPE.., OUTPUT_DIM]`.
+    fn forward(&self, input: &Tensor) -> Tensor;
+}
+
+/// Implement [`FeedForwardModule`] for a deref-able generic wrapper type.
+macro_rules! impl_wrapped_feed_forward_module {
+    ($wrapper:ty) => {
+        impl<T: FeedForwardModule + ?Sized> FeedForwardModule for $wrapper {
+            fn forward(&self, input: &Tensor) -> Tensor {
+                T::forward(self, input)
+            }
+        }
+    };
+}
+impl_wrapped_feed_forward_module!(&'_ T);
+impl_wrapped_feed_forward_module!(Box<T>);
+
+/// Implement [`Module`] and [`FeedForwardModule`] for a type that implements [`tch::nn::Module`].
+macro_rules! impl_ff_module_for_tch {
+    ($ty:ty) => {
+        impl Module for $ty {}
+        impl FeedForwardModule for $ty {
+            fn forward(&self, input: &Tensor) -> Tensor {
+                tch::nn::Module::forward(self, input)
+            }
+        }
+    };
+}
+impl_ff_module_for_tch!(tch::nn::Embedding);
+impl_ff_module_for_tch!(tch::nn::LayerNorm);
+impl_ff_module_for_tch!(tch::nn::Linear);
+
+/// A network module implementing a sequence transformation.
+pub trait SequenceModule: Module {
+    /// Apply the network over multiple sequences arranged in series one after another.
+    ///
+    /// # Args
+    /// * `inputs` - Batched input sequences arranged in series.
+    ///     An f32 tensor of shape `[BATCH_SIZE, TOTAL_SEQ_LENGTH, NUM_INPUT_FEATURES]`
+    /// * `seq_lengths` - Length of each sequence.
+    ///     The sequence length is the same across the batch dimension.
+    ///
+    /// If `seq_lengths = [L0, L1, ..., LN]` then
+    /// `inputs[.., 0..L0, ..]` is the first batch of sequences,
+    /// `inputs[.., L0..L1, ..]` is the second, etc.
+    ///
+    /// # Returns
+    /// Batched output sequences arranged in series.
+    /// A tensor of shape `[BATCH_SHAPE, TOTAL_SEQ_LENGTH, NUM_OUTPUT_FEATURES]`.
+    fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor;
+
+    /// Apply the network over multiple sequences packed together in heterogeneous batches.
+    ///
+    /// # Args
+    /// * `inputs` - Packed input sequences.
+    ///     An f32 tensor of shape `[TOTAL_STEPS, NUM_INPUT_FEATURES]`
+    ///     where the `TOTAL_STEPS` dimension consists of the packed and batched steps ordered
+    ///     first by index within a sequence, then by batch index.
+    ///     Sequences must be ordered from longest to shortest.
+    ///
+    ///     If all sequences have the same length then the `TOTAL_STEPS` dimension
+    ///     corresponds to a flattend Tensor of shape `[SEQ_LENGTH, BATCH_SIZE]`.
+    ///
+    /// * `batch_sizes` - The batch size of each in-sequence step index.
+    ///     A i64 tensor of shape `[MAX_SEQ_LENGTH]`. **Must be on the CPU.**
+    ///     Must be monotonically decreasing and positive.
+    ///
+    /// If `batch_sizes = [B0, B1, ..., BN]` then
+    /// `inputs[0..B0, ..]` are the batched first steps of all sequences,
+    /// `inptus[B0..B1, ..]` are the batched second steps, etc.
+    ///
+    /// # Returns
+    /// Packed output sequences in the same order as `inputs`.
+    /// A tensor of shape `[TOTAL_STEPS, NUM_OUTPUT_FEATURES]`.
+    ///
+    /// # Panics
+    /// Panics if:
+    /// * `inputs` device does not match the model device
+    /// * `inputs` `NUM_INPUT_FEATURES` dimension does not match the model input features
+    /// * `inputs` `TOTAL_STEPS` dimension does not match the sum of `batch_size`
+    /// * `batch_sizes` device is not CPU
+    fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor;
+}
+
+/// Implement [`SequenceModule`] for a deref-able generic wrapper type.
+macro_rules! impl_wrapped_sequence_module {
+    ($wrapper:ty) => {
+        impl<T: SequenceModule + ?Sized> SequenceModule for $wrapper {
+            fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
+                T::seq_serial(self, inputs, seq_lengths)
+            }
+            fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
+                T::seq_packed(self, inputs, batch_sizes)
+            }
+        }
+    };
+}
+impl_wrapped_sequence_module!(&'_ T);
+impl_wrapped_sequence_module!(Box<T>);
+
+/// A module that operates iteratively on a sequence of data.
+pub trait IterativeModule {
+    /// Sequence state managed by the module.
+    type State;
+
+    /// Construct an initial state for the start of a new sequence.
+    fn initial_state(&self) -> Self::State;
+
+    /// Apply one step of the module.
+    ///
+    /// # Args
+    /// * `input` - The input for one step.
+    ///     A tensor with shape `[NUM_INPUT_FEATURES]`
+    /// * `state` - The policy hidden state.
+    ///
+    /// # Returns
+    /// * `output` - The output tensor. Has shape `[NUM_OUT_FEATURES]`
+    /// * `state` - A new value for the hidden state.
+    fn step(&self, state: &mut Self::State, input: &Tensor) -> Tensor;
+}
+
+/// Implement [`IterativeModule`] for a deref-able generic wrapper type.
+macro_rules! impl_wrapped_iterative_module {
+    ($wrapper:ty) => {
+        impl<T: IterativeModule + ?Sized> IterativeModule for $wrapper {
+            type State = T::State;
+            fn initial_state(&self) -> Self::State {
+                T::initial_state(self)
+            }
+            fn step(&self, state: &mut Self::State, input: &Tensor) -> Tensor {
+                T::step(self, state, input)
+            }
+        }
+    };
+}
+impl_wrapped_iterative_module!(&'_ T);
+impl_wrapped_iterative_module!(Box<T>);

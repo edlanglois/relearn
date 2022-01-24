@@ -12,8 +12,8 @@ use relearn::spaces::{IndexedTypeSpace, Space};
 use relearn::torch::{
     agents::ActorCriticConfig,
     critic::GaeConfig,
+    modules::GruMlpConfig,
     optimizers::AdamConfig,
-    seq_modules::GruMlpConfig,
     updaters::{CriticLossUpdateRule, PpoPolicyUpdateRule, WithOptimizer},
 };
 use relearn::Prng;

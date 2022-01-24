@@ -3,10 +3,8 @@ use crate::agents::testing;
 use crate::torch::{
     agents::ActorCriticConfig,
     critic::{BuildCritic, GaeConfig, Return},
-    modules::MlpConfig,
+    modules::{AsSeq, BuildModule, GruMlpConfig, IterativeModule, MlpConfig, SequenceModule},
     optimizers::AdamConfig,
-    policy::BuildPolicy,
-    seq_modules::{GruMlpConfig, IterativeModule},
     updaters::{CriticLossUpdateRule, PolicyGradientUpdateRule, WithOptimizer},
 };
 use tch::Device;
@@ -19,8 +17,8 @@ fn test_train_policy_gradient<PB, CB>(
         WithOptimizer<CriticLossUpdateRule, AdamConfig>,
     >,
 ) where
-    PB: BuildPolicy + Clone,
-    PB::Policy: IterativeModule,
+    PB: BuildModule + Clone,
+    PB::Module: SequenceModule + IterativeModule,
     CB: BuildCritic,
 {
     // Speed up learning for this simple environment
@@ -32,7 +30,7 @@ fn test_train_policy_gradient<PB, CB>(
 
 #[test]
 fn default_mlp_return_learns_derministic_bandit() {
-    test_train_policy_gradient::<MlpConfig, Return>(Default::default())
+    test_train_policy_gradient::<AsSeq<MlpConfig>, Return>(Default::default())
 }
 
 #[test]
@@ -41,12 +39,12 @@ fn default_mlp_return_learns_derministic_bandit_cuda_if_available() {
         device: Device::cuda_if_available(),
         ..ActorCriticConfig::default()
     };
-    test_train_policy_gradient::<MlpConfig, Return>(config)
+    test_train_policy_gradient::<AsSeq<MlpConfig>, Return>(config)
 }
 
 #[test]
 fn default_mlp_gae_mlp_learns_derministic_bandit() {
-    test_train_policy_gradient::<MlpConfig, GaeConfig<MlpConfig>>(Default::default())
+    test_train_policy_gradient::<AsSeq<MlpConfig>, GaeConfig<AsSeq<MlpConfig>>>(Default::default())
 }
 
 #[test]
@@ -56,7 +54,7 @@ fn default_gru_mlp_return_learns_derministic_bandit() {
 
 #[test]
 fn default_gru_mlp_gae_mlp_derministic_bandit() {
-    test_train_policy_gradient::<GruMlpConfig, GaeConfig<MlpConfig>>(Default::default())
+    test_train_policy_gradient::<GruMlpConfig, GaeConfig<AsSeq<MlpConfig>>>(Default::default())
 }
 
 #[test]

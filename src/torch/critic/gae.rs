@@ -1,7 +1,7 @@
 //! Generalized Advantage Estimation
 use super::super::features::PackedHistoryFeaturesView;
 use super::{BuildCritic, Critic};
-use crate::torch::{seq_modules::SequenceModule, BuildModule};
+use crate::torch::modules::{BuildModule, SequenceModule};
 use crate::utils::packed;
 use tch::{nn::Path, Reduction, Tensor};
 

@@ -49,5 +49,12 @@ where
         }
     }
 
-    assert!(action_1_count >= ((num_eval_steps as f64) * threshold) as u64);
+    let threshold = ((num_eval_steps as f64) * threshold) as u64;
+    assert!(
+        action_1_count >= threshold,
+        "#a1 ({}) < thresh ({}); total_steps = {}",
+        action_1_count,
+        threshold,
+        num_eval_steps
+    );
 }
