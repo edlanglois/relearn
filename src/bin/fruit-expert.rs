@@ -12,7 +12,7 @@ use relearn::spaces::{IndexedTypeSpace, Space};
 use relearn::torch::{
     agents::ActorCriticConfig,
     critic::GaeConfig,
-    modules::GruMlpConfig,
+    modules::{AsSeq, ChainedConfig, GruConfig, MlpConfig},
     optimizers::AdamConfig,
     updaters::{CriticLossUpdateRule, PpoPolicyUpdateRule, WithOptimizer},
 };
@@ -126,13 +126,15 @@ impl<O, A> BatchUpdate<O, A> for FruitLazyExpert {
     }
 }
 
+type ModelConfig = ChainedConfig<AsSeq<MlpConfig>, ChainedConfig<GruConfig, AsSeq<MlpConfig>>>;
+
 fn main() {
     let env_config = WithStepLimit::new(FruitGame::<5, 5, 5, 5>::default(), StepLimit::new(50));
 
     let assistant_config: ActorCriticConfig<
-        GruMlpConfig,
+        ModelConfig,
         WithOptimizer<PpoPolicyUpdateRule, AdamConfig>,
-        GaeConfig<GruMlpConfig>,
+        GaeConfig<ModelConfig>,
         WithOptimizer<CriticLossUpdateRule, AdamConfig>,
     > = ActorCriticConfig {
         device: Device::Cuda(0),
