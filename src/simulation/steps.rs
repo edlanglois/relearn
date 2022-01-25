@@ -187,6 +187,7 @@ where
                 .unwrap();
             logger.end_event(Event::EnvStep).unwrap();
             self.episode_reward += step.reward;
+            self.episode_length += 1;
             if step.next.episode_done() {
                 logger
                     .log(Event::EnvEpisode, "ep_reward", self.episode_reward.into())
