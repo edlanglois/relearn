@@ -7,6 +7,7 @@ mod mdps;
 mod memory;
 mod meta;
 mod multiagent;
+mod partition;
 #[cfg(test)]
 pub mod testing;
 mod wrappers;
@@ -22,6 +23,7 @@ pub use memory::MemoryGame;
 pub use meta::{InnerEnvStructure, MetaEnv, MetaObservation, MetaObservationSpace, MetaState};
 pub use multiagent::fruit::{self, FruitGame};
 pub use multiagent::views::{FirstPlayerView, SecondPlayerView};
+pub use partition::PartitionGame;
 pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 
 use crate::agents::Actor;
