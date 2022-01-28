@@ -1,7 +1,7 @@
 //! Command-line logger
 use super::{
-    BuildThreadLogger, Event, Id, IncompatibleValueError, LogError, Loggable, ScopedLogger,
-    TimeSeriesEventLogger, TimeSeriesLogger,
+    Event, Id, IncompatibleValueError, LogError, Loggable, ScopedLogger, TimeSeriesEventLogger,
+    TimeSeriesLogger,
 };
 use enum_map::{enum_map, EnumMap};
 use std::borrow::Cow;
@@ -39,15 +39,6 @@ impl Default for CLILoggerConfig {
 
 impl CLILoggerConfig {
     pub fn build_logger(&self) -> CLILogger {
-        CLILogger::new(self.display_period, self.urgent_display_period)
-    }
-}
-
-impl BuildThreadLogger for CLILoggerConfig {
-    // TODO: Lock stdout to avoid simultaneous writes
-    type ThreadLogger = CLILogger;
-
-    fn build_thread_logger(&self, _thread_id: usize) -> Self::ThreadLogger {
         CLILogger::new(self.display_period, self.urgent_display_period)
     }
 }

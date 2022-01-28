@@ -1,9 +1,7 @@
 //! Logging statistics from simulation runs
 mod cli;
-mod multithread;
 
 pub use cli::{CLILogger, CLILoggerConfig};
-pub use multithread::BuildThreadLogger;
 
 use enum_map::Enum;
 use smallvec::SmallVec;
