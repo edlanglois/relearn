@@ -1,5 +1,5 @@
 use crate::envs::{BuildEnv, BuildEnvError, EnvStructure, Environment, Successor};
-use crate::logging::Logger;
+use crate::logging::StatsLogger;
 use crate::spaces::{Space, TupleSpace2};
 use crate::Prng;
 
@@ -92,7 +92,7 @@ where
         state: Self::State,
         action: &Self::Action,
         rng: &mut Prng,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
         let joint_action = (action.clone(), Default::default());
         self.inner.step(state, &joint_action, rng, logger)
@@ -188,7 +188,7 @@ where
         state: Self::State,
         action: &Self::Action,
         rng: &mut Prng,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
         let joint_action = (Default::default(), action.clone());
         self.inner.step(state, &joint_action, rng, logger)

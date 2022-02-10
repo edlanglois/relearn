@@ -1,6 +1,6 @@
 //! Chain environment
 use super::{CloneBuild, EnvStructure, Environment, Successor};
-use crate::logging::Logger;
+use crate::logging::StatsLogger;
 use crate::spaces::{IndexSpace, IndexedTypeSpace};
 use crate::Prng;
 use rand::prelude::*;
@@ -80,7 +80,7 @@ impl Environment for Chain {
         state: Self::State,
         action: &Self::Action,
         rng: &mut Prng,
-        _: &mut dyn Logger,
+        _: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
         let mut action = *action;
         if rng.gen::<f32>() < 0.2 {

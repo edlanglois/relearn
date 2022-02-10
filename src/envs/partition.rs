@@ -1,5 +1,5 @@
 use super::{CloneBuild, EnvStructure, Environment, Successor};
-use crate::logging::Logger;
+use crate::logging::StatsLogger;
 use crate::spaces::{
     BooleanSpace, Indexed, IndexedTypeSpace, OptionSpace, PowerSpace, TupleSpace2,
 };
@@ -105,7 +105,7 @@ impl Environment for PartitionGame {
         state: Self::State,
         action: &Self::Action,
         rng: &mut Prng,
-        _: &mut dyn Logger,
+        _: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
         let label = state.supervisor.classify(&state.element);
         let reward = match (label, action) {

@@ -1,6 +1,6 @@
 //! Fruit collection gridworlds.
 use crate::envs::{CloneBuild, EnvStructure, Environment, Successor};
-use crate::logging::Logger;
+use crate::logging::{Loggable, StatsLogger};
 use crate::spaces::{
     ArraySpace, BooleanSpace, BoxSpace, FiniteSpace, IndexSpace, IndexedTypeSpace, PowerSpace,
     ProductSpace, Space, TupleSpace2,
@@ -408,17 +408,23 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Environme
         mut state: Self::State,
         action: &Self::Action,
         _rng: &mut Prng,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
         let (principal_action, assistant_action) = *action;
 
         let reward_principal = state.step(principal_action, Player::Principal);
         let reward_assistant = state.step(assistant_action, Player::Assistant);
         logger
-            .log("reward_principal", reward_principal.into())
+            .log_no_flush(
+                "reward/principal".into(),
+                Loggable::Scalar(reward_principal),
+            )
             .unwrap();
         logger
-            .log("reward_assistant", reward_assistant.into())
+            .log_no_flush(
+                "reward/assistant".into(),
+                Loggable::Scalar(reward_assistant),
+            )
             .unwrap();
         let reward = reward_principal + reward_assistant;
         let successor = if state.is_terminal() {

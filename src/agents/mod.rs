@@ -24,7 +24,7 @@ pub use serial::SerialActorAgent;
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
 
 use crate::envs::EnvStructure;
-use crate::logging::TimeSeriesLogger;
+use crate::logging::StatsLogger;
 use crate::spaces::Space;
 use crate::Prng;
 use tch::TchError;
@@ -181,7 +181,7 @@ pub trait BatchUpdate<O, A> {
     ///
     /// The buffers can be of any size but callers should try to match (ideally) or exceed the size
     /// given by [`BatchUpdate::batch_size_hint`].
-    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
     where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a;
@@ -201,7 +201,7 @@ macro_rules! impl_wrapped_batch_update {
             fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
                 T::buffer(self, capacity)
             }
-            fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+            fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
             where
                 I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
                 Self::HistoryBuffer: 'a,

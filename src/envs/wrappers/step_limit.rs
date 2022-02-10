@@ -1,6 +1,6 @@
 use super::super::{Environment, Successor};
 use super::Wrapped;
-use crate::logging::Logger;
+use crate::logging::StatsLogger;
 use crate::Prng;
 
 /// Environment wrapper that cuts off episodes after a set number of steps.
@@ -48,7 +48,7 @@ impl<E: Environment> Environment for Wrapped<E, StepLimit> {
         state: Self::State,
         action: &Self::Action,
         rng: &mut Prng,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
         let (inner_state, step_count) = state;
         let (inner_successor, reward) = self.inner.step(inner_state, action, rng, logger);

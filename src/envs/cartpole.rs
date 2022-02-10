@@ -1,5 +1,5 @@
 use super::{BuildEnv, BuildEnvError, EnvStructure, Environment, Successor};
-use crate::logging::Logger;
+use crate::logging::StatsLogger;
 use crate::spaces::{Indexed, IndexedTypeSpace, IntervalSpace};
 use crate::Prng;
 use rand::distributions::{Distribution, Uniform};
@@ -123,7 +123,7 @@ impl Environment for CartPole {
         state: Self::State,
         action: &Self::Action,
         _: &mut Prng,
-        _: &mut dyn Logger,
+        _: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
         let applied_force = match action {
             Push::Left => -self.env.action_force,

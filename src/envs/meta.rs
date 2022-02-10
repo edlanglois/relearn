@@ -2,7 +2,7 @@
 use super::{
     BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment, Successor,
 };
-use crate::logging::Logger;
+use crate::logging::StatsLogger;
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
 use crate::Prng;
 
@@ -147,7 +147,7 @@ where
         state: Self::State,
         action: &Self::Action,
         rng: &mut Prng,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
         match state.inner_successor {
             Successor::Continue(prev_inner_state) => {

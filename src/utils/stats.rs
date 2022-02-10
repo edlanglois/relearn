@@ -19,17 +19,39 @@ impl<T: Zero> Default for OnlineMeanVariance<T> {
     }
 }
 
+impl<T: Zero> OnlineMeanVariance<T> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl<T: Copy> OnlineMeanVariance<T> {
     /// The mean of all accumulated values.
+    #[inline]
     pub fn mean(&self) -> T {
         self.mean
+    }
+
+    /// The number of accumulated samples.
+    #[inline]
+    pub fn count(&self) -> u64 {
+        self.count
     }
 }
 
 impl<T: Real> OnlineMeanVariance<T> {
     /// The (population) variance of all accumulated values.
     pub fn variance(&self) -> T {
-        self.squared_residual_sum / T::from(self.count).unwrap()
+        if self.count == 0 {
+            T::zero()
+        } else {
+            self.squared_residual_sum / T::from(self.count).unwrap()
+        }
+    }
+
+    /// The (population) standard deviation of all accumulated values.
+    pub fn stddev(&self) -> T {
+        self.variance().sqrt()
     }
 }
 

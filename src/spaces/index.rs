@@ -174,7 +174,7 @@ impl ParameterizedDistributionSpace<Tensor> for IndexSpace {
 /// Log the index as a sample from `0..N`
 impl ElementRefInto<Loggable> for IndexSpace {
     fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
-        Loggable::IndexSample {
+        Loggable::Index {
             value: self.to_index(element),
             size: self.size,
         }

@@ -6,7 +6,7 @@ use relearn::agents::{
 use relearn::envs::{
     fruit, BuildEnv, EnvStructure, Environment, FruitGame, StepLimit, WithStepLimit,
 };
-use relearn::logging::{CLILoggerConfig, TimeSeriesLogger};
+use relearn::logging::{DisplayLogger, StatsLogger};
 use relearn::simulation::{train_parallel, SimulationSummary, TrainParallelConfig};
 use relearn::spaces::{IndexedTypeSpace, Space};
 use relearn::torch::{
@@ -118,7 +118,7 @@ impl<O, A> BatchUpdate<O, A> for FruitLazyExpert {
     fn buffer(&self, _: BufferCapacityBound) -> Self::HistoryBuffer {
         NullBuffer
     }
-    fn batch_update<'a, I>(&mut self, _: I, _: &mut dyn TimeSeriesLogger)
+    fn batch_update<'a, I>(&mut self, _: I, _: &mut dyn StatsLogger)
     where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,
@@ -143,7 +143,6 @@ fn main() {
     let principal_config = FruitLazyExpert;
     let agent_config = AgentPair(principal_config, assistant_config);
 
-    let logger_config = CLILoggerConfig::default();
     let training_config = TrainParallelConfig {
         num_periods: 200,
         num_threads: num_cpus::get(),
@@ -153,7 +152,7 @@ fn main() {
     let mut rng = Prng::seed_from_u64(0);
     let env = env_config.build_env(&mut rng).unwrap();
     let mut agent = agent_config.build_agent(&env, &mut rng).unwrap();
-    let mut logger = logger_config.build_logger();
+    let mut logger = DisplayLogger::default();
 
     {
         let summary = SimulationSummary::from_steps(

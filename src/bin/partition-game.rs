@@ -1,14 +1,14 @@
 use rand::{Rng, SeedableRng};
 use relearn::agents::{ActorMode, Agent, BuildAgent};
 use relearn::envs::{BuildEnv, Environment, PartitionGame, StepLimit, WithStepLimit};
-use relearn::logging::CLILoggerConfig;
+use relearn::logging::DisplayLogger;
 use relearn::simulation::{train_parallel, SimulationSummary, TrainParallelConfig};
 use relearn::torch::{
     agents::ActorCriticConfig,
     critic::GaeConfig,
     modules::GruMlpConfig,
-    optimizers::AdamConfig,
-    updaters::{CriticLossUpdateRule, PpoPolicyUpdateRule, WithOptimizer},
+    optimizers::{AdamConfig, ConjugateGradientOptimizerConfig},
+    updaters::{CriticLossUpdateRule, TrpoPolicyUpdateRule, WithOptimizer},
 };
 use relearn::Prng;
 use tch::Device;
@@ -18,23 +18,23 @@ fn main() {
 
     let agent_config: ActorCriticConfig<
         GruMlpConfig,
-        WithOptimizer<PpoPolicyUpdateRule, AdamConfig>,
+        WithOptimizer<TrpoPolicyUpdateRule, ConjugateGradientOptimizerConfig>,
+        // WithOptimizer<PpoPolicyUpdateRule, AdamConfig>,
         GaeConfig<GruMlpConfig>,
         WithOptimizer<CriticLossUpdateRule, AdamConfig>,
     > = ActorCriticConfig {
         device: Device::Cuda(0),
         ..Default::default()
     };
-    let logger_config = CLILoggerConfig::default();
     let training_config = TrainParallelConfig {
         num_periods: 1000,
         num_threads: num_cpus::get(),
-        min_workers_steps: 50_000,
+        min_workers_steps: 5_000,
     };
     let mut rng = Prng::seed_from_u64(0);
     let env = env_config.build_env(&mut rng).unwrap();
     let mut agent = agent_config.build_agent(&env, &mut rng).unwrap();
-    let mut logger = logger_config.build_logger();
+    let mut logger = DisplayLogger::default();
 
     {
         let summary = SimulationSummary::from_steps(

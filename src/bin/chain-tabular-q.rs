@@ -1,14 +1,15 @@
 use rand::{Rng, SeedableRng};
 use relearn::agents::{ActorMode, Agent, BuildAgent, TabularQLearningAgentConfig};
 use relearn::envs::{BuildEnv, Chain, Environment};
-use relearn::logging::CLILoggerConfig;
+use relearn::logging::DisplayLogger;
 use relearn::simulation::{train_parallel, SimulationSummary, TrainParallelConfig};
 use relearn::Prng;
 
 fn main() {
     let env_config = Chain::default();
+    // let env_config =
+    //     relearn::envs::WithStepLimit::new(Chain::default(), relearn::envs::StepLimit::new(100));
     let agent_config = TabularQLearningAgentConfig::default();
-    let logger_config = CLILoggerConfig::default();
     let training_config = TrainParallelConfig {
         num_periods: 10,
         num_threads: num_cpus::get(),
@@ -18,7 +19,7 @@ fn main() {
     let mut rng = Prng::seed_from_u64(0);
     let env = env_config.build_env(&mut rng).unwrap();
     let mut agent = agent_config.build_agent(&env, &mut rng).unwrap();
-    let mut logger = logger_config.build_logger();
+    let mut logger = DisplayLogger::default();
 
     {
         let summary = SimulationSummary::from_steps(

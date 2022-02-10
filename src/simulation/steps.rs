@@ -1,7 +1,7 @@
 use super::{PartialStep, TransientStep};
 use crate::agents::Actor;
 use crate::envs::{Environment, Successor};
-use crate::logging::{Event, TimeSeriesLogger};
+use crate::logging::{Loggable, StatsLogger};
 use crate::Prng;
 use std::borrow::BorrowMut;
 use std::fmt;
@@ -55,7 +55,7 @@ where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
     R: BorrowMut<Prng>,
-    L: TimeSeriesLogger,
+    L: StatsLogger,
 {
     /// Execute one environment step then evaluate a closure on the resulting state.
     pub fn step_with<F, U>(&mut self, f: F) -> U
@@ -78,7 +78,7 @@ where
             env_state,
             &action,
             self.rng_env.borrow_mut(),
-            &mut self.logger.event_logger(Event::EnvStep),
+            &mut self.logger,
         );
 
         // Store the next state and observation if the environment continues.
@@ -120,7 +120,7 @@ where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
     R: BorrowMut<Prng>,
-    L: TimeSeriesLogger,
+    L: StatsLogger,
 {
     /// Cannot return a `TransientStep` without Generic Associated Types
     type Item = PartialStep<E::Observation, E::Action>;
@@ -141,7 +141,7 @@ where
     E: Environment,
     A: Actor<E::Observation, E::Action>,
     R: BorrowMut<Prng>,
-    L: TimeSeriesLogger,
+    L: StatsLogger,
 {
 }
 
@@ -175,31 +175,37 @@ where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
     R: BorrowMut<Prng>,
-    L: TimeSeriesLogger,
+    L: StatsLogger,
 {
     /// Cannot return a `TransientStep` without Generic Associated Types
     type Item = PartialStep<E::Observation, E::Action>;
 
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.simulator.step_with(|_, _, step, logger| {
+            // Check for flushing only on the first log of each episode boundary
+            logger.log_scalar("step/reward", step.reward);
+            // TODO: Log action and observation
             logger
-                .log(Event::EnvStep, "reward", step.reward.into())
+                .log_no_flush("step/count".into(), Loggable::CounterIncrement(1))
                 .unwrap();
-            logger.end_event(Event::EnvStep).unwrap();
             self.episode_reward += step.reward;
             self.episode_length += 1;
             if step.next.episode_done() {
                 logger
-                    .log(Event::EnvEpisode, "ep_reward", self.episode_reward.into())
-                    .unwrap();
-                logger
-                    .log(
-                        Event::EnvEpisode,
-                        "ep_length",
-                        (self.episode_length as f64).into(),
+                    .log_no_flush(
+                        "episode/reward".into(),
+                        Loggable::Scalar(self.episode_reward),
                     )
                     .unwrap();
-                logger.end_event(Event::EnvEpisode).unwrap();
+                logger
+                    .log_no_flush(
+                        "episode/length".into(),
+                        Loggable::Scalar(self.episode_length as f64),
+                    )
+                    .unwrap();
+                logger
+                    .log_no_flush("episode/count".into(), Loggable::CounterIncrement(1))
+                    .unwrap();
                 self.episode_reward = 0.0;
                 self.episode_length = 0;
             }

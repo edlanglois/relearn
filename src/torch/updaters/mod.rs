@@ -23,7 +23,7 @@ pub use with_optimizer::WithOptimizer;
 use super::critic::Critic;
 use super::features::PackedHistoryFeaturesView;
 use super::modules::SequenceModule;
-use crate::logging::TimeSeriesLogger;
+use crate::logging::StatsLogger;
 use tch::nn::VarStore;
 
 // TODO: Remove generic <AS> from all updater traits
@@ -54,7 +54,7 @@ pub trait UpdatePolicy<AS: ?Sized> {
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         action_space: &AS,
-        logger: &mut dyn TimeSeriesLogger,
+        logger: &mut dyn StatsLogger,
     ) -> PolicyStats;
 }
 
@@ -72,7 +72,7 @@ macro_rules! impl_wrapped_update_policy {
                 critic: &dyn Critic,
                 features: &dyn PackedHistoryFeaturesView,
                 action_space: &AS,
-                logger: &mut dyn TimeSeriesLogger,
+                logger: &mut dyn StatsLogger,
             ) -> PolicyStats {
                 T::update_policy(self, policy, critic, features, action_space, logger)
             }
@@ -100,7 +100,7 @@ pub trait UpdatePolicyWithOptimizer<O: ?Sized, AS: ?Sized> {
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
         action_space: &AS,
-        logger: &mut dyn TimeSeriesLogger,
+        logger: &mut dyn StatsLogger,
     ) -> PolicyStats;
 }
 
@@ -132,7 +132,7 @@ pub trait UpdateCritic {
         &mut self,
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
-        logger: &mut dyn TimeSeriesLogger,
+        logger: &mut dyn StatsLogger,
     );
 }
 
@@ -147,7 +147,7 @@ macro_rules! impl_wrapped_update_critic {
                 &mut self,
                 critic: &dyn Critic,
                 features: &dyn PackedHistoryFeaturesView,
-                logger: &mut dyn TimeSeriesLogger,
+                logger: &mut dyn StatsLogger,
             ) {
                 T::update_critic(self, critic, features, logger)
             }
@@ -173,6 +173,6 @@ pub trait UpdateCriticWithOptimizer<O: ?Sized> {
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
-        logger: &mut dyn TimeSeriesLogger,
+        logger: &mut dyn StatsLogger,
     );
 }

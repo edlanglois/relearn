@@ -4,7 +4,7 @@ use super::super::{
     optimizers::Optimizer,
 };
 use super::{PolicyStats, UpdatePolicyWithOptimizer};
-use crate::logging::{Event, TimeSeriesLogger};
+use crate::logging::StatsLogger;
 use crate::spaces::ParameterizedDistributionSpace;
 use crate::utils::distributions::ArrayDistribution;
 use tch::{Kind, Tensor};
@@ -43,9 +43,8 @@ where
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
         action_space: &AS,
-        logger: &mut dyn TimeSeriesLogger,
+        logger: &mut dyn StatsLogger,
     ) -> PolicyStats {
-        logger.start_event(Event::AgentPolicyOptStep).unwrap();
         let observation_features = features.observation_features();
         let batch_sizes = features.batch_sizes_tensor();
         let actions = features.actions();
@@ -78,12 +77,8 @@ where
         };
 
         let _ = optimizer
-            .backward_step(
-                &policy_surrogate_loss_fn,
-                &mut logger.event_logger(Event::AgentPolicyOptStep),
-            )
+            .backward_step(&policy_surrogate_loss_fn, logger)
             .unwrap();
-        logger.end_event(Event::AgentPolicyOptStep).unwrap();
 
         PolicyStats {
             entropy: Some(initial_policy_entropy),

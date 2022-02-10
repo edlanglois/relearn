@@ -4,7 +4,7 @@ use super::super::{
     optimizers::Optimizer,
 };
 use super::{PolicyStats, UpdatePolicyWithOptimizer};
-use crate::logging::{Event, TimeSeriesLogger};
+use crate::logging::StatsLogger;
 use crate::spaces::ParameterizedDistributionSpace;
 use crate::utils::distributions::ArrayDistribution;
 use std::cell::Cell;
@@ -26,9 +26,8 @@ where
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
         action_space: &AS,
-        logger: &mut dyn TimeSeriesLogger,
+        logger: &mut dyn StatsLogger,
     ) -> PolicyStats {
-        logger.start_event(Event::AgentPolicyOptStep).unwrap();
         let step_values = tch::no_grad(|| critic.seq_packed(features));
 
         let action_dist_params = policy.seq_packed(
@@ -44,13 +43,7 @@ where
             -(log_probs * &step_values).mean(Kind::Float)
         };
 
-        let _ = optimizer
-            .backward_step(
-                &policy_loss_fn,
-                &mut logger.event_logger(Event::AgentPolicyOptStep),
-            )
-            .unwrap();
-        logger.end_event(Event::AgentPolicyOptStep).unwrap();
+        let _ = optimizer.backward_step(&policy_loss_fn, logger).unwrap();
 
         let entropy = entropies.into_inner().unwrap().mean(Kind::Float).into();
         PolicyStats {

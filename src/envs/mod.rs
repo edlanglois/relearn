@@ -27,7 +27,7 @@ pub use partition::PartitionGame;
 pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 
 use crate::agents::Actor;
-use crate::logging::{Logger, TimeSeriesLogger};
+use crate::logging::StatsLogger;
 use crate::simulation::SimulatorSteps;
 use crate::spaces::Space;
 use crate::Prng;
@@ -121,14 +121,14 @@ pub trait Environment {
         state: Self::State,
         action: &Self::Action,
         rng: &mut Prng,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64);
 
     /// Run this environment with the given actor.
     fn run<T, L>(self, actor: T, seed: u64, logger: L) -> SimulatorSteps<Self, T, Prng, L>
     where
         T: Actor<Self::Observation, Self::Action>,
-        L: TimeSeriesLogger,
+        L: StatsLogger,
         Self: Sized,
     {
         let mut rng_env = Prng::seed_from_u64(seed);
@@ -155,7 +155,7 @@ macro_rules! impl_wrapped_environment {
                 state: Self::State,
                 action: &Self::Action,
                 rng: &mut Prng,
-                logger: &mut dyn Logger,
+                logger: &mut dyn StatsLogger,
             ) -> (Successor<Self::State>, f64) {
                 T::step(self, state, action, rng, logger)
             }

@@ -1,6 +1,6 @@
 use super::{Actor, ActorMode, Agent, BatchUpdate, BufferCapacityBound, WriteHistoryBuffer};
 use crate::envs::Successor;
-use crate::logging::TimeSeriesLogger;
+use crate::logging::StatsLogger;
 use crate::simulation::{PartialStep, Step};
 use crate::spaces::FiniteSpace;
 use crate::Prng;
@@ -94,7 +94,7 @@ where
         }
     }
 
-    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
     where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,

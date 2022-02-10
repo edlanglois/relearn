@@ -6,7 +6,7 @@ use super::{
     BuildCriticUpdater, BuildPolicyUpdater, PolicyStats, UpdateCritic, UpdateCriticWithOptimizer,
     UpdatePolicy, UpdatePolicyWithOptimizer,
 };
-use crate::logging::TimeSeriesLogger;
+use crate::logging::StatsLogger;
 use tch::nn::VarStore;
 
 /// An updater constructed from an update rule and an optimizer.
@@ -27,7 +27,7 @@ where
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
         action_space: &AS,
-        logger: &mut dyn TimeSeriesLogger,
+        logger: &mut dyn StatsLogger,
     ) -> PolicyStats {
         self.update_rule.update_policy_with_optimizer(
             policy,
@@ -48,7 +48,7 @@ where
         &mut self,
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
-        logger: &mut dyn TimeSeriesLogger,
+        logger: &mut dyn StatsLogger,
     ) {
         self.update_rule
             .update_critic_with_optimizer(critic, features, &mut self.optimizer, logger)

@@ -1,5 +1,5 @@
 use super::{CloneBuild, EnvStructure, Environment, Successor};
-use crate::logging::Logger;
+use crate::logging::StatsLogger;
 use crate::spaces::IndexSpace;
 use crate::Prng;
 use rand::prelude::*;
@@ -93,7 +93,7 @@ impl Environment for MemoryGame {
         state: Self::State,
         action: &Self::Action,
         _: &mut Prng,
-        _: &mut dyn Logger,
+        _: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
         let (current_state, initial_state) = state;
         if current_state == self.num_actions + self.history_len - 1 {

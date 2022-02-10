@@ -30,7 +30,7 @@
 
 use super::super::utils;
 use super::{BaseOptimizer, BuildOptimizer, OptimizerStepError, TrustRegionOptimizer};
-use crate::logging::{Logger, LoggerHelper};
+use crate::logging::StatsLogger;
 use std::borrow::Borrow;
 use std::convert::Infallible;
 use tch::{nn::VarStore, Tensor};
@@ -108,7 +108,7 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
         &self,
         loss_distance_fn: &dyn Fn() -> (Tensor, Tensor),
         max_distance: f64,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> Result<f64, OptimizerStepError> {
         let (loss, distance) = loss_distance_fn();
 
@@ -150,7 +150,7 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
             x if x.is_nan() => 1.0,
             x => x,
         };
-        logger.unwrap_log("step_size", step_size);
+        logger.log_scalar("step_size", step_size);
 
         let descent_step = step_size * step_dir;
         let initial_loss: f64 = loss.into();
@@ -176,7 +176,7 @@ impl ConjugateGradientOptimizer {
         loss_constraint_fn: &F,
         max_constraint_value: f64,
         initial_loss: f64,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> Result<(), OptimizerStepError>
     where
         F: Fn() -> (Tensor, Tensor) + ?Sized,
@@ -189,7 +189,7 @@ impl ConjugateGradientOptimizer {
 
         let mut loss = initial_loss;
         let mut constraint_val = f64::INFINITY;
-        logger.unwrap_log("initial_loss", loss);
+        logger.log_scalar("initial_loss", loss);
         for i in 0..self.config.max_backtracks {
             let ratio = self.config.backtrack_ratio.powi(i.try_into().unwrap());
 
@@ -208,14 +208,14 @@ impl ConjugateGradientOptimizer {
             loss = loss_tensor.into();
             constraint_val = constraint_tensor.into();
             if loss < initial_loss && constraint_val <= max_constraint_value {
-                logger.unwrap_log("num_backtracks", i as f64);
-                logger.unwrap_log("step_scale", ratio);
+                logger.log_scalar("num_backtracks", i as f64);
+                logger.log_scalar("step_scale", ratio);
                 break;
             }
         }
 
-        logger.unwrap_log("final_loss", loss);
-        logger.unwrap_log("final_constraint_val", constraint_val);
+        logger.log_scalar("final_loss", loss);
+        logger.log_scalar("final_constraint_val", constraint_val);
 
         let result = if loss.is_nan() {
             Err(OptimizerStepError::NaNLoss)
@@ -359,8 +359,9 @@ impl MatrixVectorProduct for Tensor {
 /// # Reference
 /// * <https://en.wikipedia.org/wiki/Conjugate_gradient_method>
 /// * <https://github.com/rlworkgroup/garage/blob/90b60905b29cea8f8373c6732ced0cadf8489b0c/src/garage/torch/optimizers/conjugate_gradient_optimizer.py>
+#[allow(non_snake_case)]
 fn solve_conjugate_gradient<T: MatrixVectorProduct<Vector = Tensor>>(
-    #[allow(non_snake_case)] f_Ax: &T,
+    f_Ax: &T,
     b: &Tensor,
     iterations: u64,
     residual_tol: f64,

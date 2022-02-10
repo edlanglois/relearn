@@ -3,7 +3,7 @@ use super::{
     WriteHistoryBuffer,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
-use crate::logging::TimeSeriesLogger;
+use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::spaces::{Space, TupleSpace2};
 use crate::Prng;
@@ -69,7 +69,7 @@ where
         HistoryBufferPair(self.0.buffer(capacity), self.1.buffer(capacity))
     }
 
-    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
     where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,

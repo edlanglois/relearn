@@ -1,6 +1,6 @@
 //! Generic Markov Decision Processes
 use super::{CloneBuild, EnvDistribution, EnvStructure, Environment, Successor};
-use crate::logging::Logger;
+use crate::logging::StatsLogger;
 use crate::spaces::IndexSpace;
 use crate::Prng;
 use ndarray::{Array2, Axis};
@@ -71,7 +71,7 @@ where
         state: Self::State,
         action: &Self::Action,
         rng: &mut Prng,
-        _: &mut dyn Logger,
+        _: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
         let (successor_distribution, reward_distribution) = &self.transitions[(state, *action)];
         let next_state = successor_distribution.sample(rng);

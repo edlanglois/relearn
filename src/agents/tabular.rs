@@ -5,7 +5,7 @@ use super::{
     Actor, ActorMode, Agent, BatchUpdate, BufferCapacityBound, BuildAgent, BuildAgentError,
 };
 use crate::envs::EnvStructure;
-use crate::logging::TimeSeriesLogger;
+use crate::logging::StatsLogger;
 use crate::simulation::TransientStep;
 use crate::spaces::FiniteSpace;
 use crate::Prng;
@@ -156,7 +156,7 @@ impl BatchUpdate<usize, usize> for BaseTabularQLearningAgent {
         SimpleBuffer::new(capacity)
     }
 
-    fn batch_update<'a, I>(&mut self, buffers: I, _logger: &mut dyn TimeSeriesLogger)
+    fn batch_update<'a, I>(&mut self, buffers: I, _logger: &mut dyn StatsLogger)
     where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,

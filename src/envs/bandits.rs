@@ -1,6 +1,6 @@
 //! Multi-armed bandit environments
 use super::{CloneBuild, EnvDistribution, EnvStructure, Environment, Successor};
-use crate::logging::Logger;
+use crate::logging::StatsLogger;
 use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use crate::Prng;
@@ -63,7 +63,7 @@ impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
         _state: Self::State,
         action: &Self::Action,
         rng: &mut Prng,
-        _logger: &mut dyn Logger,
+        _logger: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
         let reward = self.distributions[*action].sample(rng);
         (Successor::Terminate, reward)

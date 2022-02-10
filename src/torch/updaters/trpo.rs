@@ -6,7 +6,7 @@ use super::super::{
     optimizers::{OptimizerStepError, TrustRegionOptimizer},
 };
 use super::{PolicyStats, UpdatePolicyWithOptimizer};
-use crate::logging::{Event, TimeSeriesLogger, TimeSeriesLoggerHelper};
+use crate::logging::StatsLogger;
 use crate::spaces::ParameterizedDistributionSpace;
 use crate::utils::distributions::ArrayDistribution;
 use tch::{Kind, Tensor};
@@ -43,9 +43,8 @@ where
         features: &dyn PackedHistoryFeaturesView,
         optimizer: &mut O,
         action_space: &AS,
-        logger: &mut dyn TimeSeriesLogger,
+        logger: &mut dyn StatsLogger,
     ) -> PolicyStats {
-        logger.start_event(Event::AgentPolicyOptStep).unwrap();
         let _cudnn_disable_guard = if policy.has_cudnn_second_derivatives() {
             None
         } else {
@@ -95,9 +94,8 @@ where
         let result = optimizer.trust_region_backward_step(
             &policy_loss_distance_fn,
             self.max_policy_step_kl,
-            &mut logger.event_logger(Event::AgentPolicyOptStep),
+            logger,
         );
-        logger.end_event(Event::AgentPolicyOptStep).unwrap();
 
         if let Err(error) = result {
             match error {
@@ -105,8 +103,10 @@ where
                 OptimizerStepError::NaNConstraint => {
                     panic!("NaN constraint in policy optimization")
                 }
-                e => logger.unwrap_log(Event::AgentOptPeriod, "no_policy_step", e.to_string()),
-            }
+                e => logger
+                    .log("no_policy_step".into(), e.to_string().into())
+                    .unwrap(),
+            };
         }
 
         PolicyStats {

@@ -3,7 +3,7 @@ use super::{
     BuildAgentError,
 };
 use crate::envs::EnvStructure;
-use crate::logging::TimeSeriesLogger;
+use crate::logging::StatsLogger;
 use crate::spaces::{SampleSpace, Space};
 use crate::Prng;
 use std::fmt;
@@ -80,7 +80,7 @@ impl<O, AS: Space> BatchUpdate<O, AS::Element> for RandomAgent<AS> {
         NullBuffer
     }
 
-    fn batch_update<'a, I>(&mut self, _buffers: I, _logger: &mut dyn TimeSeriesLogger)
+    fn batch_update<'a, I>(&mut self, _buffers: I, _logger: &mut dyn StatsLogger)
     where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,

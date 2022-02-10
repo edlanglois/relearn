@@ -4,7 +4,7 @@ use super::super::{
     BufferCapacityBound, BuildAgent, BuildAgentError,
 };
 use crate::envs::EnvStructure;
-use crate::logging::TimeSeriesLogger;
+use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::spaces::FiniteSpace;
 use crate::utils::iter::ArgMaxBy;
@@ -175,7 +175,7 @@ impl BatchUpdate<usize, usize> for Arc<BaseUCB1Agent> {
         SimpleBuffer::new(capacity)
     }
 
-    fn batch_update<'a, I>(&mut self, buffers: I, _logger: &mut dyn TimeSeriesLogger)
+    fn batch_update<'a, I>(&mut self, buffers: I, _logger: &mut dyn StatsLogger)
     where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,

@@ -1,7 +1,7 @@
 use rand::{Rng, SeedableRng};
 use relearn::agents::{ActorMode, Agent, BuildAgent};
 use relearn::envs::{BuildEnv, Environment, FirstPlayerView, FruitGame, StepLimit, WithStepLimit};
-use relearn::logging::CLILoggerConfig;
+use relearn::logging::DisplayLogger;
 use relearn::simulation::{train_parallel, SimulationSummary, TrainParallelConfig};
 use relearn::torch::{
     agents::ActorCriticConfig,
@@ -28,7 +28,6 @@ fn main() {
         device: Device::Cuda(0),
         ..Default::default()
     };
-    let logger_config = CLILoggerConfig::default();
     let training_config = TrainParallelConfig {
         num_periods: 200,
         num_threads: num_cpus::get(),
@@ -37,7 +36,7 @@ fn main() {
     let mut rng = Prng::seed_from_u64(0);
     let env = env_config.build_env(&mut rng).unwrap();
     let mut agent = agent_config.build_agent(&env, &mut rng).unwrap();
-    let mut logger = logger_config.build_logger();
+    let mut logger = DisplayLogger::default();
 
     {
         let summary = SimulationSummary::from_steps(

@@ -5,7 +5,7 @@ pub use steps::{SimulationSummary, SimulatorSteps};
 
 use crate::agents::{ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
 use crate::envs::{Environment, Successor};
-use crate::logging::TimeSeriesLogger;
+use crate::logging::StatsLogger;
 use crate::Prng;
 use rand::SeedableRng;
 use std::iter;
@@ -81,7 +81,7 @@ pub fn train_serial<T, E>(
     num_periods: usize,
     rng_env: &mut Prng,
     rng_agent: &mut Prng,
-    logger: &mut dyn TimeSeriesLogger,
+    logger: &mut dyn StatsLogger,
 ) where
     T: Agent<E::Observation, E::Action> + ?Sized,
     E: Environment + ?Sized,
@@ -111,7 +111,7 @@ pub fn train_serial_callback<T, E, F>(
     num_periods: usize,
     rng_env: &mut Prng,
     rng_agent: &mut Prng,
-    logger: &mut dyn TimeSeriesLogger,
+    logger: &mut dyn StatsLogger,
 ) where
     T: Agent<E::Observation, E::Action> + ?Sized,
     E: Environment + ?Sized,
@@ -156,7 +156,7 @@ pub fn train_parallel<T, E>(
     config: &TrainParallelConfig,
     rng_env: &mut Prng,
     rng_agent: &mut Prng,
-    logger: &mut dyn TimeSeriesLogger,
+    logger: &mut dyn StatsLogger,
 ) where
     E: Environment + Sync + ?Sized,
     T: Agent<E::Observation, E::Action> + ?Sized,

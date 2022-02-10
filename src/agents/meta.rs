@@ -7,7 +7,7 @@ use crate::envs::{
     EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
     Successor,
 };
-use crate::logging::TimeSeriesLogger;
+use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::spaces::{NonEmptySpace, Space};
 use crate::Prng;
@@ -175,7 +175,7 @@ where
         NullBuffer
     }
 
-    fn batch_update<'a, I>(&mut self, _buffers: I, _logger: &mut dyn TimeSeriesLogger)
+    fn batch_update<'a, I>(&mut self, _buffers: I, _logger: &mut dyn StatsLogger)
     where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,

@@ -5,7 +5,7 @@ mod coptimizer;
 pub use conjugate_gradient::{ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig};
 pub use coptimizer::{AdamConfig, AdamWConfig, RmsPropConfig, SgdConfig};
 
-use crate::logging::Logger;
+use crate::logging::StatsLogger;
 use std::error::Error;
 use tch::{nn::VarStore, Tensor};
 use thiserror::Error;
@@ -41,7 +41,7 @@ pub trait Optimizer: BaseOptimizer {
     fn backward_step(
         &mut self,
         loss_fn: &dyn Fn() -> Tensor,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> Result<Tensor, OptimizerStepError>;
 }
 
@@ -61,7 +61,7 @@ pub trait OnceOptimizer: BaseOptimizer {
     /// For example, [`COptimizer`] sets parameters to NaN when the loss is NaN.
     ///
     /// [`COptimizer`]: tch::COptimizer
-    fn step_once(&self, logger: &mut dyn Logger) -> Result<(), OptimizerStepError>;
+    fn step_once(&self, logger: &mut dyn StatsLogger) -> Result<(), OptimizerStepError>;
 
     /// Apply a backward step pass, update the gradients, and perform an optimization step.
     ///
@@ -84,7 +84,7 @@ pub trait OnceOptimizer: BaseOptimizer {
     fn backward_step_once(
         &mut self,
         loss: &Tensor,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> Result<(), OptimizerStepError>;
 }
 
@@ -92,7 +92,7 @@ impl<T: OnceOptimizer> Optimizer for T {
     fn backward_step(
         &mut self,
         loss_fn: &dyn Fn() -> Tensor,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> Result<Tensor, OptimizerStepError> {
         let loss = loss_fn();
         self.backward_step_once(&loss, logger)?;
@@ -125,7 +125,7 @@ pub trait TrustRegionOptimizer: BaseOptimizer {
         &self,
         loss_distance_fn: &dyn Fn() -> (Tensor, Tensor),
         max_distance: f64,
-        logger: &mut dyn Logger,
+        logger: &mut dyn StatsLogger,
     ) -> Result<f64, OptimizerStepError>;
 }
 

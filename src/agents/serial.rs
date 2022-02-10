@@ -1,6 +1,6 @@
 //! Combined actor-agent. Prefer using simulation functions instead.
 use super::{Actor, ActorMode, Agent, WriteHistoryBuffer};
-use crate::logging::TimeSeriesLogger;
+use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::Prng;
 use std::fmt;
@@ -51,7 +51,7 @@ where
     /// Update with the most recent step result.
     ///
     /// This step must correspond to the most recent call to `Actor::act`.
-    pub fn update(&mut self, step: PartialStep<O, A>, logger: &mut dyn TimeSeriesLogger) {
+    pub fn update(&mut self, step: PartialStep<O, A>, logger: &mut dyn StatsLogger) {
         let full = self.buffer.push(step);
         if full {
             self.actor = None; // Agent cannot be updated while an actor exists.

@@ -7,7 +7,7 @@ use super::super::{
 use crate::agents::buffers::{BufferCapacityBound, SimpleBuffer, WriteHistoryBuffer};
 use crate::agents::{Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError};
 use crate::envs::EnvStructure;
-use crate::logging::{Event, Logger, LoggerHelper, TimeSeriesLogger, TimeSeriesLoggerHelper};
+use crate::logging::StatsLogger;
 use crate::spaces::{
     EncoderFeatureSpace, NonEmptyFeatures, NumFeatures, ParameterizedDistributionSpace, ReprSpace,
 };
@@ -15,6 +15,7 @@ use crate::Prng;
 use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::time::Instant;
 use tch::{nn::VarStore, Device, Tensor};
 
 /// Configuration for [`ActorCriticAgent`]
@@ -230,11 +231,13 @@ where
         SimpleBuffer::new(capacity)
     }
 
-    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn TimeSeriesLogger)
+    fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
     where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,
     {
+        let agent_update_start = Instant::now();
+
         // TODO: Avoid collecting buffers into a vec
         let buffers: Vec<_> = buffers.into_iter().collect();
         let features = LazyPackedHistoryFeatures::new(
@@ -245,17 +248,16 @@ where
             self.device,
         );
 
-        let mut update_logger = logger.event_logger(Event::AgentOptPeriod);
-        let mut history_logger = update_logger.scope("history");
-
-        history_logger.unwrap_log_scalar("num_steps", features.num_steps() as f64);
-        history_logger.unwrap_log_scalar("num_episodes", features.num_episodes() as f64);
+        let mut history_logger = logger.with_scope("history");
+        history_logger.log_scalar("num_steps", features.num_steps() as f64);
+        history_logger.log_scalar("num_episodes", features.num_episodes() as f64);
         if features.is_empty() {
-            history_logger.unwrap_log("no_model_update", "Skipping update; empty history");
+            history_logger.log_message("no_model_update", "Skipping update; empty history");
             return;
         }
 
-        let mut policy_logger = logger.scope("policy");
+        let mut policy_logger = logger.with_scope("policy");
+        let policy_update_start = Instant::now();
         let policy_stats = self.policy_updater.update_policy(
             &self.policy,
             &self.critic,
@@ -263,20 +265,24 @@ where
             &self.shared.action_space,
             &mut policy_logger,
         );
+        policy_logger.log_duration("update", policy_update_start.elapsed());
         if let Some(entropy) = policy_stats.entropy {
-            policy_logger.unwrap_log_scalar(Event::AgentOptPeriod, "entropy", entropy);
+            policy_logger.log_scalar("entropy", entropy);
         }
 
-        let mut critic_logger = logger.scope("critic");
+        let mut critic_logger = logger.with_scope("critic");
+        let critic_update_start = Instant::now();
         self.critic_updater
             .update_critic(&self.critic, &features, &mut critic_logger);
+        critic_logger.log_duration("update", critic_update_start.elapsed());
 
         // Empty the buffers
         for buffer in buffers {
             buffer.clear()
         }
 
-        logger.end_event(Event::AgentOptPeriod).unwrap();
+        logger.log_duration("agent_update", agent_update_start.elapsed());
+        logger.log_counter_increment("agent_updates", 1);
     }
 }
 
