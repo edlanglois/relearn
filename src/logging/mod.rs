@@ -18,17 +18,18 @@ pub trait StatsLogger: Send {
     /// Log a value associated with an ID.
     ///
     /// # Args
-    /// * `id` - Unique identifier of the statistic to log. Used to track the value over time.
-    ///          It is an error to use the same identifier with values that have different
-    ///          [`Loggable`] variants or are otherwise structurally incompatible.
+    /// * `id` -
+    ///     Unique identifier of the statistic to log. Used to track the value over time.
+    ///     It is an error to use the same identifier with values that have different
+    ///     [`Loggable`] variants or are otherwise structurally incompatible.
     ///
-    ///          The id can be created from a string with `into()`.
-    ///          It is recommended that users pass ids containing the name only, not a namespace.
-    ///          Namespaces should be managed with [`StatsLogger::with_scope`].
+    ///     The id can be created from a string with `into()`.
+    ///     It is recommended that users pass ids containing the name only, not a namespace.
+    ///     Namespaces should be managed with [`StatsLogger::with_scope`].
     ///
-    ///          The namespace on the id is used to internally track scope and, unexpectedly
-    ///          for the external interface, it is an **outer** namespace.
-    ///          Loggers may append inner namespaces.
+    ///     The namespace on the id is used to internally track scope and, unexpectedly
+    ///     for the external interface, it is an **outer** namespace.
+    ///     Loggers may append inner namespaces.
     ///
     /// * `value` - The value to log.
     fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError>;
@@ -37,13 +38,13 @@ pub trait StatsLogger: Send {
     ///
     /// Useful in a sequence of logs or in high frequency logs to avoid the cost of checking each
     /// time.
-    /// See [`log`] for more documentation.
+    /// See [`StatsLogger::log`] for more documentation.
     fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError>;
 
     /// Record any remaining data in the logger that has not yet been recorded.
     fn flush(&mut self);
 
-    /// Wrap such that an inner scope is added to all logged ids.
+    /// Wrap this logger such that an inner scope is added to all logged ids.
     ///
     /// This can be called on a reference for a temporary scope: `(&mut logger).with_scope(...)`
     fn with_scope(self, scope: &'static str) -> ScopedLogger<Self>
