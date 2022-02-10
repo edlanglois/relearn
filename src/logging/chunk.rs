@@ -38,7 +38,7 @@ impl<B: LoggerBackend> ChunkLogger<B> {
 
 impl<B: Default + LoggerBackend> Default for ChunkLogger<B> {
     fn default() -> Self {
-        Self::from_backend(Duration::from_secs(1), B::default())
+        Self::from_backend(Duration::from_secs(5), B::default())
     }
 }
 
