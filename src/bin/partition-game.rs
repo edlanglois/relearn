@@ -1,6 +1,6 @@
 use rand::{Rng, SeedableRng};
 use relearn::agents::{ActorMode, Agent, BuildAgent};
-use relearn::envs::{BuildEnv, Environment, PartitionGame, StepLimit, WithStepLimit};
+use relearn::envs::{BuildEnv, Environment, PartitionGame};
 use relearn::logging::DisplayLogger;
 use relearn::simulation::{train_parallel, SimulationSummary, TrainParallelConfig};
 use relearn::torch::{
@@ -14,7 +14,7 @@ use relearn::Prng;
 use tch::Device;
 
 fn main() {
-    let env_config = WithStepLimit::new(PartitionGame::default(), StepLimit::new(1000));
+    let env_config = PartitionGame::default().with_step_limit(1000);
 
     let agent_config: ActorCriticConfig<
         GruMlpConfig,

@@ -7,8 +7,7 @@ use relearn::Prng;
 
 fn main() {
     let env_config = Chain::default();
-    // let env_config =
-    //     relearn::envs::WithStepLimit::new(Chain::default(), relearn::envs::StepLimit::new(100));
+    // let env_config = Chain::default().with_step_limit(100);
     let agent_config = TabularQLearningAgentConfig::default();
     let training_config = TrainParallelConfig {
         num_periods: 10,

@@ -135,6 +135,14 @@ pub trait Environment {
         let rng_actor = Prng::from_rng(&mut rng_env).unwrap();
         SimulatorSteps::new(self, actor, rng_env, rng_actor, logger)
     }
+
+    /// Wrap the environment in an episode step limit.
+    fn with_step_limit(self, max_steps_per_episode: u64) -> WithStepLimit<Self>
+    where
+        Self: Sized,
+    {
+        Wrapped::new(self, StepLimit::new(max_steps_per_episode))
+    }
 }
 
 /// Implement `Environment` for a deref-able wrapper type generic over `T: Environment + ?Sized`.
