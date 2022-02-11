@@ -76,25 +76,29 @@ impl<'a> fmt::Display for DisplaySummary<'a> {
                     let period = duration_div_u64(*self.elapsed, *increment);
                     write!(
                         f,
-                        "  {:.2} Hz  {:?} /it",
-                        PrettyFloat(period.as_secs_f64().recip()),
-                        period
+                        "  {:.2}  {:.3}/it",
+                        Frequency::from_period(period),
+                        PrettyPrint(period)
                     )?;
                 }
                 Ok(())
             }
             ChunkSummary::Duration { stats } => {
                 let mean = stats.mean();
-                write!(f, "{:?}", Duration::from_secs_f64(mean))?;
+                write!(f, "{:.4}", PrettyPrint(Duration::from_secs_f64(mean)))?;
                 if stats.count() > 1 {
-                    write!(f, "  (σ {:?})", Duration::from_secs_f64(stats.stddev()))?;
+                    write!(
+                        f,
+                        "  (σ {:.4})",
+                        PrettyPrint(Duration::from_secs_f64(stats.stddev()))
+                    )?;
                 }
                 write!(f, "  {:.2}%", mean / self.elapsed.as_secs_f64() * 100.0)
             }
             ChunkSummary::Scalar { stats } => {
-                write!(f, "{:.3}", PrettyFloat(stats.mean()))?;
+                write!(f, "{:.3}", PrettyPrint(stats.mean()))?;
                 if stats.count() > 1 {
-                    write!(f, "  (σ {:.3})", PrettyFloat(stats.stddev()))?;
+                    write!(f, "  (σ {:.3})", PrettyPrint(stats.stddev()))?;
                 }
                 Ok(())
             }
@@ -122,17 +126,51 @@ impl<'a> fmt::Display for DisplaySummary<'a> {
     }
 }
 
-/// Pretty-printing of floating-point numbers
+/// Pretty-printing
 #[derive(Debug, Default, Copy, Clone, PartialEq, PartialOrd)]
-pub struct PrettyFloat(pub f64);
+pub struct PrettyPrint<T>(pub T);
 
-impl fmt::Display for PrettyFloat {
+impl fmt::Display for PrettyPrint<f64> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0 >= 1e6 || self.0 < 1e-4 {
+        if self.0 >= 1e6 || self.0 <= 1e-4 {
             fmt::LowerExp::fmt(&self.0, f)
         } else {
             fmt::Display::fmt(&self.0, f)
         }
+    }
+}
+
+impl fmt::Display for PrettyPrint<Duration> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // The built-in debug output works
+        fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+pub struct Frequency(f64);
+
+impl Frequency {
+    pub fn from_period(period: Duration) -> Self {
+        Self(period.as_secs_f64().recip())
+    }
+}
+
+impl fmt::Display for Frequency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = self.0;
+        // Half-open ranges in match statements are not yet stable; have to use if instead.
+        let (coef, unit) = if (1e3..1e6).contains(&value) {
+            (value / 1e3, "kHz")
+        } else if (1e6..1e9).contains(&value) {
+            (value / 1e6, "MHz")
+        } else if (1e9..1e12).contains(&value) {
+            (value / 1e9, "GHz")
+        } else {
+            (value, "Hz")
+        };
+        fmt::Display::fmt(&PrettyPrint(coef), f)?;
+        f.write_str(unit)
     }
 }
 
