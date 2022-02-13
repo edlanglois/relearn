@@ -27,6 +27,7 @@ slice-of-array = "=0.3.1" # pinned b/c low popularity; audit code on change
 smallvec = { version = "1.7", features = ["union"] }
 tch = "0.6"
 thiserror = "1.0"
+yansi = "0.5.0"
 
 [dev-dependencies]
 rstest = "0.12"

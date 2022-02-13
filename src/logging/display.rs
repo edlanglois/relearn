@@ -3,6 +3,7 @@ use super::chunk::{ChunkLogger, ChunkSummary, LoggerBackend};
 use super::Id;
 use std::fmt;
 use std::time::Duration;
+use yansi::Paint;
 
 /// Configuration for [`DisplayLogger`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -50,7 +51,11 @@ impl LoggerBackend for DisplayBackend {
         let elapsed = &elapsed;
         println!();
         for (id, summary) in summaries {
-            println!("{}: {}", id, DisplaySummary { summary, elapsed });
+            println!(
+                "{:<24} {}",
+                Paint::fixed(35, id),
+                DisplaySummary { summary, elapsed }
+            );
         }
     }
 }
@@ -62,23 +67,28 @@ struct DisplaySummary<'a> {
 }
 
 impl<'a> fmt::Display for DisplaySummary<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.summary {
             ChunkSummary::Nothing => Ok(()),
             ChunkSummary::Counter {
                 increment,
                 initial_value,
             } => {
-                write!(f, "{}  (+ {})", initial_value + increment, increment,)?;
+                write!(
+                    f,
+                    "{}  (+{})",
+                    initial_value + increment,
+                    Paint::fixed(253, increment)
+                )?;
                 if *increment > 5 {
                     // Not very accurate unless have several increments in this chunk
                     // because part of the time might have been outside of this chunk
                     let period = duration_div_u64(*self.elapsed, *increment);
                     write!(
                         f,
-                        "  {:.2}  {:.3}/it",
-                        Frequency::from_period(period),
-                        PrettyPrint(period)
+                        "  {:.2}  {:.3}",
+                        Paint::fixed(111, Frequency::from_period(period)),
+                        Paint::fixed(111, PrettyPrint(period))
                     )?;
                 }
                 Ok(())
@@ -89,16 +99,41 @@ impl<'a> fmt::Display for DisplaySummary<'a> {
                 if stats.count() > 1 {
                     write!(
                         f,
-                        "  (σ {:.4})",
-                        PrettyPrint(Duration::from_secs_f64(stats.stddev()))
+                        " {}",
+                        Paint::fixed(
+                            8,
+                            DisplayFn(|f| write!(
+                                f,
+                                "(σ {:.4})",
+                                PrettyPrint(Duration::from_secs_f64(stats.stddev()))
+                            ))
+                        )
                     )?;
                 }
-                write!(f, "  {:.2}%", mean / self.elapsed.as_secs_f64() * 100.0)
+                write!(
+                    f,
+                    " {}",
+                    Paint::fixed(
+                        221,
+                        DisplayFn(|f| write!(
+                            f,
+                            "{:.2}%",
+                            mean / self.elapsed.as_secs_f64() * 100.0
+                        ))
+                    )
+                )
             }
             ChunkSummary::Scalar { stats } => {
                 write!(f, "{:.3}", PrettyPrint(stats.mean()))?;
                 if stats.count() > 1 {
-                    write!(f, "  (σ {:.3})", PrettyPrint(stats.stddev()))?;
+                    write!(
+                        f,
+                        " {}",
+                        Paint::fixed(
+                            8,
+                            DisplayFn(|f| write!(f, "(σ {:.3})", PrettyPrint(stats.stddev())))
+                        )
+                    )?;
                 }
                 Ok(())
             }
@@ -131,8 +166,9 @@ impl<'a> fmt::Display for DisplaySummary<'a> {
 pub struct PrettyPrint<T>(pub T);
 
 impl fmt::Display for PrettyPrint<f64> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0 >= 1e6 || self.0 <= 1e-4 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let magnitude = self.0.abs();
+        if (magnitude >= 1e6 || magnitude <= 1e-4) && self.0 != 0.0 {
             fmt::LowerExp::fmt(&self.0, f)
         } else {
             fmt::Display::fmt(&self.0, f)
@@ -141,7 +177,7 @@ impl fmt::Display for PrettyPrint<f64> {
 }
 
 impl fmt::Display for PrettyPrint<Duration> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // The built-in debug output works
         fmt::Debug::fmt(&self.0, f)
     }
@@ -157,7 +193,7 @@ impl Frequency {
 }
 
 impl fmt::Display for Frequency {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let value = self.0;
         // Half-open ranges in match statements are not yet stable; have to use if instead.
         let (coef, unit) = if (1e3..1e6).contains(&value) {
@@ -171,6 +207,22 @@ impl fmt::Display for Frequency {
         };
         fmt::Display::fmt(&PrettyPrint(coef), f)?;
         f.write_str(unit)
+    }
+}
+
+/// Wraps a closure as the Display implementation
+#[derive(Debug)]
+pub struct DisplayFn<F>(F)
+where
+    // Bounded here so that the closure type does not have to be specified on creation
+    F: Fn(&mut fmt::Formatter) -> fmt::Result;
+
+impl<F> fmt::Display for DisplayFn<F>
+where
+    F: Fn(&mut fmt::Formatter) -> fmt::Result,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        (self.0)(f)
     }
 }
 

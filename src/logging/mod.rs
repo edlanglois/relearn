@@ -193,11 +193,35 @@ pub struct Id {
 }
 
 impl fmt::Display for Id {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let total_len = self.name.len() + self.namespace.iter().map(|s| s.len() + 1).sum::<usize>();
+
+        // Pad on the left for right alignment if necessary
+        if let Some(width) = f.width() {
+            if width > total_len && matches!(f.align(), Some(fmt::Alignment::Right)) {
+                let c = f.fill();
+                for _ in 0..(width - total_len) {
+                    write!(f, "{}", c)?;
+                }
+            }
+        }
+
         for scope in &self.namespace {
             write!(f, "{}/", scope)?;
         }
-        write!(f, "{}", self.name)
+        write!(f, "{}", self.name)?;
+
+        // Pad on the right for left alignment if necessary
+        if let Some(width) = f.width() {
+            if width > total_len && matches!(f.align(), Some(fmt::Alignment::Left)) {
+                let c = f.fill();
+                for _ in 0..(width - total_len) {
+                    write!(f, "{}", c)?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
