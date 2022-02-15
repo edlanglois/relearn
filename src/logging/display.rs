@@ -226,20 +226,13 @@ where
     }
 }
 
-const NANOS_PER_SEC: u64 = 1_000_000_000;
-
 /// Divide a `Duration` by `u64`
 fn duration_div_u64(d: Duration, x: u64) -> Duration {
-    assert_ne!(x, 0);
-    let d_secs = d.as_secs();
-    let d_nanos = d.subsec_nanos();
-
-    let secs = d_secs / x;
-    let carry = d_secs - secs * x;
-    let extra_nanos = carry * NANOS_PER_SEC / x;
-    let nanos_u64 = u64::from(d_nanos) / x + extra_nanos;
-    debug_assert!(nanos_u64 < NANOS_PER_SEC);
-    // NANOS_PER_SEC is less than u32::SIZE so must fit
-    let nanos: u32 = nanos_u64.try_into().unwrap();
-    Duration::new(secs, nanos)
+    // Cannot directly translate div_u32 to div_u64 because there might be overflow.
+    // Instead use float division if the divisor cannot be converted to u32.
+    if let Ok(x32) = x.try_into() {
+        d / x32
+    } else {
+        d.div_f64(x as f64)
+    }
 }
