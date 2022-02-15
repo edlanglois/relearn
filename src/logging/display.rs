@@ -15,7 +15,7 @@ pub struct DisplayLoggerConfig {
 impl Default for DisplayLoggerConfig {
     fn default() -> Self {
         Self {
-            display_period: Duration::from_secs(1),
+            display_period: Duration::from_secs(5),
         }
     }
 }
