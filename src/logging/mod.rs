@@ -1,9 +1,11 @@
 //! Logging statistics from simulation runs
 pub mod chunk;
 mod display;
+mod tensorboard;
 
 pub use chunk::ChunkLogger;
 pub use display::{DisplayLogger, DisplayLoggerConfig};
+pub use tensorboard::TensorBoardLogger;
 
 use smallvec::SmallVec;
 use std::borrow::Cow;

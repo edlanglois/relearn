@@ -1,5 +1,5 @@
 //! Command-line logger
-use super::chunk::{ChunkLogger, ChunkSummary, LoggerBackend};
+use super::chunk::{ChunkLogger, ChunkSummary, LoggerBackend, DEFAULT_CHUNK_SECONDS};
 use super::Id;
 use std::fmt;
 use std::time::Duration;
@@ -15,7 +15,7 @@ pub struct DisplayLoggerConfig {
 impl Default for DisplayLoggerConfig {
     fn default() -> Self {
         Self {
-            display_period: Duration::from_secs(5),
+            display_period: Duration::from_secs(DEFAULT_CHUNK_SECONDS),
         }
     }
 }

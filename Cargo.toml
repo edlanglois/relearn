@@ -26,6 +26,7 @@ relearn_derive = { version = "0.1.0", path = "relearn_derive" }
 slice-of-array = "=0.3.1" # pinned b/c low popularity; audit code on change
 smallvec = { version = "1.7", features = ["union"] }
 tch = "0.6"
+tensorboard-rs = "=0.2.4" # pinned b/c low popularity; audit code on change
 thiserror = "1.0"
 yansi = "0.5.0"
 

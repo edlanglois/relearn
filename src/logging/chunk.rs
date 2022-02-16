@@ -36,9 +36,11 @@ impl<B: LoggerBackend> ChunkLogger<B> {
     }
 }
 
+pub const DEFAULT_CHUNK_SECONDS: u64 = 5;
+
 impl<B: Default + LoggerBackend> Default for ChunkLogger<B> {
     fn default() -> Self {
-        Self::from_backend(Duration::from_secs(5), B::default())
+        Self::from_backend(Duration::from_secs(DEFAULT_CHUNK_SECONDS), B::default())
     }
 }
 
