@@ -249,8 +249,12 @@ where
         );
 
         let mut history_logger = logger.with_scope("history");
-        history_logger.log_scalar("num_steps", features.num_steps() as f64);
-        history_logger.log_scalar("num_episodes", features.num_episodes() as f64);
+        let num_steps = features.num_steps();
+        let num_episodes = features.num_episodes();
+        history_logger.log_scalar("num_steps", num_steps as f64);
+        history_logger.log_scalar("num_episodes", num_episodes as f64);
+        history_logger.log_counter_increment("cumulative_steps", num_steps as u64);
+        history_logger.log_counter_increment("cumulative_episodes", num_episodes as u64);
         if features.is_empty() {
             history_logger.log_message("no_model_update", "Skipping update; empty history");
             return;
@@ -265,7 +269,7 @@ where
             &self.shared.action_space,
             &mut policy_logger,
         );
-        policy_logger.log_duration("update", policy_update_start.elapsed());
+        policy_logger.log_duration("update_time", policy_update_start.elapsed());
         if let Some(entropy) = policy_stats.entropy {
             policy_logger.log_scalar("entropy", entropy);
         }
@@ -274,15 +278,15 @@ where
         let critic_update_start = Instant::now();
         self.critic_updater
             .update_critic(&self.critic, &features, &mut critic_logger);
-        critic_logger.log_duration("update", critic_update_start.elapsed());
+        critic_logger.log_duration("update_time", critic_update_start.elapsed());
 
         // Empty the buffers
         for buffer in buffers {
             buffer.clear()
         }
 
-        logger.log_duration("agent_update", agent_update_start.elapsed());
-        logger.log_counter_increment("agent_updates", 1);
+        logger.log_duration("agent/update_time", agent_update_start.elapsed());
+        logger.log_counter_increment("agent/update_count", 1)
     }
 }
 
