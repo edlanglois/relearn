@@ -271,6 +271,32 @@ impl StatsLogger for () {
     fn flush(&mut self) {}
 }
 
+/// Pair of loggers; logs to both.
+impl<A, B> StatsLogger for (A, B)
+where
+    A: StatsLogger,
+    B: StatsLogger,
+{
+    fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+        // Log to both even if one fails
+        let r1 = self.0.log(id.clone(), value.clone());
+        let r2 = self.1.log(id, value);
+        r1.and(r2)
+    }
+
+    fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+        // Log to both even if one fails
+        let r1 = self.0.log_no_flush(id.clone(), value.clone());
+        let r2 = self.1.log_no_flush(id, value);
+        r1.and(r2)
+    }
+
+    fn flush(&mut self) {
+        self.0.flush();
+        self.1.flush();
+    }
+}
+
 /// Wraps all logged names with a scope.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ScopedLogger<L> {
