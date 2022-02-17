@@ -29,7 +29,7 @@ fn main() {
         ..Default::default()
     };
     let training_config = TrainParallelConfig {
-        num_periods: 10_000,
+        num_periods: 50,
         num_threads: num_cpus::get(),
         min_workers_steps: 10_000,
     };
