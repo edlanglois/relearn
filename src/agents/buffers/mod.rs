@@ -103,6 +103,7 @@ pub trait WriteHistoryBuffer<O, A> {
     fn extend_until_ready<I>(&mut self, steps: I) -> bool
     where
         I: IntoIterator<Item = PartialStep<O, A>>,
+        Self: Sized,
     {
         for step in steps {
             if self.push(step) {

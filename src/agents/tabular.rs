@@ -13,6 +13,7 @@ use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
 use rand::Rng;
 use std::fmt;
+use std::iter;
 use std::sync::Arc;
 
 /// Configuration of an Epsilon-Greedy Tabular Q Learning Agent.
@@ -20,17 +21,31 @@ use std::sync::Arc;
 pub struct TabularQLearningAgentConfig {
     /// Probability of taking a random action.
     pub exploration_rate: f64,
+
+    /// Initial action count for each state-action pair.
+    pub initial_action_count: u64,
+
+    /// Initial action value for each state-action pair.
+    pub initial_action_value: f64,
 }
 
 impl TabularQLearningAgentConfig {
     pub const fn new(exploration_rate: f64) -> Self {
-        Self { exploration_rate }
+        Self {
+            exploration_rate,
+            initial_action_count: 0,
+            initial_action_value: 0.0,
+        }
     }
 }
 
 impl Default for TabularQLearningAgentConfig {
     fn default() -> Self {
-        Self::new(0.2)
+        Self {
+            exploration_rate: 0.2,
+            initial_action_count: 0,
+            initial_action_value: 0.0,
+        }
     }
 }
 
@@ -72,7 +87,7 @@ pub struct BaseTabularQLearningAgent {
     pub discount_factor: f64,
     pub exploration_rate: f64,
 
-    state_action_counts: Array2<u32>,
+    state_action_counts: Array2<u64>,
     state_action_values: Arc<Array2<f64>>,
 }
 
@@ -83,8 +98,29 @@ impl BaseTabularQLearningAgent {
         discount_factor: f64,
         exploration_rate: f64,
     ) -> Self {
-        let state_action_counts = Array::from_elem((num_observations, num_actions), 0);
-        let state_action_values = Arc::new(Array::from_elem((num_observations, num_actions), 0.0));
+        Self::from_priors(
+            num_observations,
+            num_actions,
+            discount_factor,
+            exploration_rate,
+            0,
+            0.0,
+        )
+    }
+
+    pub fn from_priors(
+        num_observations: usize,
+        num_actions: usize,
+        discount_factor: f64,
+        exploration_rate: f64,
+        prior_count: u64,
+        prior_value: f64,
+    ) -> Self {
+        let state_action_counts = Array::from_elem((num_observations, num_actions), prior_count);
+        let state_action_values = Arc::new(Array::from_elem(
+            (num_observations, num_actions),
+            prior_value,
+        ));
         Self {
             discount_factor,
             exploration_rate,
@@ -133,7 +169,7 @@ impl BaseTabularQLearningAgent {
         self.state_action_counts[idx] += 1;
 
         let value = step.reward + discounted_next_value;
-        let weight = f64::from(self.state_action_counts[idx]).recip();
+        let weight = (self.state_action_counts[idx] as f64).recip();
         let state_action_values = Arc::get_mut(&mut self.state_action_values)
             .expect("cannot update agent while actors exist");
         state_action_values[idx] *= 1.0 - weight;
@@ -164,6 +200,22 @@ impl BatchUpdate<usize, usize> for BaseTabularQLearningAgent {
         for buffer in buffers {
             for_each_transient_step(buffer.drain_steps(), |step| self.step_update(step));
         }
+    }
+
+    fn batch_update_single(
+        &mut self,
+        buffer: &mut Self::HistoryBuffer,
+        logger: &mut dyn StatsLogger,
+    ) {
+        self.batch_update(iter::once(buffer), logger)
+    }
+
+    fn batch_update_slice(
+        &mut self,
+        buffers: &mut [Self::HistoryBuffer],
+        logger: &mut dyn StatsLogger,
+    ) {
+        self.batch_update(buffers, logger)
     }
 }
 

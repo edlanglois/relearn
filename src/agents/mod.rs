@@ -4,6 +4,7 @@
 
 mod bandits;
 pub mod buffers;
+mod r#dyn;
 pub mod finite;
 mod meta;
 mod pair;
@@ -19,6 +20,7 @@ pub use bandits::{
 pub use buffers::{BufferCapacityBound, WriteHistoryBuffer};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
 pub use pair::AgentPair;
+pub use r#dyn::{BoxActor, BoxAgent, DynAgent};
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use serial::SerialActorAgent;
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
@@ -183,8 +185,27 @@ pub trait BatchUpdate<O, A> {
     /// given by [`BatchUpdate::batch_size_hint`].
     fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
     where
+        Self: Sized,
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a;
+
+    /// Update the agent from a history buffer.
+    ///
+    /// Like [`BatchUpdate::batch_update`] but object-safe.
+    fn batch_update_single(
+        &mut self,
+        buffer: &mut Self::HistoryBuffer,
+        logger: &mut dyn StatsLogger,
+    );
+
+    /// Update the agent from a slice of history buffers.
+    ///
+    /// Like [`BatchUpdate::batch_update`] but object-safe.
+    fn batch_update_slice(
+        &mut self,
+        buffers: &mut [Self::HistoryBuffer],
+        logger: &mut dyn StatsLogger,
+    );
 }
 
 /// Implement `BatchUpdate<O, A>` for a deref-able wrapper over `T: BatchUpdate<O, A> + ?Sized`.
@@ -201,12 +222,30 @@ macro_rules! impl_wrapped_batch_update {
             fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
                 T::buffer(self, capacity)
             }
-            fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
+            fn batch_update<'a, I>(&mut self, _buffers: I, _logger: &mut dyn StatsLogger)
             where
+                Self: Sized,
                 I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
                 Self::HistoryBuffer: 'a,
             {
-                T::batch_update(self, buffers, logger)
+                unimplemented!(
+                    "batch_update not implemented for wrappers; \
+                    try `batch_update_single` or `batch_update_slice`"
+                )
+            }
+            fn batch_update_single(
+                &mut self,
+                buffer: &mut Self::HistoryBuffer,
+                logger: &mut dyn StatsLogger,
+            ) {
+                T::batch_update_single(self, buffer, logger)
+            }
+            fn batch_update_slice(
+                &mut self,
+                buffers: &mut [Self::HistoryBuffer],
+                logger: &mut dyn StatsLogger,
+            ) {
+                T::batch_update_slice(self, buffers, logger)
             }
         }
     };

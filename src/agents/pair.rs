@@ -7,6 +7,7 @@ use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::spaces::{Space, TupleSpace2};
 use crate::Prng;
+use std::iter;
 
 /// A pair of agents / actors / configs for a two-agent environment.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
@@ -82,6 +83,22 @@ where
         }
         self.0.batch_update(buffers1.into_iter(), logger);
         self.1.batch_update(buffers2.into_iter(), logger);
+    }
+
+    fn batch_update_single(
+        &mut self,
+        buffer: &mut Self::HistoryBuffer,
+        logger: &mut dyn StatsLogger,
+    ) {
+        self.batch_update(iter::once(buffer), logger)
+    }
+
+    fn batch_update_slice(
+        &mut self,
+        buffers: &mut [Self::HistoryBuffer],
+        logger: &mut dyn StatsLogger,
+    ) {
+        self.batch_update(buffers, logger)
     }
 }
 

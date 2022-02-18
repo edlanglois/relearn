@@ -8,7 +8,6 @@ use crate::envs::{Environment, Successor};
 use crate::logging::StatsLogger;
 use crate::Prng;
 use rand::SeedableRng;
-use std::iter;
 
 /// Description of an environment step.
 ///
@@ -99,7 +98,7 @@ pub fn train_serial<T, E>(
             .with_step_logging(),
         );
         assert!(ready);
-        agent.batch_update(iter::once(&mut buffer), logger);
+        agent.batch_update_single(&mut buffer, logger);
     }
 }
 
@@ -134,7 +133,7 @@ pub fn train_serial_callback<T, E, F>(
             }),
         );
         assert!(ready);
-        agent.batch_update(iter::once(&mut buffer), logger);
+        agent.batch_update_single(&mut buffer, logger);
     }
 }
 
@@ -208,7 +207,7 @@ pub fn train_parallel<T, E>(
         })
         .unwrap();
 
-        agent.batch_update(&mut buffers, logger);
+        agent.batch_update_slice(&mut buffers, logger);
     }
 }
 

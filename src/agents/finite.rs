@@ -102,6 +102,22 @@ where
         self.agent
             .batch_update(buffers.into_iter().map(|b| &mut b.buffer), logger)
     }
+
+    fn batch_update_single(
+        &mut self,
+        buffer: &mut Self::HistoryBuffer,
+        logger: &mut dyn StatsLogger,
+    ) {
+        self.agent.batch_update_single(&mut buffer.buffer, logger)
+    }
+
+    fn batch_update_slice(
+        &mut self,
+        buffers: &mut [Self::HistoryBuffer],
+        logger: &mut dyn StatsLogger,
+    ) {
+        self.batch_update(buffers, logger)
+    }
 }
 
 /// Wraps an index-space buffer to accept finite-space elements.

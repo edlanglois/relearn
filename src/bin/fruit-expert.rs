@@ -124,6 +124,8 @@ impl<O, A> BatchUpdate<O, A> for FruitLazyExpert {
         Self::HistoryBuffer: 'a,
     {
     }
+    fn batch_update_single(&mut self, _: &mut Self::HistoryBuffer, _: &mut dyn StatsLogger) {}
+    fn batch_update_slice(&mut self, _: &mut [Self::HistoryBuffer], _: &mut dyn StatsLogger) {}
 }
 
 type ModelConfig = ChainedConfig<AsSeq<MlpConfig>, ChainedConfig<GruConfig, AsSeq<MlpConfig>>>;

@@ -236,10 +236,49 @@ where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,
     {
+        self.batch_update_slice_refs(&mut buffers.into_iter().collect::<Vec<_>>(), logger);
+    }
+
+    fn batch_update_single(
+        &mut self,
+        buffer: &mut Self::HistoryBuffer,
+        logger: &mut dyn StatsLogger,
+    ) {
+        self.batch_update_slice_refs(&mut [buffer], logger)
+    }
+
+    fn batch_update_slice(
+        &mut self,
+        buffers: &mut [Self::HistoryBuffer],
+        logger: &mut dyn StatsLogger,
+    ) {
+        self.batch_update(buffers, logger)
+    }
+}
+
+impl<OS, AS, PB, P, PU, C, CU> ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
+where
+    OS: EncoderFeatureSpace + 'static,
+    AS: ReprSpace<Tensor> + 'static,
+    P: SequenceModule,
+    PU: UpdatePolicy<AS>,
+    C: Critic,
+    CU: UpdateCritic,
+{
+    // Takes a slice of references because
+    // * it iterates over the buffers twice and it is awkward to make the right bounds for
+    //      a "clone-able" (actually, into_iter with shorter lifetimes) generic iterator.
+    // * the function is relatively large and this avoids duplicate monomorphizations
+    // * any inefficiency in the buffer access should be insignificant compared to the runtime
+    //      cost of the rest of the update
+    /// Batch update given a slice of buffer references
+    fn batch_update_slice_refs(
+        &mut self,
+        buffers: &mut [&mut SimpleBuffer<OS::Element, AS::Element>],
+        logger: &mut dyn StatsLogger,
+    ) {
         let agent_update_start = Instant::now();
 
-        // TODO: Avoid collecting buffers into a vec
-        let buffers: Vec<_> = buffers.into_iter().collect();
         let features = LazyPackedHistoryFeatures::new(
             buffers.iter().flat_map(|b| b.episodes()),
             &self.shared.observation_space,
@@ -247,7 +286,6 @@ where
             self.discount_factor,
             self.device,
         );
-
         let mut history_logger = logger.with_scope("history");
         let num_steps = features.num_steps();
         let num_episodes = features.num_episodes();
@@ -280,7 +318,6 @@ where
             .update_critic(&self.critic, &features, &mut critic_logger);
         critic_logger.log_duration("update_time", critic_update_start.elapsed());
 
-        // Empty the buffers
         for buffer in buffers {
             buffer.clear()
         }
