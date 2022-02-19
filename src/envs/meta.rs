@@ -44,11 +44,11 @@ pub struct MetaEnv<E> {
     /// Environment distribution from which each trial's episode is sampled.
     pub env_distribution: E,
     /// Number of inner episodes per trial.
-    pub episodes_per_trial: usize,
+    pub episodes_per_trial: u64,
 }
 
 impl<E> MetaEnv<E> {
-    pub const fn new(env_distribution: E, episodes_per_trial: usize) -> Self {
+    pub const fn new(env_distribution: E, episodes_per_trial: u64) -> Self {
         Self {
             env_distribution,
             episodes_per_trial,
@@ -278,7 +278,7 @@ pub struct MetaState<E: Environment> {
     /// The upcoming inner environment state.
     inner_successor: Successor<E::State>,
     /// The inner episode index within the current trial.
-    episode_index: usize,
+    episode_index: u64,
     /// Observation of the previous step of this inner episode.
     prev_step_obs: Option<InnerStepObs<E::Action>>,
 }

@@ -228,6 +228,6 @@ mod resetting_meta {
             }
         }
         let mean_episode_reward = total_episode_reward / f64::from(num_episodes);
-        assert!(mean_episode_reward > 0.7 * (num_episodes_per_trial - num_arms) as f64);
+        assert!(mean_episode_reward > 0.7 * (num_episodes_per_trial - num_arms as u64) as f64);
     }
 }
