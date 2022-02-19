@@ -58,10 +58,16 @@ where
     L: StatsLogger,
 {
     /// Execute one environment step then evaluate a closure on the resulting state.
+    ///
+    /// Use this if you need to access (a reference to) the successor state
+    /// when the episode continues (a [`TransientStep`]).
+    /// Otherwise, use the `Iterator` interface that returns [`PartialStep`].
     pub fn step_with<F, U>(&mut self, f: F) -> U
     where
         F: FnOnce(&mut E, &mut T, TransientStep<E::Observation, E::Action>, &mut L) -> U,
     {
+        // Extract the current environment and actor state.
+        // If None then start a new episode.
         let (env_state, observation, mut actor_state) = match self.state.take() {
             Some(state) => (state.env, state.observation, state.actor),
             None => {
@@ -71,9 +77,11 @@ where
                 (env_state, observation, actor_state)
             }
         };
+        // Take an action with the actor given the observation.
         let action = self
             .actor
             .act(&mut actor_state, &observation, self.rng_actor.borrow_mut());
+        // Take an environment step using this action.
         let (successor, reward) = self.env.step(
             env_state,
             &action,
@@ -86,6 +94,10 @@ where
         // for passing to the callback function.
         assert!(self.state.is_none());
         let next = match successor {
+            // Get the next state from `successor`.
+            // Generate an observation and store both (along with actor_state) in `self.state`
+            // so that we can use it on the next iteration.
+            // Return a `Successor::Continue` that references the stored observation.
             Successor::Continue(next_state) => {
                 let state_ref = self.state.insert(EpisodeState {
                     observation: self.env.observe(&next_state, self.rng_env.borrow_mut()),
@@ -95,6 +107,8 @@ where
                 Successor::Continue(&state_ref.observation)
             }
             Successor::Terminate => Successor::Terminate,
+            // If the environment is interrupted then we do not need to store the next state
+            // for future iterations. Return a Successor::Interrupt that owns the next state.
             Successor::Interrupt(next_state) => {
                 Successor::Interrupt(self.env.observe(&next_state, self.rng_env.borrow_mut()))
             }
