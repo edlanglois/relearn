@@ -128,7 +128,7 @@ where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
 {
-    SimulatorSteps::new_from_rngs(env, actor, rng_env, rng_actor, ())
+    SimulatorSteps::new(env, actor, rng_env, rng_actor, ())
         .take_episodes(num_episodes)
         .collect()
 }

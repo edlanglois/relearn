@@ -106,7 +106,7 @@ pub fn train_serial<T, E>(
     let mut buffer = agent.buffer(agent.batch_size_hint());
     for _ in 0..num_periods {
         let ready = buffer.extend_until_ready(
-            SimulatorSteps::new_from_rngs(
+            SimulatorSteps::new(
                 environment,
                 agent.actor(ActorMode::Training),
                 &mut *rng_env,
@@ -137,7 +137,7 @@ pub fn train_serial_callback<T, E, F>(
     let mut buffer = agent.buffer(agent.batch_size_hint());
     for _ in 0..num_periods {
         let ready = buffer.extend_until_ready(
-            SimulatorSteps::new_from_rngs(
+            SimulatorSteps::new(
                 environment,
                 agent.actor(ActorMode::Training),
                 &mut *rng_env,
@@ -209,7 +209,7 @@ pub fn train_parallel<T, E>(
                 let thread_logger = send_logger.take();
                 threads.push(scope.spawn(move |_scope| {
                     let ready = buffer.extend_until_ready(
-                        SimulatorSteps::new_from_rngs(
+                        SimulatorSteps::new(
                             environment,
                             actor,
                             &mut rngs.0,

@@ -130,7 +130,7 @@ pub trait Environment {
         L: StatsLogger,
         Self: Sized,
     {
-        SimulatorSteps::new(self, actor, seed, logger)
+        SimulatorSteps::new_seeded(self, actor, seed, logger)
     }
 
     /// Wrap the environment in an episode step limit.

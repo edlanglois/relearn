@@ -67,9 +67,9 @@ where
     T: Actor<E::Observation, E::Action>,
     R: Rng + SeedableRng,
 {
-    pub fn new(env: E, actor: T, seed: SimSeed, logger: L) -> Self {
+    pub fn new_seeded(env: E, actor: T, seed: SimSeed, logger: L) -> Self {
         let (rng_env, rng_actor) = seed.derive_rngs();
-        Self::new_from_rngs(env, actor, rng_env, rng_actor, logger)
+        Self::new(env, actor, rng_env, rng_actor, logger)
     }
 }
 
@@ -78,7 +78,7 @@ where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
 {
-    pub fn new_from_rngs(env: E, actor: T, rng_env: R, rng_actor: R, logger: L) -> Self {
+    pub fn new(env: E, actor: T, rng_env: R, rng_actor: R, logger: L) -> Self {
         Self {
             env,
             actor,
