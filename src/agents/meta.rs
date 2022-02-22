@@ -95,7 +95,7 @@ where
 }
 
 impl<TC, OS, AS> Actor<MetaObservation<OS::Element, AS::Element>, AS::Element>
-    for Arc<ResettingMetaAgent<TC, OS, AS>>
+    for ResettingMetaAgent<TC, OS, AS>
 where
     TC: BuildAgent<OS, AS>,
     OS: Space + Clone,
