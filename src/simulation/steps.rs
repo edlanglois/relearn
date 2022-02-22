@@ -5,7 +5,6 @@ use crate::logging::{Loggable, StatsLogger};
 use crate::Prng;
 use rand::{Rng, SeedableRng};
 use std::borrow::BorrowMut;
-use std::fmt;
 use std::iter::FusedIterator;
 
 /// Iterator of environment-actor steps.
@@ -273,53 +272,5 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         // infinite
         (usize::MAX, None)
-    }
-}
-
-/// Basic summary statistics of a simulation
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
-pub struct SimulationSummary {
-    pub num_steps: u64,
-    pub num_episodes: u64,
-    pub total_reward: f64,
-}
-impl fmt::Display for SimulationSummary {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "num_steps: {}", self.num_steps)?;
-        writeln!(f, "num_episodes: {}", self.num_episodes)?;
-        writeln!(
-            f,
-            "mean_step_reward: {}",
-            self.total_reward / self.num_steps as f64
-        )?;
-        writeln!(
-            f,
-            "mean_ep_reward:   {}",
-            self.total_reward / self.num_episodes as f64
-        )?;
-        writeln!(
-            f,
-            "mean_ep_length:   {}",
-            self.num_steps as f64 / self.num_episodes as f64
-        )?;
-        Ok(())
-    }
-}
-
-// TODO: Make this a trait
-impl SimulationSummary {
-    pub fn update<O, A>(&mut self, step: &PartialStep<O, A>) {
-        self.num_steps += 1;
-        self.total_reward += step.reward;
-        if step.next.episode_done() {
-            self.num_episodes += 1;
-        }
-    }
-
-    pub fn from_steps<I: Iterator<Item = PartialStep<O, A>>, O, A>(steps: I) -> Self {
-        steps.fold(Self::default(), |mut s, step| {
-            s.update(&step);
-            s
-        })
     }
 }

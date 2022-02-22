@@ -7,7 +7,7 @@ use relearn::envs::{
     fruit, BuildEnv, EnvStructure, Environment, FruitGame, StepLimit, WithStepLimit,
 };
 use relearn::logging::{DisplayLogger, StatsLogger};
-use relearn::simulation::{train_parallel, SimSeed, SimulationSummary, TrainParallelConfig};
+use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
 use relearn::spaces::{IndexedTypeSpace, Space};
 use relearn::torch::{
     agents::ActorCriticConfig,
@@ -157,8 +157,8 @@ fn main() {
     let mut logger = DisplayLogger::default();
 
     {
-        let summary = SimulationSummary::from_steps(
-            env.run(
+        let summary: StepsSummary = env
+            .run(
                 Agent::<<fruit::JointObsSpace<5, 5> as Space>::Element, _>::actor(
                     &agent,
                     ActorMode::Evaluation,
@@ -166,8 +166,8 @@ fn main() {
                 SimSeed::Root(0),
                 (),
             )
-            .take(10_000),
-        );
+            .take(10_000)
+            .collect();
         println!("Initial Stats\n{}", summary);
     }
 
@@ -180,8 +180,8 @@ fn main() {
         &mut logger,
     );
 
-    let summary = SimulationSummary::from_steps(
-        env.run(
+    let summary: StepsSummary = env
+        .run(
             Agent::<<fruit::JointObsSpace<5, 5> as Space>::Element, _>::actor(
                 &agent,
                 ActorMode::Evaluation,
@@ -189,7 +189,7 @@ fn main() {
             SimSeed::Root(0),
             (),
         )
-        .take(10_000),
-    );
+        .take(10_000)
+        .collect();
     println!("\nFinal Stats\n{}", summary);
 }

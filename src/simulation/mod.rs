@@ -1,7 +1,9 @@
 //! Simulating agent-environment interaction
 mod steps;
+mod summary;
 
-pub use steps::{SimSeed, SimulationSummary, SimulatorSteps};
+pub use steps::{SimSeed, SimulatorSteps};
+pub use summary::StepsSummary;
 
 use crate::agents::{ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
 use crate::envs::{Environment, Successor};
