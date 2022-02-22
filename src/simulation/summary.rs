@@ -1,44 +1,41 @@
 use super::PartialStep;
+use crate::utils::stats::OnlineMeanVariance;
 use std::fmt;
 use std::iter::FromIterator;
 
-/// Basic summary statistics of simulation steps.
+/// Summary statistics of simulation steps.
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub struct StepsSummary {
-    pub num_steps: u64,
-    pub num_episodes: u64,
-    pub total_reward: f64,
+    pub step_reward: OnlineMeanVariance<f64>,
+    pub episode_reward: OnlineMeanVariance<f64>,
+    pub episode_length: OnlineMeanVariance<f64>,
+
+    current_episode_reward: f64,
+    current_episode_length: u64,
 }
 
 impl fmt::Display for StepsSummary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "num_steps: {}", self.num_steps)?;
-        writeln!(f, "num_episodes: {}", self.num_episodes)?;
-        writeln!(
-            f,
-            "step_reward_mean: {}",
-            self.total_reward / self.num_steps as f64
-        )?;
-        writeln!(
-            f,
-            "ep_reward_mean:   {}",
-            self.total_reward / self.num_episodes as f64
-        )?;
-        writeln!(
-            f,
-            "ep_length_mean:   {}",
-            self.num_steps as f64 / self.num_episodes as f64
-        )?;
+        write!(f, "step_reward: ")?;
+        fmt::Display::fmt(&self.step_reward, f)?;
+        write!(f, "\nepisode_reward: ")?;
+        fmt::Display::fmt(&self.episode_reward, f)?;
+        write!(f, "\nepisode_length: ")?;
+        fmt::Display::fmt(&self.episode_length, f)?;
         Ok(())
     }
 }
 
 impl StepsSummary {
-    pub fn update<O, A>(&mut self, step: &PartialStep<O, A>) {
-        self.num_steps += 1;
-        self.total_reward += step.reward;
+    pub fn push<O, A>(&mut self, step: &PartialStep<O, A>) {
+        self.step_reward.push(step.reward);
+        self.current_episode_reward += step.reward;
+        self.current_episode_length += 1;
         if step.next.episode_done() {
-            self.num_episodes += 1;
+            self.episode_reward.push(self.current_episode_reward);
+            self.current_episode_reward = 0.0;
+            self.episode_length.push(self.current_episode_length as f64);
+            self.current_episode_length = 0;
         }
     }
 }
@@ -49,7 +46,7 @@ impl<O, A> FromIterator<PartialStep<O, A>> for StepsSummary {
         I: IntoIterator<Item = PartialStep<O, A>>,
     {
         steps.into_iter().fold(Self::default(), |mut s, step| {
-            s.update(&step);
+            s.push(&step);
             s
         })
     }

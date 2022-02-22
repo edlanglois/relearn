@@ -162,5 +162,5 @@ fn main() {
     let summary = args
         .agent
         .evaluate(env, args.num_trials, rng_env, rng_agent);
-    println!("{summary:}");
+    println!("{summary:.3}");
 }
