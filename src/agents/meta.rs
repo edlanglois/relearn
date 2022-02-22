@@ -39,10 +39,10 @@ where
         env: &dyn EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
         _: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
-        Ok(Arc::new(ResettingMetaAgent {
-            inner_agent_config: self.agent_config.clone(),
-            inner_env_structure: StoredEnvStructure::from(&InnerEnvStructure::new(env)),
-        }))
+        Ok(Arc::new(ResettingMetaAgent::from_meta_env(
+            self.agent_config.clone(),
+            env,
+        )))
     }
 }
 
@@ -51,6 +51,31 @@ where
 pub struct ResettingMetaAgent<TC, OS, AS> {
     inner_agent_config: TC,
     inner_env_structure: StoredEnvStructure<OS, AS>,
+}
+
+impl<TC, OS, AS> ResettingMetaAgent<TC, OS, AS> {
+    pub fn new<E: ?Sized>(inner_agent_config: TC, inner_env_structure: &E) -> Self
+    where
+        E: EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+    {
+        Self {
+            inner_agent_config,
+            inner_env_structure: StoredEnvStructure::from(inner_env_structure),
+        }
+    }
+}
+
+impl<TC, OS, AS> ResettingMetaAgent<TC, OS, AS>
+where
+    OS: Space,
+    AS: Space,
+{
+    pub fn from_meta_env<E: ?Sized>(inner_agent_config: TC, env: &E) -> Self
+    where
+        E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
+    {
+        Self::new(inner_agent_config, &InnerEnvStructure::new(env))
+    }
 }
 
 impl<TC, OS, AS> Agent<MetaObservation<OS::Element, AS::Element>, AS::Element>

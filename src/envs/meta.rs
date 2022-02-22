@@ -105,6 +105,16 @@ where
     }
 }
 
+impl<E> MetaEnv<E>
+where
+    E: EnvStructure,
+{
+    /// View the structure of the inner environment.
+    pub fn inner_structure(&self) -> InnerEnvStructure<&Self> {
+        InnerEnvStructure::new(self)
+    }
+}
+
 impl<E> Environment for MetaEnv<E>
 where
     E: EnvDistribution,
@@ -285,6 +295,9 @@ pub struct MetaState<E: Environment> {
 
 /// Wrapper that provides the inner environment structure of a meta environment ([`MetaEnv`]).
 ///
+/// Implements [`EnvStructure`] according to the inner environment structure.
+/// Can also be used via `MetaEnv::inner_structure`.
+///
 /// # Example
 ///
 ///     use relearn::envs::{InnerEnvStructure, MetaEnv, OneHotBandits, StoredEnvStructure};
@@ -297,19 +310,18 @@ pub struct MetaState<E: Environment> {
 ///
 ///     assert_eq!(base_structure, meta_inner_structure);
 ///
-/// implements an [`EnvStructure`] corresponding to the inner environment structure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InnerEnvStructure<'a, T: ?Sized>(&'a T);
+pub struct InnerEnvStructure<T>(T);
 
-impl<'a, T: ?Sized> InnerEnvStructure<'a, T> {
-    pub const fn new(inner_env: &'a T) -> Self {
+impl<T> InnerEnvStructure<T> {
+    pub const fn new(inner_env: T) -> Self {
         Self(inner_env)
     }
 }
 
-impl<'a, T, OS, AS> EnvStructure for InnerEnvStructure<'a, T>
+impl<T, OS, AS> EnvStructure for InnerEnvStructure<T>
 where
-    T: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS> + ?Sized,
+    T: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
     OS: Space,
     AS: Space,
 {
