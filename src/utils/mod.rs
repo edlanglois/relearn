@@ -1,6 +1,7 @@
 //! General-purpose utilities
 pub mod any;
 pub mod distributions;
+pub mod fmt;
 pub mod iter;
 pub mod num_array;
 pub mod order;
