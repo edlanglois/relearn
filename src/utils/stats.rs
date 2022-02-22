@@ -1,5 +1,6 @@
 //! Statistics utilities
 use num_traits::{real::Real, Zero};
+use std::fmt;
 use std::iter::{Extend, FromIterator};
 
 /// Online mean and variance calculation using Welford's Algorithm
@@ -17,6 +18,18 @@ impl<T: Zero> Default for OnlineMeanVariance<T> {
             squared_residual_sum: T::zero(),
             count: 0,
         }
+    }
+}
+
+impl<T: Real + fmt::Display> fmt::Display for OnlineMeanVariance<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(μ = ")?;
+        fmt::Display::fmt(&self.mean(), f)?;
+        write!(f, "; σ = ")?;
+        fmt::Display::fmt(&self.stddev(), f)?;
+        write!(f, "; n = ")?;
+        fmt::Display::fmt(&self.count, f)?;
+        write!(f, ")")
     }
 }
 
