@@ -12,6 +12,7 @@ repository = "https://github.com/edlanglois/relearn"
 [dependencies]
 array-init = "2.0"
 chrono = "0.4"
+clap = { version = "3.1", features = ["derive"] }
 coarsetime = "0.1.21"
 crossbeam="0.8"
 enum-map = "2.0"
