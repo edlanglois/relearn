@@ -1,3 +1,4 @@
+//! Statistics utilities
 use num_traits::{real::Real, Zero};
 use std::iter::{Extend, FromIterator};
 

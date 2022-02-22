@@ -1,3 +1,4 @@
+//! Utilities for working with tch [`Tensor`].
 use ndarray::{ArrayView, ArrayViewMut, Dim, Dimension, IntoDimension, Ix, IxDyn};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
