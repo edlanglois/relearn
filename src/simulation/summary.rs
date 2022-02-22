@@ -16,17 +16,17 @@ impl fmt::Display for StepsSummary {
         writeln!(f, "num_episodes: {}", self.num_episodes)?;
         writeln!(
             f,
-            "mean_step_reward: {}",
+            "step_reward_mean: {}",
             self.total_reward / self.num_steps as f64
         )?;
         writeln!(
             f,
-            "mean_ep_reward:   {}",
+            "ep_reward_mean:   {}",
             self.total_reward / self.num_episodes as f64
         )?;
         writeln!(
             f,
-            "mean_ep_length:   {}",
+            "ep_length_mean:   {}",
             self.num_steps as f64 / self.num_episodes as f64
         )?;
         Ok(())
