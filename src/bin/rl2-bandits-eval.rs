@@ -1,5 +1,5 @@
 use clap::{ArgEnum, Parser};
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use relearn::agents::{
     Actor, BetaThompsonSamplingAgentConfig, BuildAgent, RandomAgentConfig, ResettingMetaAgent,
     TabularQLearningAgentConfig, UCB1AgentConfig,
@@ -12,7 +12,7 @@ use relearn::simulation::{SimulatorSteps, StepsIter, StepsSummary};
 use relearn::spaces::{NonEmptySpace, Space};
 use relearn::Prng;
 
-#[derive(Parser, Debug, Clone, PartialEq)]
+#[derive(Parser, Debug, Copy, Clone, PartialEq)]
 #[clap(
     name = "rl2-bandits-eval",
     author,
@@ -46,6 +46,48 @@ pub struct Args {
     /// Enable verbose output
     #[clap(short, long)]
     pub verbose: bool,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct ExperimentConfig {
+    pub num_arms: usize,
+    pub num_episodes: u64,
+    pub num_trials: usize,
+    pub agent: AgentType,
+    pub env_seed: u64,
+    pub agent_seed: u64,
+}
+
+impl From<&Args> for ExperimentConfig {
+    fn from(args: &Args) -> Self {
+        Self {
+            num_arms: args.num_arms,
+            num_episodes: args.num_episodes,
+            num_trials: args.num_trials,
+            agent: args.agent,
+            env_seed: args.env_seed.unwrap_or_else(|| rand::thread_rng().gen()),
+            agent_seed: args.agent_seed.unwrap_or_else(|| rand::thread_rng().gen()),
+        }
+    }
+}
+
+impl ExperimentConfig {
+    fn run_experiment(&self, verbose: bool) -> StepsSummary {
+        let env_config = MetaEnv {
+            env_distribution: UniformBernoulliBandits::new(self.num_arms),
+            episodes_per_trial: self.num_episodes,
+        };
+        if verbose {
+            println!("{env_config:#?}");
+        }
+
+        let mut rng_env = Prng::seed_from_u64(self.env_seed);
+        let env = env_config.build_env(&mut rng_env).unwrap();
+
+        let rng_agent = Prng::seed_from_u64(self.agent_seed);
+        self.agent
+            .evaluate(env, self.num_trials, rng_env, rng_agent)
+    }
 }
 
 /// Agent type
@@ -133,34 +175,13 @@ where
         .collect()
 }
 
-fn new_prng(seed: Option<u64>) -> Prng {
-    match seed {
-        None => Prng::from_entropy(),
-        Some(s) => Prng::seed_from_u64(s),
-    }
-}
-
 fn main() {
     let args = Args::parse();
+    let config = ExperimentConfig::from(&args);
     if args.verbose {
-        println!("{args:#?}");
+        println!("{config:#?}");
     }
 
-    let env_config = MetaEnv {
-        env_distribution: UniformBernoulliBandits::new(args.num_arms),
-        episodes_per_trial: args.num_episodes,
-    };
-    if args.verbose {
-        println!("{env_config:#?}");
-    }
-
-    let mut rng_env = new_prng(args.env_seed);
-    let rng_agent = new_prng(args.agent_seed);
-
-    let env = env_config.build_env(&mut rng_env).unwrap();
-
-    let summary = args
-        .agent
-        .evaluate(env, args.num_trials, rng_env, rng_agent);
+    let summary = config.run_experiment(args.verbose);
     println!("{summary:.3}");
 }
