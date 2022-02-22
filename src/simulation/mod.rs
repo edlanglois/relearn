@@ -1,7 +1,7 @@
 //! Simulating agent-environment interaction
 mod steps;
 
-pub use steps::{SimulationSummary, SimulatorSteps};
+pub use steps::{SimSeed, SimulationSummary, SimulatorSteps};
 
 use crate::agents::{ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
 use crate::envs::{Environment, Successor};
@@ -88,7 +88,7 @@ pub fn train_serial<T, E>(
     let mut buffer = agent.buffer(agent.batch_size_hint());
     for _ in 0..num_periods {
         let ready = buffer.extend_until_ready(
-            SimulatorSteps::new(
+            SimulatorSteps::new_from_rngs(
                 environment,
                 agent.actor(ActorMode::Training),
                 &mut *rng_env,
@@ -119,7 +119,7 @@ pub fn train_serial_callback<T, E, F>(
     let mut buffer = agent.buffer(agent.batch_size_hint());
     for _ in 0..num_periods {
         let ready = buffer.extend_until_ready(
-            SimulatorSteps::new(
+            SimulatorSteps::new_from_rngs(
                 environment,
                 agent.actor(ActorMode::Training),
                 &mut *rng_env,
@@ -149,6 +149,9 @@ pub struct TrainParallelConfig {
 }
 
 /// Train a batch learning agent in parallel across several threads.
+///
+/// The logger is used by the main thread for agent updates
+/// as well as by one of the worker threads for action and step logs.
 pub fn train_parallel<T, E>(
     agent: &mut T,
     environment: &E,
@@ -188,7 +191,7 @@ pub fn train_parallel<T, E>(
                 let thread_logger = send_logger.take();
                 threads.push(scope.spawn(move |_scope| {
                     let ready = buffer.extend_until_ready(
-                        SimulatorSteps::new(
+                        SimulatorSteps::new_from_rngs(
                             environment,
                             actor,
                             &mut rngs.0,

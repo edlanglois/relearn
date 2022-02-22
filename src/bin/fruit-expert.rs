@@ -1,4 +1,4 @@
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use relearn::agents::buffers::{BufferCapacityBound, NullBuffer};
 use relearn::agents::{
     Actor, ActorMode, Agent, AgentPair, BatchUpdate, BuildAgent, BuildAgentError,
@@ -7,7 +7,7 @@ use relearn::envs::{
     fruit, BuildEnv, EnvStructure, Environment, FruitGame, StepLimit, WithStepLimit,
 };
 use relearn::logging::{DisplayLogger, StatsLogger};
-use relearn::simulation::{train_parallel, SimulationSummary, TrainParallelConfig};
+use relearn::simulation::{train_parallel, SimSeed, SimulationSummary, TrainParallelConfig};
 use relearn::spaces::{IndexedTypeSpace, Space};
 use relearn::torch::{
     agents::ActorCriticConfig,
@@ -163,7 +163,7 @@ fn main() {
                     &agent,
                     ActorMode::Evaluation,
                 ),
-                rng.gen(),
+                SimSeed::Root(0),
                 (),
             )
             .take(10_000),
@@ -186,7 +186,7 @@ fn main() {
                 &agent,
                 ActorMode::Evaluation,
             ),
-            rng.gen(),
+            SimSeed::Root(0),
             (),
         )
         .take(10_000),

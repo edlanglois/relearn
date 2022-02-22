@@ -4,6 +4,7 @@ use super::{
     StoredEnvStructure, StructuredEnvironment, Successor,
 };
 use crate::agents::{ActorMode, Agent, RandomAgent};
+use crate::simulation::SimSeed;
 use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space, SubsetOrd};
 use crate::Prng;
 use rand::SeedableRng;
@@ -42,7 +43,7 @@ where
     let agent = RandomAgent::new(action_space);
     env.run(
         Agent::<E::Observation, _>::actor(&agent, ActorMode::Evaluation),
-        seed,
+        SimSeed::Root(seed),
         (),
     )
     .take(num_steps)

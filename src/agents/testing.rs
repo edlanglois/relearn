@@ -1,7 +1,7 @@
 //! Agent testing utilities
 use crate::agents::{Actor, ActorMode, Agent, BuildAgent};
 use crate::envs::{DeterministicBandit, Environment};
-use crate::simulation;
+use crate::simulation::{self, SimSeed};
 use crate::spaces::{IndexSpace, SingletonSpace};
 use crate::Prng;
 use rand::SeedableRng;
@@ -43,7 +43,7 @@ where
 {
     let num_eval_steps = 1000;
     let mut action_1_count = 0;
-    for step in env.run(actor, 44, ()).take(num_eval_steps) {
+    for step in env.run(actor, SimSeed::Root(44), ()).take(num_eval_steps) {
         if step.action == 1 {
             action_1_count += 1;
         }

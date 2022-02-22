@@ -28,10 +28,9 @@ pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
 
 use crate::agents::Actor;
 use crate::logging::StatsLogger;
-use crate::simulation::SimulatorSteps;
+use crate::simulation::{SimSeed, SimulatorSteps};
 use crate::spaces::Space;
 use crate::Prng;
-use rand::SeedableRng;
 use std::borrow::Borrow;
 use std::f64;
 
@@ -125,15 +124,13 @@ pub trait Environment {
     ) -> (Successor<Self::State>, f64);
 
     /// Run this environment with the given actor.
-    fn run<T, L>(self, actor: T, seed: u64, logger: L) -> SimulatorSteps<Self, T, Prng, L>
+    fn run<T, L>(self, actor: T, seed: SimSeed, logger: L) -> SimulatorSteps<Self, T, Prng, L>
     where
         T: Actor<Self::Observation, Self::Action>,
         L: StatsLogger,
         Self: Sized,
     {
-        let mut rng_env = Prng::seed_from_u64(seed);
-        let rng_actor = Prng::from_rng(&mut rng_env).unwrap();
-        SimulatorSteps::new(self, actor, rng_env, rng_actor, logger)
+        SimulatorSteps::new(self, actor, seed, logger)
     }
 
     /// Wrap the environment in an episode step limit.

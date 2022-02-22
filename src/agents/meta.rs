@@ -201,6 +201,7 @@ mod resetting_meta {
     use super::super::{ActorMode, UCB1AgentConfig};
     use super::*;
     use crate::envs::{Environment, MetaEnv, OneHotBandits};
+    use crate::simulation::SimSeed;
     use rand::SeedableRng;
 
     #[test]
@@ -217,7 +218,7 @@ mod resetting_meta {
         let mut current_episode_reward = 0.0;
         let mut num_episodes = 0;
         for step in env
-            .run(agent.actor(ActorMode::Evaluation), 0, ())
+            .run(agent.actor(ActorMode::Evaluation), SimSeed::Root(221), ())
             .take(1000)
         {
             current_episode_reward += step.reward;

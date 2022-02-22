@@ -1,8 +1,8 @@
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent};
 use relearn::envs::{BuildEnv, Environment, FirstPlayerView, FruitGame, StepLimit, WithStepLimit};
 use relearn::logging::DisplayLogger;
-use relearn::simulation::{train_parallel, SimulationSummary, TrainParallelConfig};
+use relearn::simulation::{train_parallel, SimSeed, SimulationSummary, TrainParallelConfig};
 use relearn::torch::{
     agents::ActorCriticConfig,
     critic::GaeConfig,
@@ -40,7 +40,7 @@ fn main() {
 
     {
         let summary = SimulationSummary::from_steps(
-            env.run(&agent.actor(ActorMode::Evaluation), rng.gen(), ())
+            env.run(&agent.actor(ActorMode::Evaluation), SimSeed::Root(0), ())
                 .take(10_000),
         );
         println!("Initial Stats\n{}", summary);
@@ -56,7 +56,7 @@ fn main() {
     );
 
     let summary = SimulationSummary::from_steps(
-        env.run(&agent.actor(ActorMode::Evaluation), rng.gen(), ())
+        env.run(&agent.actor(ActorMode::Evaluation), SimSeed::Root(0), ())
             .take(10_000),
     );
     println!("\nFinal Stats\n{}", summary);

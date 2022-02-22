@@ -249,7 +249,7 @@ mod tabular_q_learning {
     use super::super::{testing, BuildAgent};
     use super::*;
     use crate::envs::{DeterministicBandit, Environment};
-    use crate::simulation;
+    use crate::simulation::{self, SimSeed};
     use rand::SeedableRng;
 
     #[test]
@@ -271,7 +271,7 @@ mod tabular_q_learning {
         // The training mode explores
         let mut train_action_1_count = 0;
         for step in (&env)
-            .run(agent.actor(ActorMode::Training), 216, ())
+            .run(agent.actor(ActorMode::Training), SimSeed::Root(216), ())
             .take(1000)
         {
             if step.action == 1 {
@@ -284,7 +284,7 @@ mod tabular_q_learning {
         // Evaluation mode exploits
         let mut eval_action_1_count = 0;
         for step in (&env)
-            .run(agent.actor(ActorMode::Evaluation), 224, ())
+            .run(agent.actor(ActorMode::Evaluation), SimSeed::Root(224), ())
             .take(1000)
         {
             if step.action == 1 {
