@@ -1,9 +1,11 @@
 //! Simulating agent-environment interaction
 mod steps;
 mod summary;
+mod take_episodes;
 
 pub use steps::{SimSeed, SimulatorSteps};
 pub use summary::StepsSummary;
+pub use take_episodes::TakeEpisodes;
 
 use crate::agents::{ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
 use crate::envs::{Environment, Successor};
@@ -52,6 +54,20 @@ impl<O, A, U> Step<O, A, U> {
         }
     }
 }
+
+/// Trait for simulation step iterators.
+pub trait StepsIter<O, A>: Iterator<Item = PartialStep<O, A>> {
+    /// Creates an iterator that yields steps from the first `n` episodes.
+    #[inline]
+    fn take_episodes(self, n: usize) -> TakeEpisodes<Self>
+    where
+        Self: Sized,
+    {
+        TakeEpisodes::new(self, n)
+    }
+}
+
+impl<T, O, A> StepsIter<O, A> for T where T: Iterator<Item = PartialStep<O, A>> {}
 
 /// Description of an environment step where the successor observation is borrowed.
 pub type TransientStep<'a, O, A> = Step<O, A, &'a O>;
