@@ -7,25 +7,23 @@ use tch::{nn::Path, Tensor};
 /// Treats the sequence dimension as a batch dimension, so each sequence step is transformed
 /// identically and independently.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct AsSeq<M> {
-    pub inner: M,
-}
+pub struct AsSeq<M>(pub M);
 
 impl<M> AsSeq<M> {
     pub const fn new(module: M) -> Self {
-        Self { inner: module }
+        Self(module)
     }
 }
 
 impl<M> From<M> for AsSeq<M> {
-    fn from(inner: M) -> Self {
-        Self { inner }
+    fn from(module: M) -> Self {
+        Self(module)
     }
 }
 
 impl<M: Module> Module for AsSeq<M> {
     fn has_cudnn_second_derivatives(&self) -> bool {
-        self.inner.has_cudnn_second_derivatives()
+        self.0.has_cudnn_second_derivatives()
     }
 }
 
@@ -33,25 +31,23 @@ impl<MC: BuildModule> BuildModule for AsSeq<MC> {
     type Module = AsSeq<MC::Module>;
 
     fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
-        AsSeq {
-            inner: self.inner.build_module(vs, in_dim, out_dim),
-        }
+        AsSeq(self.0.build_module(vs, in_dim, out_dim))
     }
 }
 
 impl<M: FeedForwardModule> FeedForwardModule for AsSeq<M> {
     fn forward(&self, input: &Tensor) -> Tensor {
-        self.inner.forward(input)
+        self.0.forward(input)
     }
 }
 
 impl<M: FeedForwardModule> SequenceModule for AsSeq<M> {
     fn seq_serial(&self, inputs: &Tensor, _seq_lengths: &[usize]) -> Tensor {
-        self.inner.forward(inputs)
+        self.0.forward(inputs)
     }
 
     fn seq_packed(&self, inputs: &Tensor, _batch_sizes: &Tensor) -> Tensor {
-        self.inner.forward(inputs)
+        self.0.forward(inputs)
     }
 }
 
@@ -61,7 +57,7 @@ impl<M: FeedForwardModule> IterativeModule for AsSeq<M> {
     fn initial_state(&self) -> Self::State {}
 
     fn step(&self, _: &mut Self::State, input: &Tensor) -> Tensor {
-        self.inner.forward(input)
+        self.0.forward(input)
     }
 }
 
