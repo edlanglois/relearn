@@ -38,6 +38,16 @@ impl StepsSummary {
             self.current_episode_length = 0;
         }
     }
+
+    #[inline]
+    pub fn num_steps(&self) -> u64 {
+        self.step_reward.count()
+    }
+
+    #[inline]
+    pub fn num_episodes(&self) -> u64 {
+        self.episode_reward.count()
+    }
 }
 
 impl<O, A> FromIterator<PartialStep<O, A>> for StepsSummary {

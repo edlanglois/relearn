@@ -60,7 +60,7 @@ mod tests {
             .take((5 * steps_per_episode * num_episodes) as usize)
             .take_episodes(num_episodes as usize)
             .collect();
-        assert_eq!(summary.num_episodes, num_episodes);
-        assert_eq!(summary.num_steps, steps_per_episode * num_episodes);
+        assert_eq!(summary.num_episodes(), num_episodes);
+        assert_eq!(summary.num_steps(), steps_per_episode * num_episodes);
     }
 }
