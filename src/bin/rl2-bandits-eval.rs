@@ -11,6 +11,7 @@ use relearn::envs::{
 use relearn::simulation::{SimulatorSteps, StepsIter, StepsSummary};
 use relearn::spaces::{NonEmptySpace, Space};
 use relearn::Prng;
+use serde::Serialize;
 
 #[derive(Parser, Debug, Copy, Clone, PartialEq)]
 #[clap(
@@ -46,52 +47,20 @@ pub struct Args {
     /// Enable verbose output
     #[clap(short, long)]
     pub verbose: bool,
+
+    /// Output format
+    #[clap(short, long, arg_enum, default_value_t = OutputFormat::Human)]
+    pub output: OutputFormat,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct ExperimentConfig {
-    pub num_arms: usize,
-    pub num_episodes: u64,
-    pub num_trials: usize,
-    pub agent: AgentType,
-    pub env_seed: u64,
-    pub agent_seed: u64,
-}
-
-impl From<&Args> for ExperimentConfig {
-    fn from(args: &Args) -> Self {
-        Self {
-            num_arms: args.num_arms,
-            num_episodes: args.num_episodes,
-            num_trials: args.num_trials,
-            agent: args.agent,
-            env_seed: args.env_seed.unwrap_or_else(|| rand::thread_rng().gen()),
-            agent_seed: args.agent_seed.unwrap_or_else(|| rand::thread_rng().gen()),
-        }
-    }
-}
-
-impl ExperimentConfig {
-    fn run_experiment(&self, verbose: bool) -> StepsSummary {
-        let env_config = MetaEnv {
-            env_distribution: UniformBernoulliBandits::new(self.num_arms),
-            episodes_per_trial: self.num_episodes,
-        };
-        if verbose {
-            println!("{env_config:#?}");
-        }
-
-        let mut rng_env = Prng::seed_from_u64(self.env_seed);
-        let env = env_config.build_env(&mut rng_env).unwrap();
-
-        let rng_agent = Prng::seed_from_u64(self.agent_seed);
-        self.agent
-            .evaluate(env, self.num_trials, rng_env, rng_agent)
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
+pub enum OutputFormat {
+    Human,
+    Json,
 }
 
 /// Agent type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum, Serialize)]
 pub enum AgentType {
     /// Uniform random
     Random,
@@ -175,13 +144,87 @@ where
         .collect()
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
+pub struct ExperimentConfig {
+    pub num_arms: usize,
+    pub num_episodes: u64,
+    pub num_trials: usize,
+    pub agent: AgentType,
+    pub env_seed: u64,
+    pub agent_seed: u64,
+}
+
+impl From<&Args> for ExperimentConfig {
+    fn from(args: &Args) -> Self {
+        Self {
+            num_arms: args.num_arms,
+            num_episodes: args.num_episodes,
+            num_trials: args.num_trials,
+            agent: args.agent,
+            env_seed: args.env_seed.unwrap_or_else(|| rand::thread_rng().gen()),
+            agent_seed: args.agent_seed.unwrap_or_else(|| rand::thread_rng().gen()),
+        }
+    }
+}
+
+impl ExperimentConfig {
+    fn run_experiment(&self, verbose: bool) -> ExperimentResults {
+        let env_config = MetaEnv {
+            env_distribution: UniformBernoulliBandits::new(self.num_arms),
+            episodes_per_trial: self.num_episodes,
+        };
+        if verbose {
+            println!("{env_config:#?}\n");
+        }
+
+        let mut rng_env = Prng::seed_from_u64(self.env_seed);
+        let env = env_config.build_env(&mut rng_env).unwrap();
+
+        let rng_agent = Prng::seed_from_u64(self.agent_seed);
+        let summary = self
+            .agent
+            .evaluate(env, self.num_trials, rng_env, rng_agent);
+
+        if verbose {
+            println!("{summary:.3}\n");
+        }
+        ExperimentResults {
+            trial_reward_mean: summary.episode_reward.mean(),
+            trial_reward_stddev: summary.episode_reward.stddev(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ExperimentResults {
+    pub trial_reward_mean: f64,
+    pub trial_reward_stddev: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ExperimentData {
+    pub config: ExperimentConfig,
+    pub results: ExperimentResults,
+}
+
 fn main() {
     let args = Args::parse();
     let config = ExperimentConfig::from(&args);
-    if args.verbose {
-        println!("{config:#?}");
-    }
+    let results = config.run_experiment(args.verbose);
 
-    let summary = config.run_experiment(args.verbose);
-    println!("{summary:.3}");
+    let data = ExperimentData { config, results };
+    match args.output {
+        OutputFormat::Human => {
+            println!("# Config\n{:#?}\n", data.config);
+            println!("# Results");
+            println!("trial_reward_mean: {:.3}", data.results.trial_reward_mean);
+            println!(
+                "trial_reward_stddev: {:.3}",
+                data.results.trial_reward_stddev
+            );
+        }
+        OutputFormat::Json => {
+            println!("{}", serde_json::to_string(&data).unwrap());
+        }
+    }
 }
