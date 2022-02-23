@@ -12,6 +12,7 @@ pub struct OnlineMeanVariance<T> {
 }
 
 impl<T: Zero> Default for OnlineMeanVariance<T> {
+    #[inline]
     fn default() -> Self {
         Self {
             mean: T::zero(),
@@ -34,6 +35,7 @@ impl<T: Real + fmt::Display> fmt::Display for OnlineMeanVariance<T> {
 }
 
 impl<T: Zero> OnlineMeanVariance<T> {
+    #[inline]
     pub fn new() -> Self {
         Self::default()
     }
@@ -55,6 +57,7 @@ impl<T: Copy> OnlineMeanVariance<T> {
 
 impl<T: Real> OnlineMeanVariance<T> {
     /// The (population) variance of all accumulated values.
+    #[inline]
     pub fn variance(&self) -> T {
         if self.count == 0 {
             T::zero()
@@ -64,6 +67,7 @@ impl<T: Real> OnlineMeanVariance<T> {
     }
 
     /// The (population) standard deviation of all accumulated values.
+    #[inline]
     pub fn stddev(&self) -> T {
         self.variance().sqrt()
     }
