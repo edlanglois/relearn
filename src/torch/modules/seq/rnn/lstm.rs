@@ -1,7 +1,7 @@
 //! Long Short-Term Memory
 use super::super::super::SequenceModule;
 use super::super::seq_serial_map;
-use super::{RnnBase, RnnBaseConfig, RnnImpl, RnnLayerWeights, RnnType};
+use super::{RnnBase, RnnBaseConfig, RnnImpl, RnnLayerWeights};
 use tch::{Device, IndexOp, Kind, Tensor};
 
 /// Configuration for [`Lstm`]
@@ -15,9 +15,8 @@ pub struct LstmImpl;
 impl RnnImpl for LstmImpl {
     type CellState = (Tensor, Tensor);
 
-    fn type_() -> RnnType {
-        RnnType::Lstm
-    }
+    const CUDNN_MODE: u32 = 2;
+    const GATES_MULTIPLE: u32 = 4;
 
     fn initial_cell_state(rnn: &RnnBase<Self>, batch_size: i64) -> Self::CellState {
         let hidden_state = Tensor::zeros(&[batch_size, rnn.hidden_size], (Kind::Float, rnn.device));
@@ -164,7 +163,7 @@ mod tests {
         let out_dim: usize = 2;
         let vs = nn::VarStore::new(Device::Cpu);
         let config = LstmConfig {
-            has_biases: false,
+            bias_init: None,
             ..LstmConfig::default()
         };
         let lstm = Lstm::new(&vs.root(), in_dim, out_dim, &config);

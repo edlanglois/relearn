@@ -1,7 +1,7 @@
 //! Gated Recurrent Unit
 use super::super::super::SequenceModule;
 use super::super::seq_serial_map;
-use super::{RnnBase, RnnBaseConfig, RnnImpl, RnnLayerWeights, RnnType};
+use super::{RnnBase, RnnBaseConfig, RnnImpl, RnnLayerWeights};
 use tch::{Device, IndexOp, Kind, Tensor};
 
 /// Configuration for [`Gru`]
@@ -15,9 +15,8 @@ pub struct GruImpl;
 impl RnnImpl for GruImpl {
     type CellState = Tensor;
 
-    fn type_() -> RnnType {
-        RnnType::Gru
-    }
+    const CUDNN_MODE: u32 = 3;
+    const GATES_MULTIPLE: u32 = 3;
 
     fn initial_cell_state(rnn: &RnnBase<Self>, batch_size: i64) -> Self::CellState {
         Tensor::zeros(&[batch_size, rnn.hidden_size], (Kind::Float, rnn.device))
@@ -149,7 +148,7 @@ mod tests {
         let out_dim: usize = 2;
         let vs = nn::VarStore::new(Device::Cpu);
         let config = GruConfig {
-            has_biases: false,
+            bias_init: None,
             ..GruConfig::default()
         };
         let gru = Gru::new(&vs.root(), in_dim, out_dim, &config);

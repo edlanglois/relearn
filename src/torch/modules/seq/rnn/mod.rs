@@ -16,18 +16,26 @@ use tch::{nn::Path, Cuda, Device, Tensor};
 pub struct RnnBaseConfig<T> {
     /// Number of layers; each has size equal to the output size when built.
     pub num_layers: usize,
-    /// Whether the layers include bias terms
-    pub has_biases: bool,
-    /// Phantom marker for the specific RNN type (`RNN`, `GRU`, `LSTM`, etc)
-    type_: PhantomData<fn() -> T>,
+    /// Initialization for input-to-hidden weight matrices
+    pub input_weights_init: Init,
+    /// Initialization for hidden-to-hidden weight matrices
+    pub hidden_weights_init: Init,
+    /// Initialization for bias vectors. None if there should be no bias terms.
+    pub bias_init: Option<Init>,
+    /// Phantom marker for the specific RNN implementation (`RNNImpl`, `GRUImpl`, `LSTMImpl`, etc)
+    pub impl_: PhantomData<fn() -> T>,
 }
 
 impl<T> Default for RnnBaseConfig<T> {
     fn default() -> Self {
         Self {
             num_layers: 1,
-            has_biases: true,
-            type_: PhantomData,
+            // Default initialization follows the Tensorflow RNN implementation as it seems the
+            // most considered. The PyTorch RNN initializes all weights and biases in the same way.
+            input_weights_init: Init::XavierUniform,
+            hidden_weights_init: Init::Orthogonal,
+            bias_init: Some(Init::Zeros),
+            impl_: PhantomData,
         }
     }
 }
@@ -44,7 +52,18 @@ pub trait RnnImpl {
     /// State for one cell (single iterative layer)
     type CellState;
 
-    fn type_() -> RnnType;
+    /// cuDNN RNN mode code
+    ///
+    /// See <https://github.com/pytorch/pytorch/blob/d6909732954ad182d13fa8ab9959502a386e9d3a/torch/csrc/api/src/nn/modules/rnn.cpp#L29>
+    ///
+    /// * `RnnRelu` - `0`
+    /// * `RnnTanh` - `1`
+    /// * `Lstm` - 2
+    /// * `Gru` - 3
+    const CUDNN_MODE: u32;
+
+    /// Number of gates per hidden unit
+    const GATES_MULTIPLE: u32;
 
     fn initial_cell_state(rnn: &RnnBase<Self>, batch_size: i64) -> Self::CellState
     where
@@ -72,14 +91,7 @@ pub struct RnnBase<T> {
 impl<T: RnnImpl> RnnBase<T> {
     pub fn new(vs: &Path, in_dim: usize, out_dim: usize, config: &RnnBaseConfig<T>) -> Self {
         Self {
-            weights: RnnWeights::init(
-                vs,
-                T::type_(),
-                in_dim,
-                out_dim,
-                config.num_layers,
-                config.has_biases,
-            ),
+            weights: RnnWeights::new(vs, in_dim, out_dim, config),
             hidden_size: out_dim.try_into().unwrap(),
             dropout: 0.0,
             device: vs.device(),
@@ -114,32 +126,6 @@ impl<T: RnnImpl> IterativeModule for RnnBase<T> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum RnnType {
-    /// Recurrent neural unit with relu activation
-    RnnRelu,
-    /// Recurrent neural unit with tanh activation
-    RnnTanh,
-    /// Long Short Term Memory
-    Lstm,
-    /// Gated Recurrent Unit
-    Gru,
-}
-
-impl RnnType {
-    /// cuDNN RNN mode code
-    ///
-    /// See <https://github.com/pytorch/pytorch/blob/d6909732954ad182d13fa8ab9959502a386e9d3a/torch/csrc/api/src/nn/modules/rnn.cpp#L29>
-    const fn cudnn_mode(&self) -> usize {
-        match self {
-            Self::RnnRelu => 0,
-            Self::RnnTanh => 1,
-            Self::Lstm => 2,
-            Self::Gru => 3,
-        }
-    }
-}
-
 #[derive(Debug)]
 struct RnnWeights {
     flat_weights: Vec<Tensor>,
@@ -147,6 +133,100 @@ struct RnnWeights {
 }
 
 impl RnnWeights {
+    /// Initialize [`RnnWeights`].
+    ///
+    /// # Reference Initialization Strategies
+    /// ## Pytorch
+    /// Initializes all weights and biases from `U(-lim, lim)` where `lim = 1 / sqrt(hidden_dim)`.
+    /// [Source](https://github.com/pytorch/pytorch/blob/5a04bd87233b5391a9fe471fadac5a3edc128e05/torch/csrc/api/src/nn/modules/rnn.cpp#L677-L683).
+    ///
+    /// ## Tensorflow
+    /// By default, initializes as:
+    /// * Input-to-hidden weights: Glorot Uniform (aka Xavier)
+    /// * Hidden-to-hidden weights: Orthogonal
+    /// * Biases: Zero
+    /// [GRU](https://github.com/keras-team/keras/blob/d8fcb9d4d4dad45080ecfdd575483653028f8eda/keras/layers/recurrent.py#L1771-L1773).
+    /// [LSTM](https://github.com/keras-team/keras/blob/d8fcb9d4d4dad45080ecfdd575483653028f8eda/keras/layers/recurrent.py#L2334-L2336).
+    ///
+    /// The weight matrices for the separate gates are initialized as a single large matrix with
+    /// output dimension `K * hidden_dim` (`K = 3` for GRU). As far as I can tell, this is not
+    /// accounted for in the initialization. Consequently, the Glorot Uniform distribution is
+    /// `U(-lim, lim)` where
+    /// `lim = sqrt(6 / (fan_in + fan_out)) = sqrt(6 / (in_dim + K * hidden_dim))`.
+    ///
+    /// ## Tch
+    /// Initializes as:
+    /// * Weights: `U(-lim, lim)` where `lim = 1 / sqrt(fan_in)`.
+    ///     (Named Kaiming Uniform but missing factor of `sqrt(3)`).
+    /// * Biases: Zero.
+    /// [Source](https://docs.rs/tch/0.6.1/src/tch/nn/rnn.rs.html#210).
+    ///
+    pub fn new<T: RnnImpl>(
+        vs: &Path,
+        in_dim: usize,
+        out_dim: usize,
+        config: &RnnBaseConfig<T>,
+    ) -> Self {
+        let in_dim: i64 = in_dim.try_into().unwrap();
+        let hidden_size: i64 = out_dim.try_into().unwrap();
+        let gates_size = hidden_size * i64::from(T::GATES_MULTIPLE);
+
+        let mut flat_weights = Vec::new();
+        for i in 0..config.num_layers {
+            let layer_input_size = if i == 0 { in_dim } else { hidden_size };
+            // TODO: Use the same initialization as PyTorch
+            // <https://pytorch.org/docs/stable/_modules/torch/nn/modules/rnn.html>
+            flat_weights.push(config.input_weights_init.add_tensor(
+                vs,
+                &format!("weight_ih_l{}", i),
+                &[gates_size, layer_input_size],
+                1.0,
+            ));
+            flat_weights.push(config.hidden_weights_init.add_tensor(
+                vs,
+                &format!("weight_hh_l{}", i),
+                &[gates_size, hidden_size],
+                1.0,
+            ));
+
+            if let Some(bias_init) = config.bias_init {
+                flat_weights.push(bias_init.add_tensor(
+                    vs,
+                    &format!("bias_ih_l{}", i),
+                    &[gates_size],
+                    1.0,
+                ));
+                flat_weights.push(bias_init.add_tensor(
+                    vs,
+                    &format!("bias_hh_l{}", i),
+                    &[gates_size],
+                    1.0,
+                ));
+            }
+        }
+
+        if vs.device().is_cuda() && Cuda::cudnn_is_available() {
+            // Flatten the weights in-place
+            // <https://github.com/pytorch/pytorch/blob/5a04bd87233b5391a9fe471fadac5a3edc128e05/torch/csrc/api/src/nn/modules/rnn.cpp#L159-L221>
+            let _no_grad = tch::no_grad_guard();
+            let _ = Tensor::internal_cudnn_rnn_flatten_weight(
+                &flat_weights,
+                if config.bias_init.is_some() { 4 } else { 2 },
+                in_dim,
+                T::CUDNN_MODE.into(),
+                hidden_size,
+                0,                        // No projections
+                config.num_layers as i64, // Num layers
+                true,                     // Batch first
+                false,                    // Not bidirectional
+            );
+        }
+        Self {
+            flat_weights,
+            has_biases: config.bias_init.is_some(),
+        }
+    }
+
     /// All weights an array
     pub fn flat_weights(&self) -> &[Tensor] {
         &self.flat_weights
@@ -172,115 +252,6 @@ impl RnnWeights {
                 weights,
                 has_biases: self.has_biases,
             })
-    }
-
-    /// Initialize [`RnnWeights`].
-    ///
-    /// # Initialization Strategies
-    /// ## Reference: Pytorch
-    /// Initializes all weights and biases from `U(-lim, lim)` where `lim = 1 / sqrt(hidden_dim)`.
-    /// [Source](https://github.com/pytorch/pytorch/blob/5a04bd87233b5391a9fe471fadac5a3edc128e05/torch/csrc/api/src/nn/modules/rnn.cpp#L677-L683).
-    ///
-    /// ## Reference: Tensorflow
-    /// By default, initializes as:
-    /// * Input-to-hidden weights: Glorot Uniform (aka Xavier)
-    /// * Hidden-to-hidden weights: Orthogonal
-    /// * Biases: Zero
-    /// [GRU](https://github.com/keras-team/keras/blob/d8fcb9d4d4dad45080ecfdd575483653028f8eda/keras/layers/recurrent.py#L1771-L1773).
-    /// [LSTM](https://github.com/keras-team/keras/blob/d8fcb9d4d4dad45080ecfdd575483653028f8eda/keras/layers/recurrent.py#L2334-L2336).
-    ///
-    /// The weight matrices for the separate gates are initialized as a single large matrix with
-    /// output dimension `K * hidden_dim` (`K = 3` for GRU). As far as I can tell, this is not
-    /// accounted for in the initialization. Consequently, the Glorot Uniform distribution is
-    /// `U(-lim, lim)` where
-    /// `lim = sqrt(6 / (fan_in + fan_out)) = sqrt(6 / (in_dim + K * hidden_dim))`.
-    ///
-    /// ## Reference: Tch
-    /// Initializes as:
-    /// * Weights: `U(-lim, lim)` where `lim = 1 / sqrt(fan_in)`.
-    ///     (Named Kaiming Uniform but missing factor of `sqrt(3)`).
-    /// * Biases: Zero.
-    /// [Source](https://docs.rs/tch/0.6.1/src/tch/nn/rnn.rs.html#210).
-    ///
-    /// ## This
-    /// This follows the Tensorflow initialization strategy because it seems the most principled.
-    ///
-    pub fn init(
-        vs: &Path,
-        type_: RnnType,
-        in_dim: usize,
-        out_dim: usize,
-        num_layers: usize,
-        with_bias: bool,
-    ) -> Self {
-        let in_dim: i64 = in_dim.try_into().unwrap();
-        let hidden_size: i64 = out_dim.try_into().unwrap();
-        let gates_size = match type_ {
-            RnnType::RnnRelu => hidden_size,
-            RnnType::RnnTanh => hidden_size,
-            RnnType::Lstm => 4 * hidden_size,
-            RnnType::Gru => 3 * hidden_size,
-        };
-
-        let input_weights_init = Init::XavierUniform;
-        let hidden_weights_init = Init::Orthogonal;
-        // let hidden_weights_init = Init::XavierUniform;
-        let biases_init = Init::Zeros;
-
-        let mut flat_weights = Vec::new();
-        for i in 0..num_layers {
-            let layer_input_size = if i == 0 { in_dim } else { hidden_size };
-            // TODO: Use the same initialization as PyTorch
-            // <https://pytorch.org/docs/stable/_modules/torch/nn/modules/rnn.html>
-            flat_weights.push(input_weights_init.add_tensor(
-                vs,
-                &format!("weight_ih_l{}", i),
-                &[gates_size, layer_input_size],
-                1.0,
-            ));
-            flat_weights.push(hidden_weights_init.add_tensor(
-                vs,
-                &format!("weight_hh_l{}", i),
-                &[gates_size, hidden_size],
-                1.0,
-            ));
-
-            if with_bias {
-                flat_weights.push(biases_init.add_tensor(
-                    vs,
-                    &format!("bias_ih_l{}", i),
-                    &[gates_size],
-                    1.0,
-                ));
-                flat_weights.push(biases_init.add_tensor(
-                    vs,
-                    &format!("bias_hh_l{}", i),
-                    &[gates_size],
-                    1.0,
-                ));
-            }
-        }
-
-        if vs.device().is_cuda() && Cuda::cudnn_is_available() {
-            // Flatten the weights in-place
-            // <https://github.com/pytorch/pytorch/blob/5a04bd87233b5391a9fe471fadac5a3edc128e05/torch/csrc/api/src/nn/modules/rnn.cpp#L159-L221>
-            let _no_grad = tch::no_grad_guard();
-            let _ = Tensor::internal_cudnn_rnn_flatten_weight(
-                &flat_weights,
-                if with_bias { 4 } else { 2 },
-                in_dim,
-                type_.cudnn_mode() as i64,
-                hidden_size,
-                0,                 // No projections
-                num_layers as i64, // Num layers
-                true,              // Batch first
-                false,             // Not bidirectional
-            );
-        }
-        Self {
-            flat_weights,
-            has_biases: with_bias,
-        }
     }
 }
 
