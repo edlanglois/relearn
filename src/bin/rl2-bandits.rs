@@ -1,0 +1,466 @@
+use clap::{ArgEnum, Parser, Subcommand};
+use rand::{Rng, SeedableRng};
+use relearn::agents::{
+    Actor, BetaThompsonSamplingAgentConfig, BuildAgent, RandomAgentConfig, ResettingMetaAgent,
+    TabularQLearningAgentConfig, UCB1AgentConfig,
+};
+use relearn::envs::{
+    BuildEnv, Environment, MetaEnv, MetaObservationSpace, StructuredEnvironment,
+    UniformBernoulliBandits,
+};
+use relearn::logging::DisplayLogger;
+use relearn::simulation::{train_parallel, TrainParallelConfig};
+use relearn::simulation::{SimulatorSteps, StepsIter, StepsSummary};
+use relearn::spaces::{IndexSpace, NonEmptySpace, SingletonSpace, Space};
+use relearn::torch::{
+    agents::{ActorCriticAgent, ActorCriticConfig},
+    critic::{Gae, GaeConfig},
+    modules::{Activation, AsSeq, Chained, ChainedConfig, Gru, GruConfig},
+    optimizers::{AdamConfig, ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig},
+    updaters::{CriticLossUpdateRule, TrpoPolicyUpdateRule, WithOptimizer},
+    Init,
+};
+use relearn::Prng;
+use serde::Serialize;
+use std::fmt;
+use std::num::ParseIntError;
+use std::str::FromStr;
+use tch::nn::{Linear, LinearConfig};
+use tch::COptimizer;
+use thiserror::Error;
+
+#[derive(Parser, Debug, Copy, Clone, PartialEq)]
+#[clap(
+    name = "rl2-bandits",
+    author,
+    about = "Train and evaluate multi-armed bandit algorithms as in the RL2 paper"
+)]
+pub struct Args {
+    /// Experiment Action
+    #[clap(subcommand)]
+    action: Action,
+
+    /// Number of bandit arms
+    #[clap(short = 'n', long, default_value_t = 10)]
+    pub num_arms: usize,
+
+    /// Number of episodes per trial
+    #[clap(short = 'k', long, default_value_t = 100)]
+    pub num_episodes: u64,
+
+    /// Number of evaluation trials
+    #[clap(long, default_value_t = 1000)]
+    pub num_trials: usize,
+
+    /// Environment random seed
+    #[clap(long)]
+    pub env_seed: Option<u64>,
+
+    /// Agent random seed
+    #[clap(long)]
+    pub agent_seed: Option<u64>,
+
+    /// Enable verbose output
+    #[clap(short, long)]
+    pub verbose: bool,
+
+    /// Output format
+    #[clap(short, long, arg_enum, default_value_t = OutputFormat::Human)]
+    pub output: OutputFormat,
+}
+
+impl Args {
+    fn config(&self) -> Config {
+        match self.action {
+            Action::Train { batch_size, device } => Config::Train(TrainConfig {
+                num_arms: self.num_arms,
+                num_episodes: self.num_episodes,
+                num_trials: self.num_trials,
+                env_seed: self.env_seed.unwrap_or_else(|| rand::thread_rng().gen()),
+                agent_seed: self.agent_seed.unwrap_or_else(|| rand::thread_rng().gen()),
+                batch_size,
+                device,
+                num_workers: num_cpus::get(),
+            }),
+            Action::Eval { agent } => Config::Eval(EvalConfig {
+                num_arms: self.num_arms,
+                num_episodes: self.num_episodes,
+                num_trials: self.num_trials,
+                agent,
+                env_seed: self.env_seed.unwrap_or_else(|| rand::thread_rng().gen()),
+                agent_seed: self.agent_seed.unwrap_or_else(|| rand::thread_rng().gen()),
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Subcommand)]
+pub enum Action {
+    /// Train the RL2 policy
+    Train {
+        /// Batch size for policy updates
+        #[clap(long, default_value_t = 250_000)]
+        batch_size: usize,
+
+        /// Device on which to perform model updates
+        #[clap(long, default_value_t = Device::Cpu)]
+        device: Device,
+    },
+    /// Evaluate an algorithm
+    Eval {
+        /// Agent type
+        #[clap(short, long, arg_enum, default_value_t = AgentType::UCB1)]
+        agent: AgentType,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum)]
+pub enum OutputFormat {
+    Human,
+    Json,
+}
+
+/// Agent type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ArgEnum, Serialize)]
+pub enum AgentType {
+    /// Uniform random
+    Random,
+    /// Epsilon-greedy
+    EpsGreedy,
+    /// Greedy
+    Greedy,
+    /// Thompson Sampling
+    TS,
+    /// Optimistic Thompson Sampling
+    OTS,
+    /// Upper Confidence Bound Alg 1
+    UCB1,
+}
+
+impl AgentType {
+    fn evaluate(
+        self,
+        meta_env: MetaEnv<UniformBernoulliBandits>,
+        num_trials: usize,
+        rng_env: Prng,
+        rng_agent: Prng,
+    ) -> StepsSummary {
+        macro_rules! eval_resetting {
+            ($config:expr) => {
+                eval_resetting_meta(meta_env, $config, num_trials, rng_env, rng_agent)
+            };
+        }
+
+        match self {
+            AgentType::Random => {
+                eval_resetting!(RandomAgentConfig)
+            }
+            AgentType::EpsGreedy => {
+                eval_resetting!(TabularQLearningAgentConfig {
+                    exploration_rate: 0.2, // paper does not give the value they used
+                    initial_action_count: 2,
+                    initial_action_value: 0.5,
+                })
+            }
+            AgentType::Greedy => eval_resetting!(TabularQLearningAgentConfig {
+                exploration_rate: 0.0,
+                initial_action_count: 2,
+                initial_action_value: 0.5,
+            }),
+            AgentType::TS => eval_resetting!(BetaThompsonSamplingAgentConfig::default()),
+            AgentType::OTS => eval_resetting!(BetaThompsonSamplingAgentConfig {
+                num_samples: 10, // paper does not give the value they used
+            }),
+            AgentType::UCB1 => eval_resetting!(UCB1AgentConfig {
+                exploration_rate: 0.2, // paper does not give the value they used
+            }),
+        }
+    }
+}
+
+fn eval_resetting_meta<E, TC, OS, AS>(
+    meta_env: E,
+    actor_config: TC,
+    num_trials: usize,
+    rng_env: Prng,
+    rng_actor: Prng,
+) -> StepsSummary
+where
+    E: StructuredEnvironment<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
+    TC: BuildAgent<OS, AS>,
+    OS: Space + Clone,
+    AS: NonEmptySpace + Clone,
+{
+    let meta_actor = ResettingMetaAgent::from_meta_env(actor_config, &meta_env);
+    eval(meta_env, meta_actor, num_trials, rng_env, rng_actor)
+}
+
+fn eval<E, T>(env: E, actor: T, num_episodes: usize, rng_env: Prng, rng_actor: Prng) -> StepsSummary
+where
+    E: Environment,
+    T: Actor<E::Observation, E::Action>,
+{
+    SimulatorSteps::new(env, actor, rng_env, rng_actor, ())
+        .take_episodes(num_episodes)
+        .collect()
+}
+
+enum Config {
+    Train(TrainConfig),
+    Eval(EvalConfig),
+}
+
+fn make_env(
+    num_arms: usize,
+    num_episodes: u64,
+    rng: &mut Prng,
+    verbose: bool,
+) -> MetaEnv<UniformBernoulliBandits> {
+    let env_config = MetaEnv {
+        env_distribution: UniformBernoulliBandits::new(num_arms),
+        episodes_per_trial: num_episodes,
+    };
+    if verbose {
+        println!("{env_config:#?}\n");
+    }
+
+    env_config.build_env(rng).unwrap()
+}
+
+/// Serializable reimplementation of [`tch::Device`].
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize)]
+pub enum Device {
+    Cpu,
+    Cuda(usize),
+}
+
+/// Parse "cpu" or "cuda:#"
+impl FromStr for Device {
+    type Err = ParseDeviceError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (device_str, index_str) = match s.split_once(':') {
+            Some((dev, index)) => (dev, Some(index)),
+            None => (s, None),
+        };
+        if device_str.eq_ignore_ascii_case("cpu") {
+            if index_str.is_some() {
+                Err(ParseDeviceError::UnexpectedIndex)
+            } else {
+                Ok(Device::Cpu)
+            }
+        } else if device_str.eq_ignore_ascii_case("cuda") {
+            let index = index_str.map(str::parse).unwrap_or(Ok(0))?;
+            Ok(Device::Cuda(index))
+        } else {
+            Err(ParseDeviceError::InvalidDevice)
+        }
+    }
+}
+
+/// Error parsing a [`Device`]
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum ParseDeviceError {
+    #[error("invalid device name")]
+    InvalidDevice,
+    #[error("invalid device index")]
+    InvalidIndex(#[from] ParseIntError),
+    #[error("unexpected device index")]
+    UnexpectedIndex,
+}
+
+impl From<Device> for tch::Device {
+    fn from(d: Device) -> Self {
+        match d {
+            Device::Cpu => Self::Cpu,
+            Device::Cuda(index) => Self::Cuda(index),
+        }
+    }
+}
+
+impl fmt::Display for Device {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Cpu => write!(f, "cpu"),
+            Self::Cuda(index) => write!(f, "cuda:{}", index),
+        }
+    }
+}
+
+impl fmt::Debug for Device {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
+type Agent = ActorCriticAgent<
+    MetaObservationSpace<SingletonSpace, IndexSpace>,
+    IndexSpace,
+    ChainedConfig<GruConfig, AsSeq<LinearConfig>>,
+    Chained<Gru, AsSeq<Linear>>,
+    WithOptimizer<TrpoPolicyUpdateRule, ConjugateGradientOptimizer>,
+    Gae<Chained<Gru, AsSeq<Linear>>>,
+    WithOptimizer<CriticLossUpdateRule, COptimizer>,
+>;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
+pub struct TrainConfig {
+    pub num_arms: usize,
+    pub num_episodes: u64,
+    pub num_trials: usize,
+    pub env_seed: u64,
+    pub agent_seed: u64,
+
+    pub batch_size: usize,
+    pub device: Device,
+    pub num_workers: usize,
+}
+
+impl TrainConfig {
+    fn train_policy(&self, verbose: bool) -> Agent {
+        let mut rng_env = Prng::seed_from_u64(self.env_seed);
+        let mut rng_agent = Prng::seed_from_u64(self.agent_seed);
+        let env = make_env(self.num_arms, self.num_episodes, &mut rng_env, verbose);
+
+        // Configuration for the policy and baseline networks
+        // GRU followed by fully-connected
+        let model_config = ChainedConfig {
+            first_config: GruConfig {
+                num_layers: 1,
+                input_weights_init: Init::XavierUniform,
+                hidden_weights_init: Init::Orthogonal,
+                bias_init: Some(Init::Zeros),
+                ..GruConfig::default()
+            },
+            second_config: AsSeq(LinearConfig::default()),
+            hidden_dim: 256,
+            // They might have also used Relu within the GRU. This only controls the activation
+            // between the hidden weights and the linear output layer.
+            // I'm not sure that it is possible to change the activation used by GRU in torch.
+            // NOTE: Could also try with no activation here if the GRU nonlinearity is sufficient.
+            activation: Activation::Relu,
+        };
+        let agent_config = ActorCriticConfig {
+            policy_config: model_config,
+            policy_updater_config: WithOptimizer {
+                update_rule: TrpoPolicyUpdateRule {
+                    // RL2 paper mentions "Mean KL" as a parameter that they set to 0.01.
+                    // I do not know of such a parameter for TRPO.
+                    // The TRPO paper has a max KL step size parameter that they set to 0.01 so
+                    // I assume that either this is what was meant by the RL2 paper or
+                    // that their strategy was not too different.
+                    max_policy_step_kl: 0.01,
+                },
+                // RL2 paper has "Policy Iters: Up to 1000".
+                // I think this refers to number of update periods,
+                // not the number of CG iterations when solving for for the descent direction.
+                // They do not seem to specify any CG optimizer parameters.
+                optimizer: ConjugateGradientOptimizerConfig::default(),
+            },
+            critic_config: GaeConfig {
+                gamma: 0.99,
+                lambda: 0.3,
+                value_fn_config: model_config,
+            },
+            // Note: I think they used CG optimization here as in the GAE paper
+            // https://arxiv.org/pdf/1506.02438.pdf, not regular gradient descent.
+            // TODO: Implement and use CG for critic updates.
+            critic_updater_config: WithOptimizer {
+                update_rule: CriticLossUpdateRule {
+                    optimizer_iters: 10,
+                },
+                optimizer: AdamConfig::default(),
+            },
+            min_batch_steps: self.batch_size,
+            device: self.device.into(),
+        };
+        let mut agent = agent_config.build_agent(&env, &mut rng_agent).unwrap();
+        let mut logger = DisplayLogger::default();
+        let training_config = TrainParallelConfig {
+            num_periods: self.num_trials,
+            num_threads: self.num_workers,
+            min_workers_steps: 10_000,
+        };
+
+        train_parallel(
+            &mut agent,
+            &env,
+            &training_config,
+            &mut rng_env,
+            &mut rng_agent,
+            &mut logger,
+        );
+
+        agent
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
+pub struct EvalConfig {
+    pub num_arms: usize,
+    pub num_episodes: u64,
+    pub num_trials: usize,
+    pub agent: AgentType,
+    pub env_seed: u64,
+    pub agent_seed: u64,
+}
+
+impl EvalConfig {
+    fn run_experiment(&self, verbose: bool) -> EvalResults {
+        let mut rng_env = Prng::seed_from_u64(self.env_seed);
+        let env = make_env(self.num_arms, self.num_episodes, &mut rng_env, verbose);
+
+        let rng_agent = Prng::seed_from_u64(self.agent_seed);
+        let summary = self
+            .agent
+            .evaluate(env, self.num_trials, rng_env, rng_agent);
+
+        if verbose {
+            println!("{summary:.3}\n");
+        }
+        EvalResults {
+            trial_reward_mean: summary.episode_reward.mean(),
+            trial_reward_stddev: summary.episode_reward.stddev(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct EvalResults {
+    pub trial_reward_mean: f64,
+    pub trial_reward_stddev: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct EvalData {
+    pub config: EvalConfig,
+    pub results: EvalResults,
+}
+
+fn main() {
+    let args = Args::parse();
+    match args.config() {
+        Config::Train(config) => {
+            let _ = config.train_policy(args.verbose);
+        }
+        Config::Eval(config) => {
+            let results = config.run_experiment(args.verbose);
+
+            let data = EvalData { config, results };
+            match args.output {
+                OutputFormat::Human => {
+                    println!("# Config\n{:#?}\n", data.config);
+                    println!("# Results");
+                    println!("trial_reward_mean: {:.3}", data.results.trial_reward_mean);
+                    println!(
+                        "trial_reward_stddev: {:.3}",
+                        data.results.trial_reward_stddev
+                    );
+                }
+                OutputFormat::Json => {
+                    println!("{}", serde_json::to_string(&data).unwrap());
+                }
+            }
+        }
+    };
+}

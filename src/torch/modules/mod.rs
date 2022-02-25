@@ -2,6 +2,7 @@
 mod chain;
 mod ff;
 mod seq;
+mod tch_;
 #[cfg(test)]
 pub mod testing;
 
@@ -123,21 +124,6 @@ macro_rules! impl_wrapped_feed_forward_module {
 }
 impl_wrapped_feed_forward_module!(&'_ T);
 impl_wrapped_feed_forward_module!(Box<T>);
-
-/// Implement [`Module`] and [`FeedForwardModule`] for a type that implements [`tch::nn::Module`].
-macro_rules! impl_ff_module_for_tch {
-    ($ty:ty) => {
-        impl Module for $ty {}
-        impl FeedForwardModule for $ty {
-            fn forward(&self, input: &Tensor) -> Tensor {
-                tch::nn::Module::forward(self, input)
-            }
-        }
-    };
-}
-impl_ff_module_for_tch!(tch::nn::Embedding);
-impl_ff_module_for_tch!(tch::nn::LayerNorm);
-impl_ff_module_for_tch!(tch::nn::Linear);
 
 /// A network module implementing a sequence transformation.
 pub trait SequenceModule: Module {

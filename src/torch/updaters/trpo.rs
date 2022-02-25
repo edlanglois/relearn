@@ -26,6 +26,7 @@ pub struct TrpoPolicyUpdateRule {
 impl Default for TrpoPolicyUpdateRule {
     fn default() -> Self {
         Self {
+            // This step size was used by all experiments in Schulman's TRPO paper.
             max_policy_step_kl: 0.01,
         }
     }
