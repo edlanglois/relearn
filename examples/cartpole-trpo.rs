@@ -18,23 +18,28 @@ use tch::Device;
 type Module = AsSeq<MlpConfig>;
 
 fn main() {
+    let env = CartPole::default().with_step_limit(500);
+    println!("Env:\n{:#?}\n", env);
+
     let agent_config: ActorCriticConfig<
         Module,
         WithOptimizer<TrpoPolicyUpdateRule, ConjugateGradientOptimizerConfig>,
         GaeConfig<Module>,
         WithOptimizer<CriticLossUpdateRule, AdamConfig>,
     > = ActorCriticConfig {
-        device: Device::Cuda(0),
+        device: Device::cuda_if_available(),
         ..Default::default()
     };
+    println!("Agent Config\n{:#?}\n", agent_config);
+
     let training_config = TrainParallelConfig {
         num_periods: 50,
         num_threads: num_cpus::get(),
         min_workers_steps: 10_000,
     };
+    println!("Training Config\n{:#?}\n", training_config);
 
     let mut rng = Prng::seed_from_u64(0);
-    let env = CartPole::default().with_step_limit(500);
     let mut agent = agent_config.build_agent(&env, &mut rng).unwrap();
 
     let mut log_dir: PathBuf = ["data", "cartpole-trpo"].iter().collect();

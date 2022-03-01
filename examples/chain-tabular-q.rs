@@ -18,28 +18,32 @@ fn main() {
     let mut rng = Prng::seed_from_u64(0);
     let env = env_config.build_env(&mut rng).unwrap();
     let mut agent = agent_config.build_agent(&env, &mut rng).unwrap();
-    let mut logger = DisplayLogger::default();
 
     {
         let summary: StepsSummary = env
             .run(&agent.actor(ActorMode::Evaluation), SimSeed::Root(0), ())
             .take(10_000)
             .collect();
-        println!("Initial Stats\n{}", summary);
+        println!("Initial Stats\n{:.3}", summary);
     }
 
-    train_parallel(
-        &mut agent,
-        &env,
-        &training_config,
-        &mut Prng::from_rng(&mut rng).unwrap(),
-        &mut rng,
-        &mut logger,
-    );
+    {
+        // This block ensures the logger is dropped before `Final Stats` are printed
+        // so that the flushed outputs appear in-order.
+        let mut logger = DisplayLogger::default();
+        train_parallel(
+            &mut agent,
+            &env,
+            &training_config,
+            &mut Prng::from_rng(&mut rng).unwrap(),
+            &mut rng,
+            &mut logger,
+        );
+    }
 
     let summary: StepsSummary = env
         .run(&agent.actor(ActorMode::Evaluation), SimSeed::Root(0), ())
         .take(10_000)
         .collect();
-    println!("\nFinal Stats\n{}", summary);
+    println!("\nFinal Stats\n{:.3}", summary);
 }

@@ -45,6 +45,12 @@ doc-only = ["tch/doc-only"]
 [package.metadata.docs.rs]
 features = [ "doc-only" ]
 
+[[example]]
+name = "cartpole-trpo"
+
+[[example]]
+name = "chain-tabular-q"
+
 [[bench]]
 name = "rnn"
 harness = false
