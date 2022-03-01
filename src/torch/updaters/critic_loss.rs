@@ -38,7 +38,6 @@ where
 
         let mut critic_opt_start = Instant::now();
         let mut initial_loss = None;
-        let mut final_loss = None;
         for i in 0..self.optimizer_iters {
             let loss = f64::from(optimizer.backward_step(&loss_fn, logger).unwrap());
             let critic_opt_end = Instant::now();
@@ -49,13 +48,10 @@ where
 
             if i == 0 {
                 initial_loss = Some(loss);
+                logger.log_scalar("loss_initial", loss);
             } else if i == self.optimizer_iters - 1 {
-                final_loss = Some(loss);
+                logger.log_scalar("loss_improvement", initial_loss.unwrap() - loss)
             }
         }
-        logger.log_scalar(
-            "loss_improvement",
-            initial_loss.unwrap() - final_loss.unwrap(),
-        )
     }
 }
