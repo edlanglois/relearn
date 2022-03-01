@@ -473,8 +473,8 @@ impl EvalConfig {
             println!("{summary:.3}\n");
         }
         EvalResults {
-            trial_reward_mean: summary.episode_reward.mean(),
-            trial_reward_stddev: summary.episode_reward.stddev(),
+            trial_reward_mean: summary.episode_reward.mean().unwrap_or(f64::NAN),
+            trial_reward_stddev: summary.episode_reward.stddev().unwrap_or(f64::NAN),
         }
     }
 }

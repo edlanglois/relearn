@@ -76,12 +76,14 @@ impl TensorBoardBackend {
                     .add_scalar(tag, (initial_value + increment) as f32, self.summary_index)
             }
             Duration { stats } => {
-                self.writer
-                    .add_scalar(tag, stats.mean() as f32, self.summary_index)
+                if let Some(mean) = stats.mean() {
+                    self.writer.add_scalar(tag, mean as f32, self.summary_index)
+                }
             }
             Scalar { stats } => {
-                self.writer
-                    .add_scalar(tag, stats.mean() as f32, self.summary_index)
+                if let Some(mean) = stats.mean() {
+                    self.writer.add_scalar(tag, mean as f32, self.summary_index)
+                }
             }
             Index { counts } => {
                 // Treat as a histogram with bucket boundaries half way between each integer.

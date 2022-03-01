@@ -25,9 +25,17 @@ impl<T: Zero> Default for OnlineMeanVariance<T> {
 impl<T: Real + fmt::Display> fmt::Display for OnlineMeanVariance<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "(μ = ")?;
-        fmt::Display::fmt(&self.mean(), f)?;
+        if let Some(mean) = self.mean() {
+            fmt::Display::fmt(&mean, f)?;
+        } else {
+            write!(f, "-")?;
+        }
         write!(f, "; σ = ")?;
-        fmt::Display::fmt(&self.stddev(), f)?;
+        if let Some(stddev) = self.stddev() {
+            fmt::Display::fmt(&stddev, f)?;
+        } else {
+            write!(f, "-")?;
+        }
         write!(f, "; n = ")?;
         fmt::Display::fmt(&self.count, f)?;
         write!(f, ")")
@@ -42,13 +50,17 @@ impl<T: Zero> OnlineMeanVariance<T> {
 }
 
 impl<T: Copy> OnlineMeanVariance<T> {
-    /// The mean of all accumulated values.
+    /// The mean of all accumulated values if at least one value has been accumulated.
     #[inline]
-    pub fn mean(&self) -> T {
-        self.mean
+    pub fn mean(&self) -> Option<T> {
+        if self.count > 0 {
+            Some(self.mean)
+        } else {
+            None
+        }
     }
 
-    /// The number of accumulated samples.
+    /// The number of accumulated values.
     #[inline]
     pub fn count(&self) -> u64 {
         self.count
@@ -57,19 +69,23 @@ impl<T: Copy> OnlineMeanVariance<T> {
 
 impl<T: Real> OnlineMeanVariance<T> {
     /// The (population) variance of all accumulated values.
+    ///
+    /// If at least one value has been accumulated.
     #[inline]
-    pub fn variance(&self) -> T {
-        if self.count == 0 {
-            T::zero()
+    pub fn variance(&self) -> Option<T> {
+        if self.count > 0 {
+            Some(self.squared_residual_sum / T::from(self.count).unwrap())
         } else {
-            self.squared_residual_sum / T::from(self.count).unwrap()
+            None
         }
     }
 
     /// The (population) standard deviation of all accumulated values.
+    ///
+    /// If at least one value has been accumulated.
     #[inline]
-    pub fn stddev(&self) -> T {
-        self.variance().sqrt()
+    pub fn stddev(&self) -> Option<T> {
+        self.variance().map(T::sqrt)
     }
 }
 
@@ -114,7 +130,7 @@ mod tests {
     fn collect_f64() {
         let stats: OnlineMeanVariance<f64> =
             [1.0, 2.0, 3.0, 4.0].into_iter().map(Into::into).collect();
-        assert!((stats.mean() - 2.5).abs() < 1e-8);
-        assert!((stats.variance() - 1.25).abs() < 1e-8);
+        assert!((stats.mean().unwrap() - 2.5).abs() < 1e-8);
+        assert!((stats.variance().unwrap() - 1.25).abs() < 1e-8);
     }
 }

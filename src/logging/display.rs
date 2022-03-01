@@ -95,46 +95,55 @@ impl<'a> fmt::Display for DisplaySummary<'a> {
                 Ok(())
             }
             ChunkSummary::Duration { stats } => {
-                let mean = stats.mean();
-                write!(f, "{:.4}", PrettyPrint(Duration::from_secs_f64(mean)))?;
-                if stats.count() > 1 {
+                if stats.count() > 0 {
+                    let mean = stats.mean().unwrap();
+                    write!(f, "{:.4}", PrettyPrint(Duration::from_secs_f64(mean)))?;
+                    if stats.count() > 1 {
+                        write!(
+                            f,
+                            " {}",
+                            Paint::fixed(
+                                8,
+                                DisplayFn(|f| write!(
+                                    f,
+                                    "(σ {:.4})",
+                                    PrettyPrint(Duration::from_secs_f64(stats.stddev().unwrap()))
+                                ))
+                            )
+                        )?;
+                    }
                     write!(
                         f,
                         " {}",
                         Paint::fixed(
-                            8,
+                            221,
                             DisplayFn(|f| write!(
                                 f,
-                                "(σ {:.4})",
-                                PrettyPrint(Duration::from_secs_f64(stats.stddev()))
+                                "{:.2}%",
+                                mean / self.elapsed.as_secs_f64() * 100.0
                             ))
                         )
                     )?;
                 }
-                write!(
-                    f,
-                    " {}",
-                    Paint::fixed(
-                        221,
-                        DisplayFn(|f| write!(
-                            f,
-                            "{:.2}%",
-                            mean / self.elapsed.as_secs_f64() * 100.0
-                        ))
-                    )
-                )
+                Ok(())
             }
             ChunkSummary::Scalar { stats } => {
-                write!(f, "{:.3}", PrettyPrint(stats.mean()))?;
-                if stats.count() > 1 {
-                    write!(
-                        f,
-                        " {}",
-                        Paint::fixed(
-                            8,
-                            DisplayFn(|f| write!(f, "(σ {:.3})", PrettyPrint(stats.stddev())))
-                        )
-                    )?;
+                if stats.count() > 0 {
+                    write!(f, "{:.3}", PrettyPrint(stats.mean().unwrap()))?;
+                    if stats.count() > 1 {
+                        write!(
+                            f,
+                            " {}",
+                            Paint::fixed(
+                                8,
+                                DisplayFn(|f| write!(
+                                    f,
+                                    "(σ {:.3})",
+                                    PrettyPrint(stats.stddev().unwrap())
+                                ))
+                            )
+                        )?;
+                    }
                 }
                 Ok(())
             }
