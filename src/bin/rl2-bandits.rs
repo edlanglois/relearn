@@ -8,7 +8,7 @@ use relearn::envs::{
     BuildEnv, Environment, MetaEnv, MetaObservationSpace, StructuredEnvironment,
     UniformBernoulliBandits,
 };
-use relearn::logging::DisplayLogger;
+use relearn::logging::{DisplayLogger, StatsLogger, TensorBoardLogger};
 use relearn::simulation::{train_parallel, TrainParallelConfig};
 use relearn::simulation::{SimulatorSteps, StepsIter, StepsSummary};
 use relearn::spaces::{IndexSpace, NonEmptySpace, SingletonSpace, Space};
@@ -24,12 +24,14 @@ use relearn::Prng;
 use serde::Serialize;
 use std::fmt;
 use std::num::ParseIntError;
+use std::path::PathBuf;
 use std::str::FromStr;
+use std::time::Duration;
 use tch::nn::{Linear, LinearConfig};
 use tch::COptimizer;
 use thiserror::Error;
 
-#[derive(Parser, Debug, Copy, Clone, PartialEq)]
+#[derive(Parser, Debug, Clone, PartialEq)]
 #[clap(
     name = "rl2-bandits",
     author,
@@ -60,9 +62,9 @@ pub struct Args {
     #[clap(long)]
     pub agent_seed: Option<u64>,
 
-    /// Enable verbose output
+    /// Suppress status output
     #[clap(short, long)]
-    pub verbose: bool,
+    pub silent: bool,
 
     /// Output format
     #[clap(short, long, arg_enum, default_value_t = OutputFormat::Human)]
@@ -71,22 +73,27 @@ pub struct Args {
 
 impl Args {
     fn config(&self) -> Config {
-        match self.action {
-            Action::Train { batch_size, device } => Config::Train(TrainConfig {
+        match &self.action {
+            Action::Train {
+                batch_size,
+                device,
+                output_dir,
+            } => Config::Train(TrainConfig {
                 num_arms: self.num_arms,
                 num_episodes: self.num_episodes,
                 num_trials: self.num_trials,
                 env_seed: self.env_seed.unwrap_or_else(|| rand::thread_rng().gen()),
                 agent_seed: self.agent_seed.unwrap_or_else(|| rand::thread_rng().gen()),
-                batch_size,
-                device,
+                batch_size: *batch_size,
+                device: *device,
                 num_workers: num_cpus::get(),
+                output_dir: output_dir.clone().into(),
             }),
             Action::Eval { agent } => Config::Eval(EvalConfig {
                 num_arms: self.num_arms,
                 num_episodes: self.num_episodes,
                 num_trials: self.num_trials,
-                agent,
+                agent: *agent,
                 env_seed: self.env_seed.unwrap_or_else(|| rand::thread_rng().gen()),
                 agent_seed: self.agent_seed.unwrap_or_else(|| rand::thread_rng().gen()),
             }),
@@ -94,7 +101,39 @@ impl Args {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Subcommand)]
+fn default_output_dir() -> DisplayPathBuf {
+    let mut output_dir = xdg::BaseDirectories::with_prefix("relearn")
+        .unwrap()
+        .get_data_file("rl2-bandits");
+    output_dir.push(chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string());
+    output_dir.into()
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+pub struct DisplayPathBuf(pub PathBuf);
+impl fmt::Display for DisplayPathBuf {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.0.display(), f)
+    }
+}
+impl From<PathBuf> for DisplayPathBuf {
+    fn from(path: PathBuf) -> Self {
+        Self(path)
+    }
+}
+impl From<DisplayPathBuf> for PathBuf {
+    fn from(dpath: DisplayPathBuf) -> Self {
+        dpath.0
+    }
+}
+impl FromStr for DisplayPathBuf {
+    type Err = <PathBuf as FromStr>::Err;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(PathBuf::from_str(s)?.into())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Subcommand)]
 pub enum Action {
     /// Train the RL2 policy
     Train {
@@ -105,6 +144,10 @@ pub enum Action {
         /// Device on which to perform model updates
         #[clap(long, default_value_t = Device::Cpu)]
         device: Device,
+
+        /// Output directory for tensorboard logs
+        #[clap(long, default_value_t = default_output_dir())]
+        output_dir: DisplayPathBuf,
     },
     /// Evaluate an algorithm
     Eval {
@@ -303,7 +346,7 @@ type Agent = ActorCriticAgent<
     WithOptimizer<CriticLossUpdateRule, COptimizer>,
 >;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TrainConfig {
     pub num_arms: usize,
     pub num_episodes: u64,
@@ -314,6 +357,7 @@ pub struct TrainConfig {
     pub batch_size: usize,
     pub device: Device,
     pub num_workers: usize,
+    pub output_dir: PathBuf,
 }
 
 impl TrainConfig {
@@ -333,7 +377,7 @@ impl TrainConfig {
                 ..GruConfig::default()
             },
             second_config: AsSeq(LinearConfig::default()),
-            hidden_dim: 256,
+            hidden_dim: 128,
             // They might have also used Relu within the GRU. This only controls the activation
             // between the hidden weights and the linear output layer.
             // I'm not sure that it is possible to change the activation used by GRU in torch.
@@ -375,11 +419,21 @@ impl TrainConfig {
             device: self.device.into(),
         };
         let mut agent = agent_config.build_agent(&env, &mut rng_agent).unwrap();
-        let mut logger = DisplayLogger::default();
+
         let training_config = TrainParallelConfig {
             num_periods: self.num_trials,
             num_threads: self.num_workers,
             min_workers_steps: 10_000,
+        };
+
+        let tb_logger = TensorBoardLogger::new(&self.output_dir, Duration::from_secs(1));
+        if verbose {
+            println!("Output Dir: {}", self.output_dir.display());
+        }
+        let mut logger: Box<dyn StatsLogger> = if verbose {
+            Box::new((DisplayLogger::default(), tb_logger))
+        } else {
+            Box::new(tb_logger)
         };
 
         train_parallel(
@@ -388,7 +442,7 @@ impl TrainConfig {
             &training_config,
             &mut rng_env,
             &mut rng_agent,
-            &mut logger,
+            logger.as_mut(),
         );
 
         agent
@@ -441,10 +495,10 @@ fn main() {
     let args = Args::parse();
     match args.config() {
         Config::Train(config) => {
-            let _ = config.train_policy(args.verbose);
+            let _ = config.train_policy(!args.silent);
         }
         Config::Eval(config) => {
-            let results = config.run_experiment(args.verbose);
+            let results = config.run_experiment(!args.silent);
 
             let data = EvalData { config, results };
             match args.output {

@@ -1,4 +1,3 @@
-use chrono::Utc;
 use rand::SeedableRng;
 use relearn::agents::BuildAgent;
 use relearn::envs::{CartPole, Environment};
@@ -39,7 +38,7 @@ fn main() {
     let mut agent = agent_config.build_agent(&env, &mut rng).unwrap();
 
     let mut log_dir: PathBuf = ["data", "cartpole-trpo"].iter().collect();
-    log_dir.push(Utc::now().format("%Y-%m-%d_%H-%M-%S").to_string());
+    log_dir.push(chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string());
     println!("Logging to {:?}", log_dir);
     let mut logger = (
         DisplayLogger::default(),

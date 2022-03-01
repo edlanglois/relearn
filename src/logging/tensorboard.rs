@@ -23,7 +23,7 @@ pub struct TensorBoardBackend {
 }
 
 impl fmt::Debug for TensorBoardBackend {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("TensorBoardBackend")
             // TODO: Output the log dir if SummaryWriter adds support for reading it.
             // .field("log_dir", &self.writer.get_logdir())
