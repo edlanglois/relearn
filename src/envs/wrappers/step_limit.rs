@@ -2,9 +2,10 @@ use super::super::{Environment, Successor};
 use super::Wrapped;
 use crate::logging::StatsLogger;
 use crate::Prng;
+use serde::{Deserialize, Serialize};
 
 /// Environment wrapper that cuts off episodes after a set number of steps.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StepLimit {
     /// Maximum number of steps per episode
     pub max_steps_per_episode: u64,

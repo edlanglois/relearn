@@ -6,12 +6,13 @@ use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use crate::Prng;
 use rand::distributions::{Distribution, Uniform};
 use rand::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 
 /// A multi-armed bandit
 ///
 /// The distribution of each arm has type `D`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Bandit<D> {
     distributions: Vec<D>,
 }
@@ -117,7 +118,7 @@ impl DeterministicBandit {
 /// "[RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning][rl2]" by Duan et al.
 ///
 /// [rl2]: https://arxiv.org/pdf/1611.02779
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct UniformBernoulliBandits {
     /// Number of bandit arms.
     pub num_arms: usize,
@@ -169,7 +170,7 @@ impl EnvDistribution for UniformBernoulliBandits {
 /// Distribution over deterministic bandits in which one arm has reward 1 and the rest have 0.
 ///
 /// The arm with reward 1 is sampled from a uniform random distribution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct OneHotBandits {
     /// Number of bandit arms.
     pub num_arms: usize,

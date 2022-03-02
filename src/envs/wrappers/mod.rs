@@ -5,11 +5,12 @@ pub use step_limit::{StepLimit, WithStepLimit};
 use super::{BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment};
 use crate::spaces::Space;
 use crate::Prng;
+use serde::{Deserialize, Serialize};
 
 /// A basic wrapped object.
 ///
 /// Consists of the inner object and the wrapper state.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Wrapped<T, W> {
     /// Wrapped object
     pub inner: T,

@@ -11,6 +11,7 @@ use enum_map::{enum_map, Enum, EnumMap};
 use rand::distributions::Standard;
 use rand::prelude::*;
 use relearn_derive::Indexed;
+use serde::{Deserialize, Serialize};
 use slice_of_array::SliceFlatExt;
 use std::fmt::{self, Display};
 
@@ -289,7 +290,7 @@ impl Move {
 /// * `H` - Grid height
 /// * `VW` - Agent viewport width (centered on agent)
 /// * `VH` - Agent viewport height (centered on agent)
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FruitGame<const W: usize, const H: usize, const VW: usize, const VH: usize> {
     /// Number of fruit of each type
     pub num_fruit: usize,

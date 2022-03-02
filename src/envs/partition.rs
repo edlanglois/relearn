@@ -5,13 +5,14 @@ use crate::spaces::{
 };
 use crate::Prng;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 
 pub const NUM_FEATURES: usize = 10;
 /// Elements to partition
 pub type Element = [bool; NUM_FEATURES];
 
 /// Environment where the goal is to partition vectors based on supervision
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PartitionGame;
 
 impl CloneBuild for PartitionGame {}

@@ -231,7 +231,7 @@ impl_wrapped_env_structure!(Box<T>);
 /// state or observation when the episode continues. By default the successor is owned but it can
 /// also be borrowed `U = &T` or omitted `U = ()`. This is useful because users might want to
 /// extract the next observation without copying.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Successor<T, U = T> {
     /// The episode continues with the given state.
     Continue(U),

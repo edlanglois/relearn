@@ -3,9 +3,10 @@ use crate::logging::StatsLogger;
 use crate::spaces::{Indexed, IndexedTypeSpace, IntervalSpace};
 use crate::Prng;
 use rand::distributions::{Distribution, Uniform};
+use serde::{Deserialize, Serialize};
 
 /// Configuration for the [`CartPole`] environment.
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CartPoleConfig {
     /// Physics configuration
     pub physics_config: PhysicalConstants,
@@ -39,7 +40,7 @@ impl BuildEnv for CartPoleConfig {
 /// [florian2005]: https://coneural.org/florian/papers/05_cart_pole.pdf
 /// [gym_cartpole]: https://gym.openai.com/envs/CartPole-v1/
 /// [cartpole_source]: https://github.com/openai/gym/blob/master/gym/envs/classic_control/cartpole.py
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CartPole {
     phys: InternalPhysicalConstants,
     env: EnvironmentParams,
@@ -54,7 +55,7 @@ impl CartPole {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Indexed)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Indexed, Serialize, Deserialize)]
 pub enum Push {
     Left,
     Right,
@@ -147,7 +148,7 @@ impl Environment for CartPole {
 }
 
 /// Physical constants for the [`CartPole`] environment.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PhysicalConstants {
     /// Downward force of gravity (m/s^2)
     pub gravity: f64,
@@ -184,7 +185,7 @@ impl Default for PhysicalConstants {
 }
 
 /// Parameters for [`CartPole`] as a reinforcement learning environment.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EnvironmentParams {
     /// Magnitude of the force (N) applied by actions.
     pub action_force: f64,
@@ -209,7 +210,7 @@ impl Default for EnvironmentParams {
 }
 
 /// Internal cart-pole constants with pre-computed common values.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 struct InternalPhysicalConstants {
     /// Fundamental constants
     c: PhysicalConstants,
@@ -243,7 +244,7 @@ impl From<PhysicalConstants> for InternalPhysicalConstants {
 }
 
 /// Physical state of the [`CartPole`] environment.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CartPolePhysicalState {
     /// Cart position from the track midpoint (m).
     pub cart_position: f64,
@@ -256,7 +257,7 @@ pub struct CartPolePhysicalState {
 }
 
 /// [`CartPole`] physical state space.
-#[derive(Debug, Copy, Clone, PartialEq, ProductSpace)]
+#[derive(Debug, Copy, Clone, PartialEq, ProductSpace, Serialize, Deserialize)]
 #[element(CartPolePhysicalState)]
 pub struct CartPolePhysicalStateSpace {
     /// Cart position from the track midpoint (m).
@@ -270,7 +271,7 @@ pub struct CartPolePhysicalStateSpace {
 }
 
 /// State of the [`CartPole`] environment.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CartPoleInternalState {
     /// Physical state.
     physical: CartPolePhysicalState,

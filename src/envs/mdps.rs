@@ -6,12 +6,13 @@ use crate::Prng;
 use ndarray::{Array2, Axis};
 use rand::distributions::Distribution;
 use rand_distr::{Dirichlet, Normal, WeightedAliasIndex};
+use serde::{Deserialize, Serialize};
 
 /// An MDP with transition and reward functions stored in lookup tables.
 ///
 /// The environment always starts in the state with index 0.
 /// There are no terminal states; episodes last forever.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TabularMdp<T = WeightedAliasIndex<f32>, R = Normal<f64>> {
     /// Environment transitions table.
     ///
@@ -92,7 +93,7 @@ where
 /// "[RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning][rl2]" by Duan et al.
 ///
 /// [rl2]: https://arxiv.org/pdf/1611.02779
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct DirichletRandomMdps {
     pub num_states: usize,
     pub num_actions: usize,

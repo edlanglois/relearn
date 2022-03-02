@@ -5,6 +5,7 @@ use crate::spaces::{IndexSpace, IndexedTypeSpace};
 use crate::Prng;
 use rand::prelude::*;
 use relearn_derive::Indexed;
+use serde::{Deserialize, Serialize};
 
 /// Chain Environment
 ///
@@ -15,7 +16,7 @@ use relearn_derive::Indexed;
 /// * Every action has a 0.2 chance of "slipping" and taking the opposite action.
 ///
 /// Described in "Bayesian Q-learning" by Dearden, Friedman and Russel (1998)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Chain {
     pub size: usize,
     pub discount_factor: f64,

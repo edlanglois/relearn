@@ -5,6 +5,7 @@ use super::{
 use crate::logging::StatsLogger;
 use crate::spaces::{BooleanSpace, IntervalSpace, OptionSpace, ProductSpace, Space};
 use crate::Prng;
+use serde::{Deserialize, Serialize};
 
 /// A meta reinforcement learning environment that treats RL itself as an environment.
 ///
@@ -39,7 +40,7 @@ use crate::Prng;
 /// "[RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning][rl2]" by Duan et al.
 ///
 /// [rl2]: https://arxiv.org/pdf/1611.02779
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct MetaEnv<E> {
     /// Environment distribution from which each trial's episode is sampled.
     pub env_distribution: E,
@@ -310,7 +311,7 @@ pub struct MetaState<E: Environment> {
 ///
 ///     assert_eq!(base_structure, meta_inner_structure);
 ///
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct InnerEnvStructure<T>(T);
 
 impl<T> InnerEnvStructure<T> {

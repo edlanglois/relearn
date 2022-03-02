@@ -2,11 +2,12 @@ use crate::envs::{BuildEnv, BuildEnvError, EnvStructure, Environment, Successor}
 use crate::logging::StatsLogger;
 use crate::spaces::{Space, TupleSpace2};
 use crate::Prng;
+use serde::{Deserialize, Serialize};
 
 /// Wraps a two-player game as a one-player game for the first player.
 ///
 /// The second player always takes the default action.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FirstPlayerView<E> {
     pub inner: E,
 }
@@ -102,7 +103,7 @@ where
 /// Wraps a two-player game as a one-player game for the second player.
 ///
 /// The first player always takes the default action.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SecondPlayerView<E> {
     pub inner: E,
 }
