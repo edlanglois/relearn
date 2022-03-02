@@ -10,6 +10,7 @@ use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::{Float, One, Zero};
 use rand::distributions::Distribution;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
@@ -51,10 +52,15 @@ pub trait Indexed {
 /// The wrapped type must implement [`Indexed`].
 /// Use `#[derive(Indexed)]` to implement `Indexed` automatically for enum types that have no
 /// internal data.
+// Can only use derives for serde traits
+// because they allow modifying the bounds to remove `T: <Trait>`
+#[derive(Serialize, Deserialize)]
+#[serde(bound = "")]
 pub struct IndexedTypeSpace<T> {
-    // <fn(T) -> T> allows Sync and Send without adding a drop check
+    // <fn() -> T> allows Sync and Send without adding a drop check
     // https://stackoverflow.com/a/50201389/1267562
-    element_type: PhantomData<fn(T) -> T>,
+    #[serde(skip)]
+    element_type: PhantomData<fn() -> T>,
 }
 
 impl<T> IndexedTypeSpace<T> {
@@ -366,6 +372,28 @@ mod subset_ord {
     fn not_strict_subset() {
         assert!(
             !(IndexedTypeSpace::<Trit>::new().strict_subset_of(&IndexedTypeSpace::<Trit>::new()))
+        );
+    }
+}
+
+#[cfg(test)]
+mod serialize {
+    use super::trit::Trit;
+    use super::*;
+    use serde_test::{assert_tokens, Token};
+
+    #[test]
+    fn ser_de_tokens() {
+        let space = IndexedTypeSpace::<Trit>::new();
+        assert_tokens(
+            &space,
+            &[
+                Token::Struct {
+                    name: "IndexedTypeSpace",
+                    len: 0,
+                },
+                Token::StructEnd,
+            ],
         );
     }
 }

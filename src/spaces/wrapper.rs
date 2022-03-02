@@ -7,6 +7,7 @@ use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, Nu
 use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::Float;
 use rand::{distributions::Distribution, Rng};
+use serde::{Deserialize, Serialize};
 use std::any;
 use std::cmp::Ordering;
 use std::fmt;
@@ -50,8 +51,13 @@ where
 }
 
 /// Space that wraps the elements of an inner space without changing semantics.
+// Can only use derives for serde traits
+// because they allow modifying the bounds to remove `W: <Trait>`
+#[derive(Serialize, Deserialize)]
+#[serde(bound(serialize = "S: Serialize", deserialize = "S: Deserialize<'de>"))]
 pub struct WrappedElementSpace<S, W> {
     inner_space: S,
+    #[serde(skip)]
     wrapper: PhantomData<fn() -> W>,
 }
 
