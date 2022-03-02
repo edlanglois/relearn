@@ -1,12 +1,25 @@
 //! Singleton space definition.
 use super::{ParameterizedDistributionSpace, ProductSpace, ReprSpace};
 use crate::torch::distributions::DeterministicEmptyVec;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use tch::{Device, Kind, Tensor};
 
 /// A space containing a single element.
 #[derive(
-    Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, ProductSpace, FiniteSpace,
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    ProductSpace,
+    FiniteSpace,
+    Serialize,
+    Deserialize,
 )]
 pub struct SingletonSpace;
 

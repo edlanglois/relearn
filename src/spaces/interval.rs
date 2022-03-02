@@ -7,12 +7,13 @@ use num_traits::{Float, ToPrimitive};
 use rand::distributions::Distribution;
 use rand::Rng;
 use rand_distr::{Gamma, StandardNormal};
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::{fmt, slice};
 use tch::Tensor;
 
 /// A closed interval of floating-point numbers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct IntervalSpace<T = f64> {
     pub low: T,
     pub high: T,

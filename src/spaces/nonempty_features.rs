@@ -5,6 +5,7 @@ use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::{Float, Zero};
 use rand::distributions::Distribution;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
 
@@ -14,7 +15,9 @@ use std::fmt;
 /// Wrapper space with a feature vector length of at least 1.
 ///
 /// Any generated features have value `0`.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
 pub struct NonEmptyFeatures<S> {
     inner: S,
 }

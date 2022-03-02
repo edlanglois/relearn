@@ -8,12 +8,13 @@ use crate::utils::num_array::{BuildFromArray1D, NumArray1D};
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
 use tch::{Device, Kind, Tensor};
 
 /// The space `{false, true}`.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct BooleanSpace;
 
 impl BooleanSpace {

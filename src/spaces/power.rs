@@ -6,10 +6,11 @@ use crate::logging::Loggable;
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
 /// A Cartesian power of a space: a Cartesian product of `N` copies of the same space.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PowerSpace<S, const N: usize> {
     pub inner_space: S,
 }

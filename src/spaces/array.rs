@@ -7,6 +7,8 @@ use crate::logging::Loggable;
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 use std::cmp::Ordering;
 use std::ops::Range;
 
@@ -15,8 +17,15 @@ use std::ops::Range;
 /// An `ArraySpace` is more general than a [`PowerSpace`](super::PowerSpace) because the inner
 /// spaces do not all have to be the same, but less general than
 /// a [tuple space](super::TupleSpace2) because the inner spaces must have the same type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// See <https://github.com/est31/serde-big-array/issues/12#issue-1115462786>
+#[serde(bound(
+    serialize = "for<'a> S: Serialize + Deserialize<'a>",
+    deserialize = "S: Serialize + Deserialize<'de>"
+))]
 pub struct ArraySpace<S, const N: usize> {
+    // Serde does not natively support const generics, BigArray provides a work-around impl
+    #[serde(with = "BigArray")]
     inner_spaces: [S; N],
 }
 

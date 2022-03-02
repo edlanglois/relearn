@@ -6,6 +6,7 @@ use crate::logging::Loggable;
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
 
@@ -14,7 +15,9 @@ use std::fmt;
 /// The feature vectors are
 /// * `[1, 0, ..., 0]` for `None`
 /// * `[0, inner_feature_vector(x)]` for `Some(x)`.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
 pub struct OptionSpace<S> {
     pub inner: S,
 }

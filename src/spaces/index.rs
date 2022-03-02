@@ -10,12 +10,13 @@ use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::{Float, One, Zero};
 use rand::distributions::Distribution;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
 use tch::{Device, Kind, Tensor};
 
 /// An index space; consists of the integers `0` to `size - 1`
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct IndexSpace {
     pub size: usize,
 }
