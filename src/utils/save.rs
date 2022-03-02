@@ -11,7 +11,7 @@ pub trait SaveLoad {
     /// Serialize to file(s).
     ///
     /// May create auxiliary files with names created by appending extensions to the given path.
-    fn save<P: AsRef<Path>>(&self, path: &P) -> Result<(), Self::SaveErr>;
+    fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), Self::SaveErr>;
 
     /// Load from file(s).
     ///
@@ -33,7 +33,7 @@ impl<T: Serialize + DeserializeOwned> SaveLoad for T {
     type SaveErr = SerdeSaveLoadError;
     type LoadErr = SerdeSaveLoadError;
 
-    fn save<P: AsRef<Path>>(&self, path: &P) -> Result<(), Self::SaveErr> {
+    fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), Self::SaveErr> {
         let file = File::create(path)?;
         serde_cbor::to_writer(file, self)?;
         Ok(())
