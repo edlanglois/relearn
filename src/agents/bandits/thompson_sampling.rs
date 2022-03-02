@@ -12,12 +12,13 @@ use crate::Prng;
 use ndarray::{Array, Array2, Axis};
 use rand::distributions::Distribution;
 use rand_distr::Beta;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::iter;
 use std::sync::Arc;
 
 /// Configuration for [`BetaThompsonSamplingAgent`]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct BetaThompsonSamplingAgentConfig {
     /// Number of posterior samples to draw.
     /// Takes the action with the highest mean sampled value.
@@ -70,7 +71,7 @@ pub type BetaThompsonSamplingAgent<OS, AS> =
 /// Base Thompson sampling agent for Bernoulli rewards with a Beta prior.
 ///
 /// Implemented only for index action and observation spaces.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct BaseBetaThompsonSamplingAgent {
     /// Reward is partitioned into high/low separated by this threshold.
     pub reward_threshold: f64,

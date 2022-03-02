@@ -11,11 +11,12 @@ use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::spaces::{NonEmptySpace, Space};
 use crate::Prng;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::Arc;
 
 /// Configuration for a [`ResettingMetaAgent`].
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ResettingMetaAgentConfig<TC> {
     pub agent_config: TC,
 }
@@ -47,7 +48,7 @@ where
 }
 
 /// Lifts a regular agent to act on a meta environment (agent interface).
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ResettingMetaAgent<TC, OS, AS> {
     inner_agent_config: TC,
     inner_env_structure: StoredEnvStructure<OS, AS>,

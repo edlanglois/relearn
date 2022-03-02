@@ -10,13 +10,14 @@ use crate::spaces::FiniteSpace;
 use crate::utils::iter::ArgMaxBy;
 use crate::Prng;
 use ndarray::{Array, Array1, Array2, Axis};
+use serde::{Deserialize, Serialize};
 use std::f64;
 use std::fmt;
 use std::iter;
 use std::sync::Arc;
 
 /// Configuration for a [`UCB1Agent`]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct UCB1AgentConfig {
     /// Scale factor on the confidence interval; controls the exploration rate.
     ///
@@ -73,7 +74,7 @@ pub type UCB1Agent<OS, AS> = FiniteSpaceAgent<Arc<BaseUCB1Agent>, OS, AS>;
 ///
 /// Applies UCB1 (Auer 2002) independently to each state.
 /// Defined for index observation and action spaces.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BaseUCB1Agent {
     /// Scale factor on the confidence interval; controls the exploration rate.
     ///

@@ -6,10 +6,11 @@ use crate::envs::EnvStructure;
 use crate::logging::StatsLogger;
 use crate::spaces::{SampleSpace, Space};
 use crate::Prng;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Configuration for a random agent.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RandomAgentConfig;
 
 impl RandomAgentConfig {
@@ -35,7 +36,7 @@ where
 }
 
 /// An agent that samples actions at random.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RandomAgent<AS> {
     action_space: AS,
 }

@@ -12,12 +12,13 @@ use crate::Prng;
 use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::iter;
 use std::sync::Arc;
 
 /// Configuration of an Epsilon-Greedy Tabular Q Learning Agent.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct TabularQLearningAgentConfig {
     /// Probability of taking a random action.
     pub exploration_rate: f64,
@@ -82,7 +83,7 @@ pub type TabularQLearningAgent<OS, AS> = FiniteSpaceAgent<BaseTabularQLearningAg
 /// Base epsilon-greedy tabular Q learning agent.
 ///
 /// Implemented only for index observation and action spaces.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BaseTabularQLearningAgent {
     pub discount_factor: f64,
     pub exploration_rate: f64,

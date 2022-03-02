@@ -4,9 +4,10 @@ use crate::logging::StatsLogger;
 use crate::simulation::{PartialStep, Step};
 use crate::spaces::FiniteSpace;
 use crate::Prng;
+use serde::{Deserialize, Serialize};
 
 /// Wraps an index-space agent as an agent over finite spaces.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FiniteSpaceAgent<T, OS, AS> {
     pub agent: T,
     pub observation_space: OS,

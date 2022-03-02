@@ -31,6 +31,7 @@ use crate::logging::StatsLogger;
 use crate::simulation::{SimSeed, SimulatorSteps};
 use crate::spaces::Space;
 use crate::Prng;
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::f64;
 
@@ -376,7 +377,7 @@ pub type PartialSuccessor<T> = Successor<T, ()>;
 /// Stored copy of an environment structure.
 ///
 /// See [`EnvStructure`] for details.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct StoredEnvStructure<OS, AS> {
     pub observation_space: OS,
     pub action_space: AS,

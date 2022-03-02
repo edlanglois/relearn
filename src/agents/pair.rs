@@ -7,10 +7,11 @@ use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::spaces::{Space, TupleSpace2};
 use crate::Prng;
+use serde::{Deserialize, Serialize};
 use std::iter;
 
 /// A pair of agents / actors / configs for a two-agent environment.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AgentPair<T0, T1>(pub T0, pub T1);
 
 impl<T0, T1, O0, O1, A0, A1> Agent<(O0, O1), (A0, A1)> for AgentPair<T0, T1>

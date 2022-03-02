@@ -5,6 +5,7 @@ use crate::envs::EnvStructure;
 use crate::logging::StatsLogger;
 use crate::spaces::Space;
 use crate::Prng;
+use serde::{Deserialize, Serialize};
 use std::any::Any;
 
 /// Trait alias for a dynamic agent
@@ -31,7 +32,7 @@ impl<T, O, A> DynAgent<O, A> for T where
 ///
 /// The `HistoryBuffer`, `Actor`, and actor's `EpisodeState` are all boxed.
 /// Implements [`DynAgent`].
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct BoxAgent<T>(pub T);
 
 impl<T> BoxAgent<T> {
