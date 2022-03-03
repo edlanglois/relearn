@@ -220,7 +220,7 @@ impl BatchUpdate<usize, usize> for BaseTabularQLearningAgent {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BaseTabularQLearningActor {
     state_action_values: Arc<Array2<f64>>,
     exploration_rate: f64,

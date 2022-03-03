@@ -29,6 +29,7 @@ use crate::envs::EnvStructure;
 use crate::logging::StatsLogger;
 use crate::spaces::Space;
 use crate::Prng;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tch::TchError;
 use thiserror::Error;
@@ -139,7 +140,7 @@ impl_wrapped_actor!(Box<T>);
 impl_wrapped_actor!(Arc<T>);
 
 /// Behaviour mode of an actor.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ActorMode {
     /// Training mode
     ///

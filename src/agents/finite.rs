@@ -42,6 +42,7 @@ where
 }
 
 /// Wraps an index-space actor as an actor over finite spaces.
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FiniteSpaceActor<T, OS, AS> {
     pub actor: T,
     pub observation_space: OS,

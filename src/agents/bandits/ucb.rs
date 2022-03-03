@@ -207,7 +207,7 @@ impl BatchUpdate<usize, usize> for Arc<BaseUCB1Agent> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BaseUCB1Actor {
     agent: Arc<BaseUCB1Agent>,
     mode: ActorMode,

@@ -183,7 +183,7 @@ impl BatchUpdate<usize, usize> for BaseBetaThompsonSamplingAgent {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct BaseBetaThompsonSamplingActor {
     mode: ActorMode,
     num_samples: usize,

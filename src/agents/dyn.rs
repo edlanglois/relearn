@@ -156,7 +156,7 @@ where
     }
 }
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct BoxActor<T>(pub T);
 impl<T, O, A> Actor<O, A> for BoxActor<T>
 where
