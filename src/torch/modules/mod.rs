@@ -48,6 +48,32 @@ macro_rules! impl_wrapped_module {
 impl_wrapped_module!(&'_ T);
 impl_wrapped_module!(Box<T>);
 
+// Options for module serialization
+//
+// * Save using VarStore. Unpleasant having distinct VarStore and Module.
+//   Not clear how to save everything except the tensors separately.
+//   Have to build the Module first to restore.
+//   Probably end up having to save the config and use that to restore. Build the module from
+//   config then overwrite the variables by loading from file.
+//
+//   ^^ I currently think this is best.
+//      Store a copy of the config in ActorCriticAgent for save/load.
+//
+// * Modules have `(named_)variables` fns for getting list of variables to save to file.
+//   Still have the problem of how to serialize/save everything except the variables.
+//   Also problem of what to do about return value from `variables`, etc.
+//      - struct ModuleVariables {outer: Vec<&Tensor>, inner: Vec<&dyn Module>}
+//      - assoc trait VariablesIter
+//      - Box<dyn Iterator<Item = &Tensor>>
+//   Allows getting rid of VarStore so that Modules entirely self-manage the tensor.
+//      This potentially creates problems for sharing variables between modules.
+//
+// * Implement serde serialization / deserialization for Tensors.
+//   Because Tensor memory cannot be safely accessed directly, this would require a potentially
+//   costly conversion to Vec.
+//   Allows getting rid of VarStore so that Modules entirely self-manage the tensor, although
+//   probably still need methods to access the variables list for passing to optimizers.
+
 /// Build a [`Module`]
 pub trait BuildModule {
     type Module;
