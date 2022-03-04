@@ -330,6 +330,7 @@ mod repr_space_tensor {
 #[cfg(test)]
 mod parameterized_sample_space_tensor {
     use super::*;
+    use std::ops::RangeInclusive;
 
     #[test]
     fn num_sample_params() {
@@ -355,15 +356,30 @@ mod parameterized_sample_space_tensor {
         }
     }
 
+    #[allow(clippy::cast_possible_truncation)]
+    fn bernoulli_confidence_interval(p: f64, n: u64) -> RangeInclusive<u64> {
+        // Using Wald method <https://en.wikipedia.org/wiki/Binomial_distribution#Wald_method>
+        // Quantile for error rate of 1e-5
+        let z = 4.4;
+        let nf = n as f64;
+        let stddev = (p * (1.0 - p) * nf).sqrt();
+        let lower_bound = nf * p - z * stddev;
+        let upper_bound = nf * p + z * stddev;
+        (lower_bound.round() as u64)..=(upper_bound.round() as u64)
+    }
+
     #[test]
     fn sample_element_check_distribution() {
         let space = IndexSpace::new(3);
-        // Probabilities: [0.09, 0.24, 0.67]
         let params = Tensor::of_slice(&[-1.0, 0.0, 1.0]);
+        // Corresponding approximate probabilities
+        let probs = [0.090, 0.245, 0.665];
+        let n = 5000;
+
         let mut one_count = 0;
         let mut two_count = 0;
         let mut three_count = 0;
-        for _ in 0..1000 {
+        for _ in 0..n {
             match space.sample_element(&params) {
                 0 => one_count += 1,
                 1 => two_count += 1,
@@ -371,9 +387,12 @@ mod parameterized_sample_space_tensor {
                 _ => panic!(),
             }
         }
-        // Check that the counts are within 3.5 standard deviations of the mean
-        assert!((58..=121).contains(&one_count));
-        assert!((197..=292).contains(&two_count));
-        assert!((613..=717).contains(&three_count));
+        // Check that the counts are within their expected intervals
+        let one_interval = bernoulli_confidence_interval(probs[0], n);
+        let two_interval = bernoulli_confidence_interval(probs[1], n);
+        let three_interval = bernoulli_confidence_interval(probs[2], n);
+        assert!(one_interval.contains(&one_count));
+        assert!(two_interval.contains(&two_count));
+        assert!(three_interval.contains(&three_count));
     }
 }
