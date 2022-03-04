@@ -1,4 +1,5 @@
 //! Categorical distribution
+use super::clamp_float_min;
 use crate::utils::distributions::ArrayDistribution;
 use tch::{Kind, Tensor};
 
@@ -28,15 +29,6 @@ impl Categorical {
         Self {
             log_probs: unnormalized_log_probs.log_softmax(-1, Kind::Float),
         }
-    }
-}
-
-/// Clamp float values to be >= the smallest finite float value.
-fn clamp_float_min(x: &Tensor) -> Result<Tensor, Kind> {
-    match x.kind() {
-        Kind::Float => Ok(x.clamp_min(f64::from(f32::MIN))),
-        Kind::Double => Ok(x.clamp_min(f64::MIN)),
-        kind => Err(kind),
     }
 }
 
