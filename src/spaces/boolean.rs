@@ -1,9 +1,11 @@
 //! `BooleanSpace` definition
 use super::{
-    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures, ReprSpace, Space,
-    SubsetOrd,
+    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures,
+    ParameterizedDistributionSpace, ReprSpace, Space, SubsetOrd,
 };
 use crate::logging::Loggable;
+use crate::torch::distributions::Bernoulli;
+use crate::utils::distributions::ArrayDistribution;
 use crate::utils::num_array::{BuildFromArray1D, NumArray1D};
 use num_traits::Float;
 use rand::distributions::Distribution;
@@ -88,6 +90,22 @@ impl ReprSpace<Tensor> for BooleanSpace {
     }
 }
 
+impl ParameterizedDistributionSpace<Tensor> for BooleanSpace {
+    type Distribution = Bernoulli;
+
+    fn num_distribution_params(&self) -> usize {
+        1
+    }
+
+    fn sample_element(&self, params: &Tensor) -> Self::Element {
+        self.distribution(params).sample().into()
+    }
+
+    fn distribution(&self, params: &Tensor) -> Self::Distribution {
+        Self::Distribution::new(params.squeeze_dim(-1))
+    }
+}
+
 impl NumFeatures for BooleanSpace {
     fn num_features(&self) -> usize {
         1
@@ -139,19 +157,19 @@ mod space {
 
     #[test]
     fn contains_false() {
-        let space = BooleanSpace::new();
+        let space = BooleanSpace;
         assert!(space.contains(&false));
     }
 
     #[test]
     fn contains_true() {
-        let space = BooleanSpace::new();
+        let space = BooleanSpace;
         assert!(space.contains(&true));
     }
 
     #[test]
     fn contains_samples() {
-        let space = BooleanSpace::new();
+        let space = BooleanSpace;
         testing::check_contains_samples(&space, 10);
     }
 }
@@ -162,20 +180,20 @@ mod subset_ord {
 
     #[test]
     fn eq() {
-        assert_eq!(BooleanSpace::new(), BooleanSpace::new());
+        assert_eq!(BooleanSpace, BooleanSpace);
     }
 
     #[test]
     fn cmp_equal() {
         assert_eq!(
-            BooleanSpace::new().subset_cmp(&BooleanSpace::new()),
+            BooleanSpace.subset_cmp(&BooleanSpace),
             Some(Ordering::Equal)
         );
     }
 
     #[test]
     fn not_less() {
-        assert!(!BooleanSpace::new().strict_subset_of(&BooleanSpace::new()));
+        assert!(!BooleanSpace.strict_subset_of(&BooleanSpace));
     }
 }
 
@@ -186,25 +204,25 @@ mod finite_space {
 
     #[test]
     fn from_to_index_iter_size() {
-        let space = BooleanSpace::new();
+        let space = BooleanSpace;
         testing::check_from_to_index_iter_size(&space);
     }
 
     #[test]
     fn from_to_index_random() {
-        let space = BooleanSpace::new();
+        let space = BooleanSpace;
         testing::check_from_to_index_random(&space, 10);
     }
 
     #[test]
     fn from_index_sampled() {
-        let space = BooleanSpace::new();
+        let space = BooleanSpace;
         testing::check_from_index_sampled(&space, 10);
     }
 
     #[test]
     fn from_index_invalid() {
-        let space = BooleanSpace::new();
+        let space = BooleanSpace;
         testing::check_from_index_invalid(&space);
     }
 }
@@ -213,22 +231,59 @@ mod finite_space {
 mod feature_space {
     use super::*;
 
-    const fn space() -> BooleanSpace {
-        BooleanSpace::new()
-    }
-
     #[test]
     fn num_features() {
-        let space = space();
-        assert_eq!(space.num_features(), 1);
+        assert_eq!(BooleanSpace.num_features(), 1);
     }
 
-    features_tests!(false_, space(), false, [0.0]);
-    features_tests!(true_, space(), true, [1.0]);
+    features_tests!(false_, BooleanSpace, false, [0.0]);
+    features_tests!(true_, BooleanSpace, true, [1.0]);
     batch_features_tests!(
         batch,
-        space(),
+        BooleanSpace,
         [false, true, true, false],
         [[0.0], [1.0], [1.0], [0.0]]
     );
+}
+
+#[cfg(test)]
+mod parameterized_sample_space_tensor {
+    use super::*;
+    use std::iter;
+
+    #[test]
+    fn num_sample_params() {
+        assert_eq!(1, BooleanSpace.num_distribution_params());
+    }
+
+    #[test]
+    fn sample_element_deterministic() {
+        let space = BooleanSpace;
+        let params = Tensor::of_slice(&[f32::INFINITY]);
+        for _ in 0..10 {
+            assert!(space.sample_element(&params));
+        }
+    }
+
+    #[test]
+    fn sample_element_check_distribution() {
+        let space = BooleanSpace;
+        // logit = 1.0; p ~= 0.731
+        let params = Tensor::of_slice(&[1.0f32]);
+        let p = 0.731;
+        let n = 5000;
+        let count: u64 = iter::repeat_with(|| if space.sample_element(&params) { 1 } else { 0 })
+            .take(n)
+            .sum();
+        // Check that the counts are within a confidence interval
+        // Using Wald method <https://en.wikipedia.org/wiki/Binomial_distribution#Wald_method>
+        // Quantile for error rate of 1e-5
+        let z = 4.4;
+        let nf = n as f64;
+        let stddev = (p * (1.0 - p) * nf).sqrt();
+        let lower_bound = nf * p - z * stddev; // ~717
+        let upper_bound = nf * p + z * stddev; // ~745
+        assert!(lower_bound <= count as f64);
+        assert!(upper_bound >= count as f64);
+    }
 }
