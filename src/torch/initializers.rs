@@ -14,9 +14,9 @@ pub enum Initializer {
     Orthogonal,
 }
 
-/// Defaults to `Uniform(FanIn)`
+/// Defaults to `Uniform(FanAvg)` a.k.a. Glorot or Xaviar initialization.
 ///
-/// This samples from `Unif(±√(3 / fan_in)`.
+/// This samples from `Unif(±√(6 / (fan_in + fan_out)))`.
 /// For reference, the typical default initialization used by other libraries are:
 /// * PyTorch: `Unif(±√(1 / fan_in))`  (proprotional to `Uniform(FanIn)`)
 /// * TensorFlow v1: `Unif(0.05)` (equal to `Uniform(Constant(0.05**2 / 3.0))`)
@@ -24,7 +24,10 @@ pub enum Initializer {
 ///
 impl Default for Initializer {
     fn default() -> Self {
-        Self::Uniform(VarianceScale::FanIn)
+        // FanIn would sometimes fail the gradient-step-reduces-loss unit tests,
+        // presumably because the gradients are too large.
+        // FanAvg has not failed that test in my experience.
+        Self::Uniform(VarianceScale::FanAvg)
     }
 }
 
