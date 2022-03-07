@@ -5,7 +5,7 @@ use tch::{nn::Path, Device, Kind, Tensor};
 
 /// Tensor initializers.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum Init {
+pub enum Initializer {
     /// Initialize to all zeros
     Zeros,
     /// Xavier uniform initialization. `Unif(±sqrt(6 / (fan_in + fan_out)))`.
@@ -35,7 +35,7 @@ fn calculate_fan_in_and_fan_out(shape: &[i64]) -> (i64, i64) {
     (fan_in, fan_out)
 }
 
-impl Init {
+impl Initializer {
     /// Create a new tensor with this initialization.
     ///
     /// # Args
@@ -188,7 +188,7 @@ mod tests {
     fn orthogonal_is_orthogonal() {
         let n = 5;
         let options = (Kind::Float, Device::Cpu);
-        let a = Init::Orthogonal.init(&[n, n], 1.0, options);
+        let a = Initializer::Orthogonal.init(&[n, n], 1.0, options);
         // An orthogonal matrix times its transpose should equal the identity matrix
         assert!(a
             .matmul(&a.tr())

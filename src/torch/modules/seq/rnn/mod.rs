@@ -5,7 +5,7 @@ mod lstm;
 pub use gru::{Gru, GruConfig};
 pub use lstm::{Lstm, LstmConfig};
 
-use super::super::super::Init;
+use super::super::super::Initializer;
 use super::super::{BuildModule, IterativeModule, Module};
 use smallvec::SmallVec;
 use std::marker::PhantomData;
@@ -17,11 +17,11 @@ pub struct RnnBaseConfig<T> {
     /// Number of layers; each has size equal to the output size when built.
     pub num_layers: usize,
     /// Initialization for input-to-hidden weight matrices
-    pub input_weights_init: Init,
+    pub input_weights_init: Initializer,
     /// Initialization for hidden-to-hidden weight matrices
-    pub hidden_weights_init: Init,
+    pub hidden_weights_init: Initializer,
     /// Initialization for bias vectors. None if there should be no bias terms.
-    pub bias_init: Option<Init>,
+    pub bias_init: Option<Initializer>,
     /// Phantom marker for the specific RNN implementation (`RNNImpl`, `GRUImpl`, `LSTMImpl`, etc)
     pub impl_: PhantomData<fn() -> T>,
 }
@@ -32,9 +32,9 @@ impl<T> Default for RnnBaseConfig<T> {
             num_layers: 1,
             // Default initialization follows the Tensorflow RNN implementation as it seems the
             // most considered. The PyTorch RNN initializes all weights and biases in the same way.
-            input_weights_init: Init::XavierUniform,
-            hidden_weights_init: Init::Orthogonal,
-            bias_init: Some(Init::Zeros),
+            input_weights_init: Initializer::XavierUniform,
+            hidden_weights_init: Initializer::Orthogonal,
+            bias_init: Some(Initializer::Zeros),
             impl_: PhantomData,
         }
     }

@@ -10,4 +10,4 @@ pub mod optimizers;
 pub mod updaters;
 pub mod utils;
 
-pub use initializers::Init;
+pub use initializers::Initializer;
