@@ -66,8 +66,16 @@ impl Default for VarianceScale {
 
 impl VarianceScale {
     /// Element sampling variance for the given tensor shape.
-    fn variance(self, shape: &[i64]) -> f64 {
-        let (fan_in, fan_out) = calculate_fan_in_and_fan_out(shape);
+    ///
+    /// # Args
+    /// * `shape`   - Shape of the tensor to create.
+    ///               All values must be non-negative (`tch` expects `i64`).
+    /// * `fan_in`  - Number of input features. Calculated from `shape` if `None`.
+    /// * `fan_out` - Number of output features. Calculated from `shape` if `None`.
+    fn variance(self, shape: &[i64], fan_in: Option<i64>, fan_out: Option<i64>) -> f64 {
+        let (fan_in_calc, fan_out_calc) = calculate_fan_in_and_fan_out(shape);
+        let fan_in = fan_in.unwrap_or(fan_in_calc);
+        let fan_out = fan_out.unwrap_or(fan_out_calc);
         match self {
             Self::Constant(v) => v,
             Self::FanIn => (fan_in as f64).recip(),
@@ -90,7 +98,11 @@ fn calculate_fan_in_and_fan_out(shape: &[i64]) -> (i64, i64) {
     // Use feature size of 1 if the dimensions are missing instead of returning an error
     let num_input_fmaps = shape.get(1).cloned().unwrap_or(1);
     let num_output_fmaps = shape.get(0).cloned().unwrap_or(1);
-    let receptive_field_size: i64 = shape[2..].iter().product();
+    let receptive_field_size: i64 = if shape.len() >= 2 {
+        shape[2..].iter().product()
+    } else {
+        1
+    };
     let fan_in = num_input_fmaps * receptive_field_size;
     let fan_out = num_output_fmaps * receptive_field_size;
     (fan_in, fan_out)
@@ -106,36 +118,58 @@ impl Initializer {
     /// * `gain`  - Scaling factor on the initialized values.
     ///             Can be used to compensate for the scaling effect of activation functions.
     ///             See pytorch's [`calculate_gain`][1] function.
+    /// * `fan_in` - Set the `fan_in` value (number of input features) for use in variance scaling.
+    ///              If `None`, `fan_in` is calculated from `shape`.
+    ///              This can be useful for example when initializing separate weight and a bias
+    ///              tensors. Despite being initialized separately, they are used together in a way
+    ///              that implies a fan in value equal to their sum of input dimensions.
     ///
     /// [1]: https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.calculate_gain
     ///
-    pub fn add_tensor(&self, vs: &Path, name: &str, shape: &[i64], gain: f64) -> Tensor {
+    pub fn add_tensor(
+        &self,
+        vs: &Path,
+        name: &str,
+        shape: &[i64],
+        gain: f64,
+        fan_in: Option<i64>,
+    ) -> Tensor {
         match self {
             Self::Zeros => vs.zeros(name, shape),
             Self::Uniform(scaling) => {
-                let lim = gain * (3.0 * scaling.variance(shape)).sqrt();
+                let lim = gain * (3.0 * scaling.variance(shape, fan_in, None)).sqrt();
                 vs.uniform(name, shape, -lim, lim)
             }
             Self::Normal(scaling) => {
                 let mean = 0.0;
-                let stddev = gain * scaling.variance(shape).sqrt();
+                let stddev = gain * scaling.variance(shape, fan_in, None).sqrt();
                 vs.randn(name, shape, mean, stddev)
             }
-            _ => vs.var_copy(name, &self.init(shape, gain, (Kind::Float, vs.device()))),
+            _ => vs.var_copy(
+                name,
+                &self.init(shape, gain, fan_in, (Kind::Float, vs.device())),
+            ),
         }
     }
 
+    // TODO: Use builder pattern to avoid so many args
     /// Initialize a new tensor
-    pub fn init(&self, shape: &[i64], gain: f64, options: (Kind, Device)) -> Tensor {
+    pub fn init(
+        &self,
+        shape: &[i64],
+        gain: f64,
+        fan_in: Option<i64>,
+        options: (Kind, Device),
+    ) -> Tensor {
         match self {
             Self::Zeros => Tensor::zeros(shape, options),
             Self::Uniform(scaling) => {
-                let lim = gain * (3.0 * scaling.variance(shape)).sqrt();
+                let lim = gain * (3.0 * scaling.variance(shape, fan_in, None)).sqrt();
                 Tensor::empty(shape, options).uniform_(-lim, lim)
             }
             Self::Normal(scaling) => {
                 let mean = 0.0;
-                let stddev = gain * scaling.variance(shape).sqrt();
+                let stddev = gain * scaling.variance(shape, fan_in, None).sqrt();
                 Tensor::empty(shape, options).normal_(mean, stddev)
             }
             Self::Orthogonal => init_orthogonal(shape, gain, options),
@@ -259,7 +293,7 @@ mod tests {
     fn orthogonal_is_orthogonal() {
         let n = 5;
         let options = (Kind::Float, Device::Cpu);
-        let a = Initializer::Orthogonal.init(&[n, n], 1.0, options);
+        let a = Initializer::Orthogonal.init(&[n, n], 1.0, None, options);
         // An orthogonal matrix times its transpose should equal the identity matrix
         assert!(a
             .matmul(&a.tr())

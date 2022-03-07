@@ -181,12 +181,14 @@ impl RnnWeights {
                 &format!("weight_ih_l{}", i),
                 &[gates_size, layer_input_size],
                 1.0,
+                None,
             ));
             flat_weights.push(config.hidden_weights_init.add_tensor(
                 vs,
                 &format!("weight_hh_l{}", i),
                 &[gates_size, hidden_size],
                 1.0,
+                None,
             ));
 
             if let Some(bias_init) = config.bias_init {
@@ -195,12 +197,14 @@ impl RnnWeights {
                     &format!("bias_ih_l{}", i),
                     &[gates_size],
                     1.0,
+                    None,
                 ));
                 flat_weights.push(bias_init.add_tensor(
                     vs,
                     &format!("bias_hh_l{}", i),
                     &[gates_size],
                     1.0,
+                    None,
                 ));
             }
         }

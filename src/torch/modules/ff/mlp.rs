@@ -1,11 +1,9 @@
 //! Multi-layer perceptron
 use super::super::{BuildModule, FeedForwardModule, Module};
 use super::func::Activation;
+use super::{Linear, LinearConfig};
 use std::iter;
-use tch::{
-    nn::{self, Linear, LinearConfig, Path},
-    Tensor,
-};
+use tch::{nn::Path, Tensor};
 
 /// Configuration for the [`Mlp`] module.
 #[derive(Debug, Clone)]
@@ -55,11 +53,11 @@ impl Mlp {
             .zip(out_dims)
             .enumerate()
             .map(|(i, (in_, out_))| {
-                nn::linear(
-                    vs / format!("layer_{}", i),
-                    *in_ as i64,
-                    *out_ as i64,
-                    config.linear_config,
+                Linear::new(
+                    &(vs / format!("layer_{}", i)),
+                    *in_,
+                    *out_,
+                    &config.linear_config,
                 )
             })
             .collect();
@@ -103,6 +101,7 @@ mod tests {
     use super::super::super::{testing, AsSeq};
     use super::*;
     use rstest::{fixture, rstest};
+    use tch::nn::VarStore;
     use tch::{kind::Kind, Device};
 
     #[fixture]
@@ -110,31 +109,31 @@ mod tests {
         let in_dim = 3;
         let out_dim = 2;
         let config = MlpConfig::default();
-        let vs = nn::VarStore::new(Device::Cpu);
+        let vs = VarStore::new(Device::Cpu);
         let module = config.build_module(&vs.root(), in_dim, out_dim);
         (module, in_dim, out_dim)
     }
 
     #[rstest]
-    fn default_module_forward_batch(default_module: (Mlp, usize, usize)) {
+    fn default_forward_batch(default_module: (Mlp, usize, usize)) {
         let (default_mlp, in_dim, out_dim) = default_module;
         testing::check_forward(&default_mlp, in_dim, out_dim, &[4], Kind::Float);
     }
 
     #[rstest]
-    fn default_module_seq_serial(default_module: (Mlp, usize, usize)) {
+    fn default_seq_serial(default_module: (Mlp, usize, usize)) {
         let (default_mlp, in_dim, out_dim) = default_module;
         testing::check_seq_serial(&AsSeq::new(default_mlp), in_dim, out_dim);
     }
 
     #[rstest]
-    fn default_module_step(default_module: (Mlp, usize, usize)) {
+    fn default_step(default_module: (Mlp, usize, usize)) {
         let (default_mlp, in_dim, out_dim) = default_module;
         testing::check_step(&AsSeq::new(default_mlp), in_dim, out_dim);
     }
 
     #[test]
-    fn default_module_forward_gradient_descent() {
+    fn default_forward_gradient_descent() {
         testing::check_config_forward_gradient_descent(&MlpConfig::default());
     }
 }
