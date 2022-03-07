@@ -14,6 +14,20 @@ pub enum Initializer {
     Orthogonal,
 }
 
+/// Defaults to `Uniform(FanIn)`
+///
+/// This samples from `Unif(±√(3 / fan_in)`.
+/// For reference, the typical default initialization used by other libraries are:
+/// * PyTorch: `Unif(±√(1 / fan_in))`  (proprotional to `Uniform(FanIn)`)
+/// * TensorFlow v1: `Unif(0.05)` (equal to `Uniform(Constant(0.05**2 / 3.0))`)
+/// * TensorFlow v2: `Unif(±√(6 / (fan_in + fan_out))` (equal to `Uniform(FanAvg)`)
+///
+impl Default for Initializer {
+    fn default() -> Self {
+        Self::Uniform(VarianceScale::FanIn)
+    }
+}
+
 /// Variance scaling mode.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum VarianceScale {
