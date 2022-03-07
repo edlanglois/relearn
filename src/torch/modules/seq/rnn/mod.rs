@@ -5,14 +5,14 @@ mod lstm;
 pub use gru::{Gru, GruConfig};
 pub use lstm::{Lstm, LstmConfig};
 
-use super::super::super::Initializer;
+use super::super::super::initializers::{Initializer, VarianceScale};
 use super::super::{BuildModule, IterativeModule, Module};
 use smallvec::SmallVec;
 use std::marker::PhantomData;
 use tch::{nn::Path, Cuda, Device, Tensor};
 
 /// Basic recurrent neural network configuration
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct RnnBaseConfig<T> {
     /// Number of layers; each has size equal to the output size when built.
     pub num_layers: usize,
@@ -32,7 +32,7 @@ impl<T> Default for RnnBaseConfig<T> {
             num_layers: 1,
             // Default initialization follows the Tensorflow RNN implementation as it seems the
             // most considered. The PyTorch RNN initializes all weights and biases in the same way.
-            input_weights_init: Initializer::XavierUniform,
+            input_weights_init: Initializer::Uniform(VarianceScale::FanAvg),
             hidden_weights_init: Initializer::Orthogonal,
             bias_init: Some(Initializer::Zeros),
             impl_: PhantomData,
