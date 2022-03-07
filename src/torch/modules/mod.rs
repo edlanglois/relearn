@@ -2,7 +2,6 @@
 mod chain;
 mod ff;
 mod seq;
-mod tch_;
 #[cfg(test)]
 pub mod testing;
 
