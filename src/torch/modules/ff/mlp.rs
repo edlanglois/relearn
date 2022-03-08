@@ -1,8 +1,11 @@
 //! Multi-layer perceptron
-use super::super::{BuildModule, FeedForwardModule, IterativeModule, Module, SequenceModule};
+use super::super::{
+    BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras, SequenceModule,
+};
 use super::func::Activation;
 use super::{Linear, LinearConfig};
-use std::iter;
+use std::iter::{self, FlatMap};
+use std::slice;
 use tch::{nn::Path, Tensor};
 
 /// Configuration for the [`Mlp`] module.
@@ -71,8 +74,43 @@ impl Mlp {
 }
 
 impl Module for Mlp {
+    #[inline]
+    fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(ModuleExtras::variables(self))
+    }
+
+    #[inline]
+    fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(ModuleExtras::trainable_variables(self))
+    }
+
     fn has_cudnn_second_derivatives(&self) -> bool {
         self.layers.iter().all(Linear::has_cudnn_second_derivatives)
+    }
+}
+
+impl<'a> ModuleExtras<'a> for Mlp {
+    type Variables = FlatMap<
+        slice::Iter<'a, Linear>,
+        <Linear as ModuleExtras<'a>>::Variables,
+        fn(&'a Linear) -> <Linear as ModuleExtras<'a>>::Variables,
+    >;
+    type TrainableVariables = FlatMap<
+        slice::Iter<'a, Linear>,
+        <Linear as ModuleExtras<'a>>::TrainableVariables,
+        fn(&'a Linear) -> <Linear as ModuleExtras<'a>>::TrainableVariables,
+    >;
+
+    #[inline]
+    fn variables(&'a self) -> Self::Variables {
+        self.layers.iter().flat_map(ModuleExtras::variables)
+    }
+
+    #[inline]
+    fn trainable_variables(&'a self) -> Self::TrainableVariables {
+        self.layers
+            .iter()
+            .flat_map(ModuleExtras::trainable_variables)
     }
 }
 
@@ -171,5 +209,17 @@ mod tests {
     #[test]
     fn seq_packed_gradient_descent() {
         testing::check_config_forward_gradient_descent(&MlpConfig::default());
+    }
+
+    #[rstest]
+    fn variables_count(default_module: (Mlp, usize, usize)) {
+        let (module, _, _) = default_module;
+        assert_eq!(Module::variables(&module).count(), 4);
+    }
+
+    #[rstest]
+    fn trainable_variables_count(default_module: (Mlp, usize, usize)) {
+        let (module, _, _) = default_module;
+        assert_eq!(Module::trainable_variables(&module).count(), 4);
     }
 }

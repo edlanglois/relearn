@@ -16,6 +16,12 @@ use tch::{nn::Path, Tensor};
 
 /// A self-contained part of a neural network.
 pub trait Module {
+    /// Iterator over variables (tensors) managed by this module.
+    fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_>;
+
+    /// Iterator over the trainable variables (tensors) managed by this module.
+    fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_>;
+
     /// Whether cuDNN supports second derivatives of this module.
     fn has_cudnn_second_derivatives(&self) -> bool {
         true // usually true
@@ -38,6 +44,12 @@ pub trait Module {
 macro_rules! impl_wrapped_module {
     ($wrapper:ty) => {
         impl<T: Module + ?Sized> Module for $wrapper {
+            fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+                T::variables(self)
+            }
+            fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+                T::trainable_variables(self)
+            }
             fn has_cudnn_second_derivatives(&self) -> bool {
                 T::has_cudnn_second_derivatives(&self)
             }
@@ -46,6 +58,18 @@ macro_rules! impl_wrapped_module {
 }
 impl_wrapped_module!(&'_ T);
 impl_wrapped_module!(Box<T>);
+
+/// Extra module methods with a less convenient interface. Prefer using [`Module`] instead.
+pub trait ModuleExtras<'a> {
+    type Variables: Iterator<Item = &'a Tensor>;
+    type TrainableVariables: Iterator<Item = &'a Tensor>;
+
+    /// Iterator over variables (tensors) managed by this module.
+    fn variables(&'a self) -> Self::Variables;
+
+    /// Iterator over the trainable variables (tensors) managed by this module.
+    fn trainable_variables(&'a self) -> Self::TrainableVariables;
+}
 
 // Options for module serialization
 //
@@ -255,13 +279,3 @@ macro_rules! impl_wrapped_iterative_module {
 }
 impl_wrapped_iterative_module!(&'_ T);
 impl_wrapped_iterative_module!(Box<T>);
-
-/* XXX
-/// Impl [`SequenceModule`] & [`IterativeModule`] for [`FeedForwardModule`] by batching on seq dim
-macro_rules! impl_batch_seq_for_forward_module {
-    ($type:ty) => {
-        impl
-
-    }
-}
-*/

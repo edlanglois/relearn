@@ -106,7 +106,7 @@ impl SequenceModule for Lstm {
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::super::testing;
+    use super::super::super::super::{testing, Module};
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{nn, Device};
@@ -174,5 +174,17 @@ mod tests {
     fn seq_packed_gradient_descent() {
         let config = LstmConfig::default();
         testing::check_config_seq_packed_gradient_descent(&config);
+    }
+
+    #[rstest]
+    fn variables_count(lstm: (Lstm, usize, usize)) {
+        let (lstm, _, _) = lstm;
+        assert_eq!(lstm.variables().count(), 4);
+    }
+
+    #[rstest]
+    fn trainable_variables_count(lstm: (Lstm, usize, usize)) {
+        let (lstm, _, _) = lstm;
+        assert_eq!(lstm.trainable_variables().count(), 4);
     }
 }

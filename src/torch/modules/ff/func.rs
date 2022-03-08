@@ -1,4 +1,5 @@
-use super::super::{FeedForwardModule, Module};
+use super::super::{FeedForwardModule, Module, ModuleExtras};
+use std::iter;
 use tch::Tensor;
 
 /// Module view of a feed-forward tensor function.
@@ -7,14 +8,41 @@ pub struct Func {
 }
 
 impl Func {
+    #[inline]
     pub fn new(f: fn(&Tensor) -> Tensor) -> Self {
         Self { f }
     }
 }
 
-impl Module for Func {}
+impl Module for Func {
+    #[inline]
+    fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(ModuleExtras::variables(self))
+    }
+
+    #[inline]
+    fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(ModuleExtras::trainable_variables(self))
+    }
+}
+
+impl<'a> ModuleExtras<'a> for Func {
+    type Variables = iter::Empty<&'a Tensor>;
+    type TrainableVariables = Self::Variables;
+
+    #[inline]
+    fn variables(&'a self) -> Self::Variables {
+        iter::empty()
+    }
+
+    #[inline]
+    fn trainable_variables(&'a self) -> Self::TrainableVariables {
+        iter::empty()
+    }
+}
 
 impl FeedForwardModule for Func {
+    #[inline]
     fn forward(&self, input: &Tensor) -> Tensor {
         (self.f)(input)
     }
@@ -132,5 +160,21 @@ mod activation {
 
         assert!(bool::from(y.greater_equal(lower_bound).all()));
         assert!(bool::from(y.less_equal(upper_bound).all()));
+    }
+
+    #[test]
+    fn variables_count() {
+        assert_eq!(
+            Module::variables(&Activation::Relu.maybe_module().unwrap()).count(),
+            0
+        );
+    }
+
+    #[test]
+    fn trainable_variables_count() {
+        assert_eq!(
+            Module::trainable_variables(&Activation::Relu.maybe_module().unwrap()).count(),
+            0
+        );
     }
 }

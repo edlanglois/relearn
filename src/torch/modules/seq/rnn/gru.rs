@@ -91,7 +91,7 @@ impl SequenceModule for Gru {
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::super::testing;
+    use super::super::super::super::{testing, Module};
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{nn, Device};
@@ -159,5 +159,17 @@ mod tests {
     fn seq_packed_gradient_descent() {
         let config = GruConfig::default();
         testing::check_config_seq_packed_gradient_descent(&config);
+    }
+
+    #[rstest]
+    fn variables_count(gru: (Gru, usize, usize)) {
+        let (gru, _, _) = gru;
+        assert_eq!(gru.variables().count(), 4);
+    }
+
+    #[rstest]
+    fn trainable_variables_count(gru: (Gru, usize, usize)) {
+        let (gru, _, _) = gru;
+        assert_eq!(gru.trainable_variables().count(), 4);
     }
 }

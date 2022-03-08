@@ -6,9 +6,10 @@ pub use gru::{Gru, GruConfig};
 pub use lstm::{Lstm, LstmConfig};
 
 use super::super::super::initializers::{Initializer, VarianceScale};
-use super::super::{BuildModule, IterativeModule, Module};
+use super::super::{BuildModule, IterativeModule, Module, ModuleExtras};
 use smallvec::SmallVec;
 use std::marker::PhantomData;
+use std::slice;
 use tch::{nn::Path, Cuda, Device, Tensor};
 
 /// Basic recurrent neural network configuration
@@ -101,8 +102,34 @@ impl<T: RnnImpl> RnnBase<T> {
 }
 
 impl<T> Module for RnnBase<T> {
+    #[inline]
+    fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(ModuleExtras::variables(self))
+    }
+
+    #[inline]
+    fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(ModuleExtras::trainable_variables(self))
+    }
+
+    #[inline]
     fn has_cudnn_second_derivatives(&self) -> bool {
         false
+    }
+}
+
+impl<'a, T> ModuleExtras<'a> for RnnBase<T> {
+    type Variables = slice::Iter<'a, Tensor>;
+    type TrainableVariables = Self::Variables;
+
+    #[inline]
+    fn variables(&'a self) -> Self::Variables {
+        self.weights.flat_weights.iter()
+    }
+
+    #[inline]
+    fn trainable_variables(&'a self) -> Self::TrainableVariables {
+        self.weights.flat_weights.iter()
     }
 }
 
@@ -174,8 +201,6 @@ impl RnnWeights {
         let mut flat_weights = Vec::new();
         for i in 0..config.num_layers {
             let layer_input_size = if i == 0 { in_dim } else { hidden_size };
-            // TODO: Use the same initialization as PyTorch
-            // <https://pytorch.org/docs/stable/_modules/torch/nn/modules/rnn.html>
             flat_weights.push(config.input_weights_init.add_tensor(
                 vs,
                 &format!("weight_ih_l{}", i),

@@ -1,5 +1,9 @@
 //! Modules applied one after another in sequence
-use super::{Activation, BuildModule, FeedForwardModule, IterativeModule, Module, SequenceModule};
+use super::{
+    Activation, BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras,
+    SequenceModule,
+};
+use std::iter;
 use tch::{nn::Path, Tensor};
 
 /// Configuration for a [`Chained`] module.
@@ -66,18 +70,46 @@ impl<T, U> Chained<T, U> {
 
 impl<T, U> Module for Chained<T, U>
 where
-    T: Module,
-    U: Module,
+    T: Module + for<'a> ModuleExtras<'a>,
+    U: Module + for<'a> ModuleExtras<'a>,
 {
+    #[inline]
+    fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(ModuleExtras::variables(self))
+    }
+
+    #[inline]
+    fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(ModuleExtras::trainable_variables(self))
+    }
+
     fn has_cudnn_second_derivatives(&self) -> bool {
         self.first.has_cudnn_second_derivatives() && self.second.has_cudnn_second_derivatives()
     }
 }
 
+impl<'a, T, U> ModuleExtras<'a> for Chained<T, U>
+where
+    T: ModuleExtras<'a>,
+    U: ModuleExtras<'a>,
+{
+    type Variables = iter::Chain<T::Variables, U::Variables>;
+    type TrainableVariables = iter::Chain<T::TrainableVariables, U::TrainableVariables>;
+
+    fn variables(&'a self) -> Self::Variables {
+        self.first.variables().chain(self.second.variables())
+    }
+    fn trainable_variables(&'a self) -> Self::TrainableVariables {
+        self.first
+            .trainable_variables()
+            .chain(self.second.trainable_variables())
+    }
+}
+
 impl<T, U> FeedForwardModule for Chained<T, U>
 where
-    T: FeedForwardModule,
-    U: FeedForwardModule,
+    T: FeedForwardModule + for<'a> ModuleExtras<'a>,
+    U: FeedForwardModule + for<'a> ModuleExtras<'a>,
 {
     fn forward(&self, input: &Tensor) -> Tensor {
         let hidden = self.first.forward(input);
@@ -88,8 +120,8 @@ where
 
 impl<T, U> SequenceModule for Chained<T, U>
 where
-    T: SequenceModule,
-    U: SequenceModule,
+    T: SequenceModule + for<'a> ModuleExtras<'a>,
+    U: SequenceModule + for<'a> ModuleExtras<'a>,
 {
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         let hidden = self.first.seq_serial(inputs, seq_lengths);
@@ -105,8 +137,8 @@ where
 
 impl<T, U> IterativeModule for Chained<T, U>
 where
-    T: IterativeModule,
-    U: IterativeModule,
+    T: IterativeModule + for<'a> ModuleExtras<'a>,
+    U: IterativeModule + for<'a> ModuleExtras<'a>,
 {
     type State = (T::State, U::State);
 
@@ -121,58 +153,29 @@ where
     }
 }
 
-/* TODO: Remove?
-/// Configuration for a stack of modules each applied to the output of the previous.
-pub struct StackedConfig<MC> {
-    // First layer configuration
-    first_config: MC,
-    // (hidden_size, module_config) for each following layer
-    rest_configs: Vec<(usize, MC)>,
-}
-
-impl<MC> StackedConfig<MC> {
-    /// Create a new stacked configuration containing just the first layer
-    pub fn new<T: Into<MC>>(config: T) -> Self {
-        Self {
-            first_config: config.into(),
-            rest_configs: Vec::new(),
-        }
-    }
-
-    /// Push a module configuration on second of the stack.
-    pub fn push<T: Into<MC>>(&mut self, hidden_dim: usize, config: T) {
-        self.rest_configs.push((hidden_dim, config.into()))
-    }
-}
-
-impl<MC: BuildModule> BuildModule for StackedConfig<MC> {
-    type Module = Vec<MC::Module>;
-
-    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
-        iter::once((in_dim, &self.first_config))
-            .chain(self.rest_configs.iter().map(|(in_, config)| (*in_, config)))
-            .zip(
-                self.rest_configs
-                    .iter()
-                    .map(|(out, _)| *out)
-                    .chain(iter::once(out_dim)),
-            )
-            .enumerate()
-            .map(|(i, ((in_, config), out))| {
-                config.build_module(&(vs / format!("layer_{}", i)), in_, out)
-            })
-            .collect()
-    }
-}
-*/
-
 impl<M: Module> Module for [M] {
+    fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(self.iter().flat_map(Module::variables))
+    }
+
+    fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(self.iter().flat_map(Module::trainable_variables))
+    }
+
     fn has_cudnn_second_derivatives(&self) -> bool {
         self.iter().all(M::has_cudnn_second_derivatives)
     }
 }
 
 impl<M: Module, const N: usize> Module for [M; N] {
+    fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(self.iter().flat_map(Module::variables))
+    }
+
+    fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(self.iter().flat_map(Module::trainable_variables))
+    }
+
     fn has_cudnn_second_derivatives(&self) -> bool {
         self.iter().all(M::has_cudnn_second_derivatives)
     }
@@ -353,5 +356,17 @@ mod tests {
     #[test]
     fn gru_mlp_seq_packed_gradient_descent() {
         testing::check_config_seq_packed_gradient_descent(&chained_gru_mlp_config());
+    }
+
+    #[rstest]
+    fn variables_count(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
+        let (gru_mlp, _, _) = gru_mlp;
+        assert_eq!(Module::variables(&gru_mlp).count(), 8);
+    }
+
+    #[rstest]
+    fn trainable_variables_count(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
+        let (gru_mlp, _, _) = gru_mlp;
+        assert_eq!(Module::trainable_variables(&gru_mlp).count(), 8);
     }
 }
