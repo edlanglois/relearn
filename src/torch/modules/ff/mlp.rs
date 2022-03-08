@@ -74,6 +74,16 @@ impl Mlp {
 }
 
 impl Module for Mlp {
+    fn shallow_clone(&self) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            layers: self.layers.iter().map(Module::shallow_clone).collect(),
+            ..*self
+        }
+    }
+
     #[inline]
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
         Box::new(ModuleExtras::variables(self))

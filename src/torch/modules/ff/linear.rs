@@ -62,6 +62,16 @@ impl Linear {
 }
 
 impl Module for Linear {
+    fn shallow_clone(&self) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            kernel: self.kernel.shallow_clone(),
+            bias: self.bias.as_ref().map(Tensor::shallow_clone),
+        }
+    }
+
     #[inline]
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
         Box::new(ModuleExtras::variables(self))

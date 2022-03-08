@@ -16,6 +16,11 @@ use tch::{nn::Path, Tensor};
 
 /// A self-contained part of a neural network.
 pub trait Module {
+    /// Create a clone of this module sharing the same variables (tensors).
+    fn shallow_clone(&self) -> Self
+    where
+        Self: Sized;
+
     /// Iterator over variables (tensors) managed by this module.
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_>;
 
@@ -44,6 +49,12 @@ pub trait Module {
 macro_rules! impl_wrapped_module {
     ($wrapper:ty) => {
         impl<T: Module + ?Sized> Module for $wrapper {
+            fn shallow_clone(&self) -> Self {
+                // TODO: Get this implemented.
+                // Maybe need a boxed_shallow_clone() -> Box<dyn Module> method and
+                // replace macro calls with a dedicated impl for Box<dyn Module>.
+                unimplemented!()
+            }
             fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
                 T::variables(self)
             }

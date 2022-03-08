@@ -3,6 +3,7 @@ use std::iter;
 use tch::Tensor;
 
 /// Module view of a feed-forward tensor function.
+#[derive(Copy, Clone)]
 pub struct Func {
     f: fn(&Tensor) -> Tensor,
 }
@@ -15,6 +16,14 @@ impl Func {
 }
 
 impl Module for Func {
+    #[inline]
+    fn shallow_clone(&self) -> Self
+    where
+        Self: Sized,
+    {
+        *self
+    }
+
     #[inline]
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
         Box::new(ModuleExtras::variables(self))

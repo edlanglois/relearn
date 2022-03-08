@@ -102,6 +102,16 @@ impl<T: RnnImpl> RnnBase<T> {
 }
 
 impl<T> Module for RnnBase<T> {
+    fn shallow_clone(&self) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            weights: self.weights.shallow_clone(),
+            ..*self
+        }
+    }
+
     #[inline]
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
         Box::new(ModuleExtras::variables(self))
@@ -253,6 +263,18 @@ impl RnnWeights {
         Self {
             flat_weights,
             has_biases: config.bias_init.is_some(),
+        }
+    }
+
+    /// Create a copy that shares the same tensors.
+    pub fn shallow_clone(&self) -> Self {
+        Self {
+            flat_weights: self
+                .flat_weights
+                .iter()
+                .map(Tensor::shallow_clone)
+                .collect(),
+            has_biases: self.has_biases,
         }
     }
 

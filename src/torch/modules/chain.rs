@@ -73,6 +73,17 @@ where
     A: Module + for<'a> ModuleExtras<'a>,
     B: Module + for<'a> ModuleExtras<'a>,
 {
+    fn shallow_clone(&self) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            first: self.first.shallow_clone(),
+            second: self.second.shallow_clone(),
+            ..*self
+        }
+    }
+
     #[inline]
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
         Box::new(ModuleExtras::variables(self))
@@ -154,6 +165,14 @@ where
 }
 
 impl<M: Module> Module for [M] {
+    fn shallow_clone(&self) -> Self
+    where
+        Self: Sized,
+    {
+        // TODO: Why is this implementation expected? Is [M] not unsized?
+        unimplemented!()
+    }
+
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
         Box::new(self.iter().flat_map(Module::variables))
     }
@@ -168,6 +187,13 @@ impl<M: Module> Module for [M] {
 }
 
 impl<M: Module, const N: usize> Module for [M; N] {
+    fn shallow_clone(&self) -> Self
+    where
+        Self: Sized,
+    {
+        array_init::array_init(|i| self[i].shallow_clone())
+    }
+
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
         Box::new(self.iter().flat_map(Module::variables))
     }
