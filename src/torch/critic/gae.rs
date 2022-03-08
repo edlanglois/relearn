@@ -69,6 +69,10 @@ where
         true
     }
 
+    fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        self.value_fn.trainable_variables()
+    }
+
     fn discount_factor(&self, env_discount_factor: f64) -> f64 {
         env_discount_factor.min(self.gamma)
     }

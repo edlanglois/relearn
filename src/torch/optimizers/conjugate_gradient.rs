@@ -33,7 +33,7 @@ use super::{BaseOptimizer, BuildOptimizer, OptimizerStepError, TrustRegionOptimi
 use crate::logging::StatsLogger;
 use std::borrow::Borrow;
 use std::convert::Infallible;
-use tch::{nn::VarStore, Tensor};
+use tch::Tensor;
 
 /// Configuration for the Conjugate Gradient Optimizer
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -67,8 +67,14 @@ impl BuildOptimizer for ConjugateGradientOptimizerConfig {
     type Optimizer = ConjugateGradientOptimizer;
     type Error = Infallible;
 
-    fn build_optimizer(&self, vs: &VarStore) -> Result<Self::Optimizer, Self::Error> {
-        Ok(ConjugateGradientOptimizer::new(vs, *self))
+    fn build_optimizer<'a, I>(&self, variables: I) -> Result<Self::Optimizer, Self::Error>
+    where
+        I: IntoIterator<Item = &'a Tensor>,
+    {
+        Ok(ConjugateGradientOptimizer::new(
+            variables.into_iter().map(Tensor::shallow_clone).collect(),
+            *self,
+        ))
     }
 }
 
@@ -87,9 +93,9 @@ pub struct ConjugateGradientOptimizer {
 }
 
 impl ConjugateGradientOptimizer {
-    pub fn new(vs: &VarStore, config: ConjugateGradientOptimizerConfig) -> Self {
+    pub fn new(variables: Vec<Tensor>, config: ConjugateGradientOptimizerConfig) -> Self {
         Self {
-            params: vs.trainable_variables(),
+            params: variables,
             config,
         }
     }
@@ -434,9 +440,8 @@ mod cg_optimizer {
     fn shared_loss_distance_computation() {
         let config = ConjugateGradientOptimizerConfig::default();
 
-        let vs = VarStore::new(Device::Cpu);
-        let x = vs.root().ones("x", &[2]);
-        let optimizer = config.build_optimizer(&vs).unwrap();
+        let x = Tensor::ones(&[2], (Kind::Float, Device::Cpu)).requires_grad_(true);
+        let optimizer = config.build_optimizer([&x]).unwrap();
 
         let y_prev = x.square().mean(Kind::Float).detach();
         let loss_distance_fn = || {
@@ -469,10 +474,9 @@ mod cg_optimizer {
     fn unused_params() {
         let config = ConjugateGradientOptimizerConfig::default();
 
-        let vs = VarStore::new(Device::Cpu);
-        let x = vs.root().ones("x", &[2]);
-        let _ = vs.root().zeros("unused", &[3]);
-        let optimizer = config.build_optimizer(&vs).unwrap();
+        let x = Tensor::ones(&[2], (Kind::Float, Device::Cpu)).requires_grad_(true);
+        let unused = Tensor::zeros(&[3], (Kind::Float, Device::Cpu)).requires_grad_(true);
+        let optimizer = config.build_optimizer([&x, &unused]).unwrap();
 
         let x_prev = x.detach().copy();
         let loss_distance_fn = || {

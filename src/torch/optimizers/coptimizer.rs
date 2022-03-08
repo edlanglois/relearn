@@ -1,7 +1,7 @@
 //! Torch optimizer wrappers and configuration
 use super::{BaseOptimizer, BuildOptimizer, OnceOptimizer, OptimizerStepError};
 use crate::logging::StatsLogger;
-use tch::{nn::VarStore, COptimizer, TchError, Tensor};
+use tch::{COptimizer, TchError, Tensor};
 
 impl BaseOptimizer for COptimizer {
     fn zero_grad(&mut self) {
@@ -35,11 +35,14 @@ where
     type Optimizer = COptimizer;
     type Error = TchError;
 
-    fn build_optimizer(&self, vs: &VarStore) -> Result<Self::Optimizer, Self::Error> {
+    fn build_optimizer<'a, I>(&self, variables: I) -> Result<Self::Optimizer, Self::Error>
+    where
+        I: IntoIterator<Item = &'a Tensor>,
+    {
         let mut optimizer: COptimizer = self.try_into()?;
-        let variables = vs.variables_.lock().unwrap();
-        for var in &variables.trainable_variables {
-            optimizer.add_parameters(&var.tensor, var.group)?;
+        for tensor in variables {
+            // Don't currently support parameter groups; always set group to 0
+            optimizer.add_parameters(tensor, 0)?;
         }
         Ok(optimizer)
     }
@@ -226,10 +229,9 @@ mod coptimizer {
     /// We might want to check for NaN in the wrapper and fail
     /// but for now it silently runs without error.
     fn sgd_nan_loss() {
-        let vs = VarStore::new(Device::Cpu);
-        let x = vs.root().f_zeros("x", &[2]).unwrap();
+        let x = Tensor::zeros(&[2], (Kind::Float, Device::Cpu)).requires_grad_(true);
 
-        let mut optimizer = SgdConfig::default().build_optimizer(&vs).unwrap();
+        let mut optimizer = SgdConfig::default().build_optimizer([&x]).unwrap();
         #[allow(clippy::eq_op)]
         let _ = optimizer
             .backward_step(&(|| (&x / &x).sum(Kind::Float)), &mut ())

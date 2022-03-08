@@ -1,7 +1,7 @@
 use super::super::{
     critic::{BuildCritic, Critic},
     features::LazyPackedHistoryFeatures,
-    modules::{BuildModule, IterativeModule, SequenceModule},
+    modules::{BuildModule, IterativeModule, Module, SequenceModule},
     updaters::{BuildCriticUpdater, BuildPolicyUpdater, UpdateCritic, UpdatePolicy},
 };
 use crate::agents::buffers::{BufferCapacityBound, SimpleBuffer, WriteHistoryBuffer};
@@ -125,6 +125,7 @@ where
     OS: EncoderFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
     PB: BuildModule<Module = P> + Clone,
+    P: Module,
     C: Critic,
 {
     pub fn new<E, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
@@ -145,7 +146,7 @@ where
         );
         let policy_updater = config
             .policy_updater_config
-            .build_policy_updater(&policy_variables);
+            .build_policy_updater(policy.trainable_variables());
 
         let critic_variables = VarStore::new(config.device);
         let critic = config
@@ -154,7 +155,7 @@ where
         let discount_factor = critic.discount_factor(env.discount_factor());
         let critic_updater = config
             .critic_updater_config
-            .build_critic_updater(&critic_variables);
+            .build_critic_updater(critic.trainable_variables());
 
         Self {
             shared: Arc::new(ActorCriticShared {

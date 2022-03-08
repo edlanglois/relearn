@@ -24,7 +24,7 @@ use super::critic::Critic;
 use super::features::PackedHistoryFeaturesView;
 use super::modules::SequenceModule;
 use crate::logging::StatsLogger;
-use tch::nn::VarStore;
+use tch::Tensor;
 
 // TODO: Remove generic <AS> from all updater traits
 
@@ -32,8 +32,10 @@ use tch::nn::VarStore;
 pub trait BuildPolicyUpdater<AS: ?Sized> {
     type Updater: UpdatePolicy<AS>;
 
-    /// Build a policy updater for the trainable variables in a variable store.
-    fn build_policy_updater(&self, vs: &VarStore) -> Self::Updater;
+    /// Build a policy updater for a set of variables.
+    fn build_policy_updater<'a, I>(&self, variables: I) -> Self::Updater
+    where
+        I: IntoIterator<Item = &'a Tensor>;
 }
 
 /// Self-contained policy updater.
@@ -115,7 +117,9 @@ pub trait BuildCriticUpdater {
     type Updater: UpdateCritic;
 
     /// Build a critic updater for the trainable variables in a variable store.
-    fn build_critic_updater(&self, vs: &VarStore) -> Self::Updater;
+    fn build_critic_updater<'a, I>(&self, variables: I) -> Self::Updater
+    where
+        I: IntoIterator<Item = &'a Tensor>;
 }
 
 /// Self-contained critic updater.

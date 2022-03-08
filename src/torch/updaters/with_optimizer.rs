@@ -7,7 +7,7 @@ use super::{
     UpdatePolicy, UpdatePolicyWithOptimizer,
 };
 use crate::logging::StatsLogger;
-use tch::nn::VarStore;
+use tch::Tensor;
 
 /// An updater constructed from an update rule and an optimizer.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
@@ -63,10 +63,13 @@ where
 {
     type Updater = WithOptimizer<U, OC::Optimizer>;
 
-    fn build_policy_updater(&self, vs: &VarStore) -> Self::Updater {
+    fn build_policy_updater<'a, I>(&self, variables: I) -> Self::Updater
+    where
+        I: IntoIterator<Item = &'a Tensor>,
+    {
         WithOptimizer {
             update_rule: self.update_rule.clone(),
-            optimizer: self.optimizer.build_optimizer(vs).unwrap(), // TODO: Error handling
+            optimizer: self.optimizer.build_optimizer(variables).unwrap(), // TODO: Error handling
         }
     }
 }
@@ -78,10 +81,13 @@ where
 {
     type Updater = WithOptimizer<U, OC::Optimizer>;
 
-    fn build_critic_updater(&self, vs: &VarStore) -> Self::Updater {
+    fn build_critic_updater<'a, I>(&self, variables: I) -> Self::Updater
+    where
+        I: IntoIterator<Item = &'a Tensor>,
+    {
         WithOptimizer {
             update_rule: self.update_rule.clone(),
-            optimizer: self.optimizer.build_optimizer(vs).unwrap(), // TODO: Error handling
+            optimizer: self.optimizer.build_optimizer(variables).unwrap(), // TODO: Error handling
         }
     }
 }

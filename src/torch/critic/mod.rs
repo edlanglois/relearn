@@ -4,6 +4,7 @@ mod gae;
 pub use gae::{Gae, GaeConfig};
 
 use super::features::PackedHistoryFeaturesView;
+use std::iter;
 use tch::{nn::Path, Tensor};
 
 /// Critic for a reinforcement learning environment.
@@ -13,7 +14,7 @@ use tch::{nn::Path, Tensor};
 /// Higher scores represent better outcomes than lower scores.
 ///
 /// # Terminology
-/// This use of "Critic" is prehaps more expansive than the typical use:
+/// This use of "Critic" is perhaps more expansive than the typical use:
 /// it does not just refer to a runtime evaluator of expected future reward given the observed
 /// trajectory so far, but instead includes a retrospective evaluation of states and actions given
 /// the empirical future trajectory.
@@ -26,6 +27,9 @@ use tch::{nn::Path, Tensor};
 pub trait Critic {
     /// Whether this critic has trainable internal parameters
     fn trainable(&self) -> bool;
+
+    /// Iterator over the trainable variables (tensors) managed by this critic.
+    fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_>;
 
     /// Get the discount factor to use when calculating step returns.
     ///
@@ -83,6 +87,10 @@ impl Critic for Return {
         false
     }
 
+    fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        Box::new(iter::empty())
+    }
+
     fn seq_packed(&self, features: &dyn PackedHistoryFeaturesView) -> Tensor {
         features.returns().shallow_clone()
     }
@@ -103,6 +111,10 @@ impl BuildCritic for Return {
 impl<T: Critic + ?Sized> Critic for Box<T> {
     fn trainable(&self) -> bool {
         T::trainable(self)
+    }
+
+    fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        T::trainable_variables(self)
     }
 
     fn discount_factor(&self, env_discount_factor: f64) -> f64 {

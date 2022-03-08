@@ -7,7 +7,7 @@ pub use coptimizer::{AdamConfig, AdamWConfig, RmsPropConfig, SgdConfig};
 
 use crate::logging::StatsLogger;
 use std::error::Error;
-use tch::{nn::VarStore, Tensor};
+use tch::Tensor;
 use thiserror::Error;
 
 /// Base optimizer interface
@@ -152,8 +152,10 @@ pub trait BuildOptimizer {
     type Optimizer;
     type Error: Error;
 
-    /// Build an optimizer for the trainable variables in a variable store.
-    fn build_optimizer(&self, vs: &VarStore) -> Result<Self::Optimizer, Self::Error>;
+    /// Build an optimizer for a collection of variables.
+    fn build_optimizer<'a, I>(&self, variables: I) -> Result<Self::Optimizer, Self::Error>
+    where
+        I: IntoIterator<Item = &'a Tensor>;
 }
 
 #[cfg(test)]
@@ -174,9 +176,8 @@ mod testing {
         let m = Tensor::of_slice(&[1.0_f32, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
         let b = Tensor::of_slice(&[2.0_f32, -3.0]);
 
-        let vs = VarStore::new(Device::Cpu);
-        let x = vs.root().f_zeros("x", &[2]).unwrap();
-        let mut optimizer = optimizer_config.build_optimizer(&vs).unwrap();
+        let x = Tensor::zeros(&[2], (Kind::Float, Device::Cpu)).requires_grad_(true);
+        let mut optimizer = optimizer_config.build_optimizer([&x]).unwrap();
 
         let loss_fn = || m.mv(&x).dot(&x) / 2 + b.dot(&x);
 
@@ -206,9 +207,8 @@ mod testing {
         let m = Tensor::of_slice(&[1.0_f32, -1.0, -1.0, 2.0]).reshape(&[2, 2]);
         let b = Tensor::of_slice(&[2.0_f32, -3.0]);
 
-        let vs = VarStore::new(Device::Cpu);
-        let x = vs.root().zeros("x", &[2]);
-        let optimizer = optimizer_config.build_optimizer(&vs).unwrap();
+        let x = Tensor::zeros(&[2], (Kind::Float, Device::Cpu)).requires_grad_(true);
+        let optimizer = optimizer_config.build_optimizer([&x]).unwrap();
 
         let x_last = x.detach().copy();
         let loss_distance_fn = || {

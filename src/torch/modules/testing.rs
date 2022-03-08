@@ -1,5 +1,5 @@
 //! Module test utilities.
-use super::{BuildModule, FeedForwardModule, IterativeModule, SequenceModule};
+use super::{BuildModule, FeedForwardModule, IterativeModule, Module, SequenceModule};
 use crate::torch::optimizers::{BuildOptimizer, OnceOptimizer, SgdConfig};
 use std::iter;
 use tch::{self, kind::Kind, nn::VarStore, Device, IndexOp, Tensor};
@@ -174,7 +174,9 @@ where
 
     let vs = VarStore::new(device);
     let model = config.build_module(&vs.root(), in_dim, out_dim);
-    let mut optimizer = SgdConfig::default().build_optimizer(&vs).unwrap();
+    let mut optimizer = SgdConfig::default()
+        .build_optimizer(model.trainable_variables())
+        .unwrap();
 
     let initial_output = model.forward(&input);
 
@@ -212,7 +214,9 @@ where
 
     let vs = VarStore::new(device);
     let model = config.build_module(&vs.root(), in_dim, out_dim);
-    let mut optimizer = SgdConfig::default().build_optimizer(&vs).unwrap();
+    let mut optimizer = SgdConfig::default()
+        .build_optimizer(model.trainable_variables())
+        .unwrap();
 
     let initial_output = model.seq_packed(&input, &batch_sizes);
 
