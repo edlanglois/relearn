@@ -4,7 +4,7 @@ use relearn::agents::{
     Actor, ActorMode, Agent, AgentPair, BatchUpdate, BuildAgent, BuildAgentError,
 };
 use relearn::envs::{
-    fruit, BuildEnv, EnvStructure, Environment, FruitGame, StepLimit, WithStepLimit,
+    fruit, BuildEnv, EnvStructure, Environment, FruitGame, LatentStepLimit, WithLatentStepLimit,
 };
 use relearn::logging::{DisplayLogger, StatsLogger};
 use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
@@ -131,7 +131,8 @@ impl<O, A> BatchUpdate<O, A> for FruitLazyExpert {
 type ModelConfig = ChainedConfig<MlpConfig, ChainedConfig<GruConfig, MlpConfig>>;
 
 fn main() {
-    let env_config = WithStepLimit::new(FruitGame::<5, 5, 5, 5>::default(), StepLimit::new(50));
+    let env_config =
+        WithLatentStepLimit::new(FruitGame::<5, 5, 5, 5>::default(), LatentStepLimit::new(50));
 
     let assistant_config: ActorCriticConfig<
         ModelConfig,

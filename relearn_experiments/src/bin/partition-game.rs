@@ -14,7 +14,7 @@ use relearn::Prng;
 use tch::Device;
 
 fn main() {
-    let env_config = PartitionGame::default().with_step_limit(1000);
+    let env_config = PartitionGame::default().with_visible_step_limit(1000);
 
     let agent_config: ActorCriticConfig<
         GruMlpConfig,

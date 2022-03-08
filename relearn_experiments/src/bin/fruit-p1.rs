@@ -1,6 +1,8 @@
 use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent};
-use relearn::envs::{BuildEnv, Environment, FirstPlayerView, FruitGame, StepLimit, WithStepLimit};
+use relearn::envs::{
+    BuildEnv, Environment, FirstPlayerView, FruitGame, VisibleStepLimit, WithVisibleStepLimit,
+};
 use relearn::logging::DisplayLogger;
 use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
 use relearn::torch::{
@@ -14,9 +16,9 @@ use relearn::Prng;
 use tch::Device;
 
 fn main() {
-    let env_config = WithStepLimit::new(
+    let env_config = WithVisibleStepLimit::new(
         FirstPlayerView::new(FruitGame::<5, 5, 5, 5>::default()),
-        StepLimit::new(50),
+        VisibleStepLimit::new(50),
     );
 
     let agent_config: ActorCriticConfig<
@@ -25,7 +27,7 @@ fn main() {
         GaeConfig<GruMlpConfig>,
         WithOptimizer<CriticLossUpdateRule, AdamConfig>,
     > = ActorCriticConfig {
-        device: Device::Cuda(0),
+        device: Device::cuda_if_available(),
         ..Default::default()
     };
     let training_config = TrainParallelConfig {

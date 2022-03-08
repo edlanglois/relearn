@@ -16,7 +16,7 @@ use relearn::torch::{
     agents::{ActorCriticAgent, ActorCriticConfig},
     critic::{Gae, GaeConfig},
     initializers::{Initializer, VarianceScale},
-    modules::{Activation, Chained, ChainedConfig, Gru, GruConfig},
+    modules::{Activation, Chained, ChainedConfig, Gru, GruConfig, Linear, LinearConfig},
     optimizers::{AdamConfig, ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig},
     updaters::{CriticLossUpdateRule, TrpoPolicyUpdateRule, WithOptimizer},
 };
@@ -27,7 +27,6 @@ use std::num::ParseIntError;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
-use tch::nn::{Linear, LinearConfig};
 use tch::COptimizer;
 use thiserror::Error;
 
