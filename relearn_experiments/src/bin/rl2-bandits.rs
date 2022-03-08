@@ -16,7 +16,7 @@ use relearn::torch::{
     agents::{ActorCriticAgent, ActorCriticConfig},
     critic::{Gae, GaeConfig},
     initializers::{Initializer, VarianceScale},
-    modules::{Activation, Chained, ChainedConfig, Gru, GruConfig, Linear, LinearConfig},
+    modules::{Activation, Chain, ChainConfig, Gru, GruConfig, Linear, LinearConfig},
     optimizers::{AdamConfig, ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig},
     updaters::{CriticLossUpdateRule, TrpoPolicyUpdateRule, WithOptimizer},
 };
@@ -338,10 +338,10 @@ impl fmt::Debug for Device {
 type Agent = ActorCriticAgent<
     MetaObservationSpace<SingletonSpace, IndexSpace>,
     IndexSpace,
-    ChainedConfig<GruConfig, LinearConfig>,
-    Chained<Gru, Linear>,
+    ChainConfig<GruConfig, LinearConfig>,
+    Chain<Gru, Linear>,
     WithOptimizer<TrpoPolicyUpdateRule, ConjugateGradientOptimizer>,
-    Gae<Chained<Gru, Linear>>,
+    Gae<Chain<Gru, Linear>>,
     WithOptimizer<CriticLossUpdateRule, COptimizer>,
 >;
 
@@ -367,7 +367,7 @@ impl TrainConfig {
 
         // Configuration for the policy and baseline networks
         // GRU followed by fully-connected
-        let model_config = ChainedConfig {
+        let model_config = ChainConfig {
             first_config: GruConfig {
                 num_layers: 1,
                 input_weights_init: Initializer::Uniform(VarianceScale::FanAvg),

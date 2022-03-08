@@ -5,12 +5,12 @@ mod seq;
 #[cfg(test)]
 pub mod testing;
 
-pub use chain::{Chained, ChainedConfig};
+pub use chain::{Chain, ChainConfig};
 pub use ff::{Activation, Func, Linear, LinearConfig, Mlp, MlpConfig};
 pub use seq::{Gru, GruConfig, Lstm, LstmConfig};
 
-pub type GruMlpConfig = ChainedConfig<GruConfig, MlpConfig>;
-pub type LstmMlpConfig = ChainedConfig<GruConfig, MlpConfig>;
+pub type GruMlpConfig = ChainConfig<GruConfig, MlpConfig>;
+pub type LstmMlpConfig = ChainConfig<GruConfig, MlpConfig>;
 
 use tch::{nn::Path, Tensor};
 
@@ -28,11 +28,11 @@ pub trait Module {
     }
 
     /// Chain another module after this one with an activation function in between.
-    fn chain<M>(self, other: M, activation: Activation) -> Chained<Self, M>
+    fn chain<M>(self, other: M, activation: Activation) -> Chain<Self, M>
     where
         Self: Sized,
     {
-        Chained {
+        Chain {
             first: self,
             second: other,
             activation,
@@ -115,11 +115,11 @@ pub trait BuildModule {
         other: MC,
         hidden_dim: usize,
         activation: Activation,
-    ) -> ChainedConfig<Self, MC>
+    ) -> ChainConfig<Self, MC>
     where
         Self: Sized,
     {
-        ChainedConfig {
+        ChainConfig {
             first_config: self,
             second_config: other,
             hidden_dim,

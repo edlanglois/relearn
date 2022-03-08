@@ -6,39 +6,39 @@ use super::{
 use std::iter;
 use tch::{nn::Path, Tensor};
 
-/// Configuration for a [`Chained`] module.
+/// Configuration for a [`Chain`] module.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct ChainedConfig<T, U> {
-    pub first_config: T,
-    pub second_config: U,
+pub struct ChainConfig<A, B> {
+    pub first_config: A,
+    pub second_config: B,
     pub hidden_dim: usize,
     pub activation: Activation,
 }
 
-impl<T, U> Default for ChainedConfig<T, U>
+impl<A, B> Default for ChainConfig<A, B>
 where
-    T: Default,
-    U: Default,
+    A: Default,
+    B: Default,
 {
     fn default() -> Self {
         Self {
-            first_config: T::default(),
-            second_config: U::default(),
+            first_config: A::default(),
+            second_config: B::default(),
             hidden_dim: 128,
             activation: Activation::default(),
         }
     }
 }
 
-impl<T, U> BuildModule for ChainedConfig<T, U>
+impl<A, B> BuildModule for ChainConfig<A, B>
 where
-    T: BuildModule,
-    U: BuildModule,
+    A: BuildModule,
+    B: BuildModule,
 {
-    type Module = Chained<T::Module, U::Module>;
+    type Module = Chain<A::Module, B::Module>;
 
     fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
-        Chained {
+        Chain {
             first: self
                 .first_config
                 .build_module(&(vs / "0"), in_dim, self.hidden_dim),
@@ -52,14 +52,14 @@ where
 
 /// One module applied to the output of another with an optional activation function in between.
 #[derive(Debug, Default, Copy, Clone)]
-pub struct Chained<T, U> {
-    pub first: T,
-    pub second: U,
+pub struct Chain<A, B> {
+    pub first: A,
+    pub second: B,
     pub activation: Activation,
 }
 
-impl<T, U> Chained<T, U> {
-    pub const fn new(first: T, second: U, activation: Activation) -> Self {
+impl<A, B> Chain<A, B> {
+    pub const fn new(first: A, second: B, activation: Activation) -> Self {
         Self {
             first,
             second,
@@ -68,10 +68,10 @@ impl<T, U> Chained<T, U> {
     }
 }
 
-impl<T, U> Module for Chained<T, U>
+impl<A, B> Module for Chain<A, B>
 where
-    T: Module + for<'a> ModuleExtras<'a>,
-    U: Module + for<'a> ModuleExtras<'a>,
+    A: Module + for<'a> ModuleExtras<'a>,
+    B: Module + for<'a> ModuleExtras<'a>,
 {
     #[inline]
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
@@ -88,13 +88,13 @@ where
     }
 }
 
-impl<'a, T, U> ModuleExtras<'a> for Chained<T, U>
+impl<'a, A, B> ModuleExtras<'a> for Chain<A, B>
 where
-    T: ModuleExtras<'a>,
-    U: ModuleExtras<'a>,
+    A: ModuleExtras<'a>,
+    B: ModuleExtras<'a>,
 {
-    type Variables = iter::Chain<T::Variables, U::Variables>;
-    type TrainableVariables = iter::Chain<T::TrainableVariables, U::TrainableVariables>;
+    type Variables = iter::Chain<A::Variables, B::Variables>;
+    type TrainableVariables = iter::Chain<A::TrainableVariables, B::TrainableVariables>;
 
     fn variables(&'a self) -> Self::Variables {
         self.first.variables().chain(self.second.variables())
@@ -106,10 +106,10 @@ where
     }
 }
 
-impl<T, U> FeedForwardModule for Chained<T, U>
+impl<A, B> FeedForwardModule for Chain<A, B>
 where
-    T: FeedForwardModule + for<'a> ModuleExtras<'a>,
-    U: FeedForwardModule + for<'a> ModuleExtras<'a>,
+    A: FeedForwardModule + for<'a> ModuleExtras<'a>,
+    B: FeedForwardModule + for<'a> ModuleExtras<'a>,
 {
     fn forward(&self, input: &Tensor) -> Tensor {
         let hidden = self.first.forward(input);
@@ -118,10 +118,10 @@ where
     }
 }
 
-impl<T, U> SequenceModule for Chained<T, U>
+impl<A, B> SequenceModule for Chain<A, B>
 where
-    T: SequenceModule + for<'a> ModuleExtras<'a>,
-    U: SequenceModule + for<'a> ModuleExtras<'a>,
+    A: SequenceModule + for<'a> ModuleExtras<'a>,
+    B: SequenceModule + for<'a> ModuleExtras<'a>,
 {
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         let hidden = self.first.seq_serial(inputs, seq_lengths);
@@ -135,12 +135,12 @@ where
     }
 }
 
-impl<T, U> IterativeModule for Chained<T, U>
+impl<A, B> IterativeModule for Chain<A, B>
 where
-    T: IterativeModule + for<'a> ModuleExtras<'a>,
-    U: IterativeModule + for<'a> ModuleExtras<'a>,
+    A: IterativeModule + for<'a> ModuleExtras<'a>,
+    B: IterativeModule + for<'a> ModuleExtras<'a>,
 {
-    type State = (T::State, U::State);
+    type State = (A::State, B::State);
 
     fn initial_state(&self) -> Self::State {
         (self.first.initial_state(), self.second.initial_state())
@@ -275,33 +275,33 @@ mod tests {
     use rstest::{fixture, rstest};
     use tch::{nn::VarStore, Device, Kind};
 
-    fn chained_mlp_config() -> ChainedConfig<MlpConfig, MlpConfig> {
+    fn chained_mlp_config() -> ChainConfig<MlpConfig, MlpConfig> {
         let mlp_config = MlpConfig {
             hidden_sizes: vec![16],
             ..MlpConfig::default()
         };
-        ChainedConfig {
+        ChainConfig {
             first_config: mlp_config.clone(),
             second_config: mlp_config,
             hidden_dim: 8,
-            ..ChainedConfig::default()
+            ..ChainConfig::default()
         }
     }
 
-    fn chained_gru_mlp_config() -> ChainedConfig<GruConfig, MlpConfig> {
-        ChainedConfig {
+    fn chained_gru_mlp_config() -> ChainConfig<GruConfig, MlpConfig> {
+        ChainConfig {
             first_config: GruConfig::default(),
             second_config: MlpConfig {
                 hidden_sizes: vec![16],
                 ..MlpConfig::default()
             },
             hidden_dim: 8,
-            ..ChainedConfig::default()
+            ..ChainConfig::default()
         }
     }
 
     #[fixture]
-    fn chained_mlp() -> (Chained<Mlp, Mlp>, usize, usize) {
+    fn chained_mlp() -> (Chain<Mlp, Mlp>, usize, usize) {
         let in_dim = 3;
         let out_dim = 2;
         let vs = VarStore::new(Device::Cpu);
@@ -310,7 +310,7 @@ mod tests {
     }
 
     #[fixture]
-    fn gru_mlp() -> (Chained<Gru, Mlp>, usize, usize) {
+    fn gru_mlp() -> (Chain<Gru, Mlp>, usize, usize) {
         let in_dim = 3;
         let out_dim = 2;
         let vs = VarStore::new(Device::Cpu);
@@ -319,31 +319,31 @@ mod tests {
     }
 
     #[rstest]
-    fn chained_mlp_forward(chained_mlp: (Chained<Mlp, Mlp>, usize, usize)) {
+    fn chained_mlp_forward(chained_mlp: (Chain<Mlp, Mlp>, usize, usize)) {
         let (chained_mlp, in_dim, out_dim) = chained_mlp;
         testing::check_forward(&chained_mlp, in_dim, out_dim, &[4], Kind::Float);
     }
 
     #[rstest]
-    fn gru_mlp_seq_serial(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
+    fn gru_mlp_seq_serial(gru_mlp: (Chain<Gru, Mlp>, usize, usize)) {
         let (gru_mlp, in_dim, out_dim) = gru_mlp;
         testing::check_seq_serial(&gru_mlp, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_mlp_seq_packed(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
+    fn gru_mlp_seq_packed(gru_mlp: (Chain<Gru, Mlp>, usize, usize)) {
         let (gru_mlp, in_dim, out_dim) = gru_mlp;
         testing::check_seq_packed(&gru_mlp, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_mlp_step(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
+    fn gru_mlp_step(gru_mlp: (Chain<Gru, Mlp>, usize, usize)) {
         let (gru_mlp, in_dim, out_dim) = gru_mlp;
         testing::check_step(&gru_mlp, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_mlp_seq_packed_matches_iter_steps(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
+    fn gru_mlp_seq_packed_matches_iter_steps(gru_mlp: (Chain<Gru, Mlp>, usize, usize)) {
         let (gru_mlp, in_dim, out_dim) = gru_mlp;
         testing::check_seq_packed_matches_iter_steps(&gru_mlp, in_dim, out_dim);
     }
@@ -359,13 +359,13 @@ mod tests {
     }
 
     #[rstest]
-    fn variables_count(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
+    fn variables_count(gru_mlp: (Chain<Gru, Mlp>, usize, usize)) {
         let (gru_mlp, _, _) = gru_mlp;
         assert_eq!(Module::variables(&gru_mlp).count(), 8);
     }
 
     #[rstest]
-    fn trainable_variables_count(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
+    fn trainable_variables_count(gru_mlp: (Chain<Gru, Mlp>, usize, usize)) {
         let (gru_mlp, _, _) = gru_mlp;
         assert_eq!(Module::trainable_variables(&gru_mlp).count(), 8);
     }
