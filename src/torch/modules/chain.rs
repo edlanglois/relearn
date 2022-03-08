@@ -135,7 +135,7 @@ where
 {
     fn forward(&self, input: &Tensor) -> Tensor {
         let hidden = self.first.forward(input);
-        let hidden = self.activation.apply(hidden);
+        let hidden = self.activation.forward_owned(hidden);
         self.second.forward(&hidden)
     }
 }
@@ -147,12 +147,12 @@ where
 {
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         let hidden = self.first.seq_serial(inputs, seq_lengths);
-        let hidden = self.activation.apply(hidden);
+        let hidden = self.activation.forward_owned(hidden);
         self.second.seq_serial(&hidden, seq_lengths)
     }
     fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
         let hidden = self.first.seq_packed(inputs, batch_sizes);
-        let hidden = self.activation.apply(hidden);
+        let hidden = self.activation.forward_owned(hidden);
         self.second.seq_packed(&hidden, batch_sizes)
     }
 }
@@ -170,7 +170,7 @@ where
 
     fn step(&self, state: &mut Self::State, input: &Tensor) -> Tensor {
         let hidden = self.first.step(&mut state.0, input);
-        let hidden = self.activation.apply(hidden);
+        let hidden = self.activation.forward_owned(hidden);
         self.second.step(&mut state.1, &hidden)
     }
 }

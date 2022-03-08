@@ -1,8 +1,8 @@
 //! Feed-forward modules
-mod func;
+mod activation;
 mod linear;
 mod mlp;
 
-pub use func::{Activation, Func};
+pub use activation::Activation;
 pub use linear::{Linear, LinearConfig};
 pub use mlp::{Mlp, MlpConfig};

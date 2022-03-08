@@ -2,8 +2,7 @@
 use super::super::{
     BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras, SequenceModule,
 };
-use super::func::Activation;
-use super::{Linear, LinearConfig};
+use super::{Activation, Linear, LinearConfig};
 use std::iter::{self, FlatMap};
 use std::slice;
 use tch::{nn::Path, Device, Tensor};
@@ -43,8 +42,8 @@ impl BuildModule for MlpConfig {
 /// Multi-layer perceptron
 pub struct Mlp {
     layers: Vec<Linear>,
-    activation: Option<fn(&Tensor) -> Tensor>,
-    output_activation: Option<fn(&Tensor) -> Tensor>,
+    activation: Activation,
+    output_activation: Activation,
 }
 
 impl Mlp {
@@ -67,8 +66,8 @@ impl Mlp {
 
         Self {
             layers,
-            activation: config.activation.maybe_function(),
-            output_activation: config.output_activation.maybe_function(),
+            activation: config.activation,
+            output_activation: config.output_activation,
         }
     }
 }
@@ -148,14 +147,10 @@ impl FeedForwardModule for Mlp {
             .expect("must have >= 1 layers by construction")
             .forward(input);
         for layer in iter_layers {
-            if let Some(activation) = self.activation {
-                hidden = activation(&hidden);
-            }
+            hidden = self.activation.forward_owned(hidden);
             hidden = layer.forward(&hidden);
         }
-        if let Some(output_activation) = self.output_activation {
-            hidden = output_activation(&hidden);
-        }
+        hidden = self.output_activation.forward_owned(hidden);
         hidden
     }
 }
