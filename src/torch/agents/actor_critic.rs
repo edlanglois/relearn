@@ -84,7 +84,6 @@ where
 
     policy_config: PB,
     policy: P,
-    policy_variables: VarStore,
     policy_updater: PU,
 
     critic: C,
@@ -111,7 +110,6 @@ where
             .field("discount_factor", &self.discount_factor)
             .field("policy_config", &self.policy_config)
             .field("policy", &self.policy)
-            .field("policy_variables", &self.policy_variables)
             .field("policy_updater", &self.policy_updater)
             .field("critic", &self.critic)
             .field("critic_updater", &self.critic_updater)
@@ -167,7 +165,6 @@ where
             discount_factor,
             policy_config: config.policy_config.clone(),
             policy,
-            policy_variables,
             policy_updater,
             critic,
             critic_updater,
@@ -190,20 +187,11 @@ where
     type Actor = ActorCriticActor<OS, AS, P>;
 
     fn actor(&self, _: ActorMode) -> Self::Actor {
-        // The actor policy is on the CPU for fast non-batch steps.
-        // Tensors do not implement Sync so a copy is created instead.
-        // TODO: Implement Module::shallow_clone instead of copying
-        let mut actor_policy_variables = VarStore::new(Device::Cpu);
-        let policy = self.policy_config.build_module(
-            &actor_policy_variables.root(),
-            self.shared.observation_space.num_features(),
-            self.shared.action_space.num_distribution_params(),
-        );
-        actor_policy_variables.copy(&self.policy_variables).unwrap();
-
+        // TODO: Store cpu_policy in the agent and synchronize it to `policy` after every update.
+        // Then use shallow_clone() to produce actor policies.
         ActorCriticActor {
             shared: Arc::clone(&self.shared),
-            policy,
+            policy: self.policy.clone_to_device(Device::Cpu),
         }
     }
 }
