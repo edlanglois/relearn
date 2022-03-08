@@ -1,8 +1,13 @@
 mod step_limit;
 
-pub use step_limit::{StepLimit, WithStepLimit};
+pub use step_limit::{
+    LatentStepLimit, VisibleStepLimit, WithLatentStepLimit, WithVisibleStepLimit,
+};
 
-use super::{BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment};
+use super::{
+    BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment,
+    StructuredEnvironment,
+};
 use crate::spaces::Space;
 use crate::Prng;
 use serde::{Deserialize, Serialize};
@@ -24,33 +29,11 @@ impl<T, W> Wrapped<T, W> {
     }
 }
 
-// TODO: Allow wrappers that change the structure types
-impl<T: EnvStructure, W> EnvStructure for Wrapped<T, W> {
-    type ObservationSpace = T::ObservationSpace;
-    type ActionSpace = T::ActionSpace;
-
-    fn observation_space(&self) -> Self::ObservationSpace {
-        self.inner.observation_space()
-    }
-
-    fn action_space(&self) -> Self::ActionSpace {
-        self.inner.action_space()
-    }
-
-    fn reward_range(&self) -> (f64, f64) {
-        self.inner.reward_range()
-    }
-
-    fn discount_factor(&self) -> f64 {
-        self.inner.discount_factor()
-    }
-}
-
 impl<EC, W> BuildEnv for Wrapped<EC, W>
 where
     EC: BuildEnv,
     W: Clone,
-    Wrapped<EC::Environment, W>: Environment<Observation = EC::Observation, Action = EC::Action>,
+    Wrapped<EC::Environment, W>: StructuredEnvironment,
 {
     type Observation = <Self::Environment as Environment>::Observation;
     type Action = <Self::Environment as Environment>::Action;
@@ -70,9 +53,10 @@ impl<ED, W> EnvDistribution for Wrapped<ED, W>
 where
     ED: EnvDistribution,
     W: Clone,
-    Wrapped<ED::Environment, W>: Environment<
-        Observation = <ED::Environment as Environment>::Observation,
-        Action = <ED::Environment as Environment>::Action,
+    Self: EnvStructure,
+    Wrapped<ED::Environment, W>: StructuredEnvironment<
+        ObservationSpace = Self::ObservationSpace,
+        ActionSpace = Self::ActionSpace,
     >,
 {
     type Environment = Wrapped<ED::Environment, W>;

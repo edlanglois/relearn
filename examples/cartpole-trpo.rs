@@ -16,7 +16,7 @@ use std::time::Duration;
 use tch::Device;
 
 fn main() {
-    let env = CartPole::default().with_step_limit(500);
+    let env = CartPole::default().with_visible_step_limit(500);
     println!("Env:\n{:#?}\n", env);
 
     let agent_config: ActorCriticConfig<

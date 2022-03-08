@@ -24,7 +24,9 @@ pub use meta::{InnerEnvStructure, MetaEnv, MetaObservation, MetaObservationSpace
 pub use multiagent::fruit::{self, FruitGame};
 pub use multiagent::views::{FirstPlayerView, SecondPlayerView};
 pub use partition::PartitionGame;
-pub use wrappers::{StepLimit, WithStepLimit, Wrapped};
+pub use wrappers::{
+    LatentStepLimit, VisibleStepLimit, WithLatentStepLimit, WithVisibleStepLimit, Wrapped,
+};
 
 use crate::agents::Actor;
 use crate::logging::StatsLogger;
@@ -134,12 +136,20 @@ pub trait Environment {
         SimulatorSteps::new_seeded(self, actor, seed, logger)
     }
 
-    /// Wrap the environment in an episode step limit.
-    fn with_step_limit(self, max_steps_per_episode: u64) -> WithStepLimit<Self>
+    /// Wrap the environment in an episode step limit without changing the observation space.
+    fn with_latent_step_limit(self, max_steps_per_episode: u64) -> WithLatentStepLimit<Self>
     where
         Self: Sized,
     {
-        Wrapped::new(self, StepLimit::new(max_steps_per_episode))
+        Wrapped::new(self, LatentStepLimit::new(max_steps_per_episode))
+    }
+
+    /// Wrap the environment in an episode step limit that is represented in the observation space.
+    fn with_visible_step_limit(self, max_steps_per_episode: u64) -> WithVisibleStepLimit<Self>
+    where
+        Self: Sized,
+    {
+        Wrapped::new(self, VisibleStepLimit::new(max_steps_per_episode))
     }
 }
 
