@@ -90,11 +90,13 @@ impl Module for Mlp {
 }
 
 impl<'a> ModuleExtras<'a> for Mlp {
+    #[allow(clippy::type_complexity)]
     type Variables = FlatMap<
         slice::Iter<'a, Linear>,
         <Linear as ModuleExtras<'a>>::Variables,
         fn(&'a Linear) -> <Linear as ModuleExtras<'a>>::Variables,
     >;
+    #[allow(clippy::type_complexity)]
     type TrainableVariables = FlatMap<
         slice::Iter<'a, Linear>,
         <Linear as ModuleExtras<'a>>::TrainableVariables,
