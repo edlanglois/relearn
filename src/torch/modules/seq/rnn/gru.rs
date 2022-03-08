@@ -161,6 +161,16 @@ mod tests {
         testing::check_config_seq_packed_gradient_descent(&config);
     }
 
+    #[test]
+    fn clone_to_new_device() {
+        testing::check_config_seq_packed_clone_to_new_device(&GruConfig::default());
+    }
+
+    #[test]
+    fn clone_to_same_device() {
+        testing::check_config_seq_packed_clone_to_same_device(&GruConfig::default());
+    }
+
     #[rstest]
     fn variables_count(gru: (Gru, usize, usize)) {
         let (gru, _, _) = gru;

@@ -51,7 +51,7 @@ where
 }
 
 /// One module applied to the output of another with an optional activation function in between.
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub struct Chain<A, B> {
     pub first: A,
     pub second: B,
@@ -408,6 +408,26 @@ mod tests {
     #[test]
     fn gru_mlp_seq_packed_gradient_descent() {
         testing::check_config_seq_packed_gradient_descent(&chained_gru_mlp_config());
+    }
+
+    #[test]
+    fn chained_mlp_forward_clone_to_new_device() {
+        testing::check_config_forward_clone_to_new_device(&chained_mlp_config());
+    }
+
+    #[test]
+    fn chained_mlp_forward_clone_to_same_device() {
+        testing::check_config_forward_clone_to_same_device(&chained_mlp_config());
+    }
+
+    #[test]
+    fn gru_mlp_seq_packed_clone_to_new_device() {
+        testing::check_config_seq_packed_clone_to_new_device(&chained_gru_mlp_config());
+    }
+
+    #[test]
+    fn gru_mlp_seq_packed_clone_to_same_device() {
+        testing::check_config_seq_packed_clone_to_same_device(&chained_gru_mlp_config());
     }
 
     #[rstest]

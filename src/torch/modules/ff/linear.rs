@@ -8,7 +8,7 @@ use std::option;
 use tch::{nn::Path, Device, Tensor};
 
 /// Configuration for the [`Linear`] module.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct LinearConfig {
     /// Initializer for the kernel (weight) matrix.
     kernel_init: Initializer,
@@ -36,7 +36,7 @@ impl BuildModule for LinearConfig {
 }
 
 /// Linear fully-connected layer module.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Linear {
     kernel: Tensor,
     bias: Option<Tensor>,
@@ -210,6 +210,16 @@ mod tests {
     #[test]
     fn seq_packed_gradient_descent() {
         testing::check_config_forward_gradient_descent(&LinearConfig::default());
+    }
+
+    #[test]
+    fn clone_to_new_device() {
+        testing::check_config_forward_clone_to_new_device(&LinearConfig::default());
+    }
+
+    #[test]
+    fn clone_to_same_device() {
+        testing::check_config_forward_clone_to_same_device(&LinearConfig::default());
     }
 
     #[rstest]

@@ -80,7 +80,7 @@ pub trait RnnImpl {
         Self: Sized;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct RnnBase<T> {
     weights: RnnWeights,
     hidden_size: i64,
@@ -118,6 +118,7 @@ impl<T> Module for RnnBase<T> {
     {
         Self {
             weights: self.weights.clone_to_device(device),
+            device,
             ..*self
         }
     }
@@ -173,7 +174,7 @@ impl<T: RnnImpl> IterativeModule for RnnBase<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct RnnWeights {
     flat_weights: Vec<Tensor>,
     has_biases: bool,

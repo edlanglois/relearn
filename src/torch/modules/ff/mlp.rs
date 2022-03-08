@@ -8,7 +8,7 @@ use std::slice;
 use tch::{nn::Path, Device, Tensor};
 
 /// Configuration for the [`Mlp`] module.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MlpConfig {
     /// Sizes of the hidden layers
     pub hidden_sizes: Vec<usize>,
@@ -40,6 +40,7 @@ impl BuildModule for MlpConfig {
 }
 
 /// Multi-layer perceptron
+#[derive(Debug, PartialEq)]
 pub struct Mlp {
     layers: Vec<Linear>,
     activation: Activation,
@@ -230,6 +231,16 @@ mod tests {
     #[test]
     fn seq_packed_gradient_descent() {
         testing::check_config_forward_gradient_descent(&MlpConfig::default());
+    }
+
+    #[test]
+    fn clone_to_new_device() {
+        testing::check_config_forward_clone_to_new_device(&MlpConfig::default());
+    }
+
+    #[test]
+    fn clone_to_same_device() {
+        testing::check_config_forward_clone_to_same_device(&MlpConfig::default());
     }
 
     #[rstest]
