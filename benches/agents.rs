@@ -13,7 +13,7 @@ use relearn::spaces::{BooleanSpace, IndexSpace};
 use relearn::torch::{
     agents::ActorCriticConfig,
     critic::Return,
-    modules::{AsSeq, GruConfig, MlpConfig},
+    modules::{GruConfig, MlpConfig},
     optimizers::AdamConfig,
     updaters::{CriticLossUpdateRule, PolicyGradientUpdateRule, WithOptimizer},
 };
@@ -132,7 +132,7 @@ fn bench_agents_act(c: &mut Criterion) {
         &mut group,
         "actor_critic_mlp",
         &ActorCriticConfig::<
-            AsSeq<MlpConfig>,
+            MlpConfig,
             WithOptimizer<PolicyGradientUpdateRule, AdamConfig>,
             Return,
             WithOptimizer<CriticLossUpdateRule, AdamConfig>,

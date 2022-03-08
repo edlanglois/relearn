@@ -267,7 +267,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{testing, AsSeq, Gru, GruConfig, Mlp, MlpConfig};
+    use super::super::{testing, Gru, GruConfig, Mlp, MlpConfig};
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{nn::VarStore, Device, Kind};
@@ -285,13 +285,13 @@ mod tests {
         }
     }
 
-    fn chained_gru_mlp_config() -> ChainedConfig<GruConfig, AsSeq<MlpConfig>> {
+    fn chained_gru_mlp_config() -> ChainedConfig<GruConfig, MlpConfig> {
         ChainedConfig {
             first_config: GruConfig::default(),
-            second_config: AsSeq::new(MlpConfig {
+            second_config: MlpConfig {
                 hidden_sizes: vec![16],
                 ..MlpConfig::default()
-            }),
+            },
             hidden_dim: 8,
             ..ChainedConfig::default()
         }
@@ -307,7 +307,7 @@ mod tests {
     }
 
     #[fixture]
-    fn gru_mlp() -> (Chained<Gru, AsSeq<Mlp>>, usize, usize) {
+    fn gru_mlp() -> (Chained<Gru, Mlp>, usize, usize) {
         let in_dim = 3;
         let out_dim = 2;
         let vs = VarStore::new(Device::Cpu);
@@ -322,25 +322,25 @@ mod tests {
     }
 
     #[rstest]
-    fn gru_mlp_seq_serial(gru_mlp: (Chained<Gru, AsSeq<Mlp>>, usize, usize)) {
+    fn gru_mlp_seq_serial(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
         let (gru_mlp, in_dim, out_dim) = gru_mlp;
         testing::check_seq_serial(&gru_mlp, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_mlp_seq_packed(gru_mlp: (Chained<Gru, AsSeq<Mlp>>, usize, usize)) {
+    fn gru_mlp_seq_packed(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
         let (gru_mlp, in_dim, out_dim) = gru_mlp;
         testing::check_seq_packed(&gru_mlp, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_mlp_step(gru_mlp: (Chained<Gru, AsSeq<Mlp>>, usize, usize)) {
+    fn gru_mlp_step(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
         let (gru_mlp, in_dim, out_dim) = gru_mlp;
         testing::check_step(&gru_mlp, in_dim, out_dim);
     }
 
     #[rstest]
-    fn gru_mlp_seq_packed_matches_iter_steps(gru_mlp: (Chained<Gru, AsSeq<Mlp>>, usize, usize)) {
+    fn gru_mlp_seq_packed_matches_iter_steps(gru_mlp: (Chained<Gru, Mlp>, usize, usize)) {
         let (gru_mlp, in_dim, out_dim) = gru_mlp;
         testing::check_seq_packed_matches_iter_steps(&gru_mlp, in_dim, out_dim);
     }

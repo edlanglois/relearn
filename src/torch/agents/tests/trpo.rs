@@ -3,7 +3,7 @@ use crate::agents::testing;
 use crate::torch::{
     agents::ActorCriticConfig,
     critic::{BuildCritic, GaeConfig, Return},
-    modules::{AsSeq, BuildModule, GruMlpConfig, IterativeModule, MlpConfig, SequenceModule},
+    modules::{BuildModule, GruMlpConfig, IterativeModule, MlpConfig, SequenceModule},
     optimizers::{AdamConfig, ConjugateGradientOptimizerConfig},
     updaters::{CriticLossUpdateRule, TrpoPolicyUpdateRule, WithOptimizer},
 };
@@ -29,7 +29,7 @@ fn test_train_trpo<PB, CB>(
 
 #[test]
 fn default_mlp_return_learns_derministic_bandit() {
-    test_train_trpo::<AsSeq<MlpConfig>, Return>(Default::default())
+    test_train_trpo::<MlpConfig, Return>(Default::default())
 }
 
 #[test]
@@ -38,12 +38,12 @@ fn default_mlp_return_learns_derministic_bandit_cuda_if_available() {
         device: Device::cuda_if_available(),
         ..ActorCriticConfig::default()
     };
-    test_train_trpo::<AsSeq<MlpConfig>, Return>(config)
+    test_train_trpo::<MlpConfig, Return>(config)
 }
 
 #[test]
 fn default_mlp_gae_mlp_learns_derministic_bandit() {
-    test_train_trpo::<AsSeq<MlpConfig>, GaeConfig<AsSeq<MlpConfig>>>(Default::default())
+    test_train_trpo::<MlpConfig, GaeConfig<MlpConfig>>(Default::default())
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn default_gru_mlp_return_learns_derministic_bandit() {
 
 #[test]
 fn default_gru_mlp_gae_mlp_derministic_bandit() {
-    test_train_trpo::<GruMlpConfig, GaeConfig<AsSeq<MlpConfig>>>(Default::default())
+    test_train_trpo::<GruMlpConfig, GaeConfig<MlpConfig>>(Default::default())
 }
 
 #[test]

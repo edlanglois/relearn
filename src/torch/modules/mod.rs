@@ -7,10 +7,10 @@ pub mod testing;
 
 pub use chain::{Chained, ChainedConfig};
 pub use ff::{Activation, Func, Mlp, MlpConfig};
-pub use seq::{AsSeq, Gru, GruConfig, Lstm, LstmConfig};
+pub use seq::{Gru, GruConfig, Lstm, LstmConfig};
 
-pub type GruMlpConfig = ChainedConfig<GruConfig, AsSeq<MlpConfig>>;
-pub type LstmMlpConfig = ChainedConfig<GruConfig, AsSeq<MlpConfig>>;
+pub type GruMlpConfig = ChainedConfig<GruConfig, MlpConfig>;
+pub type LstmMlpConfig = ChainedConfig<GruConfig, MlpConfig>;
 
 use tch::{nn::Path, Tensor};
 
@@ -255,3 +255,13 @@ macro_rules! impl_wrapped_iterative_module {
 }
 impl_wrapped_iterative_module!(&'_ T);
 impl_wrapped_iterative_module!(Box<T>);
+
+/* XXX
+/// Impl [`SequenceModule`] & [`IterativeModule`] for [`FeedForwardModule`] by batching on seq dim
+macro_rules! impl_batch_seq_for_forward_module {
+    ($type:ty) => {
+        impl
+
+    }
+}
+*/

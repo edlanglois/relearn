@@ -6,7 +6,7 @@ use relearn::simulation::{train_parallel, TrainParallelConfig};
 use relearn::torch::{
     agents::ActorCriticConfig,
     critic::GaeConfig,
-    modules::{AsSeq, MlpConfig},
+    modules::MlpConfig,
     optimizers::{AdamConfig, ConjugateGradientOptimizerConfig},
     updaters::{CriticLossUpdateRule, TrpoPolicyUpdateRule, WithOptimizer},
 };
@@ -15,16 +15,16 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tch::Device;
 
-type Module = AsSeq<MlpConfig>;
+type ModuleConfig = MlpConfig;
 
 fn main() {
     let env = CartPole::default().with_step_limit(500);
     println!("Env:\n{:#?}\n", env);
 
     let agent_config: ActorCriticConfig<
-        Module,
+        ModuleConfig,
         WithOptimizer<TrpoPolicyUpdateRule, ConjugateGradientOptimizerConfig>,
-        GaeConfig<Module>,
+        GaeConfig<ModuleConfig>,
         WithOptimizer<CriticLossUpdateRule, AdamConfig>,
     > = ActorCriticConfig {
         device: Device::cuda_if_available(),

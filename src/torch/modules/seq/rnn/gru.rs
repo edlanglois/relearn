@@ -118,7 +118,7 @@ mod tests {
     }
 
     #[rstest]
-    fn step(gru: (Gru, usize, usize)) {
+    fn seq_step(gru: (Gru, usize, usize)) {
         let (gru, in_dim, out_dim) = gru;
         testing::check_step(&gru, in_dim, out_dim);
     }

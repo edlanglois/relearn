@@ -1,7 +1,5 @@
-mod as_seq;
 mod rnn;
 
-pub use as_seq::AsSeq;
 pub use rnn::{Gru, GruConfig, Lstm, LstmConfig};
 
 use tch::{IndexOp, Tensor};

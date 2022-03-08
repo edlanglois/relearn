@@ -133,7 +133,7 @@ mod tests {
     }
 
     #[rstest]
-    fn step(lstm: (Lstm, usize, usize)) {
+    fn seq_step(lstm: (Lstm, usize, usize)) {
         let (lstm, in_dim, out_dim) = lstm;
         testing::check_step(&lstm, in_dim, out_dim);
     }

@@ -1,5 +1,5 @@
 //! Linear layer
-use super::super::{BuildModule, FeedForwardModule, Module};
+use super::super::{BuildModule, FeedForwardModule, IterativeModule, Module, SequenceModule};
 use crate::torch::initializers::Initializer;
 use tch::{nn::Path, Tensor};
 
@@ -65,9 +65,27 @@ impl FeedForwardModule for Linear {
     }
 }
 
+/// Sequence processing by batching over the sequence dimension.
+impl SequenceModule for Linear {
+    fn seq_serial(&self, inputs: &Tensor, _seq_lengths: &[usize]) -> Tensor {
+        self.forward(inputs)
+    }
+    fn seq_packed(&self, inputs: &Tensor, _batch_sizes: &Tensor) -> Tensor {
+        self.forward(inputs)
+    }
+}
+/// Iterate over a sequence by independently and identically transforming each step.
+impl IterativeModule for Linear {
+    type State = ();
+    fn initial_state(&self) -> Self::State {}
+    fn step(&self, _: &mut Self::State, input: &Tensor) -> Tensor {
+        self.forward(input)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::super::super::{testing, AsSeq};
+    use super::super::super::testing;
     use super::*;
     use rstest::{fixture, rstest};
     use tch::nn::VarStore;
@@ -84,25 +102,42 @@ mod tests {
     }
 
     #[rstest]
-    fn default_forward_batch(default_module: (Linear, usize, usize)) {
-        let (default_mlp, in_dim, out_dim) = default_module;
-        testing::check_forward(&default_mlp, in_dim, out_dim, &[4], Kind::Float);
+    fn forward_batch(default_module: (Linear, usize, usize)) {
+        let (module, in_dim, out_dim) = default_module;
+        testing::check_forward(&module, in_dim, out_dim, &[4], Kind::Float);
     }
 
     #[rstest]
-    fn default_seq_serial(default_module: (Linear, usize, usize)) {
-        let (default_mlp, in_dim, out_dim) = default_module;
-        testing::check_seq_serial(&AsSeq::new(default_mlp), in_dim, out_dim);
+    fn seq_serial(default_module: (Linear, usize, usize)) {
+        let (module, in_dim, out_dim) = default_module;
+        testing::check_seq_serial(&module, in_dim, out_dim);
     }
 
     #[rstest]
-    fn default_step(default_module: (Linear, usize, usize)) {
-        let (default_mlp, in_dim, out_dim) = default_module;
-        testing::check_step(&AsSeq::new(default_mlp), in_dim, out_dim);
+    fn seq_packed(default_module: (Linear, usize, usize)) {
+        let (module, in_dim, out_dim) = default_module;
+        testing::check_seq_packed(&module, in_dim, out_dim);
+    }
+
+    #[rstest]
+    fn seq_step(default_module: (Linear, usize, usize)) {
+        let (module, in_dim, out_dim) = default_module;
+        testing::check_step(&module, in_dim, out_dim);
+    }
+
+    #[rstest]
+    fn seq_consistent(default_module: (Linear, usize, usize)) {
+        let (module, in_dim, out_dim) = default_module;
+        testing::check_seq_packed_matches_iter_steps(&module, in_dim, out_dim);
     }
 
     #[test]
-    fn default_forward_gradient_descent() {
+    fn forward_gradient_descent() {
+        testing::check_config_forward_gradient_descent(&LinearConfig::default());
+    }
+
+    #[test]
+    fn seq_packed_gradient_descent() {
         testing::check_config_forward_gradient_descent(&LinearConfig::default());
     }
 }

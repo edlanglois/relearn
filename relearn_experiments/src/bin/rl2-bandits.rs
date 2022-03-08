@@ -15,10 +15,10 @@ use relearn::spaces::{IndexSpace, NonEmptySpace, SingletonSpace, Space};
 use relearn::torch::{
     agents::{ActorCriticAgent, ActorCriticConfig},
     critic::{Gae, GaeConfig},
-    modules::{Activation, AsSeq, Chained, ChainedConfig, Gru, GruConfig},
+    initializers::{Initializer, VarianceScale},
+    modules::{Activation, Chained, ChainedConfig, Gru, GruConfig},
     optimizers::{AdamConfig, ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig},
     updaters::{CriticLossUpdateRule, TrpoPolicyUpdateRule, WithOptimizer},
-    Init,
 };
 use relearn::Prng;
 use serde::Serialize;
@@ -339,10 +339,10 @@ impl fmt::Debug for Device {
 type Agent = ActorCriticAgent<
     MetaObservationSpace<SingletonSpace, IndexSpace>,
     IndexSpace,
-    ChainedConfig<GruConfig, AsSeq<LinearConfig>>,
-    Chained<Gru, AsSeq<Linear>>,
+    ChainedConfig<GruConfig, LinearConfig>,
+    Chained<Gru, Linear>,
     WithOptimizer<TrpoPolicyUpdateRule, ConjugateGradientOptimizer>,
-    Gae<Chained<Gru, AsSeq<Linear>>>,
+    Gae<Chained<Gru, Linear>>,
     WithOptimizer<CriticLossUpdateRule, COptimizer>,
 >;
 
@@ -371,12 +371,12 @@ impl TrainConfig {
         let model_config = ChainedConfig {
             first_config: GruConfig {
                 num_layers: 1,
-                input_weights_init: Init::XavierUniform,
-                hidden_weights_init: Init::Orthogonal,
-                bias_init: Some(Init::Zeros),
+                input_weights_init: Initializer::Uniform(VarianceScale::FanAvg),
+                hidden_weights_init: Initializer::Orthogonal,
+                bias_init: Some(Initializer::Zeros),
                 ..GruConfig::default()
             },
-            second_config: AsSeq(LinearConfig::default()),
+            second_config: LinearConfig::default(),
             hidden_dim: 128,
             // They might have also used Relu within the GRU. This only controls the activation
             // between the hidden weights and the linear output layer.
