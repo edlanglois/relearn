@@ -105,6 +105,7 @@ impl SequenceModule for Mlp {
         self.forward(inputs)
     }
 }
+
 /// Iterate over a sequence by independently and identically transforming each step.
 impl IterativeModule for Mlp {
     type State = ();

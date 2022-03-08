@@ -6,7 +6,7 @@ mod seq;
 pub mod testing;
 
 pub use chain::{Chained, ChainedConfig};
-pub use ff::{Activation, Func, Mlp, MlpConfig};
+pub use ff::{Activation, Func, Linear, LinearConfig, Mlp, MlpConfig};
 pub use seq::{Gru, GruConfig, Lstm, LstmConfig};
 
 pub type GruMlpConfig = ChainedConfig<GruConfig, MlpConfig>;

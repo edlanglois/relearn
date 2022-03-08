@@ -74,6 +74,7 @@ impl SequenceModule for Linear {
         self.forward(inputs)
     }
 }
+
 /// Iterate over a sequence by independently and identically transforming each step.
 impl IterativeModule for Linear {
     type State = ();
