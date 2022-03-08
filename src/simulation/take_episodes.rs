@@ -52,7 +52,7 @@ mod tests {
         let steps_per_episode = 10;
         let num_episodes = 30;
 
-        let env = Chain::default().with_step_limit(steps_per_episode);
+        let env = Chain::default().with_latent_step_limit(steps_per_episode);
         let agent = RandomAgent::new(env.action_space());
         let summary: StepsSummary = env
             .run(agent, SimSeed::Root(53), ())
