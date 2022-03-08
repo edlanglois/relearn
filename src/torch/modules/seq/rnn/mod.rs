@@ -112,6 +112,16 @@ impl<T> Module for RnnBase<T> {
         }
     }
 
+    fn clone_to_device(&self, device: Device) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            weights: self.weights.clone_to_device(device),
+            ..*self
+        }
+    }
+
     #[inline]
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
         Box::new(ModuleExtras::variables(self))
@@ -274,7 +284,19 @@ impl RnnWeights {
                 .iter()
                 .map(Tensor::shallow_clone)
                 .collect(),
-            has_biases: self.has_biases,
+            ..*self
+        }
+    }
+
+    /// Create a clone on the given device, copying if necessary.
+    pub fn clone_to_device(&self, device: Device) -> Self {
+        Self {
+            flat_weights: self
+                .flat_weights
+                .iter()
+                .map(|t| t.to_device(device))
+                .collect(),
+            ..*self
         }
     }
 

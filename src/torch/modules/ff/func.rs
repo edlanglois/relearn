@@ -1,6 +1,6 @@
 use super::super::{FeedForwardModule, Module, ModuleExtras};
 use std::iter;
-use tch::Tensor;
+use tch::{Device, Tensor};
 
 /// Module view of a feed-forward tensor function.
 #[derive(Copy, Clone)]
@@ -18,6 +18,14 @@ impl Func {
 impl Module for Func {
     #[inline]
     fn shallow_clone(&self) -> Self
+    where
+        Self: Sized,
+    {
+        *self
+    }
+
+    #[inline]
+    fn clone_to_device(&self, _: Device) -> Self
     where
         Self: Sized,
     {

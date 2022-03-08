@@ -6,7 +6,7 @@ use super::func::Activation;
 use super::{Linear, LinearConfig};
 use std::iter::{self, FlatMap};
 use std::slice;
-use tch::{nn::Path, Tensor};
+use tch::{nn::Path, Device, Tensor};
 
 /// Configuration for the [`Mlp`] module.
 #[derive(Debug, Clone)]
@@ -80,6 +80,20 @@ impl Module for Mlp {
     {
         Self {
             layers: self.layers.iter().map(Module::shallow_clone).collect(),
+            ..*self
+        }
+    }
+
+    fn clone_to_device(&self, device: Device) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            layers: self
+                .layers
+                .iter()
+                .map(|l| l.clone_to_device(device))
+                .collect(),
             ..*self
         }
     }

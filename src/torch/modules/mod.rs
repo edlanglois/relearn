@@ -12,12 +12,20 @@ pub use seq::{Gru, GruConfig, Lstm, LstmConfig};
 pub type GruMlpConfig = ChainConfig<GruConfig, MlpConfig>;
 pub type LstmMlpConfig = ChainConfig<GruConfig, MlpConfig>;
 
-use tch::{nn::Path, Tensor};
+use tch::{nn::Path, Device, Tensor};
 
 /// A self-contained part of a neural network.
 pub trait Module {
     /// Create a clone of this module sharing the same variables (tensors).
     fn shallow_clone(&self) -> Self
+    where
+        Self: Sized;
+
+    /// Create a clone of this module on the given device.
+    ///
+    /// A shallow clone is created if the given device is the same as the current device
+    /// otherwise the tensors are copied.
+    fn clone_to_device(&self, device: Device) -> Self
     where
         Self: Sized;
 
@@ -53,6 +61,9 @@ macro_rules! impl_wrapped_module {
                 // TODO: Get this implemented.
                 // Maybe need a boxed_shallow_clone() -> Box<dyn Module> method and
                 // replace macro calls with a dedicated impl for Box<dyn Module>.
+                unimplemented!()
+            }
+            fn clone_to_device(&self, _: Device) -> Self {
                 unimplemented!()
             }
             fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {

@@ -5,7 +5,7 @@ use super::super::{
 use crate::torch::initializers::Initializer;
 use std::iter::{self, Chain, Once};
 use std::option;
-use tch::{nn::Path, Tensor};
+use tch::{nn::Path, Device, Tensor};
 
 /// Configuration for the [`Linear`] module.
 #[derive(Debug, Copy, Clone)]
@@ -69,6 +69,16 @@ impl Module for Linear {
         Self {
             kernel: self.kernel.shallow_clone(),
             bias: self.bias.as_ref().map(Tensor::shallow_clone),
+        }
+    }
+
+    fn clone_to_device(&self, device: Device) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            kernel: self.kernel.to_device(device),
+            bias: self.bias.as_ref().map(|b| b.to_device(device)),
         }
     }
 

@@ -4,7 +4,7 @@ use super::{
     SequenceModule,
 };
 use std::iter;
-use tch::{nn::Path, Tensor};
+use tch::{nn::Path, Device, Tensor};
 
 /// Configuration for a [`Chain`] module.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -80,6 +80,17 @@ where
         Self {
             first: self.first.shallow_clone(),
             second: self.second.shallow_clone(),
+            ..*self
+        }
+    }
+
+    fn clone_to_device(&self, device: Device) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            first: self.first.clone_to_device(device),
+            second: self.second.clone_to_device(device),
             ..*self
         }
     }
@@ -173,6 +184,14 @@ impl<M: Module> Module for [M] {
         unimplemented!()
     }
 
+    fn clone_to_device(&self, _: Device) -> Self
+    where
+        Self: Sized,
+    {
+        // TODO: Why is this implementation expected? Is [M] not unsized?
+        unimplemented!()
+    }
+
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
         Box::new(self.iter().flat_map(Module::variables))
     }
@@ -192,6 +211,13 @@ impl<M: Module, const N: usize> Module for [M; N] {
         Self: Sized,
     {
         array_init::array_init(|i| self[i].shallow_clone())
+    }
+
+    fn clone_to_device(&self, device: Device) -> Self
+    where
+        Self: Sized,
+    {
+        array_init::array_init(|i| self[i].clone_to_device(device))
     }
 
     fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
