@@ -15,16 +15,14 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tch::Device;
 
-type ModuleConfig = MlpConfig;
-
 fn main() {
     let env = CartPole::default().with_step_limit(500);
     println!("Env:\n{:#?}\n", env);
 
     let agent_config: ActorCriticConfig<
-        ModuleConfig,
+        MlpConfig,
         WithOptimizer<TrpoPolicyUpdateRule, ConjugateGradientOptimizerConfig>,
-        GaeConfig<ModuleConfig>,
+        GaeConfig<MlpConfig>,
         WithOptimizer<CriticLossUpdateRule, AdamConfig>,
     > = ActorCriticConfig {
         device: Device::cuda_if_available(),
