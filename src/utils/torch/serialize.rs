@@ -174,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    fn ser_de_0d_u32_tensor() {
+    fn ser_de_tokens_0d_u32_tensor() {
         let tensor = STensor(Tensor::of_slice(&[0x12345678_i32]).reshape(&[]));
 
         let byte_order = ByteOrder::native();
@@ -214,7 +214,7 @@ mod tests {
     }
 
     #[test]
-    fn ser_de_empty_f32_tensor() {
+    fn ser_de_tokens_empty_f32_tensor() {
         let tensor = STensor(Tensor::of_slice::<f32>(&[]));
 
         let bytes: &'static [u8] = &[];
@@ -251,7 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn ser_de_1d_f32_tensor_requires_grad() {
+    fn ser_de_tokens_1d_f32_tensor_requires_grad() {
         let tensor = STensor(Tensor::of_slice::<f32>(&[1.0]).set_requires_grad(true));
 
         let bytes: &'static [u8] = &[0, 0, 128, 63];
@@ -288,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn ser_de_2d_u8_tensor() {
+    fn ser_de_tokens_2d_u8_tensor() {
         let tensor = STensor(Tensor::of_slice::<u8>(&[1, 2, 3, 4, 5, 6]).reshape(&[2, 3]));
 
         let bytes: &'static [u8] = &[1, 2, 3, 4, 5, 6];
@@ -323,5 +323,25 @@ mod tests {
             Token::StructEnd,
         ];
         assert_tokens(&tensor, &tokens);
+    }
+
+    #[test]
+    fn to_from_tensordef() {
+        let t0 = Tensor::of_slice::<u8>(&[1, 2, 3, 4, 5, 6]).reshape(&[2, 3]);
+        let td: TensorDef = (&t0).into();
+        let t1: Tensor = td.into();
+        assert_eq!(t0, t1);
+    }
+
+    #[test]
+    fn to_from_tensordef_transposed_stride() {
+        // Check that data is preserved when the stride is abnormal
+        let t0 = Tensor::of_slice::<u8>(&[1, 2, 3, 4, 5, 6, 7, 8, 9])
+            .reshape(&[3, 3])
+            .tr();
+        let td: TensorDef = (&t0).into();
+        let t1: Tensor = td.into();
+        // Stride is not necessarily preserved but data order is
+        assert_eq!(t0, t1);
     }
 }
