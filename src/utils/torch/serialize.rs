@@ -61,6 +61,7 @@ pub struct TensorDef<'a> {
     pub kind: Kind,
     #[serde(borrow)]
     pub shape: Cow<'a, [i64]>,
+    pub requires_grad: bool,
     pub byte_order: ByteOrder,
     #[serde_as(as = "Bytes")]
     #[serde(borrow)]
@@ -83,6 +84,7 @@ impl<'a> From<&'_ Tensor> for TensorDef<'a> {
         Self {
             kind,
             shape: Cow::Owned(shape),
+            requires_grad: tensor.requires_grad(),
             byte_order: ByteOrder::native(),
             data: Cow::Owned(data),
         }
@@ -97,7 +99,7 @@ impl<'a> From<&TensorDef<'a>> for Tensor {
             ByteOrder::native(),
             "data has non-native byte order"
         );
-        Self::of_data_size(&t.data, &t.shape, t.kind)
+        Self::of_data_size(&t.data, &t.shape, t.kind).set_requires_grad(t.requires_grad)
     }
 }
 
@@ -184,7 +186,7 @@ mod tests {
         let tokens = [
             Token::Struct {
                 name: "TensorDef",
-                len: 4,
+                len: 5,
             },
             Token::Str("kind"),
             Token::UnitVariant {
@@ -194,6 +196,8 @@ mod tests {
             Token::Str("shape"),
             Token::Seq { len: Some(0) },
             Token::SeqEnd,
+            Token::Str("requires_grad"),
+            Token::Bool(false),
             Token::Str("byte_order"),
             Token::UnitVariant {
                 name: "ByteOrder",
@@ -218,7 +222,7 @@ mod tests {
         let tokens = [
             Token::Struct {
                 name: "TensorDef",
-                len: 4,
+                len: 5,
             },
             Token::Str("kind"),
             Token::UnitVariant {
@@ -229,6 +233,45 @@ mod tests {
             Token::Seq { len: Some(1) },
             Token::I64(0),
             Token::SeqEnd,
+            Token::Str("requires_grad"),
+            Token::Bool(false),
+            Token::Str("byte_order"),
+            Token::UnitVariant {
+                name: "ByteOrder",
+                variant: match ByteOrder::native() {
+                    ByteOrder::BigEndian => "BigEndian",
+                    ByteOrder::LittleEndian => "LittleEndian",
+                },
+            },
+            Token::Str("data"),
+            Token::BorrowedBytes(bytes),
+            Token::StructEnd,
+        ];
+        assert_tokens(&tensor, &tokens);
+    }
+
+    #[test]
+    fn ser_de_1d_f32_tensor_requires_grad() {
+        let tensor = STensor(Tensor::of_slice::<f32>(&[1.0]).set_requires_grad(true));
+
+        let bytes: &'static [u8] = &[0, 0, 128, 63];
+
+        let tokens = [
+            Token::Struct {
+                name: "TensorDef",
+                len: 5,
+            },
+            Token::Str("kind"),
+            Token::UnitVariant {
+                name: "KindDef",
+                variant: "Float",
+            },
+            Token::Str("shape"),
+            Token::Seq { len: Some(1) },
+            Token::I64(1),
+            Token::SeqEnd,
+            Token::Str("requires_grad"),
+            Token::Bool(true),
             Token::Str("byte_order"),
             Token::UnitVariant {
                 name: "ByteOrder",
@@ -253,7 +296,7 @@ mod tests {
         let tokens = [
             Token::Struct {
                 name: "TensorDef",
-                len: 4,
+                len: 5,
             },
             Token::Str("kind"),
             Token::UnitVariant {
@@ -265,6 +308,8 @@ mod tests {
             Token::I64(2),
             Token::I64(3),
             Token::SeqEnd,
+            Token::Str("requires_grad"),
+            Token::Bool(false),
             Token::Str("byte_order"),
             Token::UnitVariant {
                 name: "ByteOrder",
