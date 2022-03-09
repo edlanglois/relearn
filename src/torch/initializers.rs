@@ -365,6 +365,12 @@ mod tests {
     }
 
     #[test]
+    fn shape() {
+        let a = Initializer::default().tensor(&[2, 3]).build();
+        assert_eq!(a.size(), [2, 3]);
+    }
+
+    #[test]
     fn gain() {
         // Unif[-1,1] has a variance of 1/3
         let a = Initializer::Uniform(VarianceScale::Constant(1.0 / 3.0))
