@@ -8,6 +8,8 @@ use thiserror::Error;
 pub enum Initializer {
     /// Initialize to all zeros
     Zeros,
+    /// Initialize all elements to the given constant value.
+    Constant(f64),
     /// Uniform distribution with variance scaled by the tensor dimensions.
     Uniform(VarianceScale),
     /// Normal distribution with variance scaled by the tensor dimensions.
@@ -36,8 +38,6 @@ impl Default for Initializer {
 /// Variance scaling mode.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum VarianceScale {
-    /// Scale based on a constant.
-    ///
     /// The initializer sampling variance is set to the given constant.
     Constant(f64),
     /// Scale based on the number of input features.
@@ -151,6 +151,7 @@ impl<'a> TensorBuilder<'a> {
 
         let tensor = match &self.initializer {
             Initializer::Zeros => Tensor::zeros(&shape_i64, options),
+            Initializer::Constant(v) => Tensor::full(&shape_i64, *v, options),
             Initializer::Uniform(scaling) => {
                 let lim = self.gain
                     * (3.0 * scaling.variance(self.shape, self.fan_in, self.fan_out)).sqrt();
@@ -355,6 +356,18 @@ fn init_orthogonal(shape: &[i64], gain: f64, options: (Kind, Device)) -> Tensor 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zeros() {
+        let a = Initializer::Zeros.tensor(&[5]).build();
+        assert_eq!(a, Tensor::zeros(&[5], (Kind::Float, Device::Cpu)));
+    }
+
+    #[test]
+    fn constant() {
+        let a = Initializer::Constant(2.0).tensor(&[5]).build();
+        assert_eq!(a, Tensor::full(&[5], 2.0, (Kind::Float, Device::Cpu)));
+    }
 
     #[test]
     fn orthogonal_is_orthogonal() {
