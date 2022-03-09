@@ -2,7 +2,7 @@
 use crate::simulation::PartialStep;
 use crate::spaces::{FeatureSpace, ReprSpace, Space};
 use crate::utils::packed::PackedSeqIter;
-use crate::utils::tensor::ExclusiveTensor;
+use crate::utils::torch::ExclusiveTensor;
 use lazycell::LazyCell;
 use tch::{Device, Tensor};
 

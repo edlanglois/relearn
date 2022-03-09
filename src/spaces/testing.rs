@@ -145,7 +145,7 @@ macro_rules! features_tests {
         mod $label {
             use super::*;
             use crate::spaces::testing;
-            use crate::utils::tensor::ExclusiveTensor;
+            use crate::utils::torch::ExclusiveTensor;
             use ndarray::Array1;
 
             #[test]
@@ -186,7 +186,7 @@ macro_rules! batch_features_tests {
         mod $label {
             use super::*;
             use crate::spaces::testing;
-            use crate::utils::tensor::ExclusiveTensor;
+            use crate::utils::torch::ExclusiveTensor;
             use ndarray::{arr2, Array2};
 
             #[test]

@@ -9,5 +9,5 @@ pub mod packed;
 pub mod save;
 pub mod sequence;
 pub mod stats;
-pub mod tensor;
+pub mod torch;
 pub mod vector;
