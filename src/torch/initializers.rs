@@ -344,7 +344,12 @@ fn init_orthogonal(shape: &[i64], gain: f64, options: (Kind, Device)) -> Tensor 
     if gain != 1.0 {
         q *= gain;
     }
-    q.reshape(shape)
+    q = q.reshape(shape);
+
+    // Copy into another tensor to ensure that the data is in C layout
+    let mut out = Tensor::empty(shape, options);
+    out.copy_(&q);
+    out
 }
 
 #[cfg(test)]
