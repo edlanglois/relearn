@@ -130,7 +130,7 @@ impl<'a> TensorDef<'a> {
         //
         // A possible alternative might be to avoid copying owned data in
         // `From<TensorDef> for Tensor`. Try using `of_blob`? That might leak the data.
-        let tensor_def = <TensorDef as Deserialize>::deserialize(deserializer)?;
+        let tensor_def: TensorDef = Deserialize::deserialize(deserializer)?;
         Ok(tensor_def.into())
     }
 }
@@ -139,10 +139,31 @@ impl<'a> TensorDef<'a> {
 mod tests {
     use super::*;
     use serde_test::{assert_tokens, Token};
+    use std::ops::Deref;
 
-    /// Standalone [`Tensor`] new type for (de)serialization tests.
+    /// (De)Serializable newtype wrapper for [`Tensor`].
     #[derive(Debug, PartialEq, Serialize, Deserialize)]
-    struct STensor(#[serde(with = "TensorDef")] Tensor);
+    #[serde(transparent)]
+    pub struct STensor(#[serde(with = "TensorDef")] pub Tensor);
+
+    impl From<Tensor> for STensor {
+        fn from(tensor: Tensor) -> Self {
+            STensor(tensor)
+        }
+    }
+    impl From<STensor> for Tensor {
+        fn from(stensor: STensor) -> Self {
+            stensor.0
+        }
+    }
+
+    impl Deref for STensor {
+        type Target = Tensor;
+        #[inline]
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
 
     #[test]
     fn ser_de_0d_u32_tensor() {
@@ -155,7 +176,6 @@ mod tests {
         };
 
         let tokens = [
-            Token::NewtypeStruct { name: "STensor" },
             Token::Struct {
                 name: "TensorDef",
                 len: 4,
@@ -190,7 +210,6 @@ mod tests {
         let bytes: &'static [u8] = &[];
 
         let tokens = [
-            Token::NewtypeStruct { name: "STensor" },
             Token::Struct {
                 name: "TensorDef",
                 len: 4,
@@ -226,7 +245,6 @@ mod tests {
         let bytes: &'static [u8] = &[1, 2, 3, 4, 5, 6];
 
         let tokens = [
-            Token::NewtypeStruct { name: "STensor" },
             Token::Struct {
                 name: "TensorDef",
                 len: 4,
