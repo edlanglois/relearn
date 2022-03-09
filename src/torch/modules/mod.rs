@@ -121,7 +121,7 @@ pub trait ModuleExtras<'a> {
 
 /// Build a [`Module`]
 pub trait BuildModule {
-    type Module;
+    type Module: Module;
 
     /// Build a new module instance.
     ///

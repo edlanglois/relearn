@@ -33,7 +33,9 @@ where
 impl<A, B> BuildModule for ChainConfig<A, B>
 where
     A: BuildModule,
+    A::Module: for<'a> ModuleExtras<'a>,
     B: BuildModule,
+    B::Module: for<'a> ModuleExtras<'a>,
 {
     type Module = Chain<A::Module, B::Module>;
 
