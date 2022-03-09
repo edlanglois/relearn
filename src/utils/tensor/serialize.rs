@@ -2,6 +2,7 @@
 #![allow(clippy::use_self)] // created by serde derive for KindDef
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_with::{serde_as, Bytes, DeserializeAs, SerializeAs};
 use std::borrow::Cow;
 use tch::{Kind, Tensor};
 
@@ -53,6 +54,7 @@ impl ByteOrder {
 ///
 /// The deserialized tensor is located on CPU memory.
 /// Panics on deserialization if the native byte order differs from the serialized byte order.
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TensorDef<'a> {
     #[serde(with = "KindDef")]
@@ -60,7 +62,8 @@ pub struct TensorDef<'a> {
     #[serde(borrow)]
     pub shape: Cow<'a, [i64]>,
     pub byte_order: ByteOrder,
-    #[serde(borrow, with = "serde_bytes")]
+    #[serde_as(as = "Bytes")]
+    #[serde(borrow)]
     pub data: Cow<'a, [u8]>,
 }
 
@@ -99,23 +102,25 @@ impl<'a> From<&TensorDef<'a>> for Tensor {
 }
 
 impl<'a> From<TensorDef<'a>> for Tensor {
+    #[inline]
     fn from(t: TensorDef<'a>) -> Self {
         Self::from(&t)
     }
 }
 
-impl<'a> TensorDef<'a> {
-    /// Serialize a [`Tensor`]. Use `#[serde(with = "TensorDef")]`.
-    pub fn serialize<S>(tensor: &Tensor, serializer: S) -> Result<S::Ok, S::Error>
+/// Serialize a [`Tensor`]. Use `#[serde_as(as = "TensorDef")]`.
+impl<'a> SerializeAs<Tensor> for TensorDef<'a> {
+    fn serialize_as<S>(source: &Tensor, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let tensor_def: TensorDef<'static> = tensor.into();
-        tensor_def.serialize(serializer)
+        TensorDef::from(source).serialize(serializer)
     }
+}
 
-    /// Deserialize a [`Tensor`] to CPU memory. Use `#[serde(with = "TensorDef")]`.
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Tensor, D::Error>
+/// Deserialize a [`Tensor`] to CPU memory. Use `#[serde_as(as = "TensorDef")]`.
+impl<'de: 'a, 'a> DeserializeAs<'de, Tensor> for TensorDef<'a> {
+    fn deserialize_as<D>(deserializer: D) -> Result<Tensor, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -142,9 +147,10 @@ mod tests {
     use std::ops::Deref;
 
     /// (De)Serializable newtype wrapper for [`Tensor`].
+    #[serde_as]
     #[derive(Debug, PartialEq, Serialize, Deserialize)]
     #[serde(transparent)]
-    pub struct STensor(#[serde(with = "TensorDef")] pub Tensor);
+    pub struct STensor(#[serde_as(as = "TensorDef")] pub Tensor);
 
     impl From<Tensor> for STensor {
         fn from(tensor: Tensor) -> Self {
