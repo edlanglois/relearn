@@ -3,7 +3,7 @@ use super::super::features::PackedHistoryFeaturesView;
 use super::{BuildCritic, Critic};
 use crate::torch::modules::{BuildModule, SequenceModule};
 use crate::utils::packed;
-use tch::{nn::Path, Reduction, Tensor};
+use tch::{Device, Reduction, Tensor};
 
 /// Generalized Advantage Estimator Config
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -30,11 +30,11 @@ where
 {
     type Critic = Gae<VC::Module>;
 
-    fn build_critic(&self, vs: &Path, in_dim: usize) -> Self::Critic {
+    fn build_critic(&self, in_dim: usize, device: Device) -> Self::Critic {
         Gae {
             gamma: self.gamma,
             lambda: self.lambda,
-            value_fn: self.value_fn_config.build_module(vs, in_dim, 1),
+            value_fn: self.value_fn_config.build_module(in_dim, 1, device),
         }
     }
 }

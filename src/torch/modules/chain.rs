@@ -4,7 +4,7 @@ use super::{
     SequenceModule,
 };
 use std::iter;
-use tch::{nn::Path, Device, Tensor};
+use tch::{Device, Tensor};
 
 /// Configuration for a [`Chain`] module.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -37,14 +37,14 @@ where
 {
     type Module = Chain<A::Module, B::Module>;
 
-    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
+    fn build_module(&self, in_dim: usize, out_dim: usize, device: Device) -> Self::Module {
         Chain {
             first: self
                 .first_config
-                .build_module(&(vs / "0"), in_dim, self.hidden_dim),
+                .build_module(in_dim, self.hidden_dim, device),
             second: self
                 .second_config
-                .build_module(&(vs / "1"), self.hidden_dim, out_dim),
+                .build_module(self.hidden_dim, out_dim, device),
             activation: self.activation,
         }
     }
@@ -325,7 +325,7 @@ mod tests {
     use super::super::{testing, Gru, GruConfig, Mlp, MlpConfig};
     use super::*;
     use rstest::{fixture, rstest};
-    use tch::{nn::VarStore, Device, Kind};
+    use tch::{Device, Kind};
 
     fn chained_mlp_config() -> ChainConfig<MlpConfig, MlpConfig> {
         let mlp_config = MlpConfig {
@@ -356,8 +356,7 @@ mod tests {
     fn chained_mlp() -> (Chain<Mlp, Mlp>, usize, usize) {
         let in_dim = 3;
         let out_dim = 2;
-        let vs = VarStore::new(Device::Cpu);
-        let mlp = chained_mlp_config().build_module(&vs.root(), in_dim, out_dim);
+        let mlp = chained_mlp_config().build_module(in_dim, out_dim, Device::Cpu);
         (mlp, in_dim, out_dim)
     }
 
@@ -365,8 +364,7 @@ mod tests {
     fn gru_mlp() -> (Chain<Gru, Mlp>, usize, usize) {
         let in_dim = 3;
         let out_dim = 2;
-        let vs = VarStore::new(Device::Cpu);
-        let mlp = chained_gru_mlp_config().build_module(&vs.root(), in_dim, out_dim);
+        let mlp = chained_gru_mlp_config().build_module(in_dim, out_dim, Device::Cpu);
         (mlp, in_dim, out_dim)
     }
 

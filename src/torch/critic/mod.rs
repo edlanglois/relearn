@@ -5,7 +5,7 @@ pub use gae::{Gae, GaeConfig};
 
 use super::features::PackedHistoryFeaturesView;
 use std::iter;
-use tch::{nn::Path, Tensor};
+use tch::{Device, Tensor};
 
 /// Critic for a reinforcement learning environment.
 ///
@@ -67,9 +67,9 @@ pub trait BuildCritic {
     /// Build a new [`Critic`] instance.
     ///
     /// # Args
-    /// * `vs` - Variable store and namespace.
     /// * `in_dim` - Number of input feature dimensions.
-    fn build_critic(&self, vs: &Path, in_dim: usize) -> Self::Critic;
+    /// * `devic`  - Device on which to store the critic variables.
+    fn build_critic(&self, in_dim: usize, device: Device) -> Self::Critic;
 }
 
 /// Value steps using the empirical discounted step return.
@@ -103,7 +103,7 @@ impl Critic for Return {
 impl BuildCritic for Return {
     type Critic = Self;
 
-    fn build_critic(&self, _vs: &Path, _in_dim: usize) -> Self::Critic {
+    fn build_critic(&self, _in_dim: usize, _: Device) -> Self::Critic {
         Self
     }
 }

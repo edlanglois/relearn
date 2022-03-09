@@ -16,7 +16,7 @@ use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Instant;
-use tch::{nn::VarStore, Device, Tensor};
+use tch::{Device, Tensor};
 
 /// Configuration for [`ActorCriticAgent`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -136,20 +136,18 @@ where
         let observation_space = NonEmptyFeatures::new(env.observation_space());
         let action_space = env.action_space();
 
-        let policy_variables = VarStore::new(config.device);
         let policy = config.policy_config.build_module(
-            &policy_variables.root(),
             observation_space.num_features(),
             action_space.num_distribution_params(),
+            config.device,
         );
         let policy_updater = config
             .policy_updater_config
             .build_policy_updater(policy.trainable_variables());
 
-        let critic_variables = VarStore::new(config.device);
         let critic = config
             .critic_config
-            .build_critic(&critic_variables.root(), observation_space.num_features());
+            .build_critic(observation_space.num_features(), config.device);
         let discount_factor = critic.discount_factor(env.discount_factor());
         let critic_updater = config
             .critic_updater_config

@@ -5,7 +5,7 @@ use super::super::{
 use super::{Activation, Linear, LinearConfig};
 use std::iter::{self, FlatMap};
 use std::slice;
-use tch::{nn::Path, Device, Tensor};
+use tch::{Device, Tensor};
 
 /// Configuration for the [`Mlp`] module.
 #[derive(Debug, Clone, PartialEq)]
@@ -34,8 +34,8 @@ impl Default for MlpConfig {
 impl BuildModule for MlpConfig {
     type Module = Mlp;
 
-    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
-        Mlp::new(vs, in_dim, out_dim, self)
+    fn build_module(&self, in_dim: usize, out_dim: usize, device: Device) -> Self::Module {
+        Mlp::new(in_dim, out_dim, device, self)
     }
 }
 
@@ -48,21 +48,13 @@ pub struct Mlp {
 }
 
 impl Mlp {
-    pub fn new(vs: &Path, in_dim: usize, out_dim: usize, config: &MlpConfig) -> Self {
+    pub fn new(in_dim: usize, out_dim: usize, device: Device, config: &MlpConfig) -> Self {
         let in_dims = iter::once(&in_dim).chain(&config.hidden_sizes);
         let out_dims = config.hidden_sizes.iter().chain(iter::once(&out_dim));
 
         let layers: Vec<_> = in_dims
             .zip(out_dims)
-            .enumerate()
-            .map(|(i, (in_, out_))| {
-                Linear::new(
-                    &(vs / format!("layer_{}", i)),
-                    *in_,
-                    *out_,
-                    &config.linear_config,
-                )
-            })
+            .map(|(in_, out_)| Linear::new(*in_, *out_, device, &config.linear_config))
             .collect();
 
         Self {
@@ -180,7 +172,6 @@ mod tests {
     use super::super::super::testing;
     use super::*;
     use rstest::{fixture, rstest};
-    use tch::nn::VarStore;
     use tch::{kind::Kind, Device};
 
     #[fixture]
@@ -188,8 +179,7 @@ mod tests {
         let in_dim = 3;
         let out_dim = 2;
         let config = MlpConfig::default();
-        let vs = VarStore::new(Device::Cpu);
-        let module = config.build_module(&vs.root(), in_dim, out_dim);
+        let module = config.build_module(in_dim, out_dim, Device::Cpu);
         (module, in_dim, out_dim)
     }
 

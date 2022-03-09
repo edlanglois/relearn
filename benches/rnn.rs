@@ -3,7 +3,7 @@ use criterion::{
     Throughput,
 };
 use relearn::torch::modules::{BuildModule, GruConfig, SequenceModule};
-use tch::{nn::VarStore, Device, Kind, Tensor};
+use tch::{Device, Kind, Tensor};
 
 fn gru_rnn(c: &mut Criterion) {
     let mut group = c.benchmark_group("gru_seq");
@@ -13,8 +13,7 @@ fn gru_rnn(c: &mut Criterion) {
     let batch_size = 1;
     let in_features = 3;
     let out_features = 4;
-    let vs = VarStore::new(Device::Cpu);
-    let gru = GruConfig::default().build_module(&vs.root(), in_features, out_features);
+    let gru = GruConfig::default().build_module(in_features, out_features, Device::Cpu);
 
     for total_steps in [1usize, 10, 100, 1000].into_iter() {
         group.throughput(Throughput::Elements(total_steps as u64));

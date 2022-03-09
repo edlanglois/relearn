@@ -5,7 +5,7 @@ use super::super::{
 use crate::torch::initializers::Initializer;
 use std::iter::{self, Chain, Once};
 use std::option;
-use tch::{nn::Path, Device, Tensor};
+use tch::{Device, Tensor};
 
 /// Configuration for the [`Linear`] module.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -30,8 +30,8 @@ impl Default for LinearConfig {
 impl BuildModule for LinearConfig {
     type Module = Linear;
 
-    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
-        Linear::new(vs, in_dim, out_dim, self)
+    fn build_module(&self, in_dim: usize, out_dim: usize, device: Device) -> Self::Module {
+        Linear::new(in_dim, out_dim, device, self)
     }
 }
 
@@ -43,20 +43,19 @@ pub struct Linear {
 }
 
 impl Linear {
-    pub fn new(vs: &Path, in_dim: usize, out_dim: usize, config: &LinearConfig) -> Self {
+    pub fn new(in_dim: usize, out_dim: usize, device: Device, config: &LinearConfig) -> Self {
         // Total fan_in is the weigths in_dim + 1 for the bias.
         let fan_in = in_dim + 1;
         Self {
-            kernel: config.kernel_init.add_tensor(
-                vs,
-                "kernel",
-                &[out_dim, in_dim],
-                1.0,
-                Some(fan_in),
-            ),
+            kernel: config
+                .kernel_init
+                .tensor(&[out_dim, in_dim])
+                .device(device)
+                .fan_in(fan_in)
+                .build(),
             bias: config
                 .bias_init
-                .map(|init| init.add_tensor(vs, "bias", &[out_dim], 1.0, Some(fan_in))),
+                .map(|b| b.tensor(&[out_dim]).device(device).fan_in(fan_in).build()),
         }
     }
 }
@@ -146,7 +145,6 @@ mod tests {
     use super::super::super::testing;
     use super::*;
     use rstest::{fixture, rstest};
-    use tch::nn::VarStore;
     use tch::{kind::Kind, Device};
 
     #[fixture]
@@ -154,8 +152,7 @@ mod tests {
         let in_dim = 3;
         let out_dim = 2;
         let config = LinearConfig::default();
-        let vs = VarStore::new(Device::Cpu);
-        let module = config.build_module(&vs.root(), in_dim, out_dim);
+        let module = config.build_module(in_dim, out_dim, Device::Cpu);
         (module, in_dim, out_dim)
     }
 
@@ -167,8 +164,7 @@ mod tests {
             bias_init: None,
             ..LinearConfig::default()
         };
-        let vs = VarStore::new(Device::Cpu);
-        let module = config.build_module(&vs.root(), in_dim, out_dim);
+        let module = config.build_module(in_dim, out_dim, Device::Cpu);
         (module, in_dim, out_dim)
     }
 

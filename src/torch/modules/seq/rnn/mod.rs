@@ -10,7 +10,7 @@ use super::super::{BuildModule, IterativeModule, Module, ModuleExtras};
 use smallvec::SmallVec;
 use std::marker::PhantomData;
 use std::slice;
-use tch::{nn::Path, Cuda, Device, Tensor};
+use tch::{Cuda, Device, Tensor};
 
 /// Basic recurrent neural network configuration
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -44,8 +44,8 @@ impl<T> Default for RnnBaseConfig<T> {
 impl<T: RnnImpl> BuildModule for RnnBaseConfig<T> {
     type Module = RnnBase<T>;
 
-    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
-        RnnBase::new(vs, in_dim, out_dim, self)
+    fn build_module(&self, in_dim: usize, out_dim: usize, device: Device) -> Self::Module {
+        RnnBase::new(in_dim, out_dim, device, self)
     }
 }
 
@@ -90,12 +90,12 @@ pub struct RnnBase<T> {
 }
 
 impl<T: RnnImpl> RnnBase<T> {
-    pub fn new(vs: &Path, in_dim: usize, out_dim: usize, config: &RnnBaseConfig<T>) -> Self {
+    pub fn new(in_dim: usize, out_dim: usize, device: Device, config: &RnnBaseConfig<T>) -> Self {
         Self {
-            weights: RnnWeights::new(vs, in_dim, out_dim, config),
+            weights: RnnWeights::new(in_dim, out_dim, device, config),
             hidden_size: out_dim,
             dropout: 0.0,
-            device: vs.device(),
+            device,
             type_: PhantomData,
         }
     }
@@ -210,9 +210,9 @@ impl RnnWeights {
     /// [Source](https://docs.rs/tch/0.6.1/src/tch/nn/rnn.rs.html#210).
     ///
     pub fn new<T: RnnImpl>(
-        vs: &Path,
         in_dim: usize,
         out_dim: usize,
+        device: Device,
         config: &RnnBaseConfig<T>,
     ) -> Self {
         let hidden_size = out_dim;
@@ -221,40 +221,32 @@ impl RnnWeights {
         let mut flat_weights = Vec::new();
         for i in 0..config.num_layers {
             let layer_input_size = if i == 0 { in_dim } else { hidden_size };
-            flat_weights.push(config.input_weights_init.add_tensor(
-                vs,
-                &format!("weight_ih_l{}", i),
-                &[gates_size, layer_input_size],
-                1.0,
-                None,
-            ));
-            flat_weights.push(config.hidden_weights_init.add_tensor(
-                vs,
-                &format!("weight_hh_l{}", i),
-                &[gates_size, hidden_size],
-                1.0,
-                None,
-            ));
+            // input-hidden weights
+            flat_weights.push(
+                config
+                    .input_weights_init
+                    .tensor(&[gates_size, layer_input_size])
+                    .device(device)
+                    .build(),
+            );
+            // hidden-hidden weights
+            flat_weights.push(
+                config
+                    .hidden_weights_init
+                    .tensor(&[gates_size, hidden_size])
+                    .device(device)
+                    .build(),
+            );
 
             if let Some(bias_init) = config.bias_init {
-                flat_weights.push(bias_init.add_tensor(
-                    vs,
-                    &format!("bias_ih_l{}", i),
-                    &[gates_size],
-                    1.0,
-                    None,
-                ));
-                flat_weights.push(bias_init.add_tensor(
-                    vs,
-                    &format!("bias_hh_l{}", i),
-                    &[gates_size],
-                    1.0,
-                    None,
-                ));
+                // input-hidden biases
+                flat_weights.push(bias_init.tensor(&[gates_size]).device(device).build());
+                // hidden-hidden biases
+                flat_weights.push(bias_init.tensor(&[gates_size]).device(device).build());
             }
         }
 
-        if vs.device().is_cuda() && Cuda::cudnn_is_available() {
+        if device.is_cuda() && Cuda::cudnn_is_available() {
             // Flatten the weights in-place
             // <https://github.com/pytorch/pytorch/blob/5a04bd87233b5391a9fe471fadac5a3edc128e05/torch/csrc/api/src/nn/modules/rnn.cpp#L159-L221>
             let _no_grad = tch::no_grad_guard();

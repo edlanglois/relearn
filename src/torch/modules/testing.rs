@@ -3,7 +3,7 @@ use super::{BuildModule, FeedForwardModule, IterativeModule, Module, SequenceMod
 use crate::torch::optimizers::{BuildOptimizer, OnceOptimizer, SgdConfig};
 use std::fmt::Debug;
 use std::iter;
-use tch::{self, kind::Kind, nn::VarStore, Device, IndexOp, Tensor};
+use tch::{self, kind::Kind, Device, IndexOp, Tensor};
 
 /// Basic structural check of [`FeedForwardModule::forward`].
 pub fn check_forward<M: FeedForwardModule>(
@@ -173,8 +173,7 @@ where
         0,
     );
 
-    let vs = VarStore::new(device);
-    let model = config.build_module(&vs.root(), in_dim, out_dim);
+    let model = config.build_module(in_dim, out_dim, device);
     let mut optimizer = SgdConfig::default()
         .build_optimizer(model.trainable_variables())
         .unwrap();
@@ -213,8 +212,7 @@ where
     let batch_sizes = Tensor::full(&[seq_dim], batch_size, (Kind::Int64, Device::Cpu));
     let target = Tensor::rand(&[seq_dim * batch_size, out_dim as i64], (kind, device));
 
-    let vs = VarStore::new(device);
-    let model = config.build_module(&vs.root(), in_dim, out_dim);
+    let model = config.build_module(in_dim, out_dim, device);
     let mut optimizer = SgdConfig::default()
         .build_optimizer(model.trainable_variables())
         .unwrap();
@@ -259,8 +257,7 @@ where
     let original_input = Tensor::ones(&[in_dim as i64], (kind, initial_device));
     let new_input = Tensor::ones(&[in_dim as i64], (kind, target_device));
 
-    let vs = VarStore::new(initial_device);
-    let original_module = config.build_module(&vs.root(), in_dim, out_dim);
+    let original_module = config.build_module(in_dim, out_dim, initial_device);
 
     // Check that forward works without crashing
     let _ = original_module.forward(&original_input);
@@ -307,8 +304,7 @@ where
     let original_input = Tensor::ones(&[total_num_steps, in_dim as i64], (kind, initial_device));
     let new_input = Tensor::ones(&[total_num_steps, in_dim as i64], (kind, target_device));
 
-    let vs = VarStore::new(initial_device);
-    let original_module = config.build_module(&vs.root(), in_dim, out_dim);
+    let original_module = config.build_module(in_dim, out_dim, initial_device);
 
     // Check that forward works without crashing
     let _ = original_module.seq_packed(&original_input, &batch_sizes);
@@ -344,8 +340,7 @@ where
 
     let input = Tensor::ones(&[in_dim as i64], (kind, device));
 
-    let vs = VarStore::new(device);
-    let original_module = config.build_module(&vs.root(), in_dim, out_dim);
+    let original_module = config.build_module(in_dim, out_dim, device);
 
     // Check that forward works without crashing
     let _ = original_module.forward(&input);
@@ -395,8 +390,7 @@ where
 
     let input = Tensor::ones(&[total_num_steps, in_dim as i64], (kind, device));
 
-    let vs = VarStore::new(device);
-    let original_module = config.build_module(&vs.root(), in_dim, out_dim);
+    let original_module = config.build_module(in_dim, out_dim, device);
 
     // Check that forward works without crashing
     let _ = original_module.seq_packed(&input, &batch_sizes);

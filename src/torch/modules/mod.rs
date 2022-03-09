@@ -12,7 +12,7 @@ pub use seq::{Gru, GruConfig, Lstm, LstmConfig};
 pub type GruMlpConfig = ChainConfig<GruConfig, MlpConfig>;
 pub type LstmMlpConfig = ChainConfig<GruConfig, MlpConfig>;
 
-use tch::{nn::Path, Device, Tensor};
+use tch::{Device, Tensor};
 
 /// A self-contained part of a neural network.
 pub trait Module {
@@ -126,10 +126,10 @@ pub trait BuildModule {
     /// Build a new module instance.
     ///
     /// # Args
-    /// * `vs` - Variable store and namespace.
-    /// * `in_dim` - Number of input feature dimensions.
-    /// * `out_dim` - Nuber of output feature dimensions.
-    fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module;
+    /// * `in_dim`  - Number of input feature dimensions.
+    /// * `out_dim` - Number of output feature dimensions.
+    /// * `device`  - Device on which to create the model tensors.
+    fn build_module(&self, in_dim: usize, out_dim: usize, device: Device) -> Self::Module;
 
     /// Chain another module configuration after this one with an activation function in between.
     fn chain<MC>(
@@ -156,8 +156,8 @@ macro_rules! impl_wrapped_build_module {
         impl<T: BuildModule + ?Sized> BuildModule for $wrapper {
             type Module = T::Module;
 
-            fn build_module(&self, vs: &Path, in_dim: usize, out_dim: usize) -> Self::Module {
-                T::build_module(self, vs, in_dim, out_dim)
+            fn build_module(&self, in_dim: usize, out_dim: usize, device: Device) -> Self::Module {
+                T::build_module(self, in_dim, out_dim, device)
             }
         }
     };

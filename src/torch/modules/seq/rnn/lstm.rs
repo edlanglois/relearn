@@ -112,14 +112,13 @@ mod tests {
     use super::super::super::super::{testing, Module};
     use super::*;
     use rstest::{fixture, rstest};
-    use tch::{nn, Device};
+    use tch::Device;
 
     #[fixture]
     fn lstm() -> (Lstm, usize, usize) {
         let in_dim: usize = 3;
         let out_dim: usize = 2;
-        let vs = nn::VarStore::new(Device::Cpu);
-        let lstm = Lstm::new(&vs.root(), in_dim, out_dim, &LstmConfig::default());
+        let lstm = Lstm::new(in_dim, out_dim, Device::Cpu, &LstmConfig::default());
         (lstm, in_dim, out_dim)
     }
 
@@ -151,12 +150,11 @@ mod tests {
     fn seq_packed_matches_iter_steps_2layers() {
         let in_dim: usize = 3;
         let out_dim: usize = 2;
-        let vs = nn::VarStore::new(Device::Cpu);
         let config = LstmConfig {
             num_layers: 2,
             ..LstmConfig::default()
         };
-        let lstm = Lstm::new(&vs.root(), in_dim, out_dim, &config);
+        let lstm = Lstm::new(in_dim, out_dim, Device::Cpu, &config);
         testing::check_seq_packed_matches_iter_steps(&lstm, in_dim, out_dim);
     }
 
@@ -164,12 +162,11 @@ mod tests {
     fn seq_packed_matches_iter_steps_nobias() {
         let in_dim: usize = 3;
         let out_dim: usize = 2;
-        let vs = nn::VarStore::new(Device::Cpu);
         let config = LstmConfig {
             bias_init: None,
             ..LstmConfig::default()
         };
-        let lstm = Lstm::new(&vs.root(), in_dim, out_dim, &config);
+        let lstm = Lstm::new(in_dim, out_dim, Device::Cpu, &config);
         testing::check_seq_packed_matches_iter_steps(&lstm, in_dim, out_dim);
     }
 

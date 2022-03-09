@@ -97,14 +97,13 @@ mod tests {
     use super::super::super::super::{testing, Module};
     use super::*;
     use rstest::{fixture, rstest};
-    use tch::{nn, Device};
+    use tch::Device;
 
     #[fixture]
     fn gru() -> (Gru, usize, usize) {
         let in_dim: usize = 3;
         let out_dim: usize = 2;
-        let vs = nn::VarStore::new(Device::Cpu);
-        let gru = Gru::new(&vs.root(), in_dim, out_dim, &GruConfig::default());
+        let gru = Gru::new(in_dim, out_dim, Device::Cpu, &GruConfig::default());
         (gru, in_dim, out_dim)
     }
 
@@ -136,12 +135,11 @@ mod tests {
     fn seq_packed_matches_iter_steps_2layers() {
         let in_dim: usize = 3;
         let out_dim: usize = 2;
-        let vs = nn::VarStore::new(Device::Cpu);
         let config = GruConfig {
             num_layers: 2,
             ..GruConfig::default()
         };
-        let gru = Gru::new(&vs.root(), in_dim, out_dim, &config);
+        let gru = Gru::new(in_dim, out_dim, Device::Cpu, &config);
         testing::check_seq_packed_matches_iter_steps(&gru, in_dim, out_dim);
     }
 
@@ -149,12 +147,11 @@ mod tests {
     fn seq_packed_matches_iter_steps_nobias() {
         let in_dim: usize = 3;
         let out_dim: usize = 2;
-        let vs = nn::VarStore::new(Device::Cpu);
         let config = GruConfig {
             bias_init: None,
             ..GruConfig::default()
         };
-        let gru = Gru::new(&vs.root(), in_dim, out_dim, &config);
+        let gru = Gru::new(in_dim, out_dim, Device::Cpu, &config);
         testing::check_seq_packed_matches_iter_steps(&gru, in_dim, out_dim);
     }
 
