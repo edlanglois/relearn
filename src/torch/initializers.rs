@@ -1,6 +1,6 @@
 //! Tensor initializers
 use smallvec::SmallVec;
-use tch::{nn::Path, Device, Kind, Tensor};
+use tch::{Device, Kind, Tensor};
 use thiserror::Error;
 
 /// Tensor initializers.
@@ -112,54 +112,6 @@ impl Initializer {
     #[inline]
     pub const fn tensor<'a>(&'a self, shape: &'a [usize]) -> TensorBuilder<'a> {
         TensorBuilder::new(self, shape)
-    }
-
-    // TODO: Remove once `Self::tensor` is used instead.
-    /// Create a new tensor with this initialization.
-    ///
-    /// # Args
-    /// * `vs`    - Namespace and storage in which to create the tensor.
-    /// * `name`  - Tensor name.
-    /// * `shape` - Tensor shape (tch uses `i64`).
-    /// * `gain`  - Scaling factor on the initialized values.
-    ///             Can be used to compensate for the scaling effect of activation functions.
-    ///             See pytorch's [`calculate_gain`][1] function.
-    /// * `fan_in` - Set the `fan_in` value (number of input features) for use in variance scaling.
-    ///              If `None`, `fan_in` is calculated from `shape`.
-    ///              This can be useful for example when initializing separate weight and a bias
-    ///              tensors. Despite being initialized separately, they are used together in a way
-    ///              that implies a fan in value equal to their sum of input dimensions.
-    ///
-    /// [1]: https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.calculate_gain
-    ///
-    pub fn add_tensor(
-        &self,
-        vs: &Path,
-        name: &str,
-        shape: &[usize],
-        gain: f64,
-        fan_in: Option<usize>,
-    ) -> Tensor {
-        let shape_i64: SmallVec<[i64; 8]> = shape.iter().map(|&d| d.try_into().unwrap()).collect();
-        match self {
-            Self::Zeros => vs.zeros(name, &shape_i64),
-            Self::Uniform(scaling) => {
-                let lim = gain * (3.0 * scaling.variance(shape, fan_in, None)).sqrt();
-                vs.uniform(name, &shape_i64, -lim, lim)
-            }
-            Self::Normal(scaling) => {
-                let mean = 0.0;
-                let stddev = gain * scaling.variance(shape, fan_in, None).sqrt();
-                vs.randn(name, &shape_i64, mean, stddev)
-            }
-            _ => {
-                let mut builder = self.tensor(shape).gain(gain).device(vs.device());
-                if let Some(x) = fan_in {
-                    builder = builder.fan_in(x)
-                }
-                vs.var_copy(name, &builder.build())
-            }
-        }
     }
 }
 
