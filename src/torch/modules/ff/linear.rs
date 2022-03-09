@@ -45,18 +45,18 @@ pub struct Linear {
 impl Linear {
     pub fn new(vs: &Path, in_dim: usize, out_dim: usize, config: &LinearConfig) -> Self {
         // Total fan_in is the weigths in_dim + 1 for the bias.
-        let fan_in = (in_dim + 1) as i64;
+        let fan_in = in_dim + 1;
         Self {
             kernel: config.kernel_init.add_tensor(
                 vs,
                 "kernel",
-                &[out_dim as i64, in_dim as i64],
+                &[out_dim, in_dim],
                 1.0,
                 Some(fan_in),
             ),
             bias: config
                 .bias_init
-                .map(|init| init.add_tensor(vs, "bias", &[out_dim as i64], 1.0, Some(fan_in))),
+                .map(|init| init.add_tensor(vs, "bias", &[out_dim], 1.0, Some(fan_in))),
         }
     }
 }

@@ -16,10 +16,13 @@ impl RnnImpl for LstmImpl {
     type CellState = (Tensor, Tensor);
 
     const CUDNN_MODE: u32 = 2;
-    const GATES_MULTIPLE: u32 = 4;
+    const GATES_MULTIPLE: usize = 4;
 
-    fn initial_cell_state(rnn: &RnnBase<Self>, batch_size: i64) -> Self::CellState {
-        let hidden_state = Tensor::zeros(&[batch_size, rnn.hidden_size], (Kind::Float, rnn.device));
+    fn initial_cell_state(rnn: &RnnBase<Self>, batch_size: usize) -> Self::CellState {
+        let hidden_state = Tensor::zeros(
+            &[batch_size as i64, rnn.hidden_size as i64],
+            (Kind::Float, rnn.device),
+        );
 
         let cell_state = hidden_state.shallow_clone();
         (hidden_state, cell_state)
@@ -55,7 +58,7 @@ impl SequenceModule for Lstm {
         let num_layers = self.weights.num_layers() as i64;
         let batch_size = shape[0] as i64;
         let zeros = Tensor::zeros(
-            &[num_layers, batch_size, self.hidden_size],
+            &[num_layers, batch_size, self.hidden_size as i64],
             (inputs.kind(), inputs.device()),
         );
         let initial_state = [zeros.shallow_clone(), zeros];
@@ -84,7 +87,7 @@ impl SequenceModule for Lstm {
         let initial_batch_size: i64 = batch_sizes.i(0).into();
         let num_layers: i64 = self.weights.num_layers() as i64;
         let zeros = Tensor::zeros(
-            &[num_layers, initial_batch_size, self.hidden_size],
+            &[num_layers, initial_batch_size, self.hidden_size as i64],
             (inputs.kind(), inputs.device()),
         );
         let initial_state = [zeros.shallow_clone(), zeros];

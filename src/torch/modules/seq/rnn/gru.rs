@@ -16,10 +16,13 @@ impl RnnImpl for GruImpl {
     type CellState = Tensor;
 
     const CUDNN_MODE: u32 = 3;
-    const GATES_MULTIPLE: u32 = 3;
+    const GATES_MULTIPLE: usize = 3;
 
-    fn initial_cell_state(rnn: &RnnBase<Self>, batch_size: i64) -> Self::CellState {
-        Tensor::zeros(&[batch_size, rnn.hidden_size], (Kind::Float, rnn.device))
+    fn initial_cell_state(rnn: &RnnBase<Self>, batch_size: usize) -> Self::CellState {
+        Tensor::zeros(
+            &[batch_size as i64, rnn.hidden_size as i64],
+            (Kind::Float, rnn.device),
+        )
     }
 
     fn cell_batch_step(
@@ -44,7 +47,7 @@ impl SequenceModule for Gru {
         let batch_size: i64 = shape[0] as i64;
         let num_layers: i64 = self.weights.num_layers() as i64;
         let initial_state = Tensor::zeros(
-            &[num_layers, batch_size, self.hidden_size],
+            &[num_layers, batch_size, self.hidden_size as i64],
             (inputs.kind(), inputs.device()),
         );
         seq_serial_map(inputs, seq_lengths, |seq_input| {
@@ -71,7 +74,7 @@ impl SequenceModule for Gru {
         let initial_batch_size: i64 = batch_sizes.i(0).into();
         let num_layers: i64 = self.weights.num_layers() as i64;
         let initial_state = Tensor::zeros(
-            &[num_layers, initial_batch_size, self.hidden_size],
+            &[num_layers, initial_batch_size, self.hidden_size as i64],
             (inputs.kind(), inputs.device()),
         );
         let (outputs, _) = Tensor::gru_data(

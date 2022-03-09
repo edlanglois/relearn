@@ -64,9 +64,9 @@ pub trait RnnImpl {
     const CUDNN_MODE: u32;
 
     /// Number of gates per hidden unit
-    const GATES_MULTIPLE: u32;
+    const GATES_MULTIPLE: usize;
 
-    fn initial_cell_state(rnn: &RnnBase<Self>, batch_size: i64) -> Self::CellState
+    fn initial_cell_state(rnn: &RnnBase<Self>, batch_size: usize) -> Self::CellState
     where
         Self: Sized;
 
@@ -83,7 +83,7 @@ pub trait RnnImpl {
 #[derive(Debug, PartialEq)]
 pub struct RnnBase<T> {
     weights: RnnWeights,
-    hidden_size: i64,
+    hidden_size: usize,
     dropout: f64,
     device: Device,
     type_: PhantomData<fn() -> T>,
@@ -93,7 +93,7 @@ impl<T: RnnImpl> RnnBase<T> {
     pub fn new(vs: &Path, in_dim: usize, out_dim: usize, config: &RnnBaseConfig<T>) -> Self {
         Self {
             weights: RnnWeights::new(vs, in_dim, out_dim, config),
-            hidden_size: out_dim.try_into().unwrap(),
+            hidden_size: out_dim,
             dropout: 0.0,
             device: vs.device(),
             type_: PhantomData,
@@ -215,9 +215,8 @@ impl RnnWeights {
         out_dim: usize,
         config: &RnnBaseConfig<T>,
     ) -> Self {
-        let in_dim: i64 = in_dim.try_into().unwrap();
-        let hidden_size: i64 = out_dim.try_into().unwrap();
-        let gates_size = hidden_size * i64::from(T::GATES_MULTIPLE);
+        let hidden_size = out_dim;
+        let gates_size = hidden_size * T::GATES_MULTIPLE;
 
         let mut flat_weights = Vec::new();
         for i in 0..config.num_layers {
@@ -262,9 +261,9 @@ impl RnnWeights {
             let _ = Tensor::internal_cudnn_rnn_flatten_weight(
                 &flat_weights,
                 if config.bias_init.is_some() { 4 } else { 2 },
-                in_dim,
+                in_dim as i64,
                 T::CUDNN_MODE.into(),
-                hidden_size,
+                hidden_size as i64,
                 0,                        // No projections
                 config.num_layers as i64, // Num layers
                 true,                     // Batch first
