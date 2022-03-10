@@ -294,7 +294,7 @@ where
 #[serde(from = "ActorData<OS, AS, P>")]
 pub struct ActorCriticActor<OS: EncoderFeatureSpace, AS, P> {
     spaces: Arc<Spaces<OS, AS>>,
-    #[serde(skip)]
+    #[serde(skip_serializing)]
     observation_encoder: <NonEmptyFeatures<OS> as EncoderFeatureSpace>::Encoder,
     policy: P,
 }
