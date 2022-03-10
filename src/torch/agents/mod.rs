@@ -3,4 +3,4 @@ mod actor_critic;
 #[cfg(test)]
 mod tests;
 
-pub use actor_critic::{ActorCriticAgent, ActorCriticConfig};
+pub use actor_critic::{ActorCriticActor, ActorCriticAgent, ActorCriticConfig};
