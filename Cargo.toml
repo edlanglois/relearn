@@ -40,6 +40,7 @@ ctor = "0.1"
 num_cpus = "1.13"
 rstest = "0.12"
 serde_cbor = "0.11" # Archived but alternative 'ciborium' is very new
+serde_json = "1.0"
 serde_test = "1.0"
 
 [features]

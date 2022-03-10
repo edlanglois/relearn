@@ -18,6 +18,8 @@ This environment has infinitely long episodes.
 ### Cart-Pole with Trust-Region Policy Optimization
 ```sh
 cargo run --release --example cartpole-trpo
+
+cargo run --release --example cartpole-trpo data/cartpole-trpo/<time>/actor.cbor
 ```
 Uses a feed-forward MLP for the policy and a separate MLP for the critic
 (baseline).
