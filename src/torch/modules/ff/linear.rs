@@ -3,12 +3,15 @@ use super::super::{
     BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras, SequenceModule,
 };
 use crate::torch::initializers::Initializer;
+use crate::utils::torch::TensorDef;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::iter::{self, Chain, Once};
 use std::option;
 use tch::{Device, Tensor};
 
 /// Configuration for the [`Linear`] module.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LinearConfig {
     /// Initializer for the kernel (weight) matrix.
     kernel_init: Initializer,
@@ -36,9 +39,12 @@ impl BuildModule for LinearConfig {
 }
 
 /// Linear fully-connected layer module.
-#[derive(Debug, PartialEq)]
+#[serde_as]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Linear {
+    #[serde_as(as = "TensorDef")]
     kernel: Tensor,
+    #[serde_as(as = "Option<TensorDef>")]
     bias: Option<Tensor>,
 }
 
@@ -222,6 +228,19 @@ mod tests {
     #[test]
     fn clone_to_same_device() {
         testing::check_config_clone_to_same_device::<RunForward, _>(&LinearConfig::default());
+    }
+
+    #[rstest]
+    #[case::forward(RunForward)]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn ser_de_matches<R: RunModule<Linear>>(
+        #[case] _runner: R,
+        default_module: (Linear, usize, usize),
+    ) {
+        let (module, in_dim, _) = default_module;
+        testing::check_ser_de_matches::<R, _>(&module, in_dim);
     }
 
     #[rstest]

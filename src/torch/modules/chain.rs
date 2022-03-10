@@ -3,11 +3,12 @@ use super::{
     Activation, BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras,
     SequenceModule,
 };
+use serde::{Deserialize, Serialize};
 use std::iter;
 use tch::{Device, Tensor};
 
 /// Configuration for a [`Chain`] module.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ChainConfig<A, B> {
     pub first_config: A,
     pub second_config: B,
@@ -53,7 +54,7 @@ where
 }
 
 /// One module applied to the output of another with an optional activation function in between.
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Chain<A, B> {
     pub first: A,
     pub second: B,
@@ -446,6 +447,31 @@ mod tests {
     #[test]
     fn gru_mlp_clone_to_same_device() {
         testing::check_config_clone_to_same_device::<RunSeqPacked, _>(&chained_gru_mlp_config());
+    }
+
+    #[rstest]
+    #[case::forward(RunForward)]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn chained_mlp_ser_de_matches<R: RunModule<Chain<Mlp, Mlp>>>(
+        #[case] _runner: R,
+        chained_mlp: (Chain<Mlp, Mlp>, usize, usize),
+    ) {
+        let (module, in_dim, _) = chained_mlp;
+        testing::check_ser_de_matches::<R, _>(&module, in_dim);
+    }
+
+    #[rstest]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn gru_mlp_ser_de_matches<R: RunModule<Chain<Gru, Mlp>>>(
+        #[case] _runner: R,
+        gru_mlp: (Chain<Gru, Mlp>, usize, usize),
+    ) {
+        let (module, in_dim, _) = gru_mlp;
+        testing::check_ser_de_matches::<R, _>(&module, in_dim);
     }
 
     #[rstest]

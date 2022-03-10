@@ -2,6 +2,7 @@
 use super::super::super::SequenceModule;
 use super::super::seq_serial_map;
 use super::{RnnBase, RnnBaseConfig, RnnImpl, RnnLayerWeights};
+use serde::{Deserialize, Serialize};
 use tch::{Device, IndexOp, Kind, Tensor};
 
 /// Configuration for [`Gru`]
@@ -10,7 +11,7 @@ pub type GruConfig = RnnBaseConfig<GruImpl>;
 /// Gated recurrent unit module
 pub type Gru = RnnBase<GruImpl>;
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct GruImpl;
 impl RnnImpl for GruImpl {
     type CellState = Tensor;
@@ -178,6 +179,15 @@ mod tests {
     #[test]
     fn clone_to_same_device() {
         testing::check_config_clone_to_same_device::<RunSeqPacked, _>(&GruConfig::default());
+    }
+
+    #[rstest]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn ser_de_matches<R: RunModule<Gru>>(#[case] _runner: R, gru: (Gru, usize, usize)) {
+        let (module, in_dim, _) = gru;
+        testing::check_ser_de_matches::<R, _>(&module, in_dim);
     }
 
     #[rstest]

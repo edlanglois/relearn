@@ -1,10 +1,11 @@
 //! Activation functions.
 use super::super::{FeedForwardModule, IterativeModule, Module, ModuleExtras, SequenceModule};
+use serde::{Deserialize, Serialize};
 use std::iter;
 use tch::{Device, Tensor};
 
 /// Activation functions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Activation {
     /// No transformation
     Identity,

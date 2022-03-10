@@ -7,13 +7,16 @@ pub use lstm::{Lstm, LstmConfig};
 
 use super::super::super::initializers::{Initializer, VarianceScale};
 use super::super::{BuildModule, IterativeModule, Module, ModuleExtras};
+use crate::utils::torch::TensorDef;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use smallvec::SmallVec;
 use std::marker::PhantomData;
 use std::slice;
 use tch::{Cuda, Device, Tensor};
 
 /// Basic recurrent neural network configuration
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RnnBaseConfig<T> {
     /// Number of layers; each has size equal to the output size when built.
     pub num_layers: usize,
@@ -80,11 +83,17 @@ pub trait RnnImpl {
         Self: Sized;
 }
 
-#[derive(Debug, PartialEq)]
+const fn cpu_device() -> Device {
+    Device::Cpu
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RnnBase<T> {
     weights: RnnWeights,
     hidden_size: usize,
     dropout: f64,
+    // Weights will deserialize to Cpu, this should match
+    #[serde(skip, default = "cpu_device")]
     device: Device,
     type_: PhantomData<fn() -> T>,
 }
@@ -174,8 +183,10 @@ impl<T: RnnImpl> IterativeModule for RnnBase<T> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[serde_as]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct RnnWeights {
+    #[serde_as(as = "Vec<TensorDef>")]
     flat_weights: Vec<Tensor>,
     has_biases: bool,
 }

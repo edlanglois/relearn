@@ -1,10 +1,11 @@
 //! Tensor initializers
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tch::{Device, Kind, Tensor};
 use thiserror::Error;
 
 /// Tensor initializers.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Initializer {
     /// Initialize to all zeros
     Zeros,
@@ -36,7 +37,7 @@ impl Default for Initializer {
 }
 
 /// Variance scaling mode.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum VarianceScale {
     /// The initializer sampling variance is set to the given constant.
     Constant(f64),

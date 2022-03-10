@@ -3,12 +3,13 @@ use super::super::{
     BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras, SequenceModule,
 };
 use super::{Activation, Linear, LinearConfig};
+use serde::{Deserialize, Serialize};
 use std::iter::{self, FlatMap};
 use std::slice;
 use tch::{Device, Tensor};
 
 /// Configuration for the [`Mlp`] module.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MlpConfig {
     /// Sizes of the hidden layers
     pub hidden_sizes: Vec<usize>,
@@ -40,7 +41,7 @@ impl BuildModule for MlpConfig {
 }
 
 /// Multi-layer perceptron
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Mlp {
     layers: Vec<Linear>,
     activation: Activation,
@@ -237,6 +238,16 @@ mod tests {
     #[test]
     fn clone_to_same_device() {
         testing::check_config_clone_to_same_device::<RunForward, _>(&MlpConfig::default());
+    }
+
+    #[rstest]
+    #[case::forward(RunForward)]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn ser_de_matches<R: RunModule<Mlp>>(#[case] _runner: R, default_module: (Mlp, usize, usize)) {
+        let (module, in_dim, _) = default_module;
+        testing::check_ser_de_matches::<R, _>(&module, in_dim);
     }
 
     #[rstest]

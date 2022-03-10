@@ -2,6 +2,7 @@
 use super::super::super::SequenceModule;
 use super::super::seq_serial_map;
 use super::{RnnBase, RnnBaseConfig, RnnImpl, RnnLayerWeights};
+use serde::{Deserialize, Serialize};
 use tch::{Device, IndexOp, Kind, Tensor};
 
 /// Configuration for [`Lstm`]
@@ -10,7 +11,7 @@ pub type LstmConfig = RnnBaseConfig<LstmImpl>;
 /// Long Short-Term Memory Module
 pub type Lstm = RnnBase<LstmImpl>;
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LstmImpl;
 impl RnnImpl for LstmImpl {
     type CellState = (Tensor, Tensor);
@@ -193,6 +194,15 @@ mod tests {
     #[test]
     fn clone_to_same_device() {
         testing::check_config_clone_to_same_device::<RunSeqPacked, _>(&LstmConfig::default());
+    }
+
+    #[rstest]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn ser_de_matches<R: RunModule<Lstm>>(#[case] _runner: R, lstm: (Lstm, usize, usize)) {
+        let (module, in_dim, _) = lstm;
+        testing::check_ser_de_matches::<R, _>(&module, in_dim);
     }
 
     #[rstest]

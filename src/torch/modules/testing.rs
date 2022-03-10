@@ -2,6 +2,7 @@
 use super::{BuildModule, FeedForwardModule, IterativeModule, Module, SequenceModule};
 use crate::torch::initializers::{Initializer, VarianceScale};
 use crate::torch::optimizers::{BuildOptimizer, OnceOptimizer, SgdConfig};
+use serde::{de::DeserializeOwned, Serialize};
 use smallvec::SmallVec;
 use std::fmt::Debug;
 use std::iter;
@@ -275,6 +276,26 @@ where
         }
     }
     assert_eq!(original_module, new_module);
+}
+
+/// Check that serializing and deserializing a module matches the original in value and output.
+pub fn check_ser_de_matches<R, M>(module: &M, in_dim: usize)
+where
+    M: Module + Serialize + DeserializeOwned + PartialEq + Debug,
+    R: RunModule<M>,
+{
+    let serialized = serde_cbor::to_vec(module).unwrap();
+    let deserialized_module: M = serde_cbor::from_slice(&serialized).unwrap();
+
+    assert_eq!(module, &deserialized_module);
+
+    // Initializer for input and target tensors: Unif[-1,1]
+    let init = Initializer::Uniform(VarianceScale::Constant(1.0 / 3.0));
+    let input = R::new_input(init, in_dim, Device::Cpu);
+
+    let module_output = R::run(module, &input);
+    let deserialized_module_output = R::run(&deserialized_module, &input);
+    assert_eq!(module_output, deserialized_module_output);
 }
 
 pub trait RunModule<M: ?Sized> {
