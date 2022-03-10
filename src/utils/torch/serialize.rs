@@ -4,7 +4,7 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, Bytes, DeserializeAs, SerializeAs};
 use std::borrow::Cow;
-use tch::{Kind, Tensor};
+use tch::{Device, Kind, Tensor};
 
 /// Remote serialization definition for [`tch::Kind`].
 ///
@@ -28,6 +28,16 @@ pub enum KindDef {
     QUInt8,
     QInt32,
     BFloat16,
+}
+
+/// Remote serialization definition for [`tch::Device`].
+///
+/// Use `#[serde(with = "DeviceDef")]` when serializing a field of type [`Device`].
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "Device")]
+pub enum DeviceDef {
+    Cpu,
+    Cuda(usize),
 }
 
 /// System byte order serialization.

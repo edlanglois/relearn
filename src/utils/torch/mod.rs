@@ -4,4 +4,4 @@ mod exclusive_tensor;
 mod serialize;
 
 pub use exclusive_tensor::ExclusiveTensor;
-pub use serialize::{ByteOrder, KindDef, TensorDef};
+pub use serialize::{ByteOrder, DeviceDef, KindDef, TensorDef};
