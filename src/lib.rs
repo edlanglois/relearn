@@ -51,7 +51,6 @@ pub mod utils;
 pub use agents::{Actor, Agent, BatchUpdate, BuildAgent};
 pub use envs::{BuildEnv, EnvStructure, Environment};
 pub use simulation::{train_parallel, train_serial, Step};
-pub use utils::save::SaveLoad;
 
 /// Pseudo-random number generator type used by agents and environments in this crate.
 ///
