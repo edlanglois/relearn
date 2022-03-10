@@ -62,7 +62,7 @@ where
     CUB::Updater: UpdateCritic,
 {
     #[allow(clippy::type_complexity)]
-    type Agent = ActorCriticAgent<OS, AS, PB, PB::Module, PUB::Updater, CB::Critic, CUB::Updater>;
+    type Agent = ActorCriticAgent<OS, AS, PB::Module, PUB::Updater, CB::Critic, CUB::Updater>;
 
     fn build_agent(
         &self,
@@ -74,7 +74,7 @@ where
 }
 
 /// Actor-critic agent.
-pub struct ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
+pub struct ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
     OS: EncoderFeatureSpace,
 {
@@ -82,7 +82,6 @@ where
     min_batch_steps: usize,
     discount_factor: f64,
 
-    policy_config: PB,
     policy: P,
     policy_updater: PU,
 
@@ -92,12 +91,11 @@ where
     device: Device,
 }
 
-impl<OS, AS, PB, P, PU, C, CU> Debug for ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
+impl<OS, AS, P, PU, C, CU> Debug for ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
     OS: EncoderFeatureSpace + Debug,
     OS::Encoder: Debug,
     AS: Debug,
-    PB: Debug,
     P: Debug,
     PU: Debug,
     C: Debug,
@@ -108,7 +106,6 @@ where
             .field("spaces", &self.spaces)
             .field("min_batch_steps", &self.min_batch_steps)
             .field("discount_factor", &self.discount_factor)
-            .field("policy_config", &self.policy_config)
             .field("policy", &self.policy)
             .field("policy_updater", &self.policy_updater)
             .field("critic", &self.critic)
@@ -118,17 +115,17 @@ where
     }
 }
 
-impl<OS, AS, PB, P, PU, C, CU> ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
+impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
     OS: EncoderFeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
-    PB: BuildModule<Module = P> + Clone,
     P: Module,
     C: Critic,
 {
-    pub fn new<E, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
+    pub fn new<E, PB, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
+        PB: BuildModule<Module = P> + Clone,
         PUB: BuildPolicyUpdater<AS, Updater = PU>,
         CB: BuildCritic<Critic = C>,
         CUB: BuildCriticUpdater<Updater = CU>,
@@ -160,7 +157,6 @@ where
             }),
             min_batch_steps: config.min_batch_steps,
             discount_factor,
-            policy_config: config.policy_config.clone(),
             policy,
             policy_updater,
             critic,
@@ -170,12 +166,11 @@ where
     }
 }
 
-impl<OS, AS, PB, P, PU, C, CU> Agent<OS::Element, AS::Element>
-    for ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
+impl<OS, AS, P, PU, C, CU> Agent<OS::Element, AS::Element>
+    for ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
     OS: EncoderFeatureSpace + 'static,
     AS: ParameterizedDistributionSpace<Tensor> + 'static,
-    PB: BuildModule<Module = P>,
     P: SequenceModule + IterativeModule,
     PU: UpdatePolicy<AS>,
     C: Critic,
@@ -193,8 +188,8 @@ where
     }
 }
 
-impl<OS, AS, PB, P, PU, C, CU> BatchUpdate<OS::Element, AS::Element>
-    for ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
+impl<OS, AS, P, PU, C, CU> BatchUpdate<OS::Element, AS::Element>
+    for ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
     OS: EncoderFeatureSpace + 'static,
     AS: ReprSpace<Tensor> + 'static,
@@ -242,7 +237,7 @@ where
     }
 }
 
-impl<OS, AS, PB, P, PU, C, CU> ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
+impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
     OS: EncoderFeatureSpace + 'static,
     AS: ReprSpace<Tensor> + 'static,
