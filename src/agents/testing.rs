@@ -17,7 +17,7 @@ where
     let mut env_rng = Prng::seed_from_u64(18);
     let mut agent_rng = Prng::seed_from_u64(19);
 
-    let env = DeterministicBandit::from_values(vec![0.0, 1.0]);
+    let env = DeterministicBandit::from_values([0.0, 1.0]);
     let mut agent = agent_config
         .build_agent(&env, &mut agent_rng)
         .expect("failed to build agent");

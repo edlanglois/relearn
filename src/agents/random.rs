@@ -103,4 +103,30 @@ impl<O, AS: Space> BatchUpdate<O, AS::Element> for RandomAgent<AS> {
     }
 }
 
-// TODO test
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::envs::{DeterministicBandit, EnvStructure, Environment};
+    use crate::simulation::SimSeed;
+    use rand::SeedableRng;
+
+    #[test]
+    /// Check that actions are contained in env action space.
+    fn actions_are_legal() {
+        let env = DeterministicBandit::from_values([0.0, 1.0, 0.5]);
+        let agent = RandomAgentConfig
+            .build_agent(&env, &mut Prng::seed_from_u64(116))
+            .unwrap();
+        let actor = Agent::<<DeterministicBandit as EnvStructure>::ObservationSpace, _>::actor(
+            &agent,
+            ActorMode::Training,
+        );
+        let action_space = env.action_space();
+
+        let mut logger = ();
+        let steps = env.run(&actor, SimSeed::Root(117), &mut logger);
+        for step in steps.take(1000) {
+            assert!(action_space.contains(&step.action));
+        }
+    }
+}
