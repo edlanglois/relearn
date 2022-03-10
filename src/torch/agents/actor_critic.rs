@@ -12,7 +12,6 @@ use crate::spaces::{
     EncoderFeatureSpace, NonEmptyFeatures, NumFeatures, ParameterizedDistributionSpace, ReprSpace,
 };
 use crate::Prng;
-use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Instant;
@@ -74,10 +73,8 @@ where
 }
 
 /// Actor-critic agent.
-pub struct ActorCriticAgent<OS, AS, P, PU, C, CU>
-where
-    OS: EncoderFeatureSpace,
-{
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActorCriticAgent<OS, AS, P, PU, C, CU> {
     spaces: Arc<Spaces<OS, AS>>,
     min_batch_steps: usize,
     discount_factor: f64,
@@ -91,33 +88,9 @@ where
     device: Device,
 }
 
-impl<OS, AS, P, PU, C, CU> Debug for ActorCriticAgent<OS, AS, P, PU, C, CU>
-where
-    OS: EncoderFeatureSpace + Debug,
-    OS::Encoder: Debug,
-    AS: Debug,
-    P: Debug,
-    PU: Debug,
-    C: Debug,
-    CU: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ActorCriticAgent")
-            .field("spaces", &self.spaces)
-            .field("min_batch_steps", &self.min_batch_steps)
-            .field("discount_factor", &self.discount_factor)
-            .field("policy", &self.policy)
-            .field("policy_updater", &self.policy_updater)
-            .field("critic", &self.critic)
-            .field("critic_updater", &self.critic_updater)
-            .field("device", &self.device)
-            .finish()
-    }
-}
-
 impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
-    OS: EncoderFeatureSpace,
+    OS: NumFeatures,
     AS: ParameterizedDistributionSpace<Tensor>,
     P: Module,
     C: Critic,
