@@ -125,7 +125,7 @@ impl<S: NumFeatures, const N: usize> NumFeatures for ArraySpace<S, N> {
 }
 
 /// Feature encoder for [`ArraySpace`]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArraySpaceEncoder<T, const N: usize> {
     inner_encoders: [T; N],
     /// Ending offsets for the feature vector of each inner space.

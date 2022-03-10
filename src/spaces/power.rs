@@ -96,6 +96,7 @@ impl<S: NumFeatures, const N: usize> NumFeatures for PowerSpace<S, N> {
 }
 
 /// Feature encoder for [`PowerSpace`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PowerSpaceEncoder<T> {
     inner_encoder: T,
     inner_num_features: usize,
