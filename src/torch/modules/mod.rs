@@ -289,7 +289,6 @@ pub trait IterativeModule {
     where
         I: IntoIterator,
         I::Item: AsRef<Tensor>,
-        Self: Sized,
     {
         ModuleStepIter::new(self, inputs.into_iter())
     }

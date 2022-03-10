@@ -93,8 +93,12 @@ impl SequenceModule for Gru {
 }
 
 #[cfg(test)]
+#[allow(clippy::needless_pass_by_value)]
 mod tests {
-    use super::super::super::super::{testing, Module};
+    use super::super::super::super::testing::{
+        self, RunIterStep, RunModule, RunSeqPacked, RunSeqSerial,
+    };
+    use super::super::super::super::Module;
     use super::*;
     use rstest::{fixture, rstest};
     use tch::Device;
@@ -155,20 +159,25 @@ mod tests {
         testing::check_seq_packed_matches_iter_steps(&gru, in_dim, out_dim);
     }
 
-    #[test]
-    fn seq_packed_gradient_descent() {
-        let config = GruConfig::default();
-        testing::check_config_seq_packed_gradient_descent(&config);
+    #[rstest]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn gradient_descent<R: RunModule<Gru>>(#[case] _runner: R) {
+        testing::check_config_gradient_descent::<R, _>(&GruConfig::default());
     }
 
-    #[test]
-    fn clone_to_new_device() {
-        testing::check_config_seq_packed_clone_to_new_device(&GruConfig::default());
+    #[rstest]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn clone_to_new_device<R: RunModule<Gru>>(#[case] _runner: R) {
+        testing::check_config_clone_to_new_device::<R, _>(&GruConfig::default());
     }
 
     #[test]
     fn clone_to_same_device() {
-        testing::check_config_seq_packed_clone_to_same_device(&GruConfig::default());
+        testing::check_config_clone_to_same_device::<RunSeqPacked, _>(&GruConfig::default());
     }
 
     #[rstest]

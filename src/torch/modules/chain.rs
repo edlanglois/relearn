@@ -323,8 +323,12 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::needless_pass_by_value)]
 mod tests {
-    use super::super::{testing, Gru, GruConfig, Mlp, MlpConfig};
+    use super::super::testing::{
+        self, RunForward, RunIterStep, RunModule, RunSeqPacked, RunSeqSerial,
+    };
+    use super::super::{Gru, GruConfig, Mlp, MlpConfig};
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{Device, Kind};
@@ -400,34 +404,48 @@ mod tests {
         testing::check_seq_packed_matches_iter_steps(&gru_mlp, in_dim, out_dim);
     }
 
-    #[test]
-    fn chained_mlp_forward_gradient_descent() {
-        testing::check_config_forward_gradient_descent(&chained_mlp_config());
+    #[rstest]
+    #[case::forward(RunForward)]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn chained_mlp_gradient_descent<R: RunModule<Chain<Mlp, Mlp>>>(#[case] _runner: R) {
+        testing::check_config_gradient_descent::<R, _>(&chained_mlp_config());
+    }
+
+    #[rstest]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn gru_mlp_gradient_descent<R: RunModule<Chain<Gru, Mlp>>>(#[case] _runner: R) {
+        testing::check_config_gradient_descent::<R, _>(&chained_gru_mlp_config());
+    }
+
+    #[rstest]
+    #[case::forward(RunForward)]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn chained_mlp_clone_to_new_device<R: RunModule<Chain<Mlp, Mlp>>>(#[case] _runner: R) {
+        testing::check_config_clone_to_new_device::<R, _>(&chained_mlp_config());
+    }
+
+    #[rstest]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn gru_mlp_clone_to_new_device<R: RunModule<Chain<Gru, Mlp>>>(#[case] _runner: R) {
+        testing::check_config_clone_to_new_device::<R, _>(&chained_gru_mlp_config());
     }
 
     #[test]
-    fn gru_mlp_seq_packed_gradient_descent() {
-        testing::check_config_seq_packed_gradient_descent(&chained_gru_mlp_config());
+    fn chained_mlp_clone_to_same_device() {
+        testing::check_config_clone_to_same_device::<RunForward, _>(&chained_mlp_config());
     }
 
     #[test]
-    fn chained_mlp_forward_clone_to_new_device() {
-        testing::check_config_forward_clone_to_new_device(&chained_mlp_config());
-    }
-
-    #[test]
-    fn chained_mlp_forward_clone_to_same_device() {
-        testing::check_config_forward_clone_to_same_device(&chained_mlp_config());
-    }
-
-    #[test]
-    fn gru_mlp_seq_packed_clone_to_new_device() {
-        testing::check_config_seq_packed_clone_to_new_device(&chained_gru_mlp_config());
-    }
-
-    #[test]
-    fn gru_mlp_seq_packed_clone_to_same_device() {
-        testing::check_config_seq_packed_clone_to_same_device(&chained_gru_mlp_config());
+    fn gru_mlp_clone_to_same_device() {
+        testing::check_config_clone_to_same_device::<RunSeqPacked, _>(&chained_gru_mlp_config());
     }
 
     #[rstest]

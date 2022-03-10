@@ -141,8 +141,11 @@ impl IterativeModule for Linear {
 }
 
 #[cfg(test)]
+#[allow(clippy::needless_pass_by_value)]
 mod tests {
-    use super::super::super::testing;
+    use super::super::super::testing::{
+        self, RunForward, RunIterStep, RunModule, RunSeqPacked, RunSeqSerial,
+    };
     use super::*;
     use rstest::{fixture, rstest};
     use tch::{kind::Kind, Device};
@@ -198,24 +201,27 @@ mod tests {
         testing::check_seq_packed_matches_iter_steps(&module, in_dim, out_dim);
     }
 
-    #[test]
-    fn forward_gradient_descent() {
-        testing::check_config_forward_gradient_descent(&LinearConfig::default());
+    #[rstest]
+    #[case::forward(RunForward)]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn gradient_descent<R: RunModule<Linear>>(#[case] _runner: R) {
+        testing::check_config_gradient_descent::<R, _>(&LinearConfig::default());
     }
 
-    #[test]
-    fn seq_packed_gradient_descent() {
-        testing::check_config_forward_gradient_descent(&LinearConfig::default());
-    }
-
-    #[test]
-    fn clone_to_new_device() {
-        testing::check_config_forward_clone_to_new_device(&LinearConfig::default());
+    #[rstest]
+    #[case::forward(RunForward)]
+    #[case::seq_serial(RunSeqSerial)]
+    #[case::seq_packed(RunSeqPacked)]
+    #[case::iter_step(RunIterStep)]
+    fn clone_to_new_device<R: RunModule<Linear>>(#[case] _runner: R) {
+        testing::check_config_clone_to_new_device::<R, _>(&LinearConfig::default());
     }
 
     #[test]
     fn clone_to_same_device() {
-        testing::check_config_forward_clone_to_same_device(&LinearConfig::default());
+        testing::check_config_clone_to_same_device::<RunForward, _>(&LinearConfig::default());
     }
 
     #[rstest]

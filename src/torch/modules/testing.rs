@@ -1,6 +1,8 @@
 //! Module test utilities.
 use super::{BuildModule, FeedForwardModule, IterativeModule, Module, SequenceModule};
+use crate::torch::initializers::{Initializer, VarianceScale};
 use crate::torch::optimizers::{BuildOptimizer, OnceOptimizer, SgdConfig};
+use smallvec::SmallVec;
 use std::fmt::Debug;
 use std::iter;
 use tch::{self, kind::Kind, Device, IndexOp, Tensor};
@@ -145,108 +147,60 @@ where
     }
 }
 
-/// Check that gradient descent improves the output of a forward model.
-pub fn check_config_forward_gradient_descent<MC>(config: &MC)
+/// Check that gradient descent improves the output of a model.
+pub fn check_config_gradient_descent<R, MC>(config: &MC)
 where
     MC: BuildModule,
-    MC::Module: FeedForwardModule,
+    R: RunModule<MC::Module>,
 {
     let in_dim = 2;
     let out_dim = 32; // needs to be large enough to avoid all 0 from ReLU by chance
-    let kind = Kind::Float;
     let device = Device::Cpu;
 
-    // Input batch consists of a row of zeros and a row of ones.
-    let input = Tensor::stack(
-        &[
-            Tensor::zeros(&[in_dim as i64], (kind, device)),
-            Tensor::ones(&[in_dim as i64], (kind, device)),
-        ],
-        0,
-    );
-    // Target is the identity function (except dimension size)
-    let target = Tensor::stack(
-        &[
-            Tensor::zeros(&[out_dim as i64], (kind, device)),
-            Tensor::ones(&[out_dim as i64], (kind, device)),
-        ],
-        0,
-    );
+    // Initializer for input and target tensors: Unif[-1,1]
+    let init = Initializer::Uniform(VarianceScale::Constant(1.0 / 3.0));
+    let input = R::new_input(init, in_dim, device);
+    let target = init
+        .tensor(&R::output_shape(out_dim))
+        .device(device)
+        .requires_grad(false)
+        .build();
 
-    let model = config.build_module(in_dim, out_dim, device);
+    let module = config.build_module(in_dim, out_dim, device);
     let mut optimizer = SgdConfig::default()
-        .build_optimizer(model.trainable_variables())
+        .build_optimizer(module.trainable_variables())
         .unwrap();
 
-    let initial_output = model.forward(&input);
+    let initial_output = R::run(&module, &input);
+    let initial_loss = (&initial_output - &target).square().sum(Kind::Float);
 
-    let initial_loss = (&initial_output - &target).square().sum(kind);
     optimizer
         .backward_step_once(&initial_loss, &mut ())
         .unwrap();
 
-    let final_output = model.forward(&input);
+    let final_output = R::run(&module, &input);
     assert_ne!(initial_output, final_output);
 
-    let final_loss = (&final_output - &target).square().sum(kind);
+    let final_loss = (&final_output - &target).square().sum(Kind::Float);
     let initial_loss_value: f32 = initial_loss.into();
     let final_loss_value: f32 = final_loss.into();
     assert!(final_loss_value < initial_loss_value);
 }
 
-/// Check that gradient descent improves the output of a sequence model using `seq_packed`.
-pub fn check_config_seq_packed_gradient_descent<MC>(config: &MC)
-where
-    MC: BuildModule,
-    MC::Module: SequenceModule,
-{
-    let in_dim: usize = 2;
-    let seq_dim = 8;
-    let batch_size = 2;
-    // out_dim * seq_dim * batch_size needs to be large enough to avoid all 0s by chance from relu
-    let out_dim: usize = 8;
-    let kind = Kind::Float;
-    let device = Device::Cpu;
-
-    let input = Tensor::rand(&[seq_dim * batch_size, in_dim as i64], (kind, device));
-    let batch_sizes = Tensor::full(&[seq_dim], batch_size, (Kind::Int64, Device::Cpu));
-    let target = Tensor::rand(&[seq_dim * batch_size, out_dim as i64], (kind, device));
-
-    let model = config.build_module(in_dim, out_dim, device);
-    let mut optimizer = SgdConfig::default()
-        .build_optimizer(model.trainable_variables())
-        .unwrap();
-
-    let initial_output = model.seq_packed(&input, &batch_sizes);
-
-    let initial_loss = (&initial_output - &target).square().sum(kind);
-    optimizer
-        .backward_step_once(&initial_loss, &mut ())
-        .unwrap();
-
-    let final_output = model.seq_packed(&input, &batch_sizes);
-    assert_ne!(initial_output, final_output);
-
-    let final_loss = (&final_output - &target).square().sum(kind);
-    let initial_loss_value: f32 = initial_loss.into();
-    let final_loss_value: f32 = final_loss.into();
-    assert!(final_loss_value < initial_loss_value);
-}
-
-/// Basic check of cloning a `FeedForwardModule` to a new device.
+/// Try to check that a model can be cloned to a new device.
 ///
-/// Constructs a model on `Cuda` if available and clones to `Cpu`.
+/// Constructs a module on `Cuda` if available and clones to `Cpu`.
 /// Ends immediately if `Cuda` is not available.
-/// Checks that `forward` works on the new module and on the original module before and after
-/// cloning.
-pub fn check_config_forward_clone_to_new_device<MC>(config: &MC)
+/// Checks that
+/// * the original module runs after cloning
+/// * the new module runs after cloning and its output matches the original module
+pub fn check_config_clone_to_new_device<R, MC>(config: &MC)
 where
     MC: BuildModule,
-    MC::Module: FeedForwardModule,
+    R: RunModule<MC::Module>,
 {
     let in_dim = 2;
     let out_dim = 3;
-    let kind = Kind::Float;
     let initial_device = Device::cuda_if_available();
     let target_device = Device::Cpu;
 
@@ -254,108 +208,64 @@ where
         return;
     }
 
-    let original_input = Tensor::ones(&[in_dim as i64], (kind, initial_device));
-    let new_input = Tensor::ones(&[in_dim as i64], (kind, target_device));
+    let init = Initializer::Constant(1.0);
+    let original_input = R::new_input(init, in_dim, initial_device);
+    let new_input = R::new_input(init, in_dim, target_device);
 
     let original_module = config.build_module(in_dim, out_dim, initial_device);
-
-    // Check that forward works without crashing
-    let _ = original_module.forward(&original_input);
 
     // Clone to target device
     let new_module = original_module.clone_to_device(target_device);
 
-    // Check that forward still works on the original module
-    let original_output = original_module.forward(&original_input);
+    // Check that the original still works
+    let original_output = R::run(&original_module, &original_input);
 
-    // Check that forward works on the new module with the target device
-    let new_output = new_module.forward(&new_input);
+    // Check that the new module works with input on the target device
+    let new_output = R::run(&new_module, &new_input);
 
     // Check that the ouputs are equal
     assert_allclose(&original_output.to_device(target_device), &new_output);
 }
 
-/// Basic check of cloning a `SequenceModule` to a new device.
-///
-/// Constructs a model on `Cuda` if available and clones to `Cpu`.
-/// Ends immediately if `Cuda` is not available.
-/// Checks that `seq_packed` works on the new module and on the original module before and after
-/// cloning.
-pub fn check_config_seq_packed_clone_to_new_device<MC>(config: &MC)
-where
-    MC: BuildModule,
-    MC::Module: SequenceModule,
-{
-    let in_dim = 2;
-    let out_dim = 3;
-    // A sequence of length 3 and one of length 1
-    let batch_sizes_array = [2, 1, 1_i64];
-    let batch_sizes = Tensor::of_slice(&batch_sizes_array); // Must always be on CPU
-    let total_num_steps: i64 = batch_sizes_array.iter().sum();
-
-    let kind = Kind::Float;
-    let initial_device = Device::cuda_if_available();
-    let target_device = Device::Cpu;
-
-    if initial_device == target_device {
-        return;
-    }
-
-    let original_input = Tensor::ones(&[total_num_steps, in_dim as i64], (kind, initial_device));
-    let new_input = Tensor::ones(&[total_num_steps, in_dim as i64], (kind, target_device));
-
-    let original_module = config.build_module(in_dim, out_dim, initial_device);
-
-    // Check that forward works without crashing
-    let _ = original_module.seq_packed(&original_input, &batch_sizes);
-
-    // Clone to target device
-    let new_module = original_module.clone_to_device(target_device);
-
-    // Check that forward still works on the original module
-    let original_output = original_module.seq_packed(&original_input, &batch_sizes);
-
-    // Check that forward works on the new module with the target device
-    let new_output = new_module.seq_packed(&new_input, &batch_sizes);
-
-    // Check that the ouputs are equal
-    assert_allclose(&original_output.to_device(target_device), &new_output);
-}
-
-/// Basic check of cloning a `FeedForwardModule` to the same device.
+/// Check use of `clone_to_device` to the same device.
 ///
 /// Constructs a module on `Cpu` and clones to `Cpu`.
-/// Checks that `forward` works on the new module and on the original module before and after
-/// cloning.
-/// Checks that the weights are shared.
-pub fn check_config_forward_clone_to_same_device<MC>(config: &MC)
+///
+/// Checks that
+/// * the original module runs before cloning
+/// * the original module runs after cloning
+/// * the new module runs after cloning and its output matches the original module
+/// * the modules share memory; they are equal after modifying the variables of one.
+pub fn check_config_clone_to_same_device<R, MC>(config: &MC)
 where
     MC: BuildModule,
-    MC::Module: FeedForwardModule + PartialEq + Debug,
+    MC::Module: PartialEq + Debug,
+    R: RunModule<MC::Module>,
 {
     let in_dim = 2;
     let out_dim = 3;
-    let kind = Kind::Float;
     let device = Device::Cpu;
 
-    let input = Tensor::ones(&[in_dim as i64], (kind, device));
+    // Initializer for input tensor: Unif[-1,1]
+    let init = Initializer::Uniform(VarianceScale::Constant(1.0 / 3.0));
+    let input = R::new_input(init, in_dim, device);
 
     let original_module = config.build_module(in_dim, out_dim, device);
 
-    // Check that forward works without crashing
-    let _ = original_module.forward(&input);
+    // Check that the original module runs without crashing
+    let _ = R::run(&original_module, &input);
 
     // Clone to target device
     let new_module = original_module.clone_to_device(device);
 
-    // Check that forward still works on the original module
-    let original_output = original_module.forward(&input);
+    // Check that the original still works
+    let original_output = R::run(&original_module, &input);
 
-    // Check that forward works on the new module with the target device
-    let new_output = new_module.forward(&input);
+    // Check that the new module works with input on the target device
+    let new_output = R::run(&new_module, &input);
 
     // Check that the ouputs are equal
-    assert_eq!(original_output, new_output);
+    assert_allclose(&original_output, &new_output);
 
     // Modify the variables of the original module and check that the modules are still equal.
     {
@@ -367,52 +277,152 @@ where
     assert_eq!(original_module, new_module);
 }
 
-/// Basic check of cloning a `SequenceModule` to the same device.
-///
-/// Constructs a model on `Cpu` and clones to `Cpu`.
-/// Ends immediately if `Cuda` is not available.
-/// Checks that `seq_packed` works on the new module and on the original module before and after
-/// cloning.
-pub fn check_config_seq_packed_clone_to_same_device<MC>(config: &MC)
+pub trait RunModule<M: ?Sized> {
+    /// Model input
+    type Input;
+
+    /// Generate an input for the model based on an initializer.
+    ///
+    /// Makes arbitrary choices about the input structure where not specified
+    /// (e.g. batch size, sequence length).
+    fn new_input(initializer: Initializer, in_dim: usize, device: Device) -> Self::Input;
+
+    /// The shape of an output tensor when the module is given an input from `new_input`.
+    ///
+    /// `out_dim` is the model's number of output features.
+    fn output_shape(out_dim: usize) -> SmallVec<[usize; 4]>;
+
+    /// Run the module on the given input. Produces a [`Tensor`] containing the output.
+    fn run(module: &M, input: &Self::Input) -> Tensor;
+}
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct RunForward;
+impl RunForward {
+    const BATCH_SIZE: usize = 3;
+}
+impl<M> RunModule<M> for RunForward
 where
-    MC: BuildModule,
-    MC::Module: SequenceModule + PartialEq + Debug,
+    M: FeedForwardModule + ?Sized,
 {
-    let in_dim = 2;
-    let out_dim = 3;
-    // A sequence of length 3 and one of length 1
-    let batch_sizes_array = [2, 1, 1_i64];
-    let batch_sizes = Tensor::of_slice(&batch_sizes_array); // Must always be on CPU
-    let total_num_steps: i64 = batch_sizes_array.iter().sum();
+    type Input = Tensor;
 
-    let kind = Kind::Float;
-    let device = Device::Cpu;
-
-    let input = Tensor::ones(&[total_num_steps, in_dim as i64], (kind, device));
-
-    let original_module = config.build_module(in_dim, out_dim, device);
-
-    // Check that forward works without crashing
-    let _ = original_module.seq_packed(&input, &batch_sizes);
-
-    // Clone to target device
-    let new_module = original_module.clone_to_device(device);
-
-    // Check that forward still works on the original module
-    let original_output = original_module.seq_packed(&input, &batch_sizes);
-
-    // Check that forward works on the new module with the target device
-    let new_output = new_module.seq_packed(&input, &batch_sizes);
-
-    // Check that the ouputs are equal
-    assert_allclose(&original_output.to_device(device), &new_output);
-
-    // Modify the variables of the original module and check that the modules are still equal.
-    {
-        let _no_grad_guard = tch::no_grad_guard();
-        for tensor in original_module.variables() {
-            let _ = tensor.shallow_clone().fill_(1);
-        }
+    fn new_input(initializer: Initializer, in_dim: usize, device: Device) -> Self::Input {
+        initializer
+            .tensor(&[Self::BATCH_SIZE, in_dim])
+            .device(device)
+            .requires_grad(false)
+            .build()
     }
-    assert_eq!(original_module, new_module);
+
+    fn output_shape(out_dim: usize) -> SmallVec<[usize; 4]> {
+        [Self::BATCH_SIZE, out_dim].into_iter().collect()
+    }
+
+    fn run(module: &M, input: &Self::Input) -> Tensor {
+        module.forward(input)
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct RunSeqSerial;
+impl RunSeqSerial {
+    const BATCH_SIZE: usize = 2;
+    const SEQ_LENGTHS: [usize; 3] = [4, 3, 1];
+}
+impl<M> RunModule<M> for RunSeqSerial
+where
+    M: SequenceModule + ?Sized,
+{
+    /// (inputs, sequence lengths)
+    type Input = (Tensor, [usize; 3]);
+
+    fn new_input(initializer: Initializer, in_dim: usize, device: Device) -> Self::Input {
+        let total_seq_len = Self::SEQ_LENGTHS.iter().sum();
+        let input = initializer
+            .tensor(&[Self::BATCH_SIZE, total_seq_len, in_dim])
+            .device(device)
+            .requires_grad(false)
+            .build();
+        (input, Self::SEQ_LENGTHS)
+    }
+
+    fn output_shape(out_dim: usize) -> SmallVec<[usize; 4]> {
+        let total_seq_len = Self::SEQ_LENGTHS.iter().sum();
+        [Self::BATCH_SIZE, total_seq_len, out_dim]
+            .into_iter()
+            .collect()
+    }
+
+    fn run(module: &M, input: &Self::Input) -> Tensor {
+        module.seq_serial(&input.0, &input.1)
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct RunSeqPacked;
+impl RunSeqPacked {
+    // Represents sequences of length [4, 3, 1]
+    const BATCH_SIZES: [usize; 4] = [3, 2, 2, 1];
+}
+impl<M> RunModule<M> for RunSeqPacked
+where
+    M: SequenceModule + ?Sized,
+{
+    /// (inputs, batch sizes)
+    type Input = (Tensor, Tensor);
+
+    fn new_input(initializer: Initializer, in_dim: usize, device: Device) -> Self::Input {
+        let total_steps = Self::BATCH_SIZES.iter().sum();
+        let input = initializer
+            .tensor(&[total_steps, in_dim])
+            .device(device)
+            .requires_grad(false)
+            .build();
+        let batch_sizes_i64: [i64; 4] = array_init::array_init(|i| Self::BATCH_SIZES[i] as i64);
+        let batch_sizes = Tensor::of_slice(&batch_sizes_i64);
+        (input, batch_sizes)
+    }
+
+    fn output_shape(out_dim: usize) -> SmallVec<[usize; 4]> {
+        let total_steps = Self::BATCH_SIZES.iter().sum();
+        [total_steps, out_dim].into_iter().collect()
+    }
+
+    fn run(module: &M, input: &Self::Input) -> Tensor {
+        module.seq_packed(&input.0, &input.1)
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct RunIterStep;
+impl RunIterStep {
+    const SEQ_LEN: usize = 5;
+}
+impl<M> RunModule<M> for RunIterStep
+where
+    M: IterativeModule + ?Sized,
+{
+    type Input = Vec<Tensor>;
+
+    fn new_input(initializer: Initializer, in_dim: usize, device: Device) -> Self::Input {
+        iter::repeat_with(|| {
+            initializer
+                .tensor(&[in_dim])
+                .device(device)
+                .requires_grad(false)
+                .build()
+        })
+        .take(Self::SEQ_LEN)
+        .collect()
+    }
+
+    fn output_shape(out_dim: usize) -> SmallVec<[usize; 4]> {
+        [Self::SEQ_LEN, out_dim].into_iter().collect()
+    }
+
+    fn run(module: &M, inputs: &Self::Input) -> Tensor {
+        let outputs: Vec<Tensor> = module.iter(inputs).collect();
+        Tensor::stack(&outputs, 0)
+    }
 }
