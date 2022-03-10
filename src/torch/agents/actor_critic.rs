@@ -11,20 +11,23 @@ use crate::logging::StatsLogger;
 use crate::spaces::{
     EncoderFeatureSpace, NonEmptyFeatures, NumFeatures, ParameterizedDistributionSpace, ReprSpace,
 };
+use crate::utils::torch::DeviceDef;
 use crate::Prng;
-use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
+use std::fmt::{self, Debug};
 use std::sync::Arc;
 use std::time::Instant;
 use tch::{Device, Tensor};
 
 /// Configuration for [`ActorCriticAgent`]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ActorCriticConfig<PB, PUB, CB, CUB> {
     pub policy_config: PB,
     pub policy_updater_config: PUB,
     pub critic_config: CB,
     pub critic_updater_config: CUB,
     pub min_batch_steps: usize,
+    #[serde(with = "DeviceDef")]
     pub device: Device,
 }
 
@@ -73,7 +76,7 @@ where
 }
 
 /// Actor-critic agent.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActorCriticAgent<OS, AS, P, PU, C, CU> {
     spaces: Arc<Spaces<OS, AS>>,
     min_batch_steps: usize,
@@ -85,7 +88,13 @@ pub struct ActorCriticAgent<OS, AS, P, PU, C, CU> {
     critic: C,
     critic_updater: CU,
 
+    // Tensors will deserialize to CPU
+    #[serde(skip, default = "cpu_device")]
     device: Device,
+}
+
+const fn cpu_device() -> Device {
+    Device::Cpu
 }
 
 impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
@@ -281,11 +290,55 @@ where
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(from = "ActorData<OS, AS, P>")]
 pub struct ActorCriticActor<OS: EncoderFeatureSpace, AS, P> {
     spaces: Arc<Spaces<OS, AS>>,
+    #[serde(skip)]
     observation_encoder: <NonEmptyFeatures<OS> as EncoderFeatureSpace>::Encoder,
     policy: P,
 }
+
+/// Serialization data for an [`ActorCriticActor`]
+#[derive(Serialize, Deserialize)]
+struct ActorData<OS, AS, P> {
+    spaces: Spaces<OS, AS>,
+    policy: P,
+}
+
+impl<OS: EncoderFeatureSpace, AS, P> From<ActorData<OS, AS, P>> for ActorCriticActor<OS, AS, P> {
+    fn from(data: ActorData<OS, AS, P>) -> Self {
+        Self::new(Arc::new(data.spaces), data.policy)
+    }
+}
+
+impl<OS, AS, P> Debug for ActorCriticActor<OS, AS, P>
+where
+    OS: EncoderFeatureSpace + Debug,
+    OS::Encoder: Debug,
+    AS: Debug,
+    P: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ActorCriticActor")
+            .field("spaces", &self.spaces)
+            .field("observation_encoder", &self.observation_encoder)
+            .field("policy", &self.policy)
+            .finish()
+    }
+}
+
+impl<OS, AS, P> Clone for ActorCriticActor<OS, AS, P>
+where
+    OS: EncoderFeatureSpace + Clone,
+    AS: Clone,
+    P: Clone,
+{
+    fn clone(&self) -> Self {
+        Self::new(self.spaces.clone(), self.policy.clone())
+    }
+}
+
 impl<OS: EncoderFeatureSpace, AS, P> ActorCriticActor<OS, AS, P> {
     pub fn new(spaces: Arc<Spaces<OS, AS>>, policy: P) -> Self {
         Self {
@@ -325,7 +378,7 @@ where
 }
 
 /// Action and Observation spaces for `ActorCriticAgent`.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Spaces<OS, AS> {
     observation_space: NonEmptyFeatures<OS>,
     action_space: AS,
