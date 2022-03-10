@@ -283,6 +283,16 @@ pub trait IterativeModule {
     /// * `output` - The output tensor. Has shape `[NUM_OUT_FEATURES]`
     /// * `state` - A new value for the hidden state.
     fn step(&self, state: &mut Self::State, input: &Tensor) -> Tensor;
+
+    /// Iterate over input tensors
+    fn iter<I>(&self, inputs: I) -> ModuleStepIter<Self, I::IntoIter>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<Tensor>,
+        Self: Sized,
+    {
+        ModuleStepIter::new(self, inputs.into_iter())
+    }
 }
 
 /// Implement [`IterativeModule`] for a deref-able generic wrapper type.
@@ -301,3 +311,71 @@ macro_rules! impl_wrapped_iterative_module {
 }
 impl_wrapped_iterative_module!(&'_ T);
 impl_wrapped_iterative_module!(Box<T>);
+
+/// Iterator over [`IterativeModule`] step outputs.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct ModuleStepIter<'a, M: IterativeModule + ?Sized, I> {
+    module: &'a M,
+    state: M::State,
+    inputs: I,
+}
+
+impl<'a, M: IterativeModule + ?Sized, I> ModuleStepIter<'a, M, I> {
+    fn new(module: &'a M, inputs: I) -> Self {
+        Self {
+            state: module.initial_state(),
+            module,
+            inputs,
+        }
+    }
+}
+
+impl<'a, M, I> Iterator for ModuleStepIter<'a, M, I>
+where
+    M: IterativeModule + ?Sized,
+    I: Iterator,
+    I::Item: AsRef<Tensor>,
+{
+    type Item = Tensor;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(
+            self.module
+                .step(&mut self.state, self.inputs.next()?.as_ref()),
+        )
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inputs.size_hint()
+    }
+
+    fn fold<B, F>(self, init: B, mut f: F) -> B
+    where
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let module = self.module;
+        self.inputs
+            .fold(
+                (self.state, init),
+                move |(mut module_state, fold_state), input| {
+                    let new_fold_state =
+                        f(fold_state, module.step(&mut module_state, input.as_ref()));
+                    (module_state, new_fold_state)
+                },
+            )
+            .1
+    }
+}
+
+impl<'a, M, I> ExactSizeIterator for ModuleStepIter<'a, M, I>
+where
+    M: IterativeModule + ?Sized,
+    I: ExactSizeIterator,
+    I::Item: AsRef<Tensor>,
+{
+    fn len(&self) -> usize {
+        self.inputs.len()
+    }
+}

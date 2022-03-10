@@ -296,12 +296,12 @@ impl<M: IterativeModule, const N: usize> IterativeModule for [M; N] {
     type State = [M::State; N];
 
     fn initial_state(&self) -> Self::State {
-        array_init::from_iter(self.iter().map(M::initial_state)).unwrap()
+        array_init::from_iter(<[M]>::iter(self).map(M::initial_state)).unwrap()
     }
 
     fn step(&self, state: &mut Self::State, input: &Tensor) -> Tensor {
         fold_or_clone(
-            self.iter().zip(state.iter_mut()),
+            <[M]>::iter(self).zip(state.iter_mut()),
             input,
             |tensor, (module, module_state)| module.step(module_state, tensor),
         )
