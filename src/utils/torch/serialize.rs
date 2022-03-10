@@ -9,7 +9,7 @@ use tch::{Device, Kind, Tensor};
 /// Remote serialization definition for [`tch::Kind`].
 ///
 /// Use `#[serde(with = "KindDef")]` when serializing a field of type [`Kind`].
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(remote = "Kind")]
 pub enum KindDef {
     Uint8,
@@ -33,7 +33,7 @@ pub enum KindDef {
 /// Remote serialization definition for [`tch::Device`].
 ///
 /// Use `#[serde(with = "DeviceDef")]` when serializing a field of type [`Device`].
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(remote = "Device")]
 pub enum DeviceDef {
     Cpu,
