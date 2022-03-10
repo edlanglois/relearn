@@ -9,6 +9,7 @@ use super::{PolicyStats, UpdatePolicyWithOptimizer};
 use crate::logging::StatsLogger;
 use crate::spaces::ParameterizedDistributionSpace;
 use crate::utils::distributions::ArrayDistribution;
+use serde::{Deserialize, Serialize};
 use tch::{Kind, Tensor};
 
 /// Trust region policy update rule.
@@ -17,7 +18,7 @@ use tch::{Kind, Tensor};
 /// [Trust Region Policy Optimization][trpo] by Schulman et al.
 ///
 /// [trpo]: https://arxiv.org/abs/1502.05477
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TrpoPolicyUpdateRule {
     /// Maximum policy KL divergence when taking a step.
     pub max_policy_step_kl: f64,

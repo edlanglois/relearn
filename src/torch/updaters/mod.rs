@@ -24,6 +24,7 @@ use super::critic::Critic;
 use super::features::PackedHistoryFeaturesView;
 use super::modules::SequenceModule;
 use crate::logging::StatsLogger;
+use serde::{Deserialize, Serialize};
 use tch::Tensor;
 
 // TODO: Remove generic <AS> from all updater traits
@@ -107,7 +108,7 @@ pub trait UpdatePolicyWithOptimizer<O: ?Sized, AS: ?Sized> {
 }
 
 /// Common statistics from a policy update.
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolicyStats {
     pub entropy: Option<f64>,
 }

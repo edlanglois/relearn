@@ -4,6 +4,7 @@ mod gae;
 pub use gae::{Gae, GaeConfig};
 
 use super::features::PackedHistoryFeaturesView;
+use serde::{Deserialize, Serialize};
 use std::iter;
 use tch::{Device, Tensor};
 
@@ -79,7 +80,7 @@ pub trait BuildCritic {
 /// # Warning
 /// Currently does not properly handle interrupted episodes.
 /// This assumes that all episodes end with a reward of 0.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Return;
 
 impl Critic for Return {

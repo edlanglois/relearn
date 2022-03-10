@@ -7,6 +7,7 @@ use super::{PolicyStats, UpdatePolicyWithOptimizer};
 use crate::logging::StatsLogger;
 use crate::spaces::ParameterizedDistributionSpace;
 use crate::utils::distributions::ArrayDistribution;
+use serde::{Deserialize, Serialize};
 use tch::{Kind, Tensor};
 
 /// Proximal policy optimization update rule with a clipped objective.
@@ -15,7 +16,7 @@ use tch::{Kind, Tensor};
 /// [Proximal Policy Optimization Algorithms][ppo] by Schulman et al.
 ///
 /// [ppo]: https://arxiv.org/abs/1707.06347
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PpoPolicyUpdateRule {
     // pub minibatch_size: usize, // TODO: Support minibatches
     pub num_epochs: u64,

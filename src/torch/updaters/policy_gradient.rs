@@ -7,11 +7,12 @@ use super::{PolicyStats, UpdatePolicyWithOptimizer};
 use crate::logging::StatsLogger;
 use crate::spaces::ParameterizedDistributionSpace;
 use crate::utils::distributions::ArrayDistribution;
+use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 use tch::{Kind, Tensor};
 
 /// Policy gradient update rule.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PolicyGradientUpdateRule;
 
 impl<O, AS> UpdatePolicyWithOptimizer<O, AS> for PolicyGradientUpdateRule

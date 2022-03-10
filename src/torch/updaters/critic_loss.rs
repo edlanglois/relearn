@@ -1,12 +1,13 @@
 use super::super::{critic::Critic, features::PackedHistoryFeaturesView, optimizers::Optimizer};
 use super::UpdateCriticWithOptimizer;
 use crate::logging::StatsLogger;
+use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
 // TODO: Move the MSE training from critic/ to here
 
 /// Rule that updates a critic by minimizing its loss for several optimizer iterations.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CriticLossUpdateRule {
     /// Number of optimizer iterations per update
     pub optimizer_iters: u64,

@@ -7,10 +7,11 @@ use super::{
     UpdatePolicy, UpdatePolicyWithOptimizer,
 };
 use crate::logging::StatsLogger;
+use serde::{Deserialize, Serialize};
 use tch::Tensor;
 
 /// An updater constructed from an update rule and an optimizer.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct WithOptimizer<U, O> {
     pub update_rule: U,
     pub optimizer: O,

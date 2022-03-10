@@ -3,10 +3,11 @@ use super::super::features::PackedHistoryFeaturesView;
 use super::{BuildCritic, Critic};
 use crate::torch::modules::{BuildModule, SequenceModule};
 use crate::utils::packed;
+use serde::{Deserialize, Serialize};
 use tch::{Device, Reduction, Tensor};
 
 /// Generalized Advantage Estimator Config
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct GaeConfig<VC> {
     pub gamma: f64,
     pub lambda: f64,
@@ -49,7 +50,7 @@ where
 /// High-Dimensional Continuous Control Using Generalized Advantage Estimation. ICLR  2016
 /// by John Schulman, Philipp Moritz, Sergey Levine, Michael I. Jordan, Pieter Abbeel
 /// <https://arxiv.org/pdf/1506.02438.pdf>
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Gae<V> {
     /// Clips the environment discount factor to be no more than this.
     pub gamma: f64,
