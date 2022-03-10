@@ -78,7 +78,7 @@ pub struct ActorCriticAgent<OS, AS, PB, P, PU, C, CU>
 where
     OS: EncoderFeatureSpace,
 {
-    shared: Arc<ActorCriticShared<OS, AS>>,
+    spaces: Arc<Spaces<OS, AS>>,
     min_batch_steps: usize,
     discount_factor: f64,
 
@@ -105,7 +105,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ActorCriticAgent")
-            .field("shared", &self.shared)
+            .field("spaces", &self.spaces)
             .field("min_batch_steps", &self.min_batch_steps)
             .field("discount_factor", &self.discount_factor)
             .field("policy_config", &self.policy_config)
@@ -154,8 +154,7 @@ where
             .build_critic_updater(critic.trainable_variables());
 
         Self {
-            shared: Arc::new(ActorCriticShared {
-                observation_encoder: observation_space.encoder(),
+            spaces: Arc::new(Spaces {
                 observation_space,
                 action_space,
             }),
@@ -187,10 +186,10 @@ where
     fn actor(&self, _: ActorMode) -> Self::Actor {
         // TODO: Store cpu_policy in the agent and synchronize it to `policy` after every update.
         // Then use shallow_clone() to produce actor policies.
-        ActorCriticActor {
-            shared: Arc::clone(&self.shared),
-            policy: self.policy.clone_to_device(Device::Cpu),
-        }
+        ActorCriticActor::new(
+            Arc::clone(&self.spaces),
+            self.policy.clone_to_device(Device::Cpu),
+        )
     }
 }
 
@@ -268,8 +267,8 @@ where
 
         let features = LazyPackedHistoryFeatures::new(
             buffers.iter().flat_map(|b| b.episodes()),
-            &self.shared.observation_space,
-            &self.shared.action_space,
+            &self.spaces.observation_space,
+            &self.spaces.action_space,
             self.discount_factor,
             self.device,
         );
@@ -291,7 +290,7 @@ where
             &self.policy,
             &self.critic,
             &features,
-            &self.shared.action_space,
+            &self.spaces.action_space,
             &mut policy_logger,
         );
         policy_logger.log_duration("update_time", policy_update_start.elapsed());
@@ -315,8 +314,18 @@ where
 }
 
 pub struct ActorCriticActor<OS: EncoderFeatureSpace, AS, P> {
-    shared: Arc<ActorCriticShared<OS, AS>>,
+    spaces: Arc<Spaces<OS, AS>>,
+    observation_encoder: <NonEmptyFeatures<OS> as EncoderFeatureSpace>::Encoder,
     policy: P,
+}
+impl<OS: EncoderFeatureSpace, AS, P> ActorCriticActor<OS, AS, P> {
+    pub fn new(spaces: Arc<Spaces<OS, AS>>, policy: P) -> Self {
+        Self {
+            observation_encoder: spaces.observation_space.encoder(),
+            spaces,
+            policy,
+        }
+    }
 }
 
 impl<OS, AS, P> Actor<OS::Element, AS::Element> for ActorCriticActor<OS, AS, P>
@@ -339,32 +348,17 @@ where
     ) -> AS::Element {
         let _no_grad = tch::no_grad_guard();
         let input = self
-            .shared
+            .spaces
             .observation_space
-            .encoder_features::<Tensor>(observation, &self.shared.observation_encoder);
+            .encoder_features::<Tensor>(observation, &self.observation_encoder);
         let output = self.policy.step(state, &input);
-        self.shared.action_space.sample_element(&output)
+        self.spaces.action_space.sample_element(&output)
     }
 }
 
-/// Shared data between [`ActorCriticAgent`] and [`ActorCriticActor`].
-pub struct ActorCriticShared<OS: EncoderFeatureSpace, AS> {
+/// Action and Observation spaces for `ActorCriticAgent`.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct Spaces<OS, AS> {
     observation_space: NonEmptyFeatures<OS>,
-    observation_encoder: <NonEmptyFeatures<OS> as EncoderFeatureSpace>::Encoder,
     action_space: AS,
-}
-
-impl<OS, AS> Debug for ActorCriticShared<OS, AS>
-where
-    OS: EncoderFeatureSpace + Debug,
-    OS::Encoder: Debug,
-    AS: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("ActorCriticShared")
-            .field("observation_space", &self.observation_space)
-            .field("observation_encoder", &self.observation_encoder)
-            .field("action_space", &self.action_space)
-            .finish()
-    }
 }
