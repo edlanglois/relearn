@@ -1,6 +1,7 @@
 //! Torch optimizer wrappers and configuration
 use super::{BaseOptimizer, BuildOptimizer, OnceOptimizer, OptimizerStepError};
 use crate::logging::StatsLogger;
+use serde::{Deserialize, Serialize};
 use tch::{COptimizer, TchError, Tensor};
 
 impl BaseOptimizer for COptimizer {
@@ -49,7 +50,7 @@ where
 }
 
 /// Configuration for the SGD optimizer.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SgdConfig {
     /// Learning rate
     pub learning_rate: f64,
@@ -90,7 +91,7 @@ impl TryFrom<&SgdConfig> for COptimizer {
 
 #[allow(clippy::doc_markdown)] // false positive on RMSProp
 /// Configuration for the RMSProp optimizer.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct RmsPropConfig {
     /// Learning rate
     pub learning_rate: f64,
@@ -134,7 +135,7 @@ impl TryFrom<&RmsPropConfig> for COptimizer {
 }
 
 /// Configuration for the Adam optimizer.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct AdamConfig {
     /// Learning rate
     pub learning_rate: f64,
@@ -171,7 +172,7 @@ impl TryFrom<&AdamConfig> for COptimizer {
 
 #[allow(clippy::doc_markdown)]
 /// Configuration for the AdamW optimizer.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct AdamWConfig {
     /// Learning rate
     pub learning_rate: f64,

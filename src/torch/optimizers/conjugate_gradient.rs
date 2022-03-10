@@ -31,12 +31,13 @@
 use super::super::utils;
 use super::{BaseOptimizer, BuildOptimizer, OptimizerStepError, TrustRegionOptimizer};
 use crate::logging::StatsLogger;
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::convert::Infallible;
 use tch::Tensor;
 
 /// Configuration for the Conjugate Gradient Optimizer
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ConjugateGradientOptimizerConfig {
     /// Number of CG iterations used to calculate A^-1 g
     pub iterations: u64,
