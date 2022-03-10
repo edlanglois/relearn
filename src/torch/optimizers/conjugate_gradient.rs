@@ -195,7 +195,7 @@ impl ConjugateGradientOptimizer {
 
         let mut loss = initial_loss;
         let mut constraint_val = f64::INFINITY;
-        logger.log_scalar("initial_loss", loss);
+        logger.log_scalar("loss_initial", loss);
         for i in 0..self.config.max_backtracks {
             let ratio = self.config.backtrack_ratio.powi(i.try_into().unwrap());
 
@@ -220,8 +220,8 @@ impl ConjugateGradientOptimizer {
             }
         }
 
-        logger.log_scalar("final_loss", loss);
-        logger.log_scalar("final_constraint_val", constraint_val);
+        logger.log_scalar("loss_final", loss);
+        logger.log_scalar("constraint_val_final", constraint_val);
 
         let result = if loss.is_nan() {
             Err(OptimizerStepError::NaNLoss)
