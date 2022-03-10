@@ -25,7 +25,6 @@ rand_distr = "0.4"
 relearn_derive = { version = "0.1.0", path = "relearn_derive" }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde-big-array = { version = "0.3", features = ["const-generics"] }
-serde_cbor = "0.11" # Archived but alternative 'ciborium' is very new
 serde_with = "1.12"
 slice-of-array = "=0.3.1" # pinned b/c low popularity; audit code on change
 smallvec = { version = "1.7", features = ["union"] }
@@ -40,6 +39,7 @@ criterion = { version = "0.3", features = ["html_reports"] }
 ctor = "0.1"
 num_cpus = "1.13"
 rstest = "0.12"
+serde_cbor = "0.11" # Archived but alternative 'ciborium' is very new
 serde_test = "1.0"
 
 [features]
