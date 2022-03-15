@@ -245,14 +245,14 @@ impl<S: NonEmptySpace + ?Sized> NonEmptySpace for Box<S> {
 /// * `Distribution<T>` is not object-safe, and even if it was,
 /// * generic super traits using `<Self::AssocType>` are not object safe due to a bug / issue:
 ///     <https://github.com/rust-lang/rust/issues/40533>.
-pub trait SampleSpace: Space {
+pub trait SampleSpace: NonEmptySpace {
     /// Sample a random element.
     fn sample(&self, rng: &mut dyn RngCore) -> Self::Element;
 }
 
 impl<S> SampleSpace for S
 where
-    S: Space + Distribution<<Self as Space>::Element>,
+    S: NonEmptySpace + Distribution<<Self as Space>::Element>,
 {
     fn sample(&self, rng: &mut dyn RngCore) -> Self::Element {
         Distribution::sample(&self, rng)
