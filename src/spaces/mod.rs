@@ -59,19 +59,24 @@ pub trait Space {
     fn contains(&self, value: &Self::Element) -> bool;
 }
 
-impl<S: Space + ?Sized> Space for &'_ S {
-    type Element = S::Element;
-    fn contains(&self, value: &Self::Element) -> bool {
-        S::contains(self, value)
-    }
-}
+/// Implement `Space` for a deref-able wrapper type generic over `S: Space + ?Sized`.
+macro_rules! impl_wrapped_space {
+    ($wrapper:ty) => {
+        impl<S> Space for $wrapper
+        where
+            S: Space + ?Sized,
+        {
+            type Element = S::Element;
 
-impl<S: Space + ?Sized> Space for Box<S> {
-    type Element = S::Element;
-    fn contains(&self, value: &Self::Element) -> bool {
-        S::contains(self, value)
-    }
+            #[inline]
+            fn contains(&self, value: &Self::Element) -> bool {
+                S::contains(self, value)
+            }
+        }
+    };
 }
+impl_wrapped_space!(&'_ S);
+impl_wrapped_space!(Box<S>);
 
 /// Compare this space to another in terms of the subset relation.
 ///
@@ -88,11 +93,13 @@ pub trait SubsetOrd: PartialEq<Self> {
     fn subset_cmp(&self, other: &Self) -> Option<Ordering>;
 
     /// Check if this is a strict subset of `other`.
+    #[inline]
     fn strict_subset_of(&self, other: &Self) -> bool {
         matches!(self.subset_cmp(other), Some(Ordering::Less))
     }
 
     /// Check if this is a subset (strict or equal) of `other`.
+    #[inline]
     fn subset_of(&self, other: &Self) -> bool {
         matches!(
             self.subset_cmp(other),
@@ -101,11 +108,13 @@ pub trait SubsetOrd: PartialEq<Self> {
     }
 
     /// Check if this is a strict superset of `other`.
+    #[inline]
     fn strict_superset_of(&self, other: &Self) -> bool {
         matches!(self.subset_cmp(other), Some(Ordering::Greater))
     }
 
     /// Check if this is a superset (strict or equal) of `other`.
+    #[inline]
     fn superset_of(&self, other: &Self) -> bool {
         matches!(
             self.subset_cmp(other),
@@ -114,17 +123,21 @@ pub trait SubsetOrd: PartialEq<Self> {
     }
 }
 
-impl<S: SubsetOrd + ?Sized> SubsetOrd for &'_ S {
-    fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
-        S::subset_cmp(self, other)
-    }
+/// Implement `SubsetOrd` for a deref-able wrapper type generic over `T: SubsetOrd + ?Sized`.
+macro_rules! impl_wrapped_subset_ord {
+    ($wrapper:ty) => {
+        impl<S> SubsetOrd for $wrapper
+        where
+            S: SubsetOrd + ?Sized,
+        {
+            fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
+                S::subset_cmp(self, other)
+            }
+        }
+    };
 }
-
-impl<S: SubsetOrd + ?Sized> SubsetOrd for Box<S> {
-    fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
-        S::subset_cmp(self, other)
-    }
-}
+impl_wrapped_subset_ord!(&'_ S);
+impl_wrapped_subset_ord!(Box<S>);
 
 /// Helper function to determine the subset ordering of a product of two spaces.
 ///
@@ -166,7 +179,7 @@ pub trait FiniteSpace: Space {
     /// The number of elements in the space.
     fn size(&self) -> usize;
 
-    /// Get the index of an element.
+    /// Get the (unique) index of an element.
     fn to_index(&self, element: &Self::Element) -> usize;
 
     /// Try to convert an index to an element.
@@ -177,43 +190,43 @@ pub trait FiniteSpace: Space {
 
     /// Try to convert an index to an element.
     ///
-    /// If None is returned then the index was invalid.
-    /// It is allowed that Some value may be returned even if the index is invalid.
-    /// If you need to validate the returned value, use [`FiniteSpace::from_index`].
+    /// If `None` is returned then the index was invalid.
+    /// `Some(_)` may be returned even if the index is invalid.
+    /// If the returned value must be validated then use [`FiniteSpace::from_index`].
+    #[inline]
     fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
         self.from_index(index)
     }
 }
 
-impl<S: FiniteSpace + ?Sized> FiniteSpace for &'_ S {
-    fn size(&self) -> usize {
-        S::size(self)
-    }
-    fn to_index(&self, element: &Self::Element) -> usize {
-        S::to_index(self, element)
-    }
-    fn from_index(&self, index: usize) -> Option<Self::Element> {
-        S::from_index(self, index)
-    }
-    fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
-        S::from_index_unchecked(self, index)
-    }
+/// Implement `FiniteSpace` for a deref-able wrapper type generic over `S: FiniteSpace + ?Sized`.
+macro_rules! impl_wrapped_finite_space {
+    ($wrapper:ty) => {
+        impl<S> FiniteSpace for $wrapper
+        where
+            S: FiniteSpace + ?Sized,
+        {
+            #[inline]
+            fn size(&self) -> usize {
+                S::size(self)
+            }
+            #[inline]
+            fn to_index(&self, element: &Self::Element) -> usize {
+                S::to_index(self, element)
+            }
+            #[inline]
+            fn from_index(&self, index: usize) -> Option<Self::Element> {
+                S::from_index(self, index)
+            }
+            #[inline]
+            fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
+                S::from_index_unchecked(self, index)
+            }
+        }
+    };
 }
-
-impl<S: FiniteSpace + ?Sized> FiniteSpace for Box<S> {
-    fn size(&self) -> usize {
-        S::size(self)
-    }
-    fn to_index(&self, element: &Self::Element) -> usize {
-        S::to_index(self, element)
-    }
-    fn from_index(&self, index: usize) -> Option<Self::Element> {
-        S::from_index(self, index)
-    }
-    fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
-        S::from_index_unchecked(self, index)
-    }
-}
+impl_wrapped_finite_space!(&'_ S);
+impl_wrapped_finite_space!(Box<S>);
 
 /// A space containing at least one element.
 pub trait NonEmptySpace: Space {
@@ -221,17 +234,22 @@ pub trait NonEmptySpace: Space {
     fn some_element(&self) -> Self::Element;
 }
 
-impl<S: NonEmptySpace + ?Sized> NonEmptySpace for &'_ S {
-    fn some_element(&self) -> Self::Element {
-        S::some_element(self)
-    }
+/// Implement `NonEmptySpace` for a deref-able wrapper type generic on `S: NonEmptySpace + ?Sized`.
+macro_rules! impl_wrapped_non_empty_space {
+    ($wrapper:ty) => {
+        impl<S> NonEmptySpace for $wrapper
+        where
+            S: NonEmptySpace + ?Sized,
+        {
+            #[inline]
+            fn some_element(&self) -> Self::Element {
+                S::some_element(self)
+            }
+        }
+    };
 }
-
-impl<S: NonEmptySpace + ?Sized> NonEmptySpace for Box<S> {
-    fn some_element(&self) -> Self::Element {
-        S::some_element(self)
-    }
-}
+impl_wrapped_non_empty_space!(&'_ S);
+impl_wrapped_non_empty_space!(Box<S>);
 
 /// A space from which samples can be drawn.
 ///
@@ -275,23 +293,54 @@ pub trait ReprSpace<T, T0 = T>: Space {
         Self::Element: 'a;
 }
 
+/// Implement `ReprSpace<T, T0>` for a deref-able wrapper type generic over `S`.
+macro_rules! impl_wrapped_repr_space {
+    ($wrapper:ty) => {
+        impl<S, T, T0> ReprSpace<T, T0> for $wrapper
+        where
+            S: ReprSpace<T, T0> + ?Sized,
+        {
+            #[inline]
+            fn repr(&self, element: &Self::Element) -> T0 {
+                S::repr(self, element)
+            }
+            #[inline]
+            fn batch_repr<'a, I>(&self, elements: I) -> T
+            where
+                I: IntoIterator<Item = &'a Self::Element>,
+                I::IntoIter: ExactSizeIterator + Clone,
+                Self::Element: 'a,
+            {
+                S::batch_repr(self, elements)
+            }
+        }
+    };
+}
+impl_wrapped_repr_space!(&'_ S);
+impl_wrapped_repr_space!(Box<S>);
+
 /// Number of features for [`EncoderFeatureSpace`] and [`FeatureSpace`].
 pub trait NumFeatures {
     /// Length of the feature vectors in which elements are encoded.
     fn num_features(&self) -> usize;
 }
 
-impl<S: NumFeatures + ?Sized> NumFeatures for &'_ S {
-    fn num_features(&self) -> usize {
-        S::num_features(self)
-    }
+/// Implement `NumFeatures` for a deref-able wrapper type generic over `S: NumFeatures + ?Sized`.
+macro_rules! impl_wrapped_num_features {
+    ($wrapper:ty) => {
+        impl<S> NumFeatures for $wrapper
+        where
+            S: NumFeatures + ?Sized,
+        {
+            #[inline]
+            fn num_features(&self) -> usize {
+                S::num_features(self)
+            }
+        }
+    };
 }
-
-impl<S: NumFeatures + ?Sized> NumFeatures for Box<S> {
-    fn num_features(&self) -> usize {
-        S::num_features(self)
-    }
-}
+impl_wrapped_num_features!(&'_ S);
+impl_wrapped_num_features!(Box<S>);
 
 /// Encode elements as feature vectors with the help of an encoder object.
 ///
@@ -394,99 +443,67 @@ pub trait EncoderFeatureSpace: Space + NumFeatures {
     }
 }
 
-impl<S: EncoderFeatureSpace + ?Sized> EncoderFeatureSpace for &'_ S {
-    type Encoder = S::Encoder;
-    fn encoder(&self) -> Self::Encoder {
-        S::encoder(self)
-    }
-    fn encoder_features_out<F: Float>(
-        &self,
-        element: &Self::Element,
-        out: &mut [F],
-        zeroed: bool,
-        encoder: &Self::Encoder,
-    ) {
-        S::encoder_features_out(self, element, out, zeroed, encoder)
-    }
-    fn encoder_features<T>(&self, element: &Self::Element, encoder: &Self::Encoder) -> T
-    where
-        T: BuildFromArray1D,
-        <T::Array as NumArray1D>::Elem: Float,
-    {
-        S::encoder_features(self, element, encoder)
-    }
-    fn encoder_batch_features_out<'a, I, A>(
-        &self,
-        elements: I,
-        out: &mut ArrayBase<A, Ix2>,
-        zeroed: bool,
-        encoder: &Self::Encoder,
-    ) where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-        A: DataMut,
-        A::Elem: Float,
-    {
-        S::encoder_batch_features_out(self, elements, out, zeroed, encoder)
-    }
-    fn encoder_batch_features<'a, I, T>(&self, elements: I, encoder: &Self::Encoder) -> T
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator,
-        Self::Element: 'a,
-        T: BuildFromArray2D,
-        <T::Array as NumArray2D>::Elem: Float,
-    {
-        S::encoder_batch_features(self, elements, encoder)
-    }
+/// Implement `EncoderFeatureSpace` for a deref-able wrapper type generic over `S`.
+macro_rules! impl_wrapped_encoder_feature_space {
+    ($wrapper:ty) => {
+        impl<S> EncoderFeatureSpace for $wrapper
+        where
+            S: EncoderFeatureSpace + ?Sized,
+        {
+            type Encoder = S::Encoder;
+            #[inline]
+            fn encoder(&self) -> Self::Encoder {
+                S::encoder(self)
+            }
+            #[inline]
+            fn encoder_features_out<F: Float>(
+                &self,
+                element: &Self::Element,
+                out: &mut [F],
+                zeroed: bool,
+                encoder: &Self::Encoder,
+            ) {
+                S::encoder_features_out(self, element, out, zeroed, encoder)
+            }
+            #[inline]
+            fn encoder_features<T>(&self, element: &Self::Element, encoder: &Self::Encoder) -> T
+            where
+                T: BuildFromArray1D,
+                <T::Array as NumArray1D>::Elem: Float,
+            {
+                S::encoder_features(self, element, encoder)
+            }
+            #[inline]
+            fn encoder_batch_features_out<'a, I, A>(
+                &self,
+                elements: I,
+                out: &mut ArrayBase<A, Ix2>,
+                zeroed: bool,
+                encoder: &Self::Encoder,
+            ) where
+                I: IntoIterator<Item = &'a Self::Element>,
+                Self::Element: 'a,
+                A: DataMut,
+                A::Elem: Float,
+            {
+                S::encoder_batch_features_out(self, elements, out, zeroed, encoder)
+            }
+            #[inline]
+            fn encoder_batch_features<'a, I, T>(&self, elements: I, encoder: &Self::Encoder) -> T
+            where
+                I: IntoIterator<Item = &'a Self::Element>,
+                I::IntoIter: ExactSizeIterator,
+                Self::Element: 'a,
+                T: BuildFromArray2D,
+                <T::Array as NumArray2D>::Elem: Float,
+            {
+                S::encoder_batch_features(self, elements, encoder)
+            }
+        }
+    };
 }
-
-impl<S: EncoderFeatureSpace + ?Sized> EncoderFeatureSpace for Box<S> {
-    type Encoder = S::Encoder;
-    fn encoder(&self) -> Self::Encoder {
-        S::encoder(self)
-    }
-    fn encoder_features_out<F: Float>(
-        &self,
-        element: &Self::Element,
-        out: &mut [F],
-        zeroed: bool,
-        encoder: &Self::Encoder,
-    ) {
-        S::encoder_features_out(self, element, out, zeroed, encoder)
-    }
-    fn encoder_features<T>(&self, element: &Self::Element, encoder: &Self::Encoder) -> T
-    where
-        T: BuildFromArray1D,
-        <T::Array as NumArray1D>::Elem: Float,
-    {
-        S::encoder_features(self, element, encoder)
-    }
-    fn encoder_batch_features_out<'a, I, A>(
-        &self,
-        elements: I,
-        out: &mut ArrayBase<A, Ix2>,
-        zeroed: bool,
-        encoder: &Self::Encoder,
-    ) where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-        A: DataMut,
-        A::Elem: Float,
-    {
-        S::encoder_batch_features_out(self, elements, out, zeroed, encoder)
-    }
-    fn encoder_batch_features<'a, I, T>(&self, elements: I, encoder: &Self::Encoder) -> T
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator,
-        Self::Element: 'a,
-        T: BuildFromArray2D,
-        <T::Array as NumArray2D>::Elem: Float,
-    {
-        S::encoder_batch_features(self, elements, encoder)
-    }
-}
+impl_wrapped_encoder_feature_space!(&'_ S);
+impl_wrapped_encoder_feature_space!(Box<S>);
 
 /// A space whose elements can be encoded as floating-point feature vectors.
 ///
@@ -563,9 +580,11 @@ pub trait FeatureSpace: Space + NumFeatures {
 }
 
 impl<S: EncoderFeatureSpace> FeatureSpace for S {
+    #[inline]
     fn features_out<F: Float>(&self, element: &Self::Element, out: &mut [F], zeroed: bool) {
         self.encoder_features_out(element, out, zeroed, &self.encoder())
     }
+    #[inline]
     fn features<T>(&self, element: &Self::Element) -> T
     where
         T: BuildFromArray1D,
@@ -573,6 +592,7 @@ impl<S: EncoderFeatureSpace> FeatureSpace for S {
     {
         self.encoder_features(element, &self.encoder())
     }
+    #[inline]
     fn batch_features_out<'a, I, A>(&self, elements: I, out: &mut ArrayBase<A, Ix2>, zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -582,6 +602,7 @@ impl<S: EncoderFeatureSpace> FeatureSpace for S {
     {
         self.encoder_batch_features_out(elements, out, zeroed, &self.encoder())
     }
+    #[inline]
     fn batch_features<'a, I, T>(&self, elements: I) -> T
     where
         I: IntoIterator<Item = &'a Self::Element>,
