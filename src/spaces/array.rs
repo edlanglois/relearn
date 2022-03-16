@@ -102,7 +102,7 @@ impl<S: FiniteSpace, const N: usize> FiniteSpace for ArraySpace<S, N> {
 
 impl<S: NonEmptySpace, const N: usize> NonEmptySpace for ArraySpace<S, N> {
     fn some_element(&self) -> <Self as Space>::Element {
-        array_init::from_iter(self.inner_spaces.iter().map(NonEmptySpace::some_element)).unwrap()
+        array_init::array_init(|i| self.inner_spaces[i].some_element())
     }
 }
 
@@ -111,7 +111,7 @@ where
     S: Space + Distribution<S::Element>,
 {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
-        array_init::from_iter(self.inner_spaces.iter().map(|s| s.sample(rng))).unwrap()
+        array_init::array_init(|i| self.inner_spaces[i].sample(rng))
     }
 }
 
@@ -146,16 +146,13 @@ impl<S: EncoderFeatureSpace, const N: usize> EncoderFeatureSpace for ArraySpace<
     type Encoder = ArraySpaceEncoder<S::Encoder, N>;
 
     fn encoder(&self) -> Self::Encoder {
-        let inner_encoders =
-            array_init::from_iter(self.inner_spaces.iter().map(EncoderFeatureSpace::encoder))
-                .unwrap();
+        let inner_encoders = array_init::array_init(|i| self.inner_spaces[i].encoder());
 
         let mut offset = 0;
-        let end_offsets = array_init::from_iter(self.inner_spaces.iter().map(|space| {
-            offset += space.num_features();
+        let end_offsets = array_init::array_init(|i| {
+            offset += self.inner_spaces[i].num_features();
             offset
-        }))
-        .unwrap();
+        });
 
         ArraySpaceEncoder {
             inner_encoders,
