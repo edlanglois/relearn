@@ -61,6 +61,7 @@ pub trait StatsLogger: Send {
     /// Log an increment to a named counter (convenience function).
     ///
     /// Panics if this name was previously used to log a value of a different type.
+    #[inline]
     fn log_counter_increment(&mut self, name: &'static str, increment: u64) {
         self.log(name.into(), Loggable::CounterIncrement(increment))
             .unwrap()
@@ -69,6 +70,7 @@ pub trait StatsLogger: Send {
     /// Log a named duration (convenience function).
     ///
     /// Panics if this name was previously used to log a value of a different type.
+    #[inline]
     fn log_duration(&mut self, name: &'static str, duration: Duration) {
         self.log(name.into(), Loggable::Duration(duration)).unwrap()
     }
@@ -76,6 +78,7 @@ pub trait StatsLogger: Send {
     /// Log a named scalar value (convenience function).
     ///
     /// Panics if this name was previously used to log a value of a different type.
+    #[inline]
     fn log_scalar(&mut self, name: &'static str, value: f64) {
         self.log(name.into(), Loggable::Scalar(value)).unwrap()
     }
@@ -84,6 +87,7 @@ pub trait StatsLogger: Send {
     ///
     /// Panics if this name was previously used to log a value of a different type
     /// or an index value with a different size.
+    #[inline]
     fn log_index(&mut self, name: &'static str, value: usize, size: usize) {
         self.log(name.into(), Loggable::Index { value, size })
             .unwrap()
@@ -92,6 +96,7 @@ pub trait StatsLogger: Send {
     /// Log a named message (convenience function).
     ///
     /// Panics if this name was previously used to log a value of a different type.
+    #[inline]
     fn log_message(&mut self, name: &'static str, message: &'static str) {
         self.log(name.into(), Loggable::Message(message.into()))
             .unwrap()
@@ -105,14 +110,17 @@ macro_rules! impl_wrapped_stats_logger {
         where
             T: StatsLogger + ?Sized,
         {
+            #[inline]
             fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
                 T::log(self, id, value)
             }
 
+            #[inline]
             fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
                 T::log_no_flush(self, id, value)
             }
 
+            #[inline]
             fn flush(&mut self) {
                 T::flush(self)
             }
@@ -124,7 +132,7 @@ impl_wrapped_stats_logger!(Box<T>);
 
 /// Value that can be logged.
 ///
-/// # Implementation Note
+/// # Design Note
 /// This is an enum to simplify the logging interface.
 /// The options are:
 /// * multiple methods
