@@ -11,11 +11,8 @@ use relearn::envs::{EnvStructure, Environment, Successor};
 use relearn::logging::StatsLogger;
 use relearn::spaces::{BooleanSpace, IndexSpace};
 use relearn::torch::{
-    agents::ActorCriticConfig,
-    critic::Return,
+    agents::{critic::Return, learning_policy::VpgConfig, ActorCriticConfig},
     modules::{GruConfig, MlpConfig},
-    optimizers::AdamConfig,
-    updaters::{CriticLossUpdateRule, PolicyGradientUpdateRule, WithOptimizer},
 };
 use relearn::Prng;
 
@@ -131,22 +128,12 @@ fn bench_agents_act(c: &mut Criterion) {
     benchmark_agent_act(
         &mut group,
         "actor_critic_mlp",
-        &ActorCriticConfig::<
-            MlpConfig,
-            WithOptimizer<PolicyGradientUpdateRule, AdamConfig>,
-            Return,
-            WithOptimizer<CriticLossUpdateRule, AdamConfig>,
-        >::default(),
+        &ActorCriticConfig::<VpgConfig<MlpConfig>, Return>::default(),
     );
     benchmark_agent_act(
         &mut group,
         "actor_critic_gru",
-        &ActorCriticConfig::<
-            GruConfig,
-            WithOptimizer<PolicyGradientUpdateRule, AdamConfig>,
-            Return,
-            WithOptimizer<CriticLossUpdateRule, AdamConfig>,
-        >::default(),
+        &ActorCriticConfig::<VpgConfig<GruConfig>, Return>::default(),
     );
 }
 

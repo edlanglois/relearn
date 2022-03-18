@@ -1,30 +1,33 @@
-use super::super::{
-    backends::WithCudnnEnabled,
-    critic::Critic,
-    features::PackedHistoryFeaturesView,
-    modules::SequenceModule,
-    optimizers::{OptimizerStepError, TrustRegionOptimizer},
+//! Trust Region Policy Optimization (TRPO)
+use super::{
+    Critic, PackedHistoryFeaturesView, ParameterizedDistributionSpace, Policy, PolicyStats,
+    PolicyUpdateRule, RuleOpt, RuleOptConfig, StatsLogger,
 };
-use super::{PolicyStats, UpdatePolicyWithOptimizer};
-use crate::logging::StatsLogger;
-use crate::spaces::ParameterizedDistributionSpace;
+use crate::torch::{
+    backends::WithCudnnEnabled,
+    optimizers::{
+        ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig, OptimizerStepError,
+        TrustRegionOptimizer,
+    },
+};
 use crate::utils::distributions::ArrayDistribution;
 use serde::{Deserialize, Serialize};
 use tch::{Kind, Tensor};
 
-/// Trust region policy update rule.
+/// Trust Region Policy Optimization (PPO) with a clipped objective.
 ///
 /// # Reference
 /// [Trust Region Policy Optimization][trpo] by Schulman et al.
 ///
 /// [trpo]: https://arxiv.org/abs/1502.05477
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TrpoPolicyUpdateRule {
+pub struct TrpoRule {
     /// Maximum policy KL divergence when taking a step.
     pub max_policy_step_kl: f64,
 }
 
-impl Default for TrpoPolicyUpdateRule {
+impl Default for TrpoRule {
+    #[inline]
     fn default() -> Self {
         Self {
             // This step size was used by all experiments in Schulman's TRPO paper.
@@ -33,17 +36,22 @@ impl Default for TrpoPolicyUpdateRule {
     }
 }
 
-impl<O, AS> UpdatePolicyWithOptimizer<O, AS> for TrpoPolicyUpdateRule
+/// A [`LearningPolicy`] using [Trust Region Policy Optimization][TrpoRule].
+pub type Trpo<P, O = ConjugateGradientOptimizer> = RuleOpt<P, O, TrpoRule>;
+/// Configuration for [`Trpo`], a [Trust Region Policy Optimization][TrpoRule] [`LearningPolicy`].
+pub type TrpoConfig<PB, OB = ConjugateGradientOptimizerConfig> = RuleOptConfig<PB, OB, TrpoRule>;
+
+impl<P, O> PolicyUpdateRule<P, O> for TrpoRule
 where
-    O: TrustRegionOptimizer + ?Sized,
-    AS: ParameterizedDistributionSpace<Tensor> + ?Sized,
+    P: Policy,
+    O: TrustRegionOptimizer,
 {
-    fn update_policy_with_optimizer(
+    fn update_external_policy<AS: ParameterizedDistributionSpace<Tensor>>(
         &self,
-        policy: &dyn SequenceModule,
+        policy: &P,
+        optimizer: &mut O,
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
-        optimizer: &mut O,
         action_space: &AS,
         logger: &mut dyn StatsLogger,
     ) -> PolicyStats {
@@ -60,7 +68,7 @@ where
         let (step_values, initial_distribution, initial_log_probs, initial_policy_entropy) = {
             let _no_grad = tch::no_grad_guard();
 
-            let step_values = critic.seq_packed(features);
+            let step_values = critic.step_values(features);
             let policy_output = policy.seq_packed(observation_features, batch_sizes);
             let distribution = action_space.distribution(&policy_output);
             let log_probs = distribution.log_probs(actions);

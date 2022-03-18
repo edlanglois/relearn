@@ -1,12 +1,10 @@
-//! Generalized Advantage Estimation
-use super::super::features::PackedHistoryFeaturesView;
-use super::{BuildCritic, Critic};
+use super::{BuildCritic, Critic, Module, PackedHistoryFeaturesView};
 use crate::torch::modules::{BuildModule, SequenceModule};
 use crate::utils::packed;
 use serde::{Deserialize, Serialize};
 use tch::{Device, Reduction, Tensor};
 
-/// Generalized Advantage Estimator Config
+/// Configuration for the Generalized Advantage Estimator critic ([`Gae`]).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct GaeConfig<VC> {
     pub gamma: f64,
@@ -40,11 +38,11 @@ where
     }
 }
 
-/// Generalized Advantage Estimator critic.
+/// Generalized Advantage Estimator (GAE) [critic][Critic].
 ///
-/// # Note
-/// Currently does not properly handle non-terminal end-of-episode.
-/// This assumes that all episodes end with a reward of `0`.
+/// # Warning
+/// Does not properly handle interrupted episodes.
+/// This assumes that all episodes end with a reward of 0.
 ///
 /// # Reference
 /// High-Dimensional Continuous Control Using Generalized Advantage Estimation. ICLR  2016
@@ -62,23 +60,52 @@ pub struct Gae<V> {
     pub value_fn: V,
 }
 
-impl<V> Critic for Gae<V>
-where
-    V: SequenceModule,
-{
-    fn trainable(&self) -> bool {
-        true
+impl<V: Module> Module for Gae<V> {
+    #[inline]
+    fn shallow_clone(&self) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            gamma: self.gamma,
+            lambda: self.lambda,
+            value_fn: self.value_fn.shallow_clone(),
+        }
     }
 
+    #[inline]
+    fn clone_to_device(&self, device: Device) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            gamma: self.gamma,
+            lambda: self.lambda,
+            value_fn: self.value_fn.clone_to_device(device),
+        }
+    }
+
+    #[inline]
+    fn variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
+        self.value_fn.variables()
+    }
+
+    #[inline]
     fn trainable_variables(&self) -> Box<dyn Iterator<Item = &Tensor> + '_> {
         self.value_fn.trainable_variables()
     }
 
-    fn discount_factor(&self, env_discount_factor: f64) -> f64 {
-        env_discount_factor.min(self.gamma)
+    #[inline]
+    fn has_cudnn_second_derivatives(&self) -> bool {
+        self.value_fn.has_cudnn_second_derivatives()
     }
+}
 
-    fn seq_packed(&self, features: &dyn PackedHistoryFeaturesView) -> Tensor {
+impl<V> Critic for Gae<V>
+where
+    V: SequenceModule,
+{
+    fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> Tensor {
         // Packed estimated values of the observed states
         let estimated_values = self
             .value_fn
@@ -123,5 +150,10 @@ where
                 .squeeze_dim(-1)
                 .mse_loss(features.returns(), Reduction::Mean),
         )
+    }
+
+    #[inline]
+    fn discount_factor(&self, env_discount_factor: f64) -> f64 {
+        env_discount_factor.min(self.gamma)
     }
 }

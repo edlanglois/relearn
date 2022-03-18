@@ -1,29 +1,29 @@
-//! Proximal policy optimization policy updater.
-use super::super::{
-    critic::Critic, features::PackedHistoryFeaturesView, modules::SequenceModule,
-    optimizers::Optimizer,
+//! Proximal Policy Optimization (PPO)
+use super::{
+    Critic, PackedHistoryFeaturesView, ParameterizedDistributionSpace, Policy, PolicyStats,
+    PolicyUpdateRule, RuleOpt, RuleOptConfig, StatsLogger,
 };
-use super::{PolicyStats, UpdatePolicyWithOptimizer};
-use crate::logging::StatsLogger;
-use crate::spaces::ParameterizedDistributionSpace;
+use crate::torch::optimizers::{AdamConfig, Optimizer};
 use crate::utils::distributions::ArrayDistribution;
 use serde::{Deserialize, Serialize};
-use tch::{Kind, Tensor};
+use tch::{COptimizer, Kind, Tensor};
 
-/// Proximal policy optimization update rule with a clipped objective.
+/// Proximal Policy Optimization (PPO) with a clipped objective.
 ///
 /// # Reference
 /// [Proximal Policy Optimization Algorithms][ppo] by Schulman et al.
 ///
 /// [ppo]: https://arxiv.org/abs/1707.06347
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PpoPolicyUpdateRule {
-    // pub minibatch_size: usize, // TODO: Support minibatches
+pub struct PpoRule {
     pub num_epochs: u64,
+    // TODO: Support minibatches
+    // pub minibatch_size: usize,
     pub clip_distance: f64,
 }
 
-impl Default for PpoPolicyUpdateRule {
+impl Default for PpoRule {
+    #[inline]
     fn default() -> Self {
         Self {
             num_epochs: 10,
@@ -32,17 +32,22 @@ impl Default for PpoPolicyUpdateRule {
     }
 }
 
-impl<O, AS> UpdatePolicyWithOptimizer<O, AS> for PpoPolicyUpdateRule
+/// A [`LearningPolicy`] using [Proximal Policy Optimization][PpoRule].
+pub type Ppo<P, O = COptimizer> = RuleOpt<P, O, PpoRule>;
+/// Configuration for [`Ppo`], a [Proximal Policy Optimization][PpoRule] [`LearningPolicy`].
+pub type PpoConfig<PB, OB = AdamConfig> = RuleOptConfig<PB, OB, PpoRule>;
+
+impl<P, O> PolicyUpdateRule<P, O> for PpoRule
 where
-    O: Optimizer + ?Sized,
-    AS: ParameterizedDistributionSpace<Tensor> + ?Sized,
+    P: Policy,
+    O: Optimizer,
 {
-    fn update_policy_with_optimizer(
+    fn update_external_policy<AS: ParameterizedDistributionSpace<Tensor>>(
         &self,
-        policy: &dyn SequenceModule,
+        policy: &P,
+        optimizer: &mut O,
         critic: &dyn Critic,
         features: &dyn PackedHistoryFeaturesView,
-        optimizer: &mut O,
         action_space: &AS,
         logger: &mut dyn StatsLogger,
     ) -> PolicyStats {
@@ -53,7 +58,7 @@ where
         let (step_values, initial_log_probs, initial_policy_entropy) = {
             let _no_grad = tch::no_grad_guard();
 
-            let step_values = critic.seq_packed(features);
+            let step_values = critic.step_values(features);
             let policy_output = policy.seq_packed(observation_features, batch_sizes);
             let distribution = action_space.distribution(&policy_output);
             let log_probs = distribution.log_probs(actions);

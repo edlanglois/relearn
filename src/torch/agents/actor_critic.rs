@@ -1,67 +1,63 @@
-use super::super::{
-    critic::{BuildCritic, Critic},
+//! Actor-critic agent
+use super::{
+    actor::PolicyActor,
+    critic::Critic,
     features::LazyPackedHistoryFeatures,
-    modules::{BuildModule, IterativeModule, Module, SequenceModule},
-    updaters::{BuildCriticUpdater, BuildPolicyUpdater, UpdateCritic, UpdatePolicy},
+    learning_critic::{BuildLearningCritic, LearningCritic},
+    learning_policy::{BuildLearningPolicy, LearningPolicy},
 };
-use crate::agents::buffers::{BufferCapacityBound, SimpleBuffer, WriteHistoryBuffer};
-use crate::agents::{Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError};
-use crate::envs::EnvStructure;
-use crate::logging::StatsLogger;
-use crate::spaces::{FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace, ReprSpace};
-use crate::utils::torch::DeviceDef;
-use crate::Prng;
+use crate::{
+    agents::buffers::{BufferCapacityBound, SimpleBuffer, WriteHistoryBuffer},
+    agents::{ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError},
+    envs::EnvStructure,
+    logging::StatsLogger,
+    spaces::{FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace},
+    torch::modules::Module,
+    utils::torch::DeviceDef,
+    Prng,
+};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::cell::RefCell;
 use std::time::Instant;
 use tch::{Device, Tensor};
 
-/// Configuration for [`ActorCriticAgent`]
+/// Configuration for [`ActorCriticAgent`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ActorCriticConfig<PB, PUB, CB, CUB> {
+pub struct ActorCriticConfig<PB, CB> {
     pub policy_config: PB,
-    pub policy_updater_config: PUB,
     pub critic_config: CB,
-    pub critic_updater_config: CUB,
+    /// Minimum number of collected steps per batch update
     pub min_batch_steps: usize,
     #[serde(with = "DeviceDef")]
     pub device: Device,
 }
 
-impl<PB, PUB, CB, CUB> Default for ActorCriticConfig<PB, PUB, CB, CUB>
+impl<PB, CB> Default for ActorCriticConfig<PB, CB>
 where
     PB: Default,
-    PUB: Default,
     CB: Default,
-    CUB: Default,
 {
+    #[inline]
     fn default() -> Self {
         Self {
             policy_config: Default::default(),
-            policy_updater_config: Default::default(),
             critic_config: Default::default(),
-            critic_updater_config: Default::default(),
             min_batch_steps: 10_000,
-            device: Device::Cpu,
+            device: Device::cuda_if_available(),
         }
     }
 }
 
-impl<PB, PUB, CB, CUB, OS, AS> BuildAgent<OS, AS> for ActorCriticConfig<PB, PUB, CB, CUB>
+impl<OS, AS, PB, CB> BuildAgent<OS, AS> for ActorCriticConfig<PB, CB>
 where
-    OS: FeatureSpace + 'static,
-    AS: ParameterizedDistributionSpace<Tensor> + 'static,
-    PB: BuildModule + Clone,
-    PB::Module: SequenceModule + IterativeModule,
-    PUB: BuildPolicyUpdater<AS>,
-    PUB::Updater: UpdatePolicy<AS>,
-    CB: BuildCritic,
-    CB::Critic: Critic,
-    CUB: BuildCriticUpdater,
-    CUB::Updater: UpdateCritic,
+    OS: FeatureSpace + Clone,
+    OS::Element: 'static,
+    AS: ParameterizedDistributionSpace<Tensor> + Clone,
+    AS::Element: 'static,
+    PB: BuildLearningPolicy,
+    CB: BuildLearningCritic,
 {
-    #[allow(clippy::type_complexity)]
-    type Agent = ActorCriticAgent<OS, AS, PB::Module, PUB::Updater, CB::Critic, CUB::Updater>;
+    type Agent = ActorCriticAgent<OS, AS, PB::LearningPolicy, CB::LearningCritic>;
 
     fn build_agent(
         &self,
@@ -72,18 +68,26 @@ where
     }
 }
 
-/// Actor-critic agent.
+/// Actor-crtic agent.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ActorCriticAgent<OS, AS, P, PU, C, CU> {
-    spaces: Arc<Spaces<OS, AS>>,
-    min_batch_steps: usize,
+pub struct ActorCriticAgent<OS, AS, P, C>
+where
+    P: LearningPolicy,
+{
+    observation_space: NonEmptyFeatures<OS>,
+    action_space: AS,
     discount_factor: f64,
+    min_batch_steps: usize,
 
-    policy: P,
-    policy_updater: PU,
+    learning_policy: P,
+    learning_critic: C,
 
-    critic: C,
-    critic_updater: CU,
+    /// A copy of the policy stored on the CPU device for memory sharing with actors.
+    ///
+    /// Only created if `device` is not `Device::Cpu`.
+    /// Must be re-copied after each policy update.
+    #[serde(skip, default)]
+    cpu_policy: RefCell<Option<P::Policy>>,
 
     // Tensors will deserialize to CPU
     #[serde(skip, default = "cpu_device")]
@@ -94,88 +98,89 @@ const fn cpu_device() -> Device {
     Device::Cpu
 }
 
-impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
+impl<OS, AS, P, C> ActorCriticAgent<OS, AS, P, C>
 where
     OS: FeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
-    P: Module,
-    C: Critic,
+    P: LearningPolicy,
+    C: LearningCritic,
 {
-    pub fn new<E, PB, PUB, CB, CUB>(env: &E, config: &ActorCriticConfig<PB, PUB, CB, CUB>) -> Self
+    pub fn new<E, PB, CB>(env: &E, config: &ActorCriticConfig<PB, CB>) -> Self
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
-        PB: BuildModule<Module = P> + Clone,
-        PUB: BuildPolicyUpdater<AS, Updater = PU>,
-        CB: BuildCritic<Critic = C>,
-        CUB: BuildCriticUpdater<Updater = CU>,
+        PB: BuildLearningPolicy<LearningPolicy = P>,
+        CB: BuildLearningCritic<LearningCritic = C>,
     {
         let observation_space = NonEmptyFeatures::new(env.observation_space());
         let action_space = env.action_space();
+        let num_observation_features = observation_space.num_features();
 
-        let policy = config.policy_config.build_module(
-            observation_space.num_features(),
+        let learning_policy = config.policy_config.build_learning_policy(
+            num_observation_features,
             action_space.num_distribution_params(),
             config.device,
         );
-        let policy_updater = config
-            .policy_updater_config
-            .build_policy_updater(policy.trainable_variables());
 
-        let critic = config
+        let learning_critic = config
             .critic_config
-            .build_critic(observation_space.num_features(), config.device);
-        let discount_factor = critic.discount_factor(env.discount_factor());
-        let critic_updater = config
-            .critic_updater_config
-            .build_critic_updater(critic.trainable_variables());
+            .build_learning_critic(num_observation_features, config.device);
 
         Self {
-            spaces: Arc::new(Spaces {
-                observation_space,
-                action_space,
-            }),
+            observation_space,
+            action_space,
+            discount_factor: learning_critic
+                .critic_ref()
+                .discount_factor(env.discount_factor()),
             min_batch_steps: config.min_batch_steps,
-            discount_factor,
-            policy,
-            policy_updater,
-            critic,
-            critic_updater,
+            learning_policy,
+            learning_critic,
+            cpu_policy: RefCell::new(None),
             device: config.device,
         }
     }
 }
 
-impl<OS, AS, P, PU, C, CU> Agent<OS::Element, AS::Element>
-    for ActorCriticAgent<OS, AS, P, PU, C, CU>
+impl<OS, AS, P, C> Agent<OS::Element, AS::Element> for ActorCriticAgent<OS, AS, P, C>
 where
-    OS: FeatureSpace + 'static,
-    AS: ParameterizedDistributionSpace<Tensor> + 'static,
-    P: SequenceModule + IterativeModule,
-    PU: UpdatePolicy<AS>,
-    C: Critic,
-    CU: UpdateCritic,
+    OS: FeatureSpace + Clone,
+    OS::Element: 'static,
+    AS: ParameterizedDistributionSpace<Tensor> + Clone,
+    AS::Element: 'static,
+    P: LearningPolicy,
+    C: LearningCritic,
 {
-    type Actor = ActorCriticActor<OS, AS, P>;
+    type Actor = PolicyActor<OS, AS, P::Policy>;
 
     fn actor(&self, _: ActorMode) -> Self::Actor {
-        // TODO: Store cpu_policy in the agent and synchronize it to `policy` after every update.
-        // Then use shallow_clone() to produce actor policies.
-        ActorCriticActor::new(
-            Arc::clone(&self.spaces),
-            self.policy.clone_to_device(Device::Cpu),
+        let cpu_policy = if matches!(self.device, Device::Cpu) {
+            self.learning_policy.policy_ref().shallow_clone()
+        } else {
+            self.cpu_policy
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    self.learning_policy
+                        .policy_ref()
+                        .clone_to_device(Device::Cpu)
+                })
+                .shallow_clone()
+        };
+
+        PolicyActor::new(
+            self.observation_space.clone(),
+            self.action_space.clone(),
+            cpu_policy,
         )
     }
 }
 
-impl<OS, AS, P, PU, C, CU> BatchUpdate<OS::Element, AS::Element>
-    for ActorCriticAgent<OS, AS, P, PU, C, CU>
+impl<OS, AS, P, C> BatchUpdate<OS::Element, AS::Element> for ActorCriticAgent<OS, AS, P, C>
 where
-    OS: FeatureSpace + 'static,
-    AS: ReprSpace<Tensor> + 'static,
-    P: SequenceModule,
-    PU: UpdatePolicy<AS>,
-    C: Critic,
-    CU: UpdateCritic,
+    OS: FeatureSpace,
+    OS::Element: 'static,
+    AS: ParameterizedDistributionSpace<Tensor>,
+    AS::Element: 'static,
+    P: LearningPolicy,
+    C: LearningCritic,
 {
     type HistoryBuffer = SimpleBuffer<OS::Element, AS::Element>;
 
@@ -216,14 +221,14 @@ where
     }
 }
 
-impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
+impl<OS, AS, P, C> ActorCriticAgent<OS, AS, P, C>
 where
-    OS: FeatureSpace + 'static,
-    AS: ReprSpace<Tensor> + 'static,
-    P: SequenceModule,
-    PU: UpdatePolicy<AS>,
-    C: Critic,
-    CU: UpdateCritic,
+    OS: FeatureSpace,
+    OS::Element: 'static,
+    AS: ParameterizedDistributionSpace<Tensor>,
+    AS::Element: 'static,
+    P: LearningPolicy,
+    C: LearningCritic,
 {
     // Takes a slice of references because
     // * it iterates over the buffers twice and it is awkward to make the right bounds for
@@ -238,11 +243,13 @@ where
         logger: &mut dyn StatsLogger,
     ) {
         let agent_update_start = Instant::now();
+        // About to update the policy so clear any existing CPU policy copy
+        self.cpu_policy = RefCell::new(None);
 
         let features = LazyPackedHistoryFeatures::new(
             buffers.iter().flat_map(|b| b.episodes()),
-            &self.spaces.observation_space,
-            &self.spaces.action_space,
+            &self.observation_space,
+            &self.action_space,
             self.discount_factor,
             self.device,
         );
@@ -260,11 +267,10 @@ where
 
         let mut policy_logger = logger.with_scope("policy");
         let policy_update_start = Instant::now();
-        let policy_stats = self.policy_updater.update_policy(
-            &self.policy,
-            &self.critic,
+        let policy_stats = self.learning_policy.update_policy(
+            self.learning_critic.critic_ref(),
             &features,
-            &self.spaces.action_space,
+            &self.action_space,
             &mut policy_logger,
         );
         policy_logger.log_duration("update_time", policy_update_start.elapsed());
@@ -274,8 +280,8 @@ where
 
         let mut critic_logger = logger.with_scope("critic");
         let critic_update_start = Instant::now();
-        self.critic_updater
-            .update_critic(&self.critic, &features, &mut critic_logger);
+        self.learning_critic
+            .update_critic(&features, &mut critic_logger);
         critic_logger.log_duration("update_time", critic_update_start.elapsed());
 
         for buffer in buffers {
@@ -285,51 +291,4 @@ where
         logger.log_duration("agent/update_time", agent_update_start.elapsed());
         logger.log_counter_increment("agent/update_count", 1)
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ActorCriticActor<OS, AS, P> {
-    spaces: Arc<Spaces<OS, AS>>,
-    policy: P,
-}
-
-impl<OS: FeatureSpace, AS, P> ActorCriticActor<OS, AS, P> {
-    pub fn new(spaces: Arc<Spaces<OS, AS>>, policy: P) -> Self {
-        Self { spaces, policy }
-    }
-}
-
-impl<OS, AS, P> Actor<OS::Element, AS::Element> for ActorCriticActor<OS, AS, P>
-where
-    OS: FeatureSpace,
-    AS: ParameterizedDistributionSpace<Tensor>,
-    P: IterativeModule,
-{
-    type EpisodeState = P::State;
-
-    fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {
-        self.policy.initial_state()
-    }
-
-    fn act(
-        &self,
-        state: &mut Self::EpisodeState,
-        observation: &OS::Element,
-        _: &mut Prng,
-    ) -> AS::Element {
-        let _no_grad = tch::no_grad_guard();
-        let input = self
-            .spaces
-            .observation_space
-            .features::<Tensor>(observation);
-        let output = self.policy.step(state, &input);
-        self.spaces.action_space.sample_element(&output)
-    }
-}
-
-/// Action and Observation spaces for `ActorCriticAgent`.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Spaces<OS, AS> {
-    observation_space: NonEmptyFeatures<OS>,
-    action_space: AS,
 }

@@ -1,19 +1,25 @@
-use super::super::{critic::Critic, features::PackedHistoryFeaturesView, optimizers::Optimizer};
-use super::UpdateCriticWithOptimizer;
-use crate::logging::StatsLogger;
+use super::{
+    Critic, CriticUpdateRule, PackedHistoryFeaturesView, RuleOpt, RuleOptConfig, StatsLogger,
+};
+use crate::torch::optimizers::{AdamConfig, Optimizer};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
+use tch::COptimizer;
 
-// TODO: Move the MSE training from critic/ to here
-
-/// Rule that updates a critic by minimizing its loss for several optimizer iterations.
+/// Critic update rule that performs multiple steps of gradient-based loss minimization.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CriticLossUpdateRule {
+pub struct GradOptRule {
     /// Number of optimizer iterations per update
     pub optimizer_iters: u64,
 }
 
-impl Default for CriticLossUpdateRule {
+/// A [`LearningCritic`] using gradient-based loss minimization ([`GradOptRule`]).
+pub type GradOpt<C, O = COptimizer> = RuleOpt<C, O, GradOptRule>;
+/// Configuration for [`GradOpt`], a gradient-based loss-minimizing [`LearningCritic`].
+pub type GradOptConfig<CB, OB = AdamConfig> = RuleOptConfig<CB, OB, GradOptRule>;
+
+impl Default for GradOptRule {
+    #[inline]
     fn default() -> Self {
         Self {
             optimizer_iters: 80,
@@ -21,21 +27,23 @@ impl Default for CriticLossUpdateRule {
     }
 }
 
-impl<O> UpdateCriticWithOptimizer<O> for CriticLossUpdateRule
+impl<C, O> CriticUpdateRule<C, O> for GradOptRule
 where
-    O: Optimizer + ?Sized,
+    C: Critic,
+    O: Optimizer,
 {
-    fn update_critic_with_optimizer(
-        &self,
-        critic: &dyn Critic,
-        features: &dyn PackedHistoryFeaturesView,
+    fn update_external_critic(
+        &mut self,
+        critic: &C,
         optimizer: &mut O,
+        features: &dyn PackedHistoryFeaturesView,
         logger: &mut dyn StatsLogger,
     ) {
-        if !critic.trainable() {
-            return;
-        }
-        let loss_fn = || critic.loss(features).unwrap();
+        let loss_fn = || {
+            critic
+                .loss(features)
+                .expect("critic has no trainable parameters")
+        };
 
         let mut critic_opt_start = Instant::now();
         for i in 0..self.optimizer_iters {

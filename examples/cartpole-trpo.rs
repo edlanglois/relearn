@@ -4,13 +4,11 @@ use relearn::agents::{ActorMode, Agent, BuildAgent};
 use relearn::envs::{CartPole, EnvStructure, Environment, WithVisibleStepLimit};
 use relearn::logging::{DisplayLogger, TensorBoardLogger};
 use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
-use relearn::torch::{
-    agents::ActorCriticConfig,
-    critic::GaeConfig,
-    modules::MlpConfig,
-    optimizers::{AdamConfig, ConjugateGradientOptimizerConfig},
-    updaters::{CriticLossUpdateRule, TrpoPolicyUpdateRule, WithOptimizer},
+use relearn::torch::agents::{
+    critic::GaeConfig, learning_critic::GradOptConfig, learning_policy::TrpoConfig,
+    ActorCriticConfig,
 };
+use relearn::torch::modules::MlpConfig;
 use relearn::Prng;
 use std::env;
 use std::fs::{self, File};
@@ -18,12 +16,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tch::Device;
 
-type AgentConfig = ActorCriticConfig<
-    MlpConfig,
-    WithOptimizer<TrpoPolicyUpdateRule, ConjugateGradientOptimizerConfig>,
-    GaeConfig<MlpConfig>,
-    WithOptimizer<CriticLossUpdateRule, AdamConfig>,
->;
+type AgentConfig = ActorCriticConfig<TrpoConfig<MlpConfig>, GradOptConfig<GaeConfig<MlpConfig>>>;
 
 fn main() {
     let env = CartPole::default().with_visible_step_limit(500);
