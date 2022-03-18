@@ -64,9 +64,7 @@ pub struct IndexedTypeSpace<T> {
 }
 
 impl<T> IndexedTypeSpace<T> {
-    // Cannot be const because
-    // E0658: function pointers cannot appear in constant functions
-    #[allow(clippy::missing_const_for_fn)]
+    #[inline]
     pub fn new() -> Self {
         Self {
             element_type: PhantomData,
@@ -75,24 +73,28 @@ impl<T> IndexedTypeSpace<T> {
 }
 
 impl<T> Default for IndexedTypeSpace<T> {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl<T> fmt::Debug for IndexedTypeSpace<T> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "IndexedTypeSpace<{}>", any::type_name::<T>())
     }
 }
 
 impl<T> fmt::Display for IndexedTypeSpace<T> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "IndexedTypeSpace<{}>", any::type_name::<T>())
     }
 }
 
 impl<T> Clone for IndexedTypeSpace<T> {
+    #[inline]
     fn clone(&self) -> Self {
         Self::new()
     }
@@ -103,12 +105,14 @@ impl<T> Copy for IndexedTypeSpace<T> {}
 impl<T: Clone + Send> Space for IndexedTypeSpace<T> {
     type Element = T;
 
+    #[inline]
     fn contains(&self, _element: &Self::Element) -> bool {
         true
     }
 }
 
 impl<T> PartialEq for IndexedTypeSpace<T> {
+    #[inline]
     fn eq(&self, _other: &Self) -> bool {
         true // There is only one kind of IndexedTypeSpace<T>
     }
@@ -117,36 +121,43 @@ impl<T> PartialEq for IndexedTypeSpace<T> {
 impl<T> Eq for IndexedTypeSpace<T> {}
 
 impl<T> Hash for IndexedTypeSpace<T> {
+    #[inline]
     fn hash<H: Hasher>(&self, _state: &mut H) {}
 }
 
 impl<T> SubsetOrd for IndexedTypeSpace<T> {
+    #[inline]
     fn subset_cmp(&self, _other: &Self) -> Option<Ordering> {
         Some(Ordering::Equal)
     }
 }
 
 impl<T: Indexed + Clone + Send> NonEmptySpace for IndexedTypeSpace<T> {
+    #[inline]
     fn some_element(&self) -> Self::Element {
         T::from_index(0).expect("space is empty")
     }
 }
 
 impl<T: Indexed> Distribution<T> for IndexedTypeSpace<T> {
+    #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
         T::from_index(rng.gen_range(0..T::SIZE)).unwrap()
     }
 }
 
 impl<T: Indexed + Clone + Send> FiniteSpace for IndexedTypeSpace<T> {
+    #[inline]
     fn size(&self) -> usize {
         T::SIZE
     }
 
+    #[inline]
     fn to_index(&self, element: &Self::Element) -> usize {
         T::index(element)
     }
 
+    #[inline]
     fn from_index(&self, index: usize) -> Option<Self::Element> {
         T::from_index(index)
     }
@@ -198,10 +209,12 @@ impl<T: Indexed + Clone + Send> FeatureSpace for IndexedTypeSpace<T> {
 
 /// Represents elements as integer tensors.
 impl<T: Indexed + Clone + Send> ReprSpace<Tensor> for IndexedTypeSpace<T> {
+    #[inline]
     fn repr(&self, element: &Self::Element) -> Tensor {
         Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu))
     }
 
+    #[inline]
     fn batch_repr<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -218,10 +231,12 @@ impl<T: Indexed + Clone + Send> ReprSpace<Tensor> for IndexedTypeSpace<T> {
 impl<T: Indexed + Clone + Send> ParameterizedDistributionSpace<Tensor> for IndexedTypeSpace<T> {
     type Distribution = Categorical;
 
+    #[inline]
     fn num_distribution_params(&self) -> usize {
         T::SIZE
     }
 
+    #[inline]
     fn sample_element(&self, params: &Tensor) -> Self::Element {
         self.from_index(
             self.distribution(params)
@@ -233,6 +248,7 @@ impl<T: Indexed + Clone + Send> ParameterizedDistributionSpace<Tensor> for Index
         .unwrap()
     }
 
+    #[inline]
     fn distribution(&self, params: &Tensor) -> Self::Distribution {
         Self::Distribution::new(params)
     }
@@ -240,6 +256,7 @@ impl<T: Indexed + Clone + Send> ParameterizedDistributionSpace<Tensor> for Index
 
 /// Log the index as a sample from `0..N`
 impl<T: Indexed + Clone + Send> ElementRefInto<Loggable> for IndexedTypeSpace<T> {
+    #[inline]
     fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
         Loggable::Index {
             value: self.to_index(element),
@@ -251,10 +268,12 @@ impl<T: Indexed + Clone + Send> ElementRefInto<Loggable> for IndexedTypeSpace<T>
 impl Indexed for bool {
     const SIZE: usize = 2;
 
+    #[inline]
     fn index(&self) -> usize {
         (*self).into()
     }
 
+    #[inline]
     fn from_index(index: usize) -> Option<Self> {
         match index {
             0 => Some(false),

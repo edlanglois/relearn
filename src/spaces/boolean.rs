@@ -20,12 +20,14 @@ use tch::{Device, Kind, Tensor};
 pub struct BooleanSpace;
 
 impl BooleanSpace {
+    #[inline]
     pub const fn new() -> Self {
         BooleanSpace
     }
 }
 
 impl fmt::Display for BooleanSpace {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "BooleanSpace")
     }
@@ -34,26 +36,31 @@ impl fmt::Display for BooleanSpace {
 impl Space for BooleanSpace {
     type Element = bool;
 
+    #[inline]
     fn contains(&self, _value: &Self::Element) -> bool {
         true
     }
 }
 
 impl SubsetOrd for BooleanSpace {
+    #[inline]
     fn subset_cmp(&self, _other: &Self) -> Option<Ordering> {
         Some(Ordering::Equal)
     }
 }
 
 impl FiniteSpace for BooleanSpace {
+    #[inline]
     fn size(&self) -> usize {
         2
     }
 
+    #[inline]
     fn to_index(&self, element: &Self::Element) -> usize {
         (*element).into()
     }
 
+    #[inline]
     fn from_index(&self, index: usize) -> Option<Self::Element> {
         match index {
             0 => Some(false),
@@ -62,12 +69,14 @@ impl FiniteSpace for BooleanSpace {
         }
     }
 
+    #[inline]
     fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
         Some(index != 0)
     }
 }
 
 impl NonEmptySpace for BooleanSpace {
+    #[inline]
     fn some_element(&self) -> Self::Element {
         false
     }
@@ -75,10 +84,12 @@ impl NonEmptySpace for BooleanSpace {
 
 /// Represent elements as a Boolean valued tensor.
 impl ReprSpace<Tensor> for BooleanSpace {
+    #[inline]
     fn repr(&self, element: &Self::Element) -> Tensor {
         Tensor::scalar_tensor(i64::from(*element), (Kind::Bool, Device::Cpu))
     }
 
+    #[inline]
     fn batch_repr<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -93,14 +104,17 @@ impl ReprSpace<Tensor> for BooleanSpace {
 impl ParameterizedDistributionSpace<Tensor> for BooleanSpace {
     type Distribution = Bernoulli;
 
+    #[inline]
     fn num_distribution_params(&self) -> usize {
         1
     }
 
+    #[inline]
     fn sample_element(&self, params: &Tensor) -> Self::Element {
         self.distribution(params).sample().into()
     }
 
+    #[inline]
     fn distribution(&self, params: &Tensor) -> Self::Distribution {
         Self::Distribution::new(params.squeeze_dim(-1))
     }
@@ -139,12 +153,14 @@ impl FeatureSpace for BooleanSpace {
 }
 
 impl Distribution<<Self as Space>::Element> for BooleanSpace {
+    #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
         rng.gen()
     }
 }
 
 impl ElementRefInto<Loggable> for BooleanSpace {
+    #[inline]
     fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
         Loggable::Scalar(u8::from(*element).into())
     }

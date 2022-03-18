@@ -18,6 +18,7 @@ pub struct IntervalSpace<T = f64> {
 }
 
 impl<T: PartialOrd> IntervalSpace<T> {
+    #[inline]
     pub fn new(low: T, high: T) -> Self {
         assert!(low <= high, "require low <= high");
         Self { low, high }
@@ -26,6 +27,7 @@ impl<T: PartialOrd> IntervalSpace<T> {
 
 /// The default interval is the full real number line.
 impl<T: Float> Default for IntervalSpace<T> {
+    #[inline]
     fn default() -> Self {
         Self {
             low: T::neg_infinity(),
@@ -35,6 +37,7 @@ impl<T: Float> Default for IntervalSpace<T> {
 }
 
 impl<T: fmt::Display> fmt::Display for IntervalSpace<T> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "IntervalSpace({}, {})", self.low, self.high)
     }
@@ -43,12 +46,14 @@ impl<T: fmt::Display> fmt::Display for IntervalSpace<T> {
 impl<T: Float + Send> Space for IntervalSpace<T> {
     type Element = T;
 
+    #[inline]
     fn contains(&self, value: &Self::Element) -> bool {
         &self.low <= value && value <= &self.high && value.is_finite()
     }
 }
 
 impl<T: PartialOrd> SubsetOrd for IntervalSpace<T> {
+    #[inline]
     fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
         use Ordering::*;
         match (
@@ -64,6 +69,7 @@ impl<T: PartialOrd> SubsetOrd for IntervalSpace<T> {
 }
 
 impl<T: Float + Send> NonEmptySpace for IntervalSpace<T> {
+    #[inline]
     fn some_element(&self) -> Self::Element {
         self.low
     }
@@ -74,10 +80,12 @@ impl<T> ReprSpace<Tensor> for IntervalSpace<T>
 where
     T: Float + tch::kind::Element + Send,
 {
+    #[inline]
     fn repr(&self, element: &Self::Element) -> Tensor {
         Tensor::of_slice(slice::from_ref(element)).squeeze_dim_(0)
     }
 
+    #[inline]
     fn batch_repr<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -109,6 +117,7 @@ impl<T: Float + ToPrimitive + Send> FeatureSpace for IntervalSpace<T> {
 }
 
 impl Distribution<f32> for IntervalSpace<f32> {
+    #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
         match (self.low.is_finite(), self.high.is_finite()) {
             (true, true) => rng.gen_range(self.low..=self.high),
@@ -120,6 +129,7 @@ impl Distribution<f32> for IntervalSpace<f32> {
 }
 
 impl Distribution<f64> for IntervalSpace<f64> {
+    #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
         match (self.low.is_finite(), self.high.is_finite()) {
             (true, true) => rng.gen_range(self.low..=self.high),
@@ -131,6 +141,7 @@ impl Distribution<f64> for IntervalSpace<f64> {
 }
 
 impl<T: Float + Into<f64> + Send> ElementRefInto<Loggable> for IntervalSpace<T> {
+    #[inline]
     fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
         Loggable::Scalar((*element).into())
     }

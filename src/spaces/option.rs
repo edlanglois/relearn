@@ -21,12 +21,14 @@ pub struct OptionSpace<S> {
 }
 
 impl<S> OptionSpace<S> {
+    #[inline]
     pub const fn new(inner: S) -> Self {
         Self { inner }
     }
 }
 
 impl<S: fmt::Display> fmt::Display for OptionSpace<S> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "OptionSpace<{}>", self.inner)
     }
@@ -35,6 +37,7 @@ impl<S: fmt::Display> fmt::Display for OptionSpace<S> {
 impl<S: Space> Space for OptionSpace<S> {
     type Element = Option<S::Element>;
 
+    #[inline]
     fn contains(&self, value: &Self::Element) -> bool {
         match value {
             None => true,
@@ -44,16 +47,19 @@ impl<S: Space> Space for OptionSpace<S> {
 }
 
 impl<S: SubsetOrd> SubsetOrd for OptionSpace<S> {
+    #[inline]
     fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
         self.inner.subset_cmp(&other.inner)
     }
 }
 
 impl<S: FiniteSpace> FiniteSpace for OptionSpace<S> {
+    #[inline]
     fn size(&self) -> usize {
         1 + self.inner.size()
     }
 
+    #[inline]
     fn to_index(&self, element: &Self::Element) -> usize {
         match element {
             None => 0,
@@ -61,6 +67,7 @@ impl<S: FiniteSpace> FiniteSpace for OptionSpace<S> {
         }
     }
 
+    #[inline]
     fn from_index(&self, index: usize) -> Option<Self::Element> {
         if index == 0 {
             Some(None)
@@ -71,6 +78,7 @@ impl<S: FiniteSpace> FiniteSpace for OptionSpace<S> {
 }
 
 impl<S: Space> NonEmptySpace for OptionSpace<S> {
+    #[inline]
     fn some_element(&self) -> Self::Element {
         None
     }
@@ -111,6 +119,7 @@ impl<S> Distribution<<Self as Space>::Element> for OptionSpace<S>
 where
     S: Space + Distribution<S::Element>,
 {
+    #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
         // Sample None half of the time.
         if rng.gen() {
@@ -123,6 +132,7 @@ where
 
 // NOTE: ElementRefTryInto instead of ElementRefInto?
 impl<S: Space> ElementRefInto<Loggable> for OptionSpace<S> {
+    #[inline]
     fn elem_ref_into(&self, _element: &Self::Element) -> Loggable {
         // No clear way to convert structured elements into Loggable
         Loggable::Nothing

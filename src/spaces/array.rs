@@ -29,6 +29,7 @@ pub struct ArraySpace<S, const N: usize> {
 }
 
 impl<S, const N: usize> ArraySpace<S, N> {
+    #[inline]
     pub const fn new(inner_spaces: [S; N]) -> Self {
         Self { inner_spaces }
     }
@@ -37,6 +38,7 @@ impl<S, const N: usize> ArraySpace<S, N> {
 impl<S: Space, const N: usize> Space for ArraySpace<S, N> {
     type Element = [S::Element; N];
 
+    #[inline]
     fn contains(&self, value: &Self::Element) -> bool {
         self.inner_spaces
             .iter()
@@ -46,6 +48,7 @@ impl<S: Space, const N: usize> Space for ArraySpace<S, N> {
 }
 
 impl<S: Space + SubsetOrd, const N: usize> SubsetOrd for ArraySpace<S, N> {
+    #[inline]
     fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
         iter_product_subset_ord(
             self.inner_spaces
@@ -57,6 +60,7 @@ impl<S: Space + SubsetOrd, const N: usize> SubsetOrd for ArraySpace<S, N> {
 }
 
 impl<S: FiniteSpace, const N: usize> FiniteSpace for ArraySpace<S, N> {
+    #[inline]
     fn size(&self) -> usize {
         self.inner_spaces
             .iter()
@@ -68,6 +72,7 @@ impl<S: FiniteSpace, const N: usize> FiniteSpace for ArraySpace<S, N> {
             })
     }
 
+    #[inline]
     fn to_index(&self, element: &Self::Element) -> usize {
         // The index is obtained by treating the element as a little-endian number
         // when written as a sequence of inner-space indices.
@@ -80,6 +85,7 @@ impl<S: FiniteSpace, const N: usize> FiniteSpace for ArraySpace<S, N> {
             })
     }
 
+    #[inline]
     fn from_index(&self, mut index: usize) -> Option<Self::Element> {
         let mut spaces_iter = self.inner_spaces.iter();
 
@@ -100,6 +106,7 @@ impl<S: FiniteSpace, const N: usize> FiniteSpace for ArraySpace<S, N> {
 }
 
 impl<S: NonEmptySpace, const N: usize> NonEmptySpace for ArraySpace<S, N> {
+    #[inline]
     fn some_element(&self) -> <Self as Space>::Element {
         array_init::array_init(|i| self.inner_spaces[i].some_element())
     }
@@ -109,6 +116,7 @@ impl<S, const N: usize> Distribution<<Self as Space>::Element> for ArraySpace<S,
 where
     S: Space + Distribution<S::Element>,
 {
+    #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
         array_init::array_init(|i| self.inner_spaces[i].sample(rng))
     }
@@ -141,6 +149,7 @@ impl<S: FeatureSpace, const N: usize> FeatureSpace for ArraySpace<S, N> {
 }
 
 impl<S: Space, const N: usize> ElementRefInto<Loggable> for ArraySpace<S, N> {
+    #[inline]
     fn elem_ref_into(&self, _element: &Self::Element) -> Loggable {
         // Too complex to log
         Loggable::Nothing

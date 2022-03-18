@@ -41,9 +41,11 @@ where
     T::Target: Sized,
 {
     type Inner = T::Target;
+    #[inline]
     fn wrap(inner: Self::Inner) -> Self {
         inner.into()
     }
+    #[inline]
     fn inner_ref(&self) -> &Self::Inner {
         self
     }
@@ -61,6 +63,7 @@ pub struct WrappedElementSpace<S, W> {
 }
 
 impl<S, W> WrappedElementSpace<S, W> {
+    #[inline]
     pub fn new(inner: S) -> Self {
         Self {
             inner,
@@ -70,6 +73,7 @@ impl<S, W> WrappedElementSpace<S, W> {
 }
 
 impl<S, W> From<S> for WrappedElementSpace<S, W> {
+    #[inline]
     fn from(inner: S) -> Self {
         Self::new(inner)
     }
@@ -87,6 +91,7 @@ impl<S: fmt::Debug, W> fmt::Debug for WrappedElementSpace<S, W> {
 }
 
 impl<S: Default, W> Default for WrappedElementSpace<S, W> {
+    #[inline]
     fn default() -> Self {
         Self {
             inner: Default::default(),
@@ -96,6 +101,7 @@ impl<S: Default, W> Default for WrappedElementSpace<S, W> {
 }
 
 impl<S: Clone, W> Clone for WrappedElementSpace<S, W> {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -107,6 +113,7 @@ impl<S: Clone, W> Clone for WrappedElementSpace<S, W> {
 impl<S: Copy, W> Copy for WrappedElementSpace<S, W> {}
 
 impl<S: PartialEq, W> PartialEq for WrappedElementSpace<S, W> {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.inner.eq(&other.inner)
     }
@@ -115,24 +122,28 @@ impl<S: PartialEq, W> PartialEq for WrappedElementSpace<S, W> {
 impl<S: Eq, W> Eq for WrappedElementSpace<S, W> {}
 
 impl<S: Hash, W> Hash for WrappedElementSpace<S, W> {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.inner.hash(state)
     }
 }
 
 impl<S: PartialOrd, W> PartialOrd for WrappedElementSpace<S, W> {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.inner.partial_cmp(&other.inner)
     }
 }
 
 impl<S: Ord, W> Ord for WrappedElementSpace<S, W> {
+    #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.inner.cmp(&other.inner)
     }
 }
 
 impl<S: SubsetOrd, W> SubsetOrd for WrappedElementSpace<S, W> {
+    #[inline]
     fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
         self.inner.subset_cmp(&other.inner)
     }
@@ -145,6 +156,7 @@ where
 {
     type Element = W;
 
+    #[inline]
     fn contains(&self, value: &Self::Element) -> bool {
         self.inner.contains(value.inner_ref())
     }
@@ -155,18 +167,22 @@ where
     S: FiniteSpace,
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
+    #[inline]
     fn size(&self) -> usize {
         self.inner.size()
     }
 
+    #[inline]
     fn to_index(&self, element: &Self::Element) -> usize {
         self.inner.to_index(element.inner_ref())
     }
 
+    #[inline]
     fn from_index(&self, index: usize) -> Option<Self::Element> {
         self.inner.from_index(index).map(Wrapper::wrap)
     }
 
+    #[inline]
     fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
         self.inner.from_index_unchecked(index).map(Wrapper::wrap)
     }
@@ -177,6 +193,7 @@ where
     S: NonEmptySpace,
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
+    #[inline]
     fn some_element(&self) -> Self::Element {
         W::wrap(self.inner.some_element())
     }
@@ -187,6 +204,7 @@ where
     S: Space + Distribution<S::Element>,
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
+    #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
         W::wrap(self.inner.sample(rng))
     }
@@ -198,10 +216,12 @@ where
     S::Element: 'static,
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
+    #[inline]
     fn repr(&self, element: &Self::Element) -> T0 {
         self.inner.repr(element.inner_ref())
     }
 
+    #[inline]
     fn batch_repr<'a, I>(&self, elements: I) -> T
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -271,6 +291,7 @@ where
     S: ElementRefInto<T>,
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
+    #[inline]
     fn elem_ref_into(&self, element: &Self::Element) -> T {
         self.inner.elem_ref_into(element.inner_ref())
     }

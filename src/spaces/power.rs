@@ -14,6 +14,7 @@ pub struct PowerSpace<S, const N: usize> {
 }
 
 impl<S, const N: usize> PowerSpace<S, N> {
+    #[inline]
     pub const fn new(inner: S) -> Self {
         Self { inner }
     }
@@ -22,18 +23,21 @@ impl<S, const N: usize> PowerSpace<S, N> {
 impl<S: Space, const N: usize> Space for PowerSpace<S, N> {
     type Element = [S::Element; N];
 
+    #[inline]
     fn contains(&self, value: &Self::Element) -> bool {
         value.iter().all(|v| self.inner.contains(v))
     }
 }
 
 impl<S: SubsetOrd, const N: usize> SubsetOrd for PowerSpace<S, N> {
+    #[inline]
     fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
         self.inner.subset_cmp(&other.inner)
     }
 }
 
 impl<S: FiniteSpace, const N: usize> FiniteSpace for PowerSpace<S, N> {
+    #[inline]
     fn size(&self) -> usize {
         self.inner
             .size()
@@ -41,6 +45,7 @@ impl<S: FiniteSpace, const N: usize> FiniteSpace for PowerSpace<S, N> {
             .expect("Size of space is larger than usize")
     }
 
+    #[inline]
     fn to_index(&self, element: &Self::Element) -> usize {
         // The index is obtained by treating the element as a little-endian number
         // when written as a sequence of inner-space indices.
@@ -53,6 +58,7 @@ impl<S: FiniteSpace, const N: usize> FiniteSpace for PowerSpace<S, N> {
         index
     }
 
+    #[inline]
     fn from_index(&self, mut index: usize) -> Option<Self::Element> {
         let inner_size = self.inner.size();
         let result_elems = array_init::try_array_init(|_| {
@@ -73,6 +79,7 @@ impl<S, const N: usize> NonEmptySpace for PowerSpace<S, N>
 where
     S: NonEmptySpace + Distribution<S::Element>,
 {
+    #[inline]
     fn some_element(&self) -> Self::Element {
         array_init::array_init(|_| self.inner.some_element())
     }
@@ -82,6 +89,7 @@ impl<S, const N: usize> Distribution<<Self as Space>::Element> for PowerSpace<S,
 where
     S: Space + Distribution<S::Element>,
 {
+    #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
         array_init::array_init(|_| self.inner.sample(rng))
     }
@@ -108,6 +116,7 @@ impl<S: FeatureSpace, const N: usize> FeatureSpace for PowerSpace<S, N> {
 }
 
 impl<S: Space, const N: usize> ElementRefInto<Loggable> for PowerSpace<S, N> {
+    #[inline]
     fn elem_ref_into(&self, _element: &Self::Element) -> Loggable {
         // Too complex to log
         Loggable::Nothing

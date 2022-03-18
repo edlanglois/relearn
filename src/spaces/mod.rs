@@ -129,6 +129,7 @@ macro_rules! impl_wrapped_subset_ord {
         where
             S: SubsetOrd + ?Sized,
         {
+            #[inline]
             fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
                 S::subset_cmp(self, other)
             }
@@ -271,6 +272,7 @@ impl<S> SampleSpace for S
 where
     S: NonEmptySpace + Distribution<<Self as Space>::Element>,
 {
+    #[inline]
     fn sample(&self, rng: &mut dyn RngCore) -> Self::Element {
         Distribution::sample(&self, rng)
     }
@@ -453,6 +455,7 @@ pub trait ElementInto<T>: Space {
 }
 
 impl<T: ElementRefInto<U>, U> ElementInto<U> for T {
+    #[inline]
     fn elem_into(&self, element: Self::Element) -> U {
         self.elem_ref_into(&element)
     }
@@ -465,12 +468,14 @@ pub trait ElementRefInto<T>: Space {
 }
 
 impl<S: ElementRefInto<T> + ?Sized, T> ElementRefInto<T> for &'_ S {
+    #[inline]
     fn elem_ref_into(&self, element: &Self::Element) -> T {
         S::elem_ref_into(self, element)
     }
 }
 
 impl<S: ElementRefInto<T> + ?Sized, T> ElementRefInto<T> for Box<S> {
+    #[inline]
     fn elem_ref_into(&self, element: &Self::Element) -> T {
         S::elem_ref_into(self, element)
     }

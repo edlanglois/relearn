@@ -22,12 +22,14 @@ pub struct IndexSpace {
 }
 
 impl IndexSpace {
+    #[inline]
     pub const fn new(size: usize) -> Self {
         Self { size }
     }
 }
 
 impl fmt::Display for IndexSpace {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "IndexSpace({})", self.size)
     }
@@ -36,18 +38,21 @@ impl fmt::Display for IndexSpace {
 impl Space for IndexSpace {
     type Element = usize;
 
+    #[inline]
     fn contains(&self, value: &Self::Element) -> bool {
         value < &self.size
     }
 }
 
 impl SubsetOrd for IndexSpace {
+    #[inline]
     fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
         self.size.partial_cmp(&other.size)
     }
 }
 
 impl NonEmptySpace for IndexSpace {
+    #[inline]
     fn some_element(&self) -> <Self as Space>::Element {
         assert_ne!(self.size, 0, "space is empty");
         0
@@ -55,20 +60,24 @@ impl NonEmptySpace for IndexSpace {
 }
 
 impl Distribution<<Self as Space>::Element> for IndexSpace {
+    #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
         rng.gen_range(0..self.size)
     }
 }
 
 impl FiniteSpace for IndexSpace {
+    #[inline]
     fn size(&self) -> usize {
         self.size
     }
 
+    #[inline]
     fn to_index(&self, element: &Self::Element) -> usize {
         *element
     }
 
+    #[inline]
     fn from_index(&self, index: usize) -> Option<Self::Element> {
         if index >= self.size {
             None
@@ -77,6 +86,7 @@ impl FiniteSpace for IndexSpace {
         }
     }
 
+    #[inline]
     fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
         Some(index)
     }
@@ -128,10 +138,12 @@ impl FeatureSpace for IndexSpace {
 
 /// Represents elements as integer tensors.
 impl ReprSpace<Tensor> for IndexSpace {
+    #[inline]
     fn repr(&self, element: &Self::Element) -> Tensor {
         Tensor::scalar_tensor(self.to_index(element) as i64, (Kind::Int64, Device::Cpu))
     }
 
+    #[inline]
     fn batch_repr<'a, I>(&self, elements: I) -> Tensor
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -148,10 +160,12 @@ impl ReprSpace<Tensor> for IndexSpace {
 impl ParameterizedDistributionSpace<Tensor> for IndexSpace {
     type Distribution = Categorical;
 
+    #[inline]
     fn num_distribution_params(&self) -> usize {
         self.size
     }
 
+    #[inline]
     fn sample_element(&self, params: &Tensor) -> Self::Element {
         self.from_index(
             self.distribution(params)
@@ -163,6 +177,7 @@ impl ParameterizedDistributionSpace<Tensor> for IndexSpace {
         .unwrap()
     }
 
+    #[inline]
     fn distribution(&self, params: &Tensor) -> Self::Distribution {
         Self::Distribution::new(params)
     }
@@ -170,6 +185,7 @@ impl ParameterizedDistributionSpace<Tensor> for IndexSpace {
 
 /// Log the index as a sample from `0..N`
 impl ElementRefInto<Loggable> for IndexSpace {
+    #[inline]
     fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
         Loggable::Index {
             value: self.to_index(element),
@@ -179,6 +195,7 @@ impl ElementRefInto<Loggable> for IndexSpace {
 }
 
 impl<T: FiniteSpace + ?Sized> From<&T> for IndexSpace {
+    #[inline]
     fn from(space: &T) -> Self {
         Self { size: space.size() }
     }
