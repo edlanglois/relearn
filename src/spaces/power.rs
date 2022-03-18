@@ -1,7 +1,5 @@
 //! Cartesian power space.
-use super::{
-    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures, Space, SubsetOrd,
-};
+use super::{ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, Space, SubsetOrd};
 use crate::logging::Loggable;
 use num_traits::Float;
 use rand::distributions::Distribution;
@@ -12,12 +10,12 @@ use std::cmp::Ordering;
 /// A Cartesian power of a space: a Cartesian product of `N` copies of the same space.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PowerSpace<S, const N: usize> {
-    pub inner_space: S,
+    pub inner: S,
 }
 
 impl<S, const N: usize> PowerSpace<S, N> {
-    pub const fn new(inner_space: S) -> Self {
-        Self { inner_space }
+    pub const fn new(inner: S) -> Self {
+        Self { inner }
     }
 }
 
@@ -25,19 +23,19 @@ impl<S: Space, const N: usize> Space for PowerSpace<S, N> {
     type Element = [S::Element; N];
 
     fn contains(&self, value: &Self::Element) -> bool {
-        value.iter().all(|v| self.inner_space.contains(v))
+        value.iter().all(|v| self.inner.contains(v))
     }
 }
 
 impl<S: SubsetOrd, const N: usize> SubsetOrd for PowerSpace<S, N> {
     fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.inner_space.subset_cmp(&other.inner_space)
+        self.inner.subset_cmp(&other.inner)
     }
 }
 
 impl<S: FiniteSpace, const N: usize> FiniteSpace for PowerSpace<S, N> {
     fn size(&self) -> usize {
-        self.inner_space
+        self.inner
             .size()
             .checked_pow(N.try_into().expect("Size of space is larger than usize"))
             .expect("Size of space is larger than usize")
@@ -46,19 +44,19 @@ impl<S: FiniteSpace, const N: usize> FiniteSpace for PowerSpace<S, N> {
     fn to_index(&self, element: &Self::Element) -> usize {
         // The index is obtained by treating the element as a little-endian number
         // when written as a sequence of inner-space indices.
-        let inner_size = self.inner_space.size();
+        let inner_size = self.inner.size();
         let mut index = 0;
         for inner_elem in element.iter().rev() {
             index *= inner_size;
-            index += self.inner_space.to_index(inner_elem)
+            index += self.inner.to_index(inner_elem)
         }
         index
     }
 
     fn from_index(&self, mut index: usize) -> Option<Self::Element> {
-        let inner_size = self.inner_space.size();
+        let inner_size = self.inner.size();
         let result_elems = array_init::try_array_init(|_| {
-            let result_elem = self.inner_space.from_index(index % inner_size).ok_or(());
+            let result_elem = self.inner.from_index(index % inner_size).ok_or(());
             index /= inner_size;
             result_elem
         })
@@ -76,7 +74,7 @@ where
     S: NonEmptySpace + Distribution<S::Element>,
 {
     fn some_element(&self) -> Self::Element {
-        array_init::array_init(|_| self.inner_space.some_element())
+        array_init::array_init(|_| self.inner.some_element())
     }
 }
 
@@ -85,50 +83,27 @@ where
     S: Space + Distribution<S::Element>,
 {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
-        array_init::array_init(|_| self.inner_space.sample(rng))
+        array_init::array_init(|_| self.inner.sample(rng))
     }
 }
 
-impl<S: NumFeatures, const N: usize> NumFeatures for PowerSpace<S, N> {
+/// Features are the concatenation of inner feature vectors
+impl<S: FeatureSpace, const N: usize> FeatureSpace for PowerSpace<S, N> {
+    #[inline]
     fn num_features(&self) -> usize {
-        self.inner_space.num_features() * N
-    }
-}
-
-/// Feature encoder for [`PowerSpace`].
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct PowerSpaceEncoder<T> {
-    inner_encoder: T,
-    inner_num_features: usize,
-}
-
-impl<S: EncoderFeatureSpace, const N: usize> EncoderFeatureSpace for PowerSpace<S, N> {
-    type Encoder = PowerSpaceEncoder<S::Encoder>;
-
-    fn encoder(&self) -> Self::Encoder {
-        PowerSpaceEncoder {
-            inner_encoder: self.inner_space.encoder(),
-            inner_num_features: self.inner_space.num_features(),
-        }
+        self.inner.num_features() * N
     }
 
-    fn encoder_features_out<F: Float>(
+    #[inline]
+    fn features_out<'a, F: Float>(
         &self,
         element: &Self::Element,
-        out: &mut [F],
+        out: &'a mut [F],
         zeroed: bool,
-        encoder: &Self::Encoder,
-    ) {
-        let mut chunks = out.chunks_exact_mut(encoder.inner_num_features);
-        for inner_elem in element {
-            let chunk = chunks.next().expect("output slice is too small");
-            self.inner_space.encoder_features_out(
-                inner_elem,
-                chunk,
-                zeroed,
-                &encoder.inner_encoder,
-            );
-        }
+    ) -> &'a mut [F] {
+        element.iter().fold(out, |out, inner_elem| {
+            self.inner.features_out(inner_elem, out, zeroed)
+        })
     }
 }
 

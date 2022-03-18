@@ -35,8 +35,7 @@ pub use wrapper::BoxSpace;
 
 // Re-export space macros from relearn_derive
 pub use relearn_derive::{
-    EncoderFeatureSpace, FiniteSpace, Indexed, LogElementSpace, NumFeatures, ProductSpace,
-    SampleSpace, Space, SubsetOrd,
+    FiniteSpace, Indexed, LogElementSpace, ProductSpace, SampleSpace, Space, SubsetOrd,
 };
 
 use crate::utils::distributions::ArrayDistribution;
@@ -319,210 +318,34 @@ macro_rules! impl_wrapped_repr_space {
 impl_wrapped_repr_space!(&'_ S);
 impl_wrapped_repr_space!(Box<S>);
 
-/// Number of features for [`EncoderFeatureSpace`] and [`FeatureSpace`].
-pub trait NumFeatures {
-    /// Length of the feature vectors in which elements are encoded.
-    fn num_features(&self) -> usize;
-}
-
-/// Implement `NumFeatures` for a deref-able wrapper type generic over `S: NumFeatures + ?Sized`.
-macro_rules! impl_wrapped_num_features {
-    ($wrapper:ty) => {
-        impl<S> NumFeatures for $wrapper
-        where
-            S: NumFeatures + ?Sized,
-        {
-            #[inline]
-            fn num_features(&self) -> usize {
-                S::num_features(self)
-            }
-        }
-    };
-}
-impl_wrapped_num_features!(&'_ S);
-impl_wrapped_num_features!(Box<S>);
-
-/// Encode elements as feature vectors with the help of an encoder object.
-///
-/// This is intended as a helper to implement faster encoding.
-/// See [`FeatureSpace`] for a similar interface without an encoder.
-pub trait EncoderFeatureSpace: Space + NumFeatures {
-    /// Object to help with encoding.
-    type Encoder;
-
-    /// Construct an encoder to help with encoding.
-    ///
-    /// The encoder is only valid while the space is not mutated.
-    /// Using the encoder with a modified space may produce incorrect results or panics,
-    /// but not memory safety issues.
-    fn encoder(&self) -> Self::Encoder;
-
-    /// Encode the feature vector of an element into a mutable slice.
-    ///
-    /// # Args
-    /// * `element` - The element to encode.
-    /// * `out` - A slice of length at least `num_features()` in which the features are written.
-    ///           The entire slice may be written to, even if it is longer than `num_features()`.
-    /// * `zeroed` - Whether `out` is zero-initialized.
-    ///              Helps avoid redundant writes for sparse feature vectors.
-    /// * `encoder`- Encoder helper object.
-    ///
-    /// # Panics
-    /// * If the slice is not large enough to fit the feature vector.
-    /// * May panic if the encoder is out of date for this space object.
-    fn encoder_features_out<F: Float>(
-        &self,
-        element: &Self::Element,
-        out: &mut [F],
-        zeroed: bool,
-        encoder: &Self::Encoder,
-    );
-
-    /// Encode the feature vector of an element into an array.
-    fn encoder_features<T>(&self, element: &Self::Element, encoder: &Self::Encoder) -> T
-    where
-        T: BuildFromArray1D,
-        <T::Array as NumArray1D>::Elem: Float,
-    {
-        let mut array = T::Array::zeros(self.num_features());
-        self.encoder_features_out(element, array.as_slice_mut(), true, encoder);
-        array.into()
-    }
-
-    /// Encode the feature vectors of multiple elements into rows of a two-dimensional array.
-    ///
-    /// # Args
-    /// * `elements` - Elements to encode.
-    /// * `out` - A two-dimensional array of shape at least `[elements.len(), num_features()]`.
-    ///           The entire array may be written to, even if it is larger than required.
-    /// * `zeroed` - Whether `out` is zero-initialized.
-    ///              Helps avoid redundant writes for sparse feature vectors.
-    /// * `encoder`- Encoder helper object.
-    ///
-    /// # Panics
-    /// * If the slice is not large enough to fit the feature vector.
-    /// * May panic if the encoder is out of date for this space object.
-    fn encoder_batch_features_out<'a, I, A>(
-        &self,
-        elements: I,
-        out: &mut ArrayBase<A, Ix2>,
-        zeroed: bool,
-        encoder: &Self::Encoder,
-    ) where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-        A: DataMut,
-        A::Elem: Float,
-    {
-        // Don't zip rows so that we can check whether there are too few rows.
-        let mut rows = out.rows_mut().into_iter();
-        for element in elements {
-            let mut row = rows.next().expect("fewer rows than elements");
-            self.encoder_features_out(
-                element,
-                row.as_slice_mut().expect("could not view row as slice"),
-                zeroed,
-                encoder,
-            );
-        }
-    }
-
-    /// Encode the feature vectors of multiple elements as rows of a two-dimensional array.
-    fn encoder_batch_features<'a, I, T>(&self, elements: I, encoder: &Self::Encoder) -> T
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator,
-        Self::Element: 'a,
-        T: BuildFromArray2D,
-        <T::Array as NumArray2D>::Elem: Float,
-    {
-        let elements = elements.into_iter();
-        let mut array = T::Array::zeros((elements.len(), self.num_features()));
-        self.encoder_batch_features_out(elements, &mut array.view_mut(), true, encoder);
-        array.into()
-    }
-}
-
-/// Implement `EncoderFeatureSpace` for a deref-able wrapper type generic over `S`.
-macro_rules! impl_wrapped_encoder_feature_space {
-    ($wrapper:ty) => {
-        impl<S> EncoderFeatureSpace for $wrapper
-        where
-            S: EncoderFeatureSpace + ?Sized,
-        {
-            type Encoder = S::Encoder;
-            #[inline]
-            fn encoder(&self) -> Self::Encoder {
-                S::encoder(self)
-            }
-            #[inline]
-            fn encoder_features_out<F: Float>(
-                &self,
-                element: &Self::Element,
-                out: &mut [F],
-                zeroed: bool,
-                encoder: &Self::Encoder,
-            ) {
-                S::encoder_features_out(self, element, out, zeroed, encoder)
-            }
-            #[inline]
-            fn encoder_features<T>(&self, element: &Self::Element, encoder: &Self::Encoder) -> T
-            where
-                T: BuildFromArray1D,
-                <T::Array as NumArray1D>::Elem: Float,
-            {
-                S::encoder_features(self, element, encoder)
-            }
-            #[inline]
-            fn encoder_batch_features_out<'a, I, A>(
-                &self,
-                elements: I,
-                out: &mut ArrayBase<A, Ix2>,
-                zeroed: bool,
-                encoder: &Self::Encoder,
-            ) where
-                I: IntoIterator<Item = &'a Self::Element>,
-                Self::Element: 'a,
-                A: DataMut,
-                A::Elem: Float,
-            {
-                S::encoder_batch_features_out(self, elements, out, zeroed, encoder)
-            }
-            #[inline]
-            fn encoder_batch_features<'a, I, T>(&self, elements: I, encoder: &Self::Encoder) -> T
-            where
-                I: IntoIterator<Item = &'a Self::Element>,
-                I::IntoIter: ExactSizeIterator,
-                Self::Element: 'a,
-                T: BuildFromArray2D,
-                <T::Array as NumArray2D>::Elem: Float,
-            {
-                S::encoder_batch_features(self, elements, encoder)
-            }
-        }
-    };
-}
-impl_wrapped_encoder_feature_space!(&'_ S);
-impl_wrapped_encoder_feature_space!(Box<S>);
-
 /// A space whose elements can be encoded as floating-point feature vectors.
-///
-/// This presents a simpler interface than `EncoderFeatureSpace` and avoids the associated trait.
-pub trait FeatureSpace: Space + NumFeatures {
+pub trait FeatureSpace: Space {
+    /// Length of the encoded feature vectors.
+    fn num_features(&self) -> usize;
+
     /// Encode the feature vector of an element into a mutable slice.
     ///
     /// # Args
     /// * `element` - The element to encode.
     /// * `out` - A slice of length at least `num_features()` in which the features are written.
-    ///           The entire slice may be written to, even if it is longer than `num_features()`.
+    ///           Only the first `num_features()` values are written to.
     /// * `zeroed` - Whether `out` is zero-initialized.
     ///              Helps avoid redundant writes for sparse feature vectors.
+    ///
+    /// # Returns
+    /// A reference to the remainder of out: `&mut out[num_features()..]`.
     ///
     /// # Panics
     /// If the slice is not large enough to fit the feature vector.
-    fn features_out<F: Float>(&self, element: &Self::Element, out: &mut [F], zeroed: bool);
+    fn features_out<'a, F: Float>(
+        &self,
+        element: &Self::Element,
+        out: &'a mut [F],
+        zeroed: bool,
+    ) -> &'a mut [F];
 
-    /// Encode the feature Vector of an element into an array.
+    /// Encode the feature vector of an element into an array.
+    #[inline]
     fn features<T>(&self, element: &Self::Element) -> T
     where
         T: BuildFromArray1D,
@@ -538,12 +361,13 @@ pub trait FeatureSpace: Space + NumFeatures {
     /// # Args
     /// * `elements` - Elements to encode.
     /// * `out` - A two-dimensional array of shape at least `[elements.len(), num_features()]`.
-    ///           The entire array may be written to, even if it is larger than required.
+    ///           Only the left `[.., 0..num_features()]` subarray may be written to.
     /// * `zeroed` - Whether `out` is zero-initialized.
     ///              Helps avoid redundant writes for sparse feature vectors.
     ///
     /// # Panics
     /// If the array is not large enough to fit the feature vectors.
+    #[inline]
     fn batch_features_out<'a, I, A>(&self, elements: I, out: &mut ArrayBase<A, Ix2>, zeroed: bool)
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -564,6 +388,7 @@ pub trait FeatureSpace: Space + NumFeatures {
     }
 
     /// Encode the feature vectors of multiple elements as rows of a two-dimensional array.
+    #[inline]
     fn batch_features<'a, I, T>(&self, elements: I) -> T
     where
         I: IntoIterator<Item = &'a Self::Element>,
@@ -576,42 +401,6 @@ pub trait FeatureSpace: Space + NumFeatures {
         let mut array = T::Array::zeros((elements.len(), self.num_features()));
         self.batch_features_out(elements, &mut array.view_mut(), true);
         array.into()
-    }
-}
-
-impl<S: EncoderFeatureSpace> FeatureSpace for S {
-    #[inline]
-    fn features_out<F: Float>(&self, element: &Self::Element, out: &mut [F], zeroed: bool) {
-        self.encoder_features_out(element, out, zeroed, &self.encoder())
-    }
-    #[inline]
-    fn features<T>(&self, element: &Self::Element) -> T
-    where
-        T: BuildFromArray1D,
-        <T::Array as NumArray1D>::Elem: Float,
-    {
-        self.encoder_features(element, &self.encoder())
-    }
-    #[inline]
-    fn batch_features_out<'a, I, A>(&self, elements: I, out: &mut ArrayBase<A, Ix2>, zeroed: bool)
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        Self::Element: 'a,
-        A: DataMut,
-        A::Elem: Float,
-    {
-        self.encoder_batch_features_out(elements, out, zeroed, &self.encoder())
-    }
-    #[inline]
-    fn batch_features<'a, I, T>(&self, elements: I) -> T
-    where
-        I: IntoIterator<Item = &'a Self::Element>,
-        I::IntoIter: ExactSizeIterator,
-        Self::Element: 'a,
-        T: BuildFromArray2D,
-        <T::Array as NumArray2D>::Elem: Float,
-    {
-        self.encoder_batch_features(elements, &self.encoder())
     }
 }
 

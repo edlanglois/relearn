@@ -99,24 +99,13 @@ pub fn sample_space_macro_derive(input: TokenStream) -> TokenStream {
     space::impl_space_trait_macro::<space::SampleSpaceImpl>(ast)
 }
 
-/// Derive `relearn::spaces::NumFeatures` for a struct as a Cartesian product space of its fields.
+/// Derive `relearn::spaces::FeatureSpace` for a struct as a Cartesian product space of its fields.
 ///
 /// Expects that `Space` will be implemented according to `#[derive(Space)]`.
-#[proc_macro_derive(NumFeatures)]
-pub fn num_features_macro_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(FeatureSpace)]
+pub fn feature_space_macro_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
-    space::impl_space_trait_macro::<space::NumFeaturesImpl>(ast)
-}
-
-/// Derive `relearn::spaces::EncoderFeatureSpace` for a struct as a Cartesian product space of its fields.
-///
-/// `EncoderFeatureSpace` also provides `FeatureSpace` via a blanket implementation.
-///
-/// Expects that `Space` will be implemented according to `#[derive(Space)]`.
-#[proc_macro_derive(EncoderFeatureSpace)]
-pub fn encoder_feature_space_macro_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
-    space::impl_space_trait_macro::<space::EncoderFeatureSpaceImpl>(ast)
+    space::impl_space_trait_macro::<space::FeatureSpaceImpl>(ast)
 }
 
 /// Derive trivial `relearn::spaces::ElementRefInto<Loggable>` for a struct.
@@ -132,8 +121,8 @@ pub fn log_element_space_macro_derive(input: TokenStream) -> TokenStream {
 /// Derive `Space` and other space traits for a struct as a Cartesian product space of its fields.
 ///
 /// Derives the following traits:
-/// [`Space`], [`SubsetOrd`], [`NonEmptySpace`], [`SampleSpace`], [`NumFeatures`],
-/// [`EncoderFeatureSpace`], and [`LogElementSpace`] (`ElementRefInto<Loggable>`).
+/// [`Space`], [`SubsetOrd`], [`NonEmptySpace`], [`SampleSpace`], [`FeatureSpace`],
+/// and [`LogElementSpace`] (`ElementRefInto<Loggable>`).
 ///
 /// Does not derive [`FiniteSpace`].
 ///

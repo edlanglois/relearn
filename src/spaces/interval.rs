@@ -1,7 +1,5 @@
 //! `IntervalSpace` definition
-use super::{
-    ElementRefInto, EncoderFeatureSpace, NonEmptySpace, NumFeatures, ReprSpace, Space, SubsetOrd,
-};
+use super::{ElementRefInto, FeatureSpace, NonEmptySpace, ReprSpace, Space, SubsetOrd};
 use crate::logging::Loggable;
 use num_traits::{Float, ToPrimitive};
 use rand::distributions::Distribution;
@@ -91,23 +89,22 @@ where
     }
 }
 
-impl<T: Float + Send> NumFeatures for IntervalSpace<T> {
+/// Features are `[f]` for element `f`.
+impl<T: Float + ToPrimitive + Send> FeatureSpace for IntervalSpace<T> {
+    #[inline]
     fn num_features(&self) -> usize {
         1
     }
-}
 
-impl<T: Float + ToPrimitive + Send> EncoderFeatureSpace for IntervalSpace<T> {
-    type Encoder = ();
-    fn encoder(&self) -> Self::Encoder {}
-    fn encoder_features_out<F: Float>(
+    #[inline]
+    fn features_out<'a, F: Float>(
         &self,
         element: &Self::Element,
-        out: &mut [F],
+        out: &'a mut [F],
         _zeroed: bool,
-        _encoder: &Self::Encoder,
-    ) {
-        out[0] = F::from(*element).expect("could not convert element to float")
+    ) -> &'a mut [F] {
+        out[0] = F::from(*element).expect("could not convert element to float");
+        &mut out[1..]
     }
 }
 

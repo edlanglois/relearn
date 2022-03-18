@@ -1,7 +1,6 @@
 //! Generic wrapper spaces
 use super::{
-    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures, ReprSpace, Space,
-    SubsetOrd,
+    ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, ReprSpace, Space, SubsetOrd,
 };
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
 use ndarray::{ArrayBase, DataMut, Ix2};
@@ -20,7 +19,7 @@ pub type BoxSpace<S> = WrappedElementSpace<S, Box<<S as Space>::Element>>;
 
 impl<S: Space + fmt::Display> fmt::Display for BoxSpace<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "BoxSpace<{}>", self.inner_space)
+        write!(f, "BoxSpace<{}>", self.inner)
     }
 }
 
@@ -56,23 +55,23 @@ where
 #[derive(Serialize, Deserialize)]
 #[serde(bound(serialize = "S: Serialize", deserialize = "S: Deserialize<'de>"))]
 pub struct WrappedElementSpace<S, W> {
-    inner_space: S,
+    inner: S,
     #[serde(skip)]
     wrapper: PhantomData<fn() -> W>,
 }
 
 impl<S, W> WrappedElementSpace<S, W> {
-    pub fn new(inner_space: S) -> Self {
+    pub fn new(inner: S) -> Self {
         Self {
-            inner_space,
+            inner,
             wrapper: PhantomData,
         }
     }
 }
 
 impl<S, W> From<S> for WrappedElementSpace<S, W> {
-    fn from(inner_space: S) -> Self {
-        Self::new(inner_space)
+    fn from(inner: S) -> Self {
+        Self::new(inner)
     }
 }
 
@@ -82,7 +81,7 @@ impl<S: fmt::Debug, W> fmt::Debug for WrappedElementSpace<S, W> {
             f,
             "WrappedElementSpace<{}>({:?})",
             any::type_name::<W>(),
-            self.inner_space
+            self.inner
         )
     }
 }
@@ -90,7 +89,7 @@ impl<S: fmt::Debug, W> fmt::Debug for WrappedElementSpace<S, W> {
 impl<S: Default, W> Default for WrappedElementSpace<S, W> {
     fn default() -> Self {
         Self {
-            inner_space: Default::default(),
+            inner: Default::default(),
             wrapper: PhantomData,
         }
     }
@@ -99,7 +98,7 @@ impl<S: Default, W> Default for WrappedElementSpace<S, W> {
 impl<S: Clone, W> Clone for WrappedElementSpace<S, W> {
     fn clone(&self) -> Self {
         Self {
-            inner_space: self.inner_space.clone(),
+            inner: self.inner.clone(),
             wrapper: PhantomData,
         }
     }
@@ -109,7 +108,7 @@ impl<S: Copy, W> Copy for WrappedElementSpace<S, W> {}
 
 impl<S: PartialEq, W> PartialEq for WrappedElementSpace<S, W> {
     fn eq(&self, other: &Self) -> bool {
-        self.inner_space.eq(&other.inner_space)
+        self.inner.eq(&other.inner)
     }
 }
 
@@ -117,25 +116,25 @@ impl<S: Eq, W> Eq for WrappedElementSpace<S, W> {}
 
 impl<S: Hash, W> Hash for WrappedElementSpace<S, W> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.inner_space.hash(state)
+        self.inner.hash(state)
     }
 }
 
 impl<S: PartialOrd, W> PartialOrd for WrappedElementSpace<S, W> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.inner_space.partial_cmp(&other.inner_space)
+        self.inner.partial_cmp(&other.inner)
     }
 }
 
 impl<S: Ord, W> Ord for WrappedElementSpace<S, W> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.inner_space.cmp(&other.inner_space)
+        self.inner.cmp(&other.inner)
     }
 }
 
 impl<S: SubsetOrd, W> SubsetOrd for WrappedElementSpace<S, W> {
     fn subset_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.inner_space.subset_cmp(&other.inner_space)
+        self.inner.subset_cmp(&other.inner)
     }
 }
 
@@ -147,7 +146,7 @@ where
     type Element = W;
 
     fn contains(&self, value: &Self::Element) -> bool {
-        self.inner_space.contains(value.inner_ref())
+        self.inner.contains(value.inner_ref())
     }
 }
 
@@ -157,21 +156,19 @@ where
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     fn size(&self) -> usize {
-        self.inner_space.size()
+        self.inner.size()
     }
 
     fn to_index(&self, element: &Self::Element) -> usize {
-        self.inner_space.to_index(element.inner_ref())
+        self.inner.to_index(element.inner_ref())
     }
 
     fn from_index(&self, index: usize) -> Option<Self::Element> {
-        self.inner_space.from_index(index).map(Wrapper::wrap)
+        self.inner.from_index(index).map(Wrapper::wrap)
     }
 
     fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
-        self.inner_space
-            .from_index_unchecked(index)
-            .map(Wrapper::wrap)
+        self.inner.from_index_unchecked(index).map(Wrapper::wrap)
     }
 }
 
@@ -181,7 +178,7 @@ where
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     fn some_element(&self) -> Self::Element {
-        W::wrap(self.inner_space.some_element())
+        W::wrap(self.inner.some_element())
     }
 }
 
@@ -191,7 +188,7 @@ where
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
-        W::wrap(self.inner_space.sample(rng))
+        W::wrap(self.inner.sample(rng))
     }
 }
 
@@ -202,7 +199,7 @@ where
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     fn repr(&self, element: &Self::Element) -> T0 {
-        self.inner_space.repr(element.inner_ref())
+        self.inner.repr(element.inner_ref())
     }
 
     fn batch_repr<'a, I>(&self, elements: I) -> T
@@ -211,74 +208,52 @@ where
         I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
-        self.inner_space
+        self.inner
             .batch_repr(elements.into_iter().map(Wrapper::inner_ref))
     }
 }
 
-impl<S, W> NumFeatures for WrappedElementSpace<S, W>
+impl<S, W> FeatureSpace for WrappedElementSpace<S, W>
 where
-    S: Space + NumFeatures,
-    W: Wrapper<Inner = S::Element> + Clone + Send,
-{
-    fn num_features(&self) -> usize {
-        self.inner_space.num_features()
-    }
-}
-
-impl<S, W> EncoderFeatureSpace for WrappedElementSpace<S, W>
-where
-    S: Space + EncoderFeatureSpace,
+    S: FeatureSpace,
     S::Element: 'static,
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
-    type Encoder = S::Encoder;
-
-    fn encoder(&self) -> Self::Encoder {
-        self.inner_space.encoder()
+    #[inline]
+    fn num_features(&self) -> usize {
+        self.inner.num_features()
     }
 
-    fn encoder_features_out<F: Float>(
+    #[inline]
+    fn features_out<'a, F: Float>(
         &self,
         element: &Self::Element,
-        out: &mut [F],
+        out: &'a mut [F],
         zeroed: bool,
-        encoder: &Self::Encoder,
-    ) {
-        self.inner_space
-            .encoder_features_out(element.inner_ref(), out, zeroed, encoder)
+    ) -> &'a mut [F] {
+        self.inner.features_out(element.inner_ref(), out, zeroed)
     }
-
-    fn encoder_features<T>(&self, element: &Self::Element, encoder: &Self::Encoder) -> T
+    #[inline]
+    fn features<T>(&self, element: &Self::Element) -> T
     where
         T: BuildFromArray1D,
         <T::Array as NumArray1D>::Elem: Float,
     {
-        self.inner_space
-            .encoder_features(element.inner_ref(), encoder)
+        self.inner.features(element.inner_ref())
     }
-
-    fn encoder_batch_features_out<'a, I, A>(
-        &self,
-        elements: I,
-        out: &mut ArrayBase<A, Ix2>,
-        zeroed: bool,
-        encoder: &Self::Encoder,
-    ) where
+    #[inline]
+    fn batch_features_out<'a, I, A>(&self, elements: I, out: &mut ArrayBase<A, Ix2>, zeroed: bool)
+    where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a,
         A: DataMut,
         A::Elem: Float,
     {
-        self.inner_space.encoder_batch_features_out(
-            elements.into_iter().map(Wrapper::inner_ref),
-            out,
-            zeroed,
-            encoder,
-        )
+        self.inner
+            .batch_features_out(elements.into_iter().map(Wrapper::inner_ref), out, zeroed)
     }
-
-    fn encoder_batch_features<'a, I, T>(&self, elements: I, encoder: &Self::Encoder) -> T
+    #[inline]
+    fn batch_features<'a, I, T>(&self, elements: I) -> T
     where
         I: IntoIterator<Item = &'a Self::Element>,
         I::IntoIter: ExactSizeIterator,
@@ -286,8 +261,8 @@ where
         T: BuildFromArray2D,
         <T::Array as NumArray2D>::Elem: Float,
     {
-        self.inner_space
-            .encoder_batch_features(elements.into_iter().map(Wrapper::inner_ref), encoder)
+        self.inner
+            .batch_features(elements.into_iter().map(Wrapper::inner_ref))
     }
 }
 
@@ -297,6 +272,6 @@ where
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     fn elem_ref_into(&self, element: &Self::Element) -> T {
-        self.inner_space.elem_ref_into(element.inner_ref())
+        self.inner.elem_ref_into(element.inner_ref())
     }
 }

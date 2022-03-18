@@ -1,12 +1,12 @@
 //! `IndexSpace` definition
 use super::{
-    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures,
-    ParameterizedDistributionSpace, ReprSpace, Space, SubsetOrd,
+    ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, ParameterizedDistributionSpace,
+    ReprSpace, Space, SubsetOrd,
 };
 use crate::logging::Loggable;
 use crate::torch::distributions::Categorical;
 use crate::utils::distributions::ArrayDistribution;
-use ndarray::{ArrayBase, DataMut, Ix2};
+use ndarray::{s, ArrayBase, DataMut, Ix2};
 use num_traits::{Float, One, Zero};
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -83,49 +83,45 @@ impl FiniteSpace for IndexSpace {
 }
 
 /// Features are one-hot vectors
-impl NumFeatures for IndexSpace {
+impl FeatureSpace for IndexSpace {
+    #[inline]
     fn num_features(&self) -> usize {
         self.size
     }
-}
 
-impl EncoderFeatureSpace for IndexSpace {
-    type Encoder = ();
-    fn encoder(&self) -> Self::Encoder {}
-
-    fn encoder_features_out<F: Float>(
+    #[inline]
+    fn features_out<'a, F: Float>(
         &self,
         element: &Self::Element,
-        out: &mut [F],
+        out: &'a mut [F],
         zeroed: bool,
-        _encoder: &Self::Encoder,
-    ) {
+    ) -> &'a mut [F] {
+        let (out, rest) = out.split_at_mut(self.size);
         if !zeroed {
-            out.fill(F::zero())
+            out.fill(F::zero());
         }
-        out[self.to_index(element)] = F::one()
+        out[self.to_index(element)] = F::one();
+        rest
     }
 
-    fn encoder_batch_features_out<'a, I, A>(
-        &self,
-        elements: I,
-        out: &mut ArrayBase<A, Ix2>,
-        zeroed: bool,
-        _encoder: &Self::Encoder,
-    ) where
+    #[inline]
+    fn batch_features_out<'a, I, A>(&self, elements: I, out: &mut ArrayBase<A, Ix2>, zeroed: bool)
+    where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a,
         A: DataMut,
         A::Elem: Float,
     {
         if !zeroed {
-            out.fill(A::Elem::zero())
+            out.slice_mut(s![.., 0..self.num_features()])
+                .fill(Zero::zero());
         }
+
         // Don't zip rows so that we can check whether there are too few rows.
         let mut rows = out.rows_mut().into_iter();
         for element in elements {
             let mut row = rows.next().expect("fewer rows than elements");
-            row[self.to_index(element)] = A::Elem::one();
+            row[self.to_index(element)] = One::one();
         }
     }
 }

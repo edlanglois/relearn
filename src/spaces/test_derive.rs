@@ -1,5 +1,5 @@
 use super::{
-    testing, BooleanSpace, ElementRefInto, FiniteSpace, IndexSpace, IntervalSpace, NumFeatures,
+    testing, BooleanSpace, ElementRefInto, FeatureSpace, FiniteSpace, IndexSpace, IntervalSpace,
     Space, SubsetOrd,
 };
 use crate::logging::Loggable;
@@ -16,8 +16,7 @@ mod unit {
         FiniteSpace,
         NonEmptySpace,
         SampleSpace,
-        NumFeatures,
-        EncoderFeatureSpace,
+        FeatureSpace,
         LogElementSpace,
     )]
     struct UnitSpace;
@@ -283,8 +282,7 @@ mod named_generic {
         FiniteSpace,
         NonEmptySpace,
         SampleSpace,
-        NumFeatures,
-        EncoderFeatureSpace,
+        FeatureSpace,
         LogElementSpace,
     )]
     #[element(NamedGeneric<T::Element>)]
@@ -435,8 +433,7 @@ mod unnamed {
         FiniteSpace,
         NonEmptySpace,
         SampleSpace,
-        NumFeatures,
-        EncoderFeatureSpace,
+        FeatureSpace,
         LogElementSpace,
     )]
     struct UnnamedStructSpace(BooleanSpace, IndexSpace);
@@ -566,8 +563,7 @@ mod unnamed_generic {
         FiniteSpace,
         NonEmptySpace,
         SampleSpace,
-        NumFeatures,
-        EncoderFeatureSpace,
+        FeatureSpace,
         LogElementSpace,
     )]
     struct GenericTriple<T, U>(T, U, U);
@@ -777,15 +773,7 @@ mod unnamed_generic {
 /// raw inner values `x`.
 mod unnamed_one {
     #[derive(
-        Debug,
-        PartialEq,
-        Space,
-        SubsetOrd,
-        FiniteSpace,
-        SampleSpace,
-        NumFeatures,
-        EncoderFeatureSpace,
-        LogElementSpace,
+        Debug, PartialEq, Space, SubsetOrd, FiniteSpace, SampleSpace, FeatureSpace, LogElementSpace,
     )]
     struct UnnamedOne<T>(T);
 }

@@ -1,7 +1,7 @@
 //! `BooleanSpace` definition
 use super::{
-    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures,
-    ParameterizedDistributionSpace, ReprSpace, Space, SubsetOrd,
+    ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, ParameterizedDistributionSpace,
+    ReprSpace, Space, SubsetOrd,
 };
 use crate::logging::Loggable;
 use crate::torch::distributions::Bernoulli;
@@ -76,7 +76,7 @@ impl NonEmptySpace for BooleanSpace {
 /// Represent elements as a Boolean valued tensor.
 impl ReprSpace<Tensor> for BooleanSpace {
     fn repr(&self, element: &Self::Element) -> Tensor {
-        Tensor::scalar_tensor(*element as i64, (Kind::Bool, Device::Cpu))
+        Tensor::scalar_tensor(i64::from(*element), (Kind::Bool, Device::Cpu))
     }
 
     fn batch_repr<'a, I>(&self, elements: I) -> Tensor
@@ -106,26 +106,26 @@ impl ParameterizedDistributionSpace<Tensor> for BooleanSpace {
     }
 }
 
-impl NumFeatures for BooleanSpace {
+/// Features are `[0.0]` for `false` and `[1.0]` for `true`
+impl FeatureSpace for BooleanSpace {
+    #[inline]
     fn num_features(&self) -> usize {
         1
     }
-}
 
-impl EncoderFeatureSpace for BooleanSpace {
-    type Encoder = ();
-    fn encoder(&self) -> Self::Encoder {}
-    fn encoder_features_out<F: Float>(
+    #[inline]
+    fn features_out<'a, F: Float>(
         &self,
         element: &Self::Element,
-        out: &mut [F],
+        out: &'a mut [F],
         _zeroed: bool,
-        _encoder: &Self::Encoder,
-    ) {
+    ) -> &'a mut [F] {
         out[0] = if *element { F::one() } else { F::zero() };
+        &mut out[1..]
     }
 
-    fn encoder_features<T>(&self, element: &Self::Element, _encoder: &Self::Encoder) -> T
+    #[inline]
+    fn features<T>(&self, element: &Self::Element) -> T
     where
         T: BuildFromArray1D,
         <T::Array as NumArray1D>::Elem: Float,
@@ -146,7 +146,7 @@ impl Distribution<<Self as Space>::Element> for BooleanSpace {
 
 impl ElementRefInto<Loggable> for BooleanSpace {
     fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
-        Loggable::Scalar((*element as u8).into())
+        Loggable::Scalar(u8::from(*element).into())
     }
 }
 

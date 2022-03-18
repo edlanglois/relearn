@@ -364,81 +364,39 @@ impl SpaceTraitImpl for SampleSpaceImpl {
     }
 }
 
-pub(crate) struct NumFeaturesImpl;
-impl SpaceTraitImpl for NumFeaturesImpl {
+pub(crate) struct FeatureSpaceImpl;
+impl SpaceTraitImpl for FeatureSpaceImpl {
     fn impl_trait<T: SpaceStruct>(name: &Ident, generics: Generics, struct_: T) -> TokenStream2 {
-        let generics = add_trait_bounds(generics, &parse_quote!(::relearn::spaces::NumFeatures));
+        let generics = add_trait_bounds(generics, &parse_quote!(::relearn::spaces::FeatureSpace));
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
         let field_num_features = struct_.fields().map(|(id, _, span)| {
             quote_spanned! {span=>
-                ::relearn::spaces::NumFeatures::num_features(&self.#id)
+                ::relearn::spaces::FeatureSpace::num_features(&self.#id)
             }
         });
 
-        quote! {
-            impl #impl_generics ::relearn::spaces::NumFeatures for #name #ty_generics #where_clause {
-                fn num_features(&self) -> usize {
-                    0 #( + #field_num_features )*
-                }
-            }
-        }
-    }
-}
-
-pub(crate) struct EncoderFeatureSpaceImpl;
-impl SpaceTraitImpl for EncoderFeatureSpaceImpl {
-    fn impl_trait<T: SpaceStruct>(name: &Ident, generics: Generics, struct_: T) -> TokenStream2 {
-        let generics = add_trait_bounds(
-            generics,
-            &parse_quote!(::relearn::spaces::EncoderFeatureSpace),
-        );
-        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-        let field_encoder_type = struct_.fields().map(|(_, ty, span)| {
+        let field_features_out = struct_.fields().map(|(id, _, span)| {
             quote_spanned! {span=>
-                <#ty as ::relearn::spaces::EncoderFeatureSpace>::Encoder
-            }
-        });
-        let field_encoder = struct_.fields().map(|(id, _, span)| {
-            quote_spanned! {span=>
-                ::relearn::spaces::EncoderFeatureSpace::encoder(&self.#id)
-            }
-        });
-        let field_num_features = struct_.fields().map(|(id, _, span)| {
-            quote_spanned! {span=>
-                ::relearn::spaces::NumFeatures::num_features(&self.#id)
-            }
-        });
-
-        let field_encoder_features_out = struct_.fields().enumerate().map(|(i, (id, _, span))| {
-            let idx = Index::from(i);
-            let range = if i == 0 {
-                quote! {..encoder.1[#i]}
-            } else {
-                quote! {encoder.1[#i-1]..encoder.1[#i]}
-            };
-            quote_spanned! {span=>
-                ::relearn::spaces::EncoderFeatureSpace::encoder_features_out(
+                out = ::relearn::spaces::FeatureSpace::features_out(
                     &self.#id,
                     &element.#id,
-                    &mut out[#range],
-                    zeroed,
-                    &encoder.0.#idx
-                )
+                    out,
+                    zeroed);
             }
         });
+
         let num_fields = struct_.fields().len();
 
-        let option_encoder_batch_features_out = if num_fields == 0 {
+        let option_batch_features_out = if num_fields == 0 {
             // Custom implementation when there are no fields to avoid iterating over elements
             Some(quote! {
-                fn encoder_batch_features_out<'a, I, A>(
+                #[inline]
+                fn batch_features_out<'a, I, A>(
                     &self,
                     elements: I,
                     out: &mut ::ndarray::ArrayBase<A, ::ndarray::Ix2>,
-                    zeroed: bool,
-                    encoder: &Self::Encoder,
+                    zeroed: bool
                 ) where
                     I: IntoIterator<Item = &'a Self::Element>,
                     Self::Element: 'a,
@@ -452,41 +410,24 @@ impl SpaceTraitImpl for EncoderFeatureSpaceImpl {
         };
 
         quote! {
-            impl #impl_generics ::relearn::spaces::EncoderFeatureSpace for #name #ty_generics #where_clause {
-                /// Encoder type
-                ///
-                /// A tuple ( field_encoders: (...), feature_ends: [usize; num_fields] )
-                /// where `feature_ends[i-1]..feature_ends[i]` is range of features corresponding
-                /// to field `i`.
-                type Encoder = (
-                    ( #(#field_encoder_type,)* ),
-                    [usize; #num_fields]
-                );
-
-                // Relies on array values being evaluated in order.
-                #[allow(clippy::eval_order_dependence)]
-                fn encoder(&self) -> Self::Encoder {
-                    // The trailing comma is important so that the one-field case is still a tuple
-                    let field_encoders = ( #(#field_encoder,)* );
-                    let mut offset = 0;
-                    let feature_ends = [ #( {
-                        offset += #field_num_features;
-                        offset
-                    } ),* ];
-                    (field_encoders, feature_ends)
+            impl #impl_generics ::relearn::spaces::FeatureSpace for #name #ty_generics #where_clause {
+                #[inline]
+                fn num_features(&self) -> usize {
+                    0 #( + #field_num_features )*
                 }
 
-                fn encoder_features_out<F: ::num_traits::Float>(
+                #[inline]
+                fn features_out<'a, F: ::num_traits::Float>(
                     &self,
                     element: &Self::Element,
-                    out: &mut [F],
+                    mut out: &'a mut [F],
                     zeroed: bool,
-                    encoder: &Self::Encoder,
-                ) {
-                    #( #field_encoder_features_out; )*
+                ) -> &'a mut [F] {
+                    #( #field_features_out; )*
+                    out
                 }
 
-                #option_encoder_batch_features_out
+                #option_batch_features_out
             }
         }
     }
@@ -515,13 +456,12 @@ impl SpaceTraitImpl for ProductSpaceImpl {
     where
         T: SpaceStruct + Copy,
     {
-        let impls = vec![
+        let impls = [
             SpaceImpl::impl_trait(name, generics.clone(), struct_),
             SubsetOrdImpl::impl_trait(name, generics.clone(), struct_),
             NonEmptySpaceImpl::impl_trait(name, generics.clone(), struct_),
             SampleSpaceImpl::impl_trait(name, generics.clone(), struct_),
-            NumFeaturesImpl::impl_trait(name, generics.clone(), struct_),
-            EncoderFeatureSpaceImpl::impl_trait(name, generics.clone(), struct_),
+            FeatureSpaceImpl::impl_trait(name, generics.clone(), struct_),
             LogElementSpaceImpl::impl_trait(name, generics, struct_),
         ];
 

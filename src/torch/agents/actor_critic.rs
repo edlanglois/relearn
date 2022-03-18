@@ -8,13 +8,10 @@ use crate::agents::buffers::{BufferCapacityBound, SimpleBuffer, WriteHistoryBuff
 use crate::agents::{Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError};
 use crate::envs::EnvStructure;
 use crate::logging::StatsLogger;
-use crate::spaces::{
-    EncoderFeatureSpace, NonEmptyFeatures, NumFeatures, ParameterizedDistributionSpace, ReprSpace,
-};
+use crate::spaces::{FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace, ReprSpace};
 use crate::utils::torch::DeviceDef;
 use crate::Prng;
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Debug};
 use std::sync::Arc;
 use std::time::Instant;
 use tch::{Device, Tensor};
@@ -52,7 +49,7 @@ where
 
 impl<PB, PUB, CB, CUB, OS, AS> BuildAgent<OS, AS> for ActorCriticConfig<PB, PUB, CB, CUB>
 where
-    OS: EncoderFeatureSpace + 'static,
+    OS: FeatureSpace + 'static,
     AS: ParameterizedDistributionSpace<Tensor> + 'static,
     PB: BuildModule + Clone,
     PB::Module: SequenceModule + IterativeModule,
@@ -99,7 +96,7 @@ const fn cpu_device() -> Device {
 
 impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
-    OS: NumFeatures,
+    OS: FeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
     P: Module,
     C: Critic,
@@ -151,7 +148,7 @@ where
 impl<OS, AS, P, PU, C, CU> Agent<OS::Element, AS::Element>
     for ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
-    OS: EncoderFeatureSpace + 'static,
+    OS: FeatureSpace + 'static,
     AS: ParameterizedDistributionSpace<Tensor> + 'static,
     P: SequenceModule + IterativeModule,
     PU: UpdatePolicy<AS>,
@@ -173,7 +170,7 @@ where
 impl<OS, AS, P, PU, C, CU> BatchUpdate<OS::Element, AS::Element>
     for ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
-    OS: EncoderFeatureSpace + 'static,
+    OS: FeatureSpace + 'static,
     AS: ReprSpace<Tensor> + 'static,
     P: SequenceModule,
     PU: UpdatePolicy<AS>,
@@ -221,7 +218,7 @@ where
 
 impl<OS, AS, P, PU, C, CU> ActorCriticAgent<OS, AS, P, PU, C, CU>
 where
-    OS: EncoderFeatureSpace + 'static,
+    OS: FeatureSpace + 'static,
     AS: ReprSpace<Tensor> + 'static,
     P: SequenceModule,
     PU: UpdatePolicy<AS>,
@@ -290,68 +287,21 @@ where
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(from = "ActorData<OS, AS, P>")]
-pub struct ActorCriticActor<OS: EncoderFeatureSpace, AS, P> {
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ActorCriticActor<OS, AS, P> {
     spaces: Arc<Spaces<OS, AS>>,
-    #[serde(skip_serializing)]
-    observation_encoder: <NonEmptyFeatures<OS> as EncoderFeatureSpace>::Encoder,
     policy: P,
 }
 
-/// Serialization data for an [`ActorCriticActor`]
-#[derive(Serialize, Deserialize)]
-struct ActorData<OS, AS, P> {
-    spaces: Spaces<OS, AS>,
-    policy: P,
-}
-
-impl<OS: EncoderFeatureSpace, AS, P> From<ActorData<OS, AS, P>> for ActorCriticActor<OS, AS, P> {
-    fn from(data: ActorData<OS, AS, P>) -> Self {
-        Self::new(Arc::new(data.spaces), data.policy)
-    }
-}
-
-impl<OS, AS, P> Debug for ActorCriticActor<OS, AS, P>
-where
-    OS: EncoderFeatureSpace + Debug,
-    OS::Encoder: Debug,
-    AS: Debug,
-    P: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("ActorCriticActor")
-            .field("spaces", &self.spaces)
-            .field("observation_encoder", &self.observation_encoder)
-            .field("policy", &self.policy)
-            .finish()
-    }
-}
-
-impl<OS, AS, P> Clone for ActorCriticActor<OS, AS, P>
-where
-    OS: EncoderFeatureSpace + Clone,
-    AS: Clone,
-    P: Clone,
-{
-    fn clone(&self) -> Self {
-        Self::new(self.spaces.clone(), self.policy.clone())
-    }
-}
-
-impl<OS: EncoderFeatureSpace, AS, P> ActorCriticActor<OS, AS, P> {
+impl<OS: FeatureSpace, AS, P> ActorCriticActor<OS, AS, P> {
     pub fn new(spaces: Arc<Spaces<OS, AS>>, policy: P) -> Self {
-        Self {
-            observation_encoder: spaces.observation_space.encoder(),
-            spaces,
-            policy,
-        }
+        Self { spaces, policy }
     }
 }
 
 impl<OS, AS, P> Actor<OS::Element, AS::Element> for ActorCriticActor<OS, AS, P>
 where
-    OS: EncoderFeatureSpace,
+    OS: FeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
     P: IterativeModule,
 {
@@ -371,7 +321,7 @@ where
         let input = self
             .spaces
             .observation_space
-            .encoder_features::<Tensor>(observation, &self.observation_encoder);
+            .features::<Tensor>(observation);
         let output = self.policy.step(state, &input);
         self.spaces.action_space.sample_element(&output)
     }

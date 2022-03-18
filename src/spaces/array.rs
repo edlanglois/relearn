@@ -1,7 +1,7 @@
 //! Array space
 use super::{
-    iter_product_subset_ord, ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace,
-    NumFeatures, Space, SubsetOrd,
+    iter_product_subset_ord, ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, Space,
+    SubsetOrd,
 };
 use crate::logging::Loggable;
 use num_traits::Float;
@@ -10,7 +10,6 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use std::cmp::Ordering;
-use std::ops::Range;
 
 /// A Cartesian product of `N` spaces of the same type (but not necessarily the same space).
 ///
@@ -115,65 +114,29 @@ where
     }
 }
 
-impl<S: NumFeatures, const N: usize> NumFeatures for ArraySpace<S, N> {
+/// Features are the concatenation of inner feature vectors
+impl<S: FeatureSpace, const N: usize> FeatureSpace for ArraySpace<S, N> {
+    #[inline]
     fn num_features(&self) -> usize {
         self.inner_spaces
             .iter()
-            .map(NumFeatures::num_features)
+            .map(FeatureSpace::num_features)
             .sum()
     }
-}
 
-/// Feature encoder for [`ArraySpace`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ArraySpaceEncoder<T, const N: usize> {
-    inner_encoders: [T; N],
-    /// Ending offsets for the feature vector of each inner space.
-    end_offsets: [usize; N],
-}
-impl<T, const N: usize> ArraySpaceEncoder<T, N> {
-    /// Iterator over index ranges for each inner space.
-    fn ranges(&self) -> impl Iterator<Item = Range<usize>> + '_ {
-        self.end_offsets
-            .first()
-            .map(|&i| 0..i)
-            .into_iter()
-            .chain(self.end_offsets.windows(2).map(|w| w[0]..w[1]))
-    }
-}
-
-impl<S: EncoderFeatureSpace, const N: usize> EncoderFeatureSpace for ArraySpace<S, N> {
-    type Encoder = ArraySpaceEncoder<S::Encoder, N>;
-
-    fn encoder(&self) -> Self::Encoder {
-        let inner_encoders = array_init::array_init(|i| self.inner_spaces[i].encoder());
-
-        let mut offset = 0;
-        let end_offsets = array_init::array_init(|i| {
-            offset += self.inner_spaces[i].num_features();
-            offset
-        });
-
-        ArraySpaceEncoder {
-            inner_encoders,
-            end_offsets,
-        }
-    }
-    fn encoder_features_out<F: Float>(
+    #[inline]
+    fn features_out<'a, F: Float>(
         &self,
         element: &Self::Element,
-        out: &mut [F],
+        out: &'a mut [F],
         zeroed: bool,
-        encoder: &Self::Encoder,
-    ) {
-        for (((range, inner_space), inner_encoder), inner_elem) in encoder
-            .ranges()
-            .zip(&self.inner_spaces)
-            .zip(&encoder.inner_encoders)
+    ) -> &'a mut [F] {
+        self.inner_spaces
+            .iter()
             .zip(element)
-        {
-            inner_space.encoder_features_out(inner_elem, &mut out[range], zeroed, inner_encoder);
-        }
+            .fold(out, |out, (inner_space, inner_elem)| {
+                inner_space.features_out(inner_elem, out, zeroed)
+            })
     }
 }
 

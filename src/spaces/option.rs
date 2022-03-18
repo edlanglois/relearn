@@ -1,7 +1,5 @@
 //! Option space definition.
-use super::{
-    ElementRefInto, EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures, Space, SubsetOrd,
-};
+use super::{ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, Space, SubsetOrd};
 use crate::logging::Loggable;
 use num_traits::Float;
 use rand::distributions::Distribution;
@@ -78,37 +76,32 @@ impl<S: Space> NonEmptySpace for OptionSpace<S> {
     }
 }
 
-impl<S: NumFeatures> NumFeatures for OptionSpace<S> {
+/// Features are `[0.0, features(x)..]` for `Some(x)` and `[1.0, 0.0, ..., 0.0]` for `None`.
+impl<S: FeatureSpace> FeatureSpace for OptionSpace<S> {
+    #[inline]
     fn num_features(&self) -> usize {
         1 + self.inner.num_features()
     }
-}
 
-impl<S: EncoderFeatureSpace> EncoderFeatureSpace for OptionSpace<S> {
-    type Encoder = S::Encoder;
-
-    fn encoder(&self) -> Self::Encoder {
-        self.inner.encoder()
-    }
-
-    fn encoder_features_out<F: Float>(
+    #[inline]
+    fn features_out<'a, F: Float>(
         &self,
         element: &Self::Element,
-        out: &mut [F],
+        out: &'a mut [F],
         zeroed: bool,
-        encoder: &Self::Encoder,
-    ) {
+    ) -> &'a mut [F] {
         match element {
             None => {
+                let end = self.inner.num_features() + 1;
                 out[0] = F::one();
                 if !zeroed {
-                    out[1..].fill(F::zero())
+                    out[1..end].fill(F::zero());
                 }
+                &mut out[end..]
             }
             Some(inner_elem) => {
                 out[0] = F::zero();
-                self.inner
-                    .encoder_features_out(inner_elem, &mut out[1..], zeroed, encoder)
+                self.inner.features_out(inner_elem, &mut out[1..], zeroed)
             }
         }
     }

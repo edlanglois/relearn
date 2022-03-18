@@ -76,7 +76,8 @@ where
     T::Elem: Float + Debug,
 {
     let mut out = T::zeros(expected.len());
-    space.features_out(element, out.as_slice_mut(), true);
+    let result = space.features_out(element, out.as_slice_mut(), true);
+    assert_eq!(result.len(), 0);
     assert_eq!(out.as_slice(), expected);
 }
 
@@ -88,8 +89,25 @@ where
     T::Elem: Float + Debug,
 {
     let mut out = T::ones(expected.len());
-    space.features_out(element, out.as_slice_mut(), false);
+    let result = space.features_out(element, out.as_slice_mut(), false);
+    assert_eq!(result.len(), 0);
     assert_eq!(out.as_slice(), expected);
+}
+
+/// Check the length of [`FeatureSpace::features_out`] returned excess output.
+///
+/// The return value length should be shorter by [`FeatureSpace::num_features`].
+pub fn check_features_out_excess_return_len<S: FeatureSpace>(space: &S, element: &S::Element) {
+    let mut out = vec![0.0; space.num_features() + 5];
+    let result = space.features_out(element, &mut out, true);
+    assert_eq!(result.len(), 5);
+}
+
+/// Check that any excess output passed to [`FeatureSpace::features_out`] remains unchanged.
+pub fn check_features_out_excess_unchanged<S: FeatureSpace>(space: &S, element: &S::Element) {
+    let mut out = vec![-2.0; space.num_features() + 5];
+    let result = space.features_out(element, &mut out, true);
+    assert_eq!(result, [-2.0; 5]);
 }
 
 /// Check [`FeatureSpace::batch_features`].
@@ -175,6 +193,14 @@ macro_rules! features_tests {
                 testing::check_features_out_nonzero::<_, ExclusiveTensor<f32, _>>(
                     &$space, &$elem, &$expected,
                 );
+            }
+            #[test]
+            fn features_out_excess_return_len() {
+                testing::check_features_out_excess_return_len(&$space, &$elem);
+            }
+            #[test]
+            fn features_out_excess_unchanged() {
+                testing::check_features_out_excess_unchanged(&$space, &$elem);
             }
         }
     };

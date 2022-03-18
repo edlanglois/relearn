@@ -1,7 +1,7 @@
 //! Wrap spaces to have non-empty feature vectors.
-use super::{EncoderFeatureSpace, FiniteSpace, NonEmptySpace, NumFeatures, Space, SubsetOrd};
+use super::{FeatureSpace, FiniteSpace, NonEmptySpace, Space, SubsetOrd};
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
-use ndarray::{ArrayBase, DataMut, Ix2};
+use ndarray::{s, ArrayBase, DataMut, Ix2};
 use num_traits::{Float, Zero};
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -76,76 +76,64 @@ impl<S: Space + Distribution<S::Element>> Distribution<<Self as Space>::Element>
     }
 }
 
-impl<S: NumFeatures> NumFeatures for NonEmptyFeatures<S> {
+/// Features are either the inner features if non-empty or `[0.0]`.
+impl<S: FeatureSpace> FeatureSpace for NonEmptyFeatures<S> {
+    #[inline]
     fn num_features(&self) -> usize {
         self.inner.num_features().max(1)
     }
-}
 
-/// Feature encoder for [`NonEmptyFeatures`]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct NonEmptyFeaturesEncoder<T> {
-    inner_encoder: T,
-    inner_is_empty: bool,
-}
-impl<S: EncoderFeatureSpace> EncoderFeatureSpace for NonEmptyFeatures<S> {
-    type Encoder = NonEmptyFeaturesEncoder<S::Encoder>;
-
-    fn encoder(&self) -> Self::Encoder {
-        NonEmptyFeaturesEncoder {
-            inner_encoder: self.inner.encoder(),
-            inner_is_empty: self.inner.num_features() == 0,
-        }
-    }
-
-    fn encoder_features_out<F: Float>(
+    #[inline]
+    fn features_out<'a, F: Float>(
         &self,
         element: &Self::Element,
-        out: &mut [F],
+        out: &'a mut [F],
         zeroed: bool,
-        encoder: &Self::Encoder,
-    ) {
-        if !encoder.inner_is_empty {
-            self.inner
-                .encoder_features_out(element, out, zeroed, &encoder.inner_encoder)
+    ) -> &'a mut [F] {
+        let out_len = out.len();
+        let rest = self.inner.features_out(element, out, zeroed);
+        if rest.len() == out_len {
+            // No features have been written; write a 0
+            rest[0] = Zero::zero();
+            &mut rest[1..]
         } else {
-            out[0] = F::zero();
+            // features written by inner
+            rest
         }
     }
 
-    fn encoder_features<T>(&self, element: &Self::Element, encoder: &Self::Encoder) -> T
+    #[inline]
+    fn features<T>(&self, element: &Self::Element) -> T
     where
         T: BuildFromArray1D,
         <T::Array as NumArray1D>::Elem: Float,
     {
-        if !encoder.inner_is_empty {
-            self.inner.encoder_features(element, &encoder.inner_encoder)
-        } else {
-            T::Array::zeros(1).into()
+        let num_inner_features = self.inner.num_features();
+        let mut array = T::Array::zeros(num_inner_features.max(1));
+        if num_inner_features > 0 {
+            self.features_out(element, array.as_slice_mut(), true);
         }
+        array.into()
     }
 
-    fn encoder_batch_features_out<'a, I, A>(
-        &self,
-        elements: I,
-        out: &mut ArrayBase<A, Ix2>,
-        zeroed: bool,
-        encoder: &Self::Encoder,
-    ) where
+    #[inline]
+    fn batch_features_out<'a, I, A>(&self, elements: I, out: &mut ArrayBase<A, Ix2>, zeroed: bool)
+    where
         I: IntoIterator<Item = &'a Self::Element>,
         Self::Element: 'a,
         A: DataMut,
         A::Elem: Float,
     {
-        if !encoder.inner_is_empty {
-            self.inner
-                .encoder_batch_features_out(elements, out, zeroed, &encoder.inner_encoder)
+        let num_inner_features = self.inner.num_features();
+        if num_inner_features > 0 {
+            self.inner.batch_features_out(elements, out, zeroed)
         } else if !zeroed {
-            out.fill(Zero::zero())
+            out.slice_mut(s![.., 0]).fill(Zero::zero())
         }
     }
 
-    fn encoder_batch_features<'a, I, T>(&self, elements: I, encoder: &Self::Encoder) -> T
+    #[inline]
+    fn batch_features<'a, I, T>(&self, elements: I) -> T
     where
         I: IntoIterator<Item = &'a Self::Element>,
         I::IntoIter: ExactSizeIterator,
@@ -153,9 +141,9 @@ impl<S: EncoderFeatureSpace> EncoderFeatureSpace for NonEmptyFeatures<S> {
         T: BuildFromArray2D,
         <T::Array as NumArray2D>::Elem: Float,
     {
-        if !encoder.inner_is_empty {
-            self.inner
-                .encoder_batch_features(elements, &encoder.inner_encoder)
+        let num_inner_features = self.inner.num_features();
+        if num_inner_features > 0 {
+            self.inner.batch_features(elements)
         } else {
             T::Array::zeros((elements.into_iter().len(), 1)).into()
         }
