@@ -224,8 +224,12 @@ where
     // Check that the new module works with input on the target device
     let new_output = R::run(&new_module, &new_input);
 
-    // Check that the ouputs are equal
-    assert_allclose(&original_output.to_device(target_device), &new_output);
+    // Check that outputs are equal.
+    // Use relaxed bounds compared to `assert_allclose` because different devices can
+    // have different floating-point errors.
+    assert!(original_output
+        .to_device(target_device)
+        .allclose(&new_output, 1e-5, 1e-5, false))
 }
 
 /// Check use of `clone_to_device` to the same device.
