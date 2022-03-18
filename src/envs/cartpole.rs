@@ -211,6 +211,7 @@ impl Default for EnvironmentParams {
 
 /// Internal cart-pole constants with pre-computed common values.
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(into = "PhysicalConstants", from = "PhysicalConstants")]
 struct InternalPhysicalConstants {
     /// Fundamental constants
     c: PhysicalConstants,
@@ -240,6 +241,12 @@ impl From<PhysicalConstants> for InternalPhysicalConstants {
             inv_total_mass,
             mass_length_pole,
         }
+    }
+}
+
+impl From<InternalPhysicalConstants> for PhysicalConstants {
+    fn from(ic: InternalPhysicalConstants) -> Self {
+        ic.c
     }
 }
 
