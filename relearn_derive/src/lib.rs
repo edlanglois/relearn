@@ -33,6 +33,7 @@ pub fn indexed_macro_derive(input: TokenStream) -> TokenStream {
 /// ```
 /// use relearn::spaces::{BooleanSpace, Space};
 ///
+/// #[derive(Clone)]
 /// struct MyElem<T> {
 ///     first: bool,
 ///     second: T,
@@ -148,6 +149,7 @@ pub fn log_element_space_macro_derive(input: TokenStream) -> TokenStream {
 /// ```
 /// use relearn::spaces::{BooleanSpace, Space, ProductSpace};
 ///
+/// #[derive(Clone)]
 /// struct MyElem<T> {
 ///     first: bool,
 ///     second: T,
