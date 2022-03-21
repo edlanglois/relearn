@@ -9,7 +9,10 @@ pub use tensorboard::TensorBoardLogger;
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::fmt;
+use std::iter;
+use std::slice;
 use std::time::Duration;
 use thiserror::Error;
 
@@ -193,13 +196,24 @@ impl Loggable {
 }
 
 /// A hierarchical identifier.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Id {
-    // Must have namespace before name for correct derive(PartialOrd)
-    /// Hierarchical namespace; from outermost (top-level) name to innermost.
-    namespace: SmallVec<[&'static str; 6]>,
-    /// Innermost name
+    /// Base (innermost) name of the identifier.
     name: Cow<'static, str>,
+    /// Hierarchical namespace in reverse order from innermost to outermost (top-level)
+    namespace: SmallVec<[&'static str; 6]>,
+}
+
+impl PartialOrd for Id {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Id {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.components().cmp(other.components())
+    }
 }
 
 impl fmt::Display for Id {
@@ -216,7 +230,7 @@ impl fmt::Display for Id {
             }
         }
 
-        for scope in &self.namespace {
+        for scope in self.namespace.iter().rev() {
             write!(f, "{}/", scope)?;
         }
         write!(f, "{}", self.name)?;
@@ -239,6 +253,7 @@ impl<T> From<T> for Id
 where
     T: Into<Cow<'static, str>>,
 {
+    #[inline]
     fn from(name: T) -> Self {
         Self {
             name: name.into(),
@@ -252,6 +267,17 @@ impl Id {
     fn with_inner_scope(mut self, scope: &'static str) -> Self {
         self.namespace.push(scope);
         self
+    }
+
+    /// Iterator over ID components
+    pub fn components(
+        &self,
+    ) -> iter::Chain<iter::Cloned<iter::Rev<slice::Iter<&str>>>, iter::Once<&str>> {
+        self.namespace
+            .iter()
+            .rev()
+            .cloned() // &&str -> &str
+            .chain(iter::once(self.name.as_ref()))
     }
 }
 
@@ -313,21 +339,25 @@ pub struct ScopedLogger<L> {
 }
 
 impl<L> ScopedLogger<L> {
+    #[inline]
     pub const fn new(scope: &'static str, logger: L) -> Self {
         Self { scope, logger }
     }
 }
 
 impl<L: StatsLogger> StatsLogger for ScopedLogger<L> {
+    #[inline]
     fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
         self.logger.log(id.with_inner_scope(self.scope), value)
     }
 
+    #[inline]
     fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
         self.logger
             .log_no_flush(id.with_inner_scope(self.scope), value)
     }
 
+    #[inline]
     fn flush(&mut self) {
         self.logger.flush()
     }
