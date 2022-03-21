@@ -415,17 +415,12 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Environme
 
         let reward_principal = state.step(principal_action, Player::Principal);
         let reward_assistant = state.step(assistant_action, Player::Assistant);
-        logger
-            .log_no_flush(
-                "reward/principal".into(),
-                Loggable::Scalar(reward_principal),
-            )
+        let mut reward_logger = logger.with_scope("reward");
+        reward_logger
+            .log_no_flush("principal".into(), Loggable::Scalar(reward_principal))
             .unwrap();
-        logger
-            .log_no_flush(
-                "reward/assistant".into(),
-                Loggable::Scalar(reward_assistant),
-            )
+        reward_logger
+            .log_no_flush("assistant".into(), Loggable::Scalar(reward_assistant))
             .unwrap();
         let reward = reward_principal + reward_assistant;
         let successor = if state.is_terminal() {

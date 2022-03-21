@@ -255,8 +255,14 @@ where
 {
     #[inline]
     fn from(name: T) -> Self {
+        let name = name.into();
+        debug_assert!(
+            !name.contains('/'),
+            "path separators are not allowed in Id name; \
+            use [...].collect() or logger.with_scope(...) instead"
+        );
         Self {
-            name: name.into(),
+            name,
             namespace: SmallVec::new(),
         }
     }

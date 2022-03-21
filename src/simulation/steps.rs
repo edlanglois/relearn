@@ -236,29 +236,28 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.simulator.step_with(|_, _, step, logger| {
-            // Check for flushing only on the first log of each episode boundary
-            logger.log_scalar("step/reward", step.reward);
+            // Check for flushing only once per step.
+            let mut step_logger = logger.with_scope("step");
+            step_logger.log_scalar("reward", step.reward);
             // TODO: Log action and observation
-            logger
-                .log_no_flush("step/count".into(), Loggable::CounterIncrement(1))
+            step_logger
+                .log_no_flush("count".into(), Loggable::CounterIncrement(1))
                 .unwrap();
             self.episode_reward += step.reward;
             self.episode_length += 1;
             if step.next.episode_done() {
-                logger
-                    .log_no_flush(
-                        "episode/reward".into(),
-                        Loggable::Scalar(self.episode_reward),
-                    )
+                let mut episode_logger = logger.with_scope("episode");
+                episode_logger
+                    .log_no_flush("reward".into(), Loggable::Scalar(self.episode_reward))
                     .unwrap();
-                logger
+                episode_logger
                     .log_no_flush(
-                        "episode/length".into(),
+                        "length".into(),
                         Loggable::Scalar(self.episode_length as f64),
                     )
                     .unwrap();
-                logger
-                    .log_no_flush("episode/count".into(), Loggable::CounterIncrement(1))
+                episode_logger
+                    .log_no_flush("count".into(), Loggable::CounterIncrement(1))
                     .unwrap();
                 self.episode_reward = 0.0;
                 self.episode_length = 0;

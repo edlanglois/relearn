@@ -288,7 +288,8 @@ where
             buffer.clear()
         }
 
-        logger.log_duration("agent/update_time", agent_update_start.elapsed());
-        logger.log_counter_increment("agent/update_count", 1)
+        let mut agent_logger = logger.with_scope("agent");
+        agent_logger.log_duration("update_time", agent_update_start.elapsed());
+        agent_logger.log_counter_increment("update_count", 1)
     }
 }

@@ -49,15 +49,17 @@ where
         for i in 0..self.optimizer_iters {
             let loss = f64::from(optimizer.backward_step(&loss_fn, logger).unwrap());
             let critic_opt_end = Instant::now();
-            logger.log_scalar("step/loss", loss);
-            logger.log_counter_increment("step/count", 1);
-            logger.log_duration("step/time", critic_opt_end - critic_opt_start);
+
+            let mut step_logger = logger.with_scope("step");
+            step_logger.log_scalar("loss", loss);
+            step_logger.log_counter_increment("count", 1);
+            step_logger.log_duration("time", critic_opt_end - critic_opt_start);
             critic_opt_start = critic_opt_end;
 
             if i == 0 {
                 logger.log_scalar("loss_initial", loss);
             } else if i == self.optimizer_iters - 1 {
-                logger.log_scalar("loss_final", loss)
+                logger.log_scalar("loss_final", loss);
             }
         }
     }
