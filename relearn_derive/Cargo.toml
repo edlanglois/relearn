@@ -1,6 +1,6 @@
 [package]
 name = "relearn_derive"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Eric Langlois <eric@langlois.xyz>"]
 edition = "2021"
 description = "Derive macros for the relearn package"
@@ -20,7 +20,7 @@ syn="1.0"
 ndarray = "0.15"
 num-traits = "0.2"
 rand = "0.8"
-relearn = { version = "0.1.2", path = ".." }
+relearn = { version = "0.2.0", path = ".." }
 
 [features]
 doc-only = ["relearn/doc-only"]
