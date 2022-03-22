@@ -13,12 +13,15 @@ use relearn::simulation::{train_parallel, TrainParallelConfig};
 use relearn::simulation::{SimulatorSteps, StepsIter, StepsSummary};
 use relearn::spaces::{IndexSpace, NonEmptySpace, SingletonSpace, Space};
 use relearn::torch::{
-    agents::{ActorCriticAgent, ActorCriticConfig},
-    critic::{Gae, GaeConfig},
+    agents::{
+        critic::{Gae, GaeConfig},
+        learning_critic::{GradOpt, GradOptConfig, GradOptRule},
+        learning_policy::{Trpo, TrpoConfig, TrpoRule},
+        ActorCriticAgent, ActorCriticConfig,
+    },
     initializers::{Initializer, VarianceScale},
     modules::{Activation, Chain, ChainConfig, Gru, GruConfig, Linear, LinearConfig},
-    optimizers::{AdamConfig, ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig},
-    updaters::{CriticLossUpdateRule, TrpoPolicyUpdateRule, WithOptimizer},
+    optimizers::{AdamConfig, ConjugateGradientOptimizerConfig},
 };
 use relearn::Prng;
 use serde::Serialize;
@@ -27,7 +30,6 @@ use std::num::ParseIntError;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
-use tch::COptimizer;
 use thiserror::Error;
 
 #[derive(Parser, Debug, Clone, PartialEq)]
@@ -335,14 +337,12 @@ impl fmt::Debug for Device {
     }
 }
 
+type Model = Chain<Gru, Linear>;
 type Agent = ActorCriticAgent<
     MetaObservationSpace<SingletonSpace, IndexSpace>,
     IndexSpace,
-    ChainConfig<GruConfig, LinearConfig>,
-    Chain<Gru, Linear>,
-    WithOptimizer<TrpoPolicyUpdateRule, ConjugateGradientOptimizer>,
-    Gae<Chain<Gru, Linear>>,
-    WithOptimizer<CriticLossUpdateRule, COptimizer>,
+    Trpo<Model>,
+    GradOpt<Gae<Model>>,
 >;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -383,37 +383,39 @@ impl TrainConfig {
             // NOTE: Could also try with no activation here if the GRU nonlinearity is sufficient.
             activation: Activation::Relu,
         };
-        let agent_config = ActorCriticConfig {
-            policy_config: model_config,
-            policy_updater_config: WithOptimizer {
-                update_rule: TrpoPolicyUpdateRule {
-                    // RL2 paper mentions "Mean KL" as a parameter that they set to 0.01.
-                    // I do not know of such a parameter for TRPO.
-                    // The TRPO paper has a max KL step size parameter that they set to 0.01 so
-                    // I assume that either this is what was meant by the RL2 paper or
-                    // that their strategy was not too different.
-                    max_policy_step_kl: 0.01,
-                },
-                // RL2 paper has "Policy Iters: Up to 1000".
-                // I think this refers to number of update periods,
-                // not the number of CG iterations when solving for for the descent direction.
-                // They do not seem to specify any CG optimizer parameters.
-                optimizer: ConjugateGradientOptimizerConfig::default(),
+        let policy_config = TrpoConfig {
+            module_config: model_config,
+            // RL2 paper has "Policy Iters: Up to 1000".
+            // I think this refers to number of update periods,
+            // not the number of CG iterations when solving for for the descent direction.
+            // They do not seem to specify any CG optimizer parameters.
+            optimizer_config: ConjugateGradientOptimizerConfig::default(),
+            update_rule_config: TrpoRule {
+                // RL2 paper mentions "Mean KL" as a parameter that they set to 0.01.
+                // I do not know of such a parameter for TRPO.
+                // The TRPO paper has a max KL step size parameter that they set to 0.01 so
+                // I assume that either this is what was meant by the RL2 paper or
+                // that their strategy was not too different.
+                max_policy_step_kl: 0.01,
             },
-            critic_config: GaeConfig {
+        };
+        // Note: I think they used CG optimization here as in the GAE paper
+        // https://arxiv.org/pdf/1506.02438.pdf, not regular gradient descent.
+        // TODO: Implement and use CG for critic updates.
+        let critic_config = GradOptConfig {
+            module_config: GaeConfig {
                 gamma: 0.99,
                 lambda: 0.3,
                 value_fn_config: model_config,
             },
-            // Note: I think they used CG optimization here as in the GAE paper
-            // https://arxiv.org/pdf/1506.02438.pdf, not regular gradient descent.
-            // TODO: Implement and use CG for critic updates.
-            critic_updater_config: WithOptimizer {
-                update_rule: CriticLossUpdateRule {
-                    optimizer_iters: 10,
-                },
-                optimizer: AdamConfig::default(),
+            optimizer_config: AdamConfig::default(),
+            update_rule_config: GradOptRule {
+                optimizer_iters: 10,
             },
+        };
+        let agent_config = ActorCriticConfig {
+            policy_config,
+            critic_config,
             min_batch_steps: self.batch_size,
             device: self.device.into(),
         };

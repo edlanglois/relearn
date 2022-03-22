@@ -10,11 +10,11 @@ use relearn::logging::{DisplayLogger, StatsLogger};
 use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
 use relearn::spaces::{IndexedTypeSpace, Space};
 use relearn::torch::{
-    agents::ActorCriticConfig,
-    critic::GaeConfig,
+    agents::{
+        critic::GaeConfig, learning_critic::GradOptConfig, learning_policy::PpoConfig,
+        ActorCriticConfig,
+    },
     modules::{ChainConfig, GruConfig, MlpConfig},
-    optimizers::AdamConfig,
-    updaters::{CriticLossUpdateRule, PpoPolicyUpdateRule, WithOptimizer},
 };
 use relearn::Prng;
 use std::cmp::Ordering;
@@ -135,10 +135,8 @@ fn main() {
         WithLatentStepLimit::new(FruitGame::<5, 5, 5, 5>::default(), LatentStepLimit::new(50));
 
     let assistant_config: ActorCriticConfig<
-        ModelConfig,
-        WithOptimizer<PpoPolicyUpdateRule, AdamConfig>,
-        GaeConfig<ModelConfig>,
-        WithOptimizer<CriticLossUpdateRule, AdamConfig>,
+        PpoConfig<ModelConfig>,
+        GradOptConfig<GaeConfig<ModelConfig>>,
     > = ActorCriticConfig {
         device: Device::Cuda(0),
         ..Default::default()

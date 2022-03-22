@@ -6,11 +6,11 @@ use relearn::envs::{
 use relearn::logging::DisplayLogger;
 use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
 use relearn::torch::{
-    agents::ActorCriticConfig,
-    critic::GaeConfig,
+    agents::{
+        critic::GaeConfig, learning_critic::GradOptConfig, learning_policy::PpoConfig,
+        ActorCriticConfig,
+    },
     modules::GruMlpConfig,
-    optimizers::AdamConfig,
-    updaters::{CriticLossUpdateRule, PpoPolicyUpdateRule, WithOptimizer},
 };
 use relearn::Prng;
 use tch::Device;
@@ -22,10 +22,8 @@ fn main() {
     );
 
     let agent_config: ActorCriticConfig<
-        GruMlpConfig,
-        WithOptimizer<PpoPolicyUpdateRule, AdamConfig>,
-        GaeConfig<GruMlpConfig>,
-        WithOptimizer<CriticLossUpdateRule, AdamConfig>,
+        PpoConfig<GruMlpConfig>,
+        GradOptConfig<GaeConfig<GruMlpConfig>>,
     > = ActorCriticConfig {
         device: Device::cuda_if_available(),
         ..Default::default()

@@ -3,13 +3,11 @@ use relearn::agents::{ActorMode, Agent, BuildAgent};
 use relearn::envs::{BuildEnv, Environment, PartitionGame};
 use relearn::logging::DisplayLogger;
 use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
-use relearn::torch::{
-    agents::ActorCriticConfig,
-    critic::GaeConfig,
-    modules::GruMlpConfig,
-    optimizers::{AdamConfig, ConjugateGradientOptimizerConfig},
-    updaters::{CriticLossUpdateRule, TrpoPolicyUpdateRule, WithOptimizer},
+use relearn::torch::agents::{
+    critic::GaeConfig, learning_critic::GradOptConfig, learning_policy::TrpoConfig,
+    ActorCriticConfig,
 };
+use relearn::torch::modules::GruMlpConfig;
 use relearn::Prng;
 use tch::Device;
 
@@ -17,11 +15,8 @@ fn main() {
     let env_config = PartitionGame::default().with_visible_step_limit(1000);
 
     let agent_config: ActorCriticConfig<
-        GruMlpConfig,
-        WithOptimizer<TrpoPolicyUpdateRule, ConjugateGradientOptimizerConfig>,
-        // WithOptimizer<PpoPolicyUpdateRule, AdamConfig>,
-        GaeConfig<GruMlpConfig>,
-        WithOptimizer<CriticLossUpdateRule, AdamConfig>,
+        TrpoConfig<GruMlpConfig>,
+        GradOptConfig<GaeConfig<GruMlpConfig>>,
     > = ActorCriticConfig {
         device: Device::Cuda(0),
         ..Default::default()
