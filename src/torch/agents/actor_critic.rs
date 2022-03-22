@@ -242,7 +242,6 @@ where
         buffers: &mut [&mut SimpleBuffer<OS::Element, AS::Element>],
         logger: &mut dyn StatsLogger,
     ) {
-        let agent_update_start = Instant::now();
         // About to update the policy so clear any existing CPU policy copy
         self.cpu_policy = RefCell::new(None);
 
@@ -253,15 +252,8 @@ where
             self.discount_factor,
             self.device,
         );
-        let mut history_logger = logger.with_scope("history");
-        let num_steps = features.num_steps();
-        let num_episodes = features.num_episodes();
-        history_logger.log_scalar("num_steps", num_steps as f64);
-        history_logger.log_scalar("num_episodes", num_episodes as f64);
-        history_logger.log_counter_increment("cumulative_steps", num_steps as u64);
-        history_logger.log_counter_increment("cumulative_episodes", num_episodes as u64);
         if features.is_empty() {
-            history_logger.log_message("no_model_update", "Skipping update; empty history");
+            logger.log_message("no_model_update", "Skipping update; empty history");
             return;
         }
 
@@ -287,9 +279,5 @@ where
         for buffer in buffers {
             buffer.clear()
         }
-
-        let mut agent_logger = logger.with_scope("agent");
-        agent_logger.log_duration("update_time", agent_update_start.elapsed());
-        agent_logger.log_counter_increment("update_count", 1)
     }
 }

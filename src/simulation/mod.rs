@@ -4,7 +4,7 @@ mod summary;
 mod take_episodes;
 
 pub use steps::{SimSeed, SimulatorSteps};
-pub use summary::StepsSummary;
+pub use summary::{OnlineStepsSummary, StepsSummary};
 pub use take_episodes::TakeEpisodes;
 
 use crate::agents::{ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
@@ -12,6 +12,7 @@ use crate::envs::{Environment, Successor};
 use crate::logging::StatsLogger;
 use crate::Prng;
 use rand::SeedableRng;
+use std::time::Instant;
 
 /// Description of an environment step.
 ///
@@ -200,17 +201,20 @@ pub fn train_parallel<T, E>(
         .collect();
 
     for _ in 0..config.num_periods {
+        let collect_start = Instant::now();
+
         // Send the logger to the first thread
         let mut worker0_logger = logger.with_scope("worker0");
         let mut send_logger = Some(&mut worker0_logger as &mut dyn StatsLogger);
 
-        crossbeam::scope(|scope| {
+        let summary = crossbeam::scope(|scope| {
             let mut threads = Vec::new();
 
             for (buffer, rngs) in buffers.iter_mut().zip(&mut thread_rngs) {
                 let actor = agent.actor(ActorMode::Training);
                 let thread_logger = send_logger.take();
                 threads.push(scope.spawn(move |_scope| {
+                    let mut summary = OnlineStepsSummary::default();
                     let ready = buffer.extend_until_ready(
                         SimulatorSteps::new(
                             environment,
@@ -219,19 +223,49 @@ pub fn train_parallel<T, E>(
                             &mut rngs.1,
                             thread_logger.unwrap_or(&mut ()),
                         )
-                        .with_step_logging(),
+                        .with_step_logging()
+                        .map(|step| {
+                            summary.push(&step);
+                            step
+                        }),
                     );
                     assert!(ready);
+                    StepsSummary::from(summary)
                 }));
             }
 
-            for thread in threads {
-                thread.join().unwrap()
-            }
+            threads
+                .into_iter()
+                .map(|t| t.join().unwrap())
+                .sum::<StepsSummary>()
         })
         .unwrap();
 
+        let mut sim_logger = logger.with_scope("sim");
+        let mut episode_logger = (&mut sim_logger).with_scope("ep");
+        let num_episodes = summary.episode_length.count();
+        if num_episodes > 0 {
+            episode_logger.log_scalar("reward_mean", summary.episode_reward.mean().unwrap());
+            episode_logger.log_scalar("reward_stddev", summary.episode_reward.stddev().unwrap());
+            episode_logger.log_scalar("length_mean", summary.episode_length.mean().unwrap());
+            episode_logger.log_scalar("length_stddev", summary.episode_length.stddev().unwrap());
+        }
+        episode_logger.log_counter_increment("count", num_episodes);
+        let mut step_logger = (&mut sim_logger).with_scope("step");
+        let num_steps = summary.step_reward.count();
+        if num_steps > 0 {
+            step_logger.log_scalar("reward_mean", summary.step_reward.mean().unwrap());
+            step_logger.log_scalar("reward_stddev", summary.step_reward.stddev().unwrap());
+        }
+        step_logger.log_counter_increment("count", num_steps);
+        let update_start = Instant::now();
+        sim_logger.log_duration("time", update_start - collect_start);
+
         agent.batch_update_slice(&mut buffers, &mut *logger);
+
+        let mut agent_logger = logger.with_scope("agent_update");
+        agent_logger.log_duration("time", update_start.elapsed());
+        agent_logger.log_counter_increment("count", 1);
     }
 }
 

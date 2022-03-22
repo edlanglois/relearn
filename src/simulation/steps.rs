@@ -179,6 +179,7 @@ where
     /// Cannot return a `TransientStep` without Generic Associated Types
     type Item = PartialStep<E::Observation, E::Action>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.step_with(|_, _, s, _| s.into_partial()))
     }
