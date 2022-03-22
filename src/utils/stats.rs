@@ -146,6 +146,17 @@ impl<T: Real> FromIterator<T> for OnlineMeanVariance<T> {
     }
 }
 
+impl<T: Real> FromIterator<Self> for OnlineMeanVariance<T> {
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = Self>,
+    {
+        iter.into_iter()
+            .reduce(|a, b| a + b)
+            .unwrap_or_else(Self::default)
+    }
+}
+
 impl<T: Real> Add for OnlineMeanVariance<T> {
     type Output = Self;
 
@@ -187,8 +198,7 @@ mod tests {
 
     #[test]
     fn collect_f64() {
-        let stats: OnlineMeanVariance<f64> =
-            [1.0, 2.0, 3.0, 4.0].into_iter().map(Into::into).collect();
+        let stats: OnlineMeanVariance<f64> = [1.0, 2.0, 3.0, 4.0].into_iter().collect();
         assert!((stats.mean().unwrap() - 2.5).abs() < 1e-8);
         assert!((stats.variance().unwrap() - 1.25).abs() < 1e-8);
     }
