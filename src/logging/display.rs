@@ -1,42 +1,34 @@
 //! Command-line logger
-use super::chunk::{ChunkLogger, ChunkSummary, LoggerBackend, DEFAULT_CHUNK_SECONDS};
-use super::Id;
+use super::chunk::{ChunkLogger, ChunkSummary, Chunker, SummaryWriter};
+use super::{ByTime, Id, LogError, Loggable, StatsLogger};
 use crate::utils::fmt::{DisplayFn, Frequency, PrettyPrint};
 use std::fmt;
 use std::time::Duration;
 use yansi::Paint;
 
-/// Configuration for [`DisplayLogger`].
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct DisplayLoggerConfig {
-    /// Display and summary period.
-    pub display_period: Duration,
-}
+/// Logger that displays grouped summaries to standard output.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct DisplayLogger<C: Chunker = ByTime>(ChunkLogger<C, DisplayBackend>);
 
-impl Default for DisplayLoggerConfig {
-    fn default() -> Self {
-        Self {
-            display_period: Duration::from_secs(DEFAULT_CHUNK_SECONDS),
-        }
+impl<C: Chunker> DisplayLogger<C> {
+    #[inline]
+    pub fn new(chunker: C) -> Self {
+        Self(ChunkLogger::new(chunker, DisplayBackend))
     }
 }
 
-impl DisplayLoggerConfig {
-    pub fn build_logger(&self) -> DisplayLogger {
-        DisplayLogger::new(self.display_period)
+impl<C: Chunker> StatsLogger for DisplayLogger<C> {
+    #[inline]
+    fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+        self.0.log(id, value)
     }
-}
-
-/// Logger that displays summaries to standard output.
-pub type DisplayLogger = ChunkLogger<DisplayBackend>;
-
-impl DisplayLogger {
-    /// Create a new `DisplayLogger`
-    ///
-    /// # Args
-    /// * `display_period` - Display and summary period.
-    pub fn new(display_period: Duration) -> Self {
-        Self::from_backend(display_period, DisplayBackend)
+    #[inline]
+    fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+        self.0.log_no_flush(id, value)
+    }
+    #[inline]
+    fn flush(&mut self) {
+        self.0.flush()
     }
 }
 
@@ -44,8 +36,8 @@ impl DisplayLogger {
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct DisplayBackend;
 
-impl LoggerBackend for DisplayBackend {
-    fn record_summaries<'a, I>(&mut self, summaries: I, elapsed: Duration)
+impl SummaryWriter for DisplayBackend {
+    fn write_summaries<'a, I>(&mut self, summaries: I, elapsed: Duration)
     where
         I: Iterator<Item = (&'a Id, &'a ChunkSummary)>,
     {

@@ -2,7 +2,7 @@
 use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent};
 use relearn::envs::{CartPole, EnvStructure, Environment, WithVisibleStepLimit};
-use relearn::logging::{DisplayLogger, TensorBoardLogger};
+use relearn::logging::{ByCounter, DisplayLogger, TensorBoardLogger};
 use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
 use relearn::torch::agents::{
     critic::GaeConfig, learning_critic::GradOptConfig, learning_policy::TrpoConfig,
@@ -13,7 +13,6 @@ use relearn::Prng;
 use std::env;
 use std::fs::{self, File};
 use std::path::PathBuf;
-use std::time::Duration;
 use tch::Device;
 
 type AgentConfig = ActorCriticConfig<TrpoConfig<MlpConfig>, GradOptConfig<GaeConfig<MlpConfig>>>;
@@ -49,9 +48,10 @@ fn main() {
             let mut agent = agent_config.build_agent(&env, &mut rng).unwrap();
 
             println!("Logging to {:?}", output_dir);
+            let log_on_name = ["agent_update", "count"];
             let mut logger = (
-                DisplayLogger::default(),
-                TensorBoardLogger::new(&output_dir, Duration::from_millis(200)),
+                DisplayLogger::new(ByCounter::of_path(log_on_name, 2)),
+                TensorBoardLogger::new(ByCounter::of_path(log_on_name, 1), &output_dir),
             );
 
             train_parallel(

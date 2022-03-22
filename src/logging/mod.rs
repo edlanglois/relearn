@@ -1,11 +1,15 @@
 //! Logging statistics from simulation runs
-pub mod chunk;
+mod chunk;
+mod chunk_by_counter;
+mod chunk_by_time;
 mod display;
 mod tensorboard;
 
 pub use chunk::ChunkLogger;
-pub use display::{DisplayLogger, DisplayLoggerConfig};
-pub use tensorboard::TensorBoardLogger;
+pub use chunk_by_counter::ByCounter;
+pub use chunk_by_time::ByTime;
+pub use display::{DisplayBackend, DisplayLogger};
+pub use tensorboard::{TensorBoardBackend, TensorBoardLogger};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
@@ -269,6 +273,23 @@ where
     }
 }
 
+impl FromIterator<&'static str> for Id {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = &'static str>,
+    {
+        let mut rev_namespace: SmallVec<[&'static str; 6]> = iter.into_iter().collect();
+        let name = rev_namespace
+            .pop()
+            .expect("must have at least one name")
+            .into();
+        Self {
+            name,
+            namespace: rev_namespace.into_iter().rev().collect(),
+        }
+    }
+}
+
 impl Id {
     /// Add a new inner scope to the namespace.
     fn with_inner_scope(mut self, scope: &'static str) -> Self {
@@ -276,7 +297,7 @@ impl Id {
         self
     }
 
-    /// Iterator over ID components
+    /// Iterator over namespace / name components.
     pub fn components(
         &self,
     ) -> iter::Chain<iter::Cloned<iter::Rev<slice::Iter<&str>>>, iter::Once<&str>> {

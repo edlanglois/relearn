@@ -1,60 +1,108 @@
 use super::{Id, LogError, Loggable, StatsLogger};
 use crate::utils::stats::OnlineMeanVariance;
-use coarsetime::{Duration as CDuration, Instant as CInstant};
 use std::borrow::Cow;
 use std::collections::{btree_map::Entry, BTreeMap};
 use std::ops::Drop;
 use std::time::{Duration, Instant};
 
+/// Control the aggregation of logs into summaries and summaries into chunks.
+pub trait Chunker: Send {
+    /// Saved context for deciding whether to log post-flush
+    ///
+    /// # Design Note
+    /// This complexity is necesary because Rust does not provide a way to get a reference to the
+    /// key after insertion so `flush_post_log` would not otherwise be able to depend on the value
+    /// of `Id` (without cloning Id).
+    /// See <https://stackoverflow.com/questions/32401857>
+    type Context;
+
+    /// Decide whether to flush the current chunk before the given value is added to the summary.
+    fn flush_pre_log(
+        &self,
+        summaries: &BTreeMap<Id, Node>,
+        id: &Id,
+        value: &Loggable,
+    ) -> Flush<Self::Context>;
+
+    /// Decide whether to flush the current chunk after the value has been added to the summary.
+    fn flush_post_log(&self, context: Self::Context, updated: &ChunkSummary) -> bool;
+
+    /// Indicate that the current chunk has been flushed
+    fn flushed(&mut self);
+}
+
+/// When and whether to flush the current chunk.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum Flush<T> {
+    /// Do not flush
+    No,
+    /// Flush before logging
+    PreLog,
+    /// Maybe flush after logging, determined by [`Chunker::flush_post_log`].
+    MaybePostLog(T),
+}
+
+/// Write out summaries to a backend.
+pub trait SummaryWriter: Send {
+    fn write_summaries<'a, I>(&mut self, summaries: I, elapsed: Duration)
+    where
+        I: Iterator<Item = (&'a Id, &'a ChunkSummary)>;
+}
+
 /// Logs time series statistics by breaking the time series into chunks and summarizing each chunk.
-pub struct ChunkLogger<B: LoggerBackend> {
-    // Coarse time is used because the current time is checked on every log event,
-    // which might be quite frequent for per-step values so the time checks should be fast.
-    // The accuracy of the clock (~1ms for coarse vs. ~1ns for regular) is not very important
-    // since it is only used for checking whether the chunk duration has elapsed (~1s).
-    chunk_duration: CDuration,
-    coarse_chunk_start: CInstant,
-    // Precise chunk start time for use when recording statistics.
-    chunk_start: Instant,
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChunkLogger<C: Chunker, W: SummaryWriter> {
+    chunker: C,
+    writer: W,
 
     // A binary tree is used so that keys are retrieved in sorted order
     summaries: BTreeMap<Id, Node>,
 
-    backend: B,
+    // Start time of the current chunk.
+    //
+    // Passed to writers, used for measuring event frequences for example.
+    chunk_start: Instant,
 }
 
-impl<B: LoggerBackend> ChunkLogger<B> {
-    /// Create a new logger with the given backend.
-    pub fn from_backend(chunk_duration: Duration, backend: B) -> Self {
+impl<C: Chunker, W: SummaryWriter> ChunkLogger<C, W> {
+    pub fn new(chunker: C, writer: W) -> Self {
         Self {
-            chunk_duration: CDuration::new(chunk_duration.as_secs(), chunk_duration.subsec_nanos()),
-            coarse_chunk_start: CInstant::now(),
-            chunk_start: Instant::now(),
+            chunker,
+            writer,
             summaries: BTreeMap::new(),
-            backend,
+            chunk_start: Instant::now(),
         }
     }
 }
 
-pub const DEFAULT_CHUNK_SECONDS: u64 = 5;
-
-impl<B: Default + LoggerBackend> Default for ChunkLogger<B> {
+impl<C: Chunker + Default, W: SummaryWriter + Default> Default for ChunkLogger<C, W> {
     fn default() -> Self {
-        Self::from_backend(Duration::from_secs(DEFAULT_CHUNK_SECONDS), B::default())
+        Self::new(C::default(), W::default())
     }
 }
 
-impl<B: LoggerBackend> StatsLogger for ChunkLogger<B> {
+impl<C: Chunker, W: SummaryWriter> StatsLogger for ChunkLogger<C, W> {
     fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
-        // Check whether the chunk duration has elapsed.
-        // This is done before logging because logs are likely to occur in bursts with the duration
-        // elapsing in between. Logging first would cause the first value of the burst to be split
-        // into a separate chunk from the rest.
-        if self.coarse_chunk_start.elapsed() > self.chunk_duration {
-            self.flush()
+        let flush_request = self.chunker.flush_pre_log(&self.summaries, &id, &value);
+        if matches!(flush_request, Flush::PreLog) {
+            self.flush();
         }
 
-        self.log_no_flush(id, value)
+        let node = match self.summaries.entry(id) {
+            Entry::Vacant(e) => e.insert(Node::new(value.into())),
+            Entry::Occupied(e) => {
+                let node = e.into_mut();
+                node.push(value)?;
+                node
+            }
+        };
+
+        if let Flush::MaybePostLog(context) = flush_request {
+            if self.chunker.flush_post_log(context, &node.summary) {
+                self.flush()
+            }
+        }
+        Ok(())
     }
 
     fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
@@ -62,15 +110,15 @@ impl<B: LoggerBackend> StatsLogger for ChunkLogger<B> {
             Entry::Vacant(e) => {
                 e.insert(Node::new(value.into()));
             }
-            Entry::Occupied(mut e) => {
-                e.get_mut().push(value)?;
+            Entry::Occupied(e) => {
+                e.into_mut().push(value)?;
             }
         };
         Ok(())
     }
 
     fn flush(&mut self) {
-        self.backend.record_summaries(
+        self.writer.write_summaries(
             self.summaries.iter().filter_map(|(id, node)| {
                 if node.dirty {
                     Some((id, &node.summary))
@@ -85,27 +133,20 @@ impl<B: LoggerBackend> StatsLogger for ChunkLogger<B> {
         for node in self.summaries.values_mut() {
             node.reset();
         }
-        self.coarse_chunk_start = CInstant::now();
         self.chunk_start = Instant::now();
+        self.chunker.flushed();
     }
 }
 
 /// Flush when dropped
-impl<B: LoggerBackend> Drop for ChunkLogger<B> {
+impl<C: Chunker, W: SummaryWriter> Drop for ChunkLogger<C, W> {
     fn drop(&mut self) {
         self.flush();
     }
 }
 
-pub trait LoggerBackend: Send {
-    /// Record the given summaries to the backend.
-    fn record_summaries<'a, I>(&mut self, summaries: I, elapsed: Duration)
-    where
-        I: Iterator<Item = (&'a Id, &'a ChunkSummary)>;
-}
-
 #[derive(Debug, Clone, PartialEq)]
-struct Node {
+pub struct Node {
     /// Variable chunk summary
     summary: ChunkSummary,
     /// Whether the summary has been updated in this chunk

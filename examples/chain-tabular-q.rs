@@ -1,7 +1,7 @@
 use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent, TabularQLearningAgentConfig};
 use relearn::envs::{BuildEnv, Chain, Environment};
-use relearn::logging::DisplayLogger;
+use relearn::logging::{ByCounter, DisplayLogger};
 use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
 use relearn::Prng;
 
@@ -30,7 +30,7 @@ fn main() {
     {
         // This block ensures the logger is dropped before `Final Stats` are printed
         // so that the flushed outputs appear in-order.
-        let mut logger = DisplayLogger::default();
+        let mut logger = DisplayLogger::new(ByCounter::of_path(["agent_update", "count"], 10));
         train_parallel(
             &mut agent,
             &env,

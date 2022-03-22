@@ -8,7 +8,7 @@ use relearn::envs::{
     BuildEnv, Environment, MetaEnv, MetaObservationSpace, StructuredEnvironment,
     UniformBernoulliBandits,
 };
-use relearn::logging::{DisplayLogger, StatsLogger, TensorBoardLogger};
+use relearn::logging::{ByTime, DisplayLogger, StatsLogger, TensorBoardLogger};
 use relearn::simulation::{train_parallel, TrainParallelConfig};
 use relearn::simulation::{SimulatorSteps, StepsIter, StepsSummary};
 use relearn::spaces::{IndexSpace, NonEmptySpace, SingletonSpace, Space};
@@ -427,12 +427,13 @@ impl TrainConfig {
             min_workers_steps: 10_000,
         };
 
-        let tb_logger = TensorBoardLogger::new(&self.output_dir, Duration::from_secs(1));
+        let tb_logger =
+            TensorBoardLogger::new(ByTime::new(Duration::from_secs(1)), &self.output_dir);
         if verbose {
             println!("Output Dir: {}", self.output_dir.display());
         }
         let mut logger: Box<dyn StatsLogger> = if verbose {
-            Box::new((DisplayLogger::default(), tb_logger))
+            Box::new((DisplayLogger::<ByTime>::default(), tb_logger))
         } else {
             Box::new(tb_logger)
         };

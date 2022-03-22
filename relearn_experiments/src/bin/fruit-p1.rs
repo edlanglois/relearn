@@ -36,7 +36,7 @@ fn main() {
     let mut rng = Prng::seed_from_u64(0);
     let env = env_config.build_env(&mut rng).unwrap();
     let mut agent = agent_config.build_agent(&env, &mut rng).unwrap();
-    let mut logger = DisplayLogger::default();
+    let mut logger: DisplayLogger = DisplayLogger::default();
 
     {
         let summary: StepsSummary = env
