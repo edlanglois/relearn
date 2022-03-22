@@ -200,10 +200,13 @@ pub fn train_parallel<T, E>(
         .collect();
 
     for _ in 0..config.num_periods {
+        // Send the logger to the first thread
+        let mut worker0_logger = logger.with_scope("worker0");
+        let mut send_logger = Some(&mut worker0_logger as &mut dyn StatsLogger);
+
         crossbeam::scope(|scope| {
             let mut threads = Vec::new();
-            // Send the logger to the first thread
-            let mut send_logger = Some(&mut *logger);
+
             for (buffer, rngs) in buffers.iter_mut().zip(&mut thread_rngs) {
                 let actor = agent.actor(ActorMode::Training);
                 let thread_logger = send_logger.take();
@@ -228,7 +231,7 @@ pub fn train_parallel<T, E>(
         })
         .unwrap();
 
-        agent.batch_update_slice(&mut buffers, logger);
+        agent.batch_update_slice(&mut buffers, &mut *logger);
     }
 }
 

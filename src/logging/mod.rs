@@ -52,6 +52,7 @@ pub trait StatsLogger: Send {
     /// Wrap this logger such that an inner scope is added to all logged ids.
     ///
     /// This can be called on a reference for a temporary scope: `(&mut logger).with_scope(...)`
+    #[inline]
     fn with_scope(self, scope: &'static str) -> ScopedLogger<Self>
     where
         Self: Sized,
