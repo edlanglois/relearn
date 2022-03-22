@@ -8,7 +8,7 @@ use relearn::envs::{
     BuildEnv, Environment, MetaEnv, MetaObservationSpace, StructuredEnvironment,
     UniformBernoulliBandits,
 };
-use relearn::logging::{ByTime, DisplayLogger, StatsLogger, TensorBoardLogger};
+use relearn::logging::{ByCounter, DisplayLogger, StatsLogger, TensorBoardLogger};
 use relearn::simulation::{train_parallel, TrainParallelConfig};
 use relearn::simulation::{SimulatorSteps, StepsIter, StepsSummary};
 use relearn::spaces::{IndexSpace, NonEmptySpace, SingletonSpace, Space};
@@ -29,7 +29,6 @@ use std::fmt;
 use std::num::ParseIntError;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Parser, Debug, Clone, PartialEq)]
@@ -427,13 +426,13 @@ impl TrainConfig {
             min_workers_steps: 10_000,
         };
 
-        let tb_logger =
-            TensorBoardLogger::new(ByTime::new(Duration::from_secs(1)), &self.output_dir);
+        let log_chunker = ByCounter::of_path(["agent_update", "count"], 1);
+        let tb_logger = TensorBoardLogger::new(log_chunker.clone(), &self.output_dir);
         if verbose {
             println!("Output Dir: {}", self.output_dir.display());
         }
         let mut logger: Box<dyn StatsLogger> = if verbose {
-            Box::new((DisplayLogger::<ByTime>::default(), tb_logger))
+            Box::new((DisplayLogger::new(log_chunker), tb_logger))
         } else {
             Box::new(tb_logger)
         };
