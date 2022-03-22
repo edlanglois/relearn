@@ -44,11 +44,11 @@ pub struct Args {
     action: Action,
 
     /// Number of bandit arms
-    #[clap(short = 'n', long, default_value_t = 10)]
+    #[clap(short = 'k', long, default_value_t = 10)]
     pub num_arms: usize,
 
     /// Number of episodes per trial
-    #[clap(short = 'k', long, default_value_t = 100)]
+    #[clap(short = 'n', long, default_value_t = 100)]
     pub num_episodes: u64,
 
     /// Number of evaluation trials
@@ -410,7 +410,7 @@ impl TrainConfig {
             },
             optimizer_config: AdamConfig::default(),
             update_rule_config: GradOptRule {
-                optimizer_iters: 10,
+                optimizer_iters: 50,
             },
         };
         let agent_config = ActorCriticConfig {
