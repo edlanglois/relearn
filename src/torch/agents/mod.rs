@@ -1,3 +1,4 @@
+//! Torch agents and associated components.
 mod actor;
 mod actor_critic;
 pub mod critic;

@@ -1,4 +1,4 @@
-//! Utilities for working with tch [`Tensor`].
+//! Utilities for working with [`tch::Tensor`].
 
 mod exclusive_tensor;
 mod serialize;

@@ -15,9 +15,11 @@ use tch::{COptimizer, Kind, Tensor};
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct VpgRule;
 
-/// A [`LearningPolicy`] using [Vanilla Policy Gradient][VpgRule].
+/// A [`LearningPolicy`][super::LearningPolicy] using [Vanilla Policy Gradient][VpgRule].
 pub type Vpg<P, O = COptimizer> = RuleOpt<P, O, VpgRule>;
-/// Configuration for [`Vpg`], a [Vanilla Policy Gradient][VpgRule] [`LearningPolicy`].
+/// Configuration for [`Vpg`], a [Vanilla Policy Gradient][VpgRule] [`LearningPolicy`][1].
+///
+/// [1]: super::LearningPolicy
 pub type VpgConfig<PB, OB = AdamConfig> = RuleOptConfig<PB, OB, VpgRule>;
 
 impl<P, O> PolicyUpdateRule<P, O> for VpgRule

@@ -32,9 +32,11 @@ impl Default for PpoRule {
     }
 }
 
-/// A [`LearningPolicy`] using [Proximal Policy Optimization][PpoRule].
+/// A [`LearningPolicy`][super::LearningPolicy] using [Proximal Policy Optimization][PpoRule].
 pub type Ppo<P, O = COptimizer> = RuleOpt<P, O, PpoRule>;
-/// Configuration for [`Ppo`], a [Proximal Policy Optimization][PpoRule] [`LearningPolicy`].
+/// Configuration for [`Ppo`], a [Proximal Policy Optimization][PpoRule] [`LearningPolicy`][1].
+///
+/// [1]: super::LearningPolicy
 pub type PpoConfig<PB, OB = AdamConfig> = RuleOptConfig<PB, OB, PpoRule>;
 
 impl<P, O> PolicyUpdateRule<P, O> for PpoRule

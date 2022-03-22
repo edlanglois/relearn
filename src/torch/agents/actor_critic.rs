@@ -68,7 +68,7 @@ where
     }
 }
 
-/// Actor-crtic agent.
+/// Actor-crtic agent. Consists of a [`LearningPolicy`] and a [`LearningCritic`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActorCriticAgent<OS, AS, P, C>
 where

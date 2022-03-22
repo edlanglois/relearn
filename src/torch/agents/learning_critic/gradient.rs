@@ -13,9 +13,13 @@ pub struct GradOptRule {
     pub optimizer_iters: u64,
 }
 
-/// A [`LearningCritic`] using gradient-based loss minimization ([`GradOptRule`]).
+/// A [`LearningCritic`][1] using gradient-based loss minimization ([`GradOptRule`]).
+///
+/// [1]: super::LearningCritic
 pub type GradOpt<C, O = COptimizer> = RuleOpt<C, O, GradOptRule>;
-/// Configuration for [`GradOpt`], a gradient-based loss-minimizing [`LearningCritic`].
+/// Configuration for [`GradOpt`], a gradient-based loss-minimizing [`LearningCritic`][1].
+///
+/// [1]: super::LearningCritic
 pub type GradOptConfig<CB, OB = AdamConfig> = RuleOptConfig<CB, OB, GradOptRule>;
 
 impl Default for GradOptRule {

@@ -36,9 +36,11 @@ impl Default for TrpoRule {
     }
 }
 
-/// A [`LearningPolicy`] using [Trust Region Policy Optimization][TrpoRule].
+/// A [`LearningPolicy`][super::LearningPolicy] using [Trust Region Policy Optimization][TrpoRule].
 pub type Trpo<P, O = ConjugateGradientOptimizer> = RuleOpt<P, O, TrpoRule>;
-/// Configuration for [`Trpo`], a [Trust Region Policy Optimization][TrpoRule] [`LearningPolicy`].
+/// Configuration for [`Trpo`], a [Trust Region Policy Optimization][TrpoRule] [`LearningPolicy`][1].
+///
+/// [1]: super::LearningPolicy
 pub type TrpoConfig<PB, OB = ConjugateGradientOptimizerConfig> = RuleOptConfig<PB, OB, TrpoRule>;
 
 impl<P, O> PolicyUpdateRule<P, O> for TrpoRule
