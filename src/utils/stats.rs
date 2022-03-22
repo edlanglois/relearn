@@ -1,11 +1,12 @@
 //! Statistics utilities
 use num_traits::{real::Real, Zero};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::iter::{Extend, FromIterator};
 use std::ops::{Add, AddAssign};
 
-/// Online mean and variance calculation using Welford's Algorithm
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+/// Mean and variance with support for online updates.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct OnlineMeanVariance<T> {
     mean: T,
     squared_residual_sum: T,
@@ -151,9 +152,7 @@ impl<T: Real> FromIterator<Self> for OnlineMeanVariance<T> {
     where
         I: IntoIterator<Item = Self>,
     {
-        iter.into_iter()
-            .reduce(|a, b| a + b)
-            .unwrap_or_else(Self::default)
+        iter.into_iter().reduce(|a, b| a + b).unwrap_or_default()
     }
 }
 
