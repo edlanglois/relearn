@@ -2,7 +2,8 @@ use super::PartialStep;
 use crate::utils::stats::OnlineMeanVariance;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::iter::FromIterator;
+use std::iter::{FromIterator, Sum};
+use std::ops::{Add, AddAssign};
 
 /// Summary statistics of simulation steps.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
@@ -13,6 +14,7 @@ pub struct StepsSummary {
 }
 
 impl From<OnlineStepsSummary> for StepsSummary {
+    #[inline]
     fn from(online_summary: OnlineStepsSummary) -> Self {
         online_summary.completed
     }
@@ -43,11 +45,44 @@ impl StepsSummary {
 }
 
 impl<O, A> FromIterator<PartialStep<O, A>> for StepsSummary {
+    #[inline]
     fn from_iter<I>(steps: I) -> Self
     where
         I: IntoIterator<Item = PartialStep<O, A>>,
     {
         OnlineStepsSummary::from_iter(steps).into()
+    }
+}
+
+impl Add for StepsSummary {
+    type Output = Self;
+
+    #[inline]
+    fn add(self, other: Self) -> Self {
+        Self {
+            step_reward: self.step_reward + other.step_reward,
+            episode_reward: self.episode_reward + other.episode_reward,
+            episode_length: self.episode_length + other.episode_length,
+        }
+    }
+}
+
+impl AddAssign for StepsSummary {
+    #[inline]
+    fn add_assign(&mut self, other: Self) {
+        self.step_reward += other.step_reward;
+        self.episode_reward += other.episode_reward;
+        self.episode_length += other.episode_length;
+    }
+}
+
+impl Sum for StepsSummary {
+    #[inline]
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Self>,
+    {
+        iter.reduce(|a, b| a + b).unwrap_or_default()
     }
 }
 
@@ -88,6 +123,7 @@ impl OnlineStepsSummary {
 }
 
 impl<O, A> FromIterator<PartialStep<O, A>> for OnlineStepsSummary {
+    #[inline]
     fn from_iter<I>(steps: I) -> Self
     where
         I: IntoIterator<Item = PartialStep<O, A>>,
