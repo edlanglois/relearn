@@ -2,7 +2,7 @@
 use num_traits::{real::Real, Zero};
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::iter::{Extend, FromIterator};
+use std::iter::{Extend, FromIterator, Sum};
 use std::ops::{Add, AddAssign};
 
 /// Mean and variance with support for online updates.
@@ -147,12 +147,12 @@ impl<T: Real> FromIterator<T> for OnlineMeanVariance<T> {
     }
 }
 
-impl<T: Real> FromIterator<Self> for OnlineMeanVariance<T> {
-    fn from_iter<I>(iter: I) -> Self
+impl<T: Real> Sum for OnlineMeanVariance<T> {
+    fn sum<I>(iter: I) -> Self
     where
-        I: IntoIterator<Item = Self>,
+        I: Iterator<Item = Self>,
     {
-        iter.into_iter().reduce(|a, b| a + b).unwrap_or_default()
+        iter.reduce(|a, b| a + b).unwrap_or_default()
     }
 }
 
@@ -224,5 +224,13 @@ mod tests {
         b += a;
         let c: OnlineMeanVariance<f64> = [1.0, 2.0, 3.0, 4.0].into_iter().collect();
         assert_eq!(b, c);
+    }
+
+    #[test]
+    fn sum() {
+        let a: OnlineMeanVariance<f64> = [1.0, 2.0].into_iter().collect();
+        let b: OnlineMeanVariance<f64> = [3.0, 4.0].into_iter().collect();
+        let c: OnlineMeanVariance<f64> = [1.0, 2.0, 3.0, 4.0].into_iter().collect();
+        assert_eq!([a, b].into_iter().sum::<OnlineMeanVariance<_>>(), c);
     }
 }
