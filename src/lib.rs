@@ -15,11 +15,8 @@
 //! describing a set of possible values while methods are provided by other traits in
 //! [`spaces`](crate::spaces).
 //!
-//! Basic actor-environment simulation (without training) is performed by
-//! [`SimulatorSteps`](crate::simulation::SimulatorSteps).
-//! This is an iterator over partial [`Step`](crate::simulation::Step) and allows more
-//! complex iteration via
-//! [`SimulatorSteps::step_with`](crate::simulation::SimulatorSteps::step_with).
+//! Environment-actor simulation is performed by [`Steps`](crate::simulation::Steps) and the
+//! resulting [`Step`](crate::simulation::Step) are accessible via an `Iterator` interface.
 //! Training is performed by [`train_serial`](crate::simulation::train_serial) and
 //! [`train_parallel`](crate::simulation::train_parallel).
 //!

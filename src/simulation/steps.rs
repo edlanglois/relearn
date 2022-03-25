@@ -1,4 +1,4 @@
-use super::{PartialStep, SimSeed, TransientStep};
+use super::{PartialStep, SimSeed};
 use crate::agents::Actor;
 use crate::envs::{Environment, Successor};
 use crate::logging::{Loggable, StatsLogger};
@@ -69,15 +69,8 @@ where
     R: BorrowMut<Prng>,
     L: StatsLogger,
 {
-    /// Execute one environment step then evaluate a closure on the resulting state.
-    ///
-    /// Use this if you need to access (a reference to) the successor state
-    /// when the episode continues (a [`TransientStep`]).
-    /// Otherwise, use the `Iterator` interface that returns [`PartialStep`].
-    pub fn step_with<F, U>(&mut self, f: F) -> U
-    where
-        F: FnOnce(&mut E, &mut T, TransientStep<E::Observation, E::Action>, &mut L) -> U,
-    {
+    /// Advance to the next environment-actor step.
+    pub fn step(&mut self) -> PartialStep<E::Observation, E::Action> {
         // Extract the current environment and actor state.
         // If None then start a new episode.
         let (env_state, observation, mut actor_state) = match self.state.take() {
@@ -104,19 +97,20 @@ where
         // Store the next state and observation if the environment continues.
         // Collect the successor observation information (converting Continue into a reference)
         // for passing to the callback function.
-        assert!(self.state.is_none());
+        debug_assert!(self.state.is_none());
         let next = match successor {
             // Get the next state from `successor`.
             // Generate an observation and store both (along with actor_state) in `self.state`
             // so that we can use it on the next iteration.
             // Return a `Successor::Continue` that references the stored observation.
             Successor::Continue(next_state) => {
-                let state_ref = self.state.insert(EpisodeState {
+                self.state = Some(EpisodeState {
                     observation: self.env.observe(&next_state, self.rng_env.borrow_mut()),
                     env: next_state,
                     actor: actor_state,
                 });
-                Successor::Continue(&state_ref.observation)
+                // Note: Transient version would instead return Continue(&self.state.observation)
+                Successor::Continue(())
             }
             Successor::Terminate => Successor::Terminate,
             // If the environment is interrupted then we do not need to store the next state
@@ -126,16 +120,22 @@ where
             }
         };
 
-        let step = TransientStep {
+        PartialStep {
             observation,
             action,
             reward,
             next,
-        };
-
-        f(&mut self.env, &mut self.actor, step, &mut self.logger)
+        }
     }
+}
 
+impl<E, T, R, L> Steps<E, T, R, L>
+where
+    E: Environment,
+    T: Actor<E::Observation, E::Action>,
+    R: BorrowMut<Prng>,
+    L: StatsLogger,
+{
     pub fn with_step_logging(self) -> LoggedSteps<E, T, R, L> {
         LoggedSteps::new(self)
     }
@@ -153,7 +153,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.step_with(|_, _, s, _| s.into_partial()))
+        Some(self.step())
     }
 
     #[inline]
@@ -208,36 +208,35 @@ where
     type Item = PartialStep<E::Observation, E::Action>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.simulator.step_with(|_, _, step, logger| {
-            // Check for flushing only once per step.
-            let mut step_logger = logger.with_scope("step");
-            step_logger.log_scalar("reward", step.reward);
-            // TODO: Log action and observation
-            step_logger
+        let step = self.simulator.next()?;
+
+        let mut step_logger = (&mut self.simulator.logger).with_scope("step");
+        step_logger.log_scalar("reward", step.reward);
+        // TODO: Log action and observation
+        step_logger
+            .log_no_flush("count".into(), Loggable::CounterIncrement(1))
+            .unwrap();
+        self.episode_reward += step.reward;
+        self.episode_length += 1;
+        if step.next.episode_done() {
+            let mut episode_logger = (&mut self.simulator.logger).with_scope("episode");
+            episode_logger
+                .log_no_flush("reward".into(), Loggable::Scalar(self.episode_reward))
+                .unwrap();
+            episode_logger
+                .log_no_flush(
+                    "length".into(),
+                    Loggable::Scalar(self.episode_length as f64),
+                )
+                .unwrap();
+            episode_logger
                 .log_no_flush("count".into(), Loggable::CounterIncrement(1))
                 .unwrap();
-            self.episode_reward += step.reward;
-            self.episode_length += 1;
-            if step.next.episode_done() {
-                let mut episode_logger = logger.with_scope("episode");
-                episode_logger
-                    .log_no_flush("reward".into(), Loggable::Scalar(self.episode_reward))
-                    .unwrap();
-                episode_logger
-                    .log_no_flush(
-                        "length".into(),
-                        Loggable::Scalar(self.episode_length as f64),
-                    )
-                    .unwrap();
-                episode_logger
-                    .log_no_flush("count".into(), Loggable::CounterIncrement(1))
-                    .unwrap();
-                self.episode_reward = 0.0;
-                self.episode_length = 0;
-            }
+            self.episode_reward = 0.0;
+            self.episode_length = 0;
+        }
 
-            step.into_partial()
-        }))
+        Some(step)
     }
 
     #[inline]
