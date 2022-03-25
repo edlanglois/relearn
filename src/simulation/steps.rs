@@ -1,7 +1,7 @@
-use super::{PartialStep, SimSeed};
+use super::{PartialStep, SimSeed, Simulation};
 use crate::agents::Actor;
 use crate::envs::{Environment, Successor};
-use crate::logging::{Loggable, StatsLogger};
+use crate::logging::StatsLogger;
 use crate::Prng;
 use rand::{Rng, SeedableRng};
 use std::borrow::BorrowMut;
@@ -59,6 +59,45 @@ where
             logger,
             state: None,
         }
+    }
+}
+
+impl<E, T, R, L> Simulation for Steps<E, T, R, L>
+where
+    E: Environment,
+    T: Actor<E::Observation, E::Action>,
+    R: BorrowMut<Prng>,
+    L: StatsLogger,
+{
+    type Observation = E::Observation;
+    type Action = E::Action;
+    type Environment = E;
+    type Actor = T;
+    type Logger = L;
+
+    #[inline]
+    fn env(&self) -> &Self::Environment {
+        &self.env
+    }
+    #[inline]
+    fn env_mut(&mut self) -> &mut Self::Environment {
+        &mut self.env
+    }
+    #[inline]
+    fn actor(&self) -> &Self::Actor {
+        &self.actor
+    }
+    #[inline]
+    fn actor_mut(&mut self) -> &mut Self::Actor {
+        &mut self.actor
+    }
+    #[inline]
+    fn logger(&self) -> &Self::Logger {
+        &self.logger
+    }
+    #[inline]
+    fn logger_mut(&mut self) -> &mut Self::Logger {
+        &mut self.logger
     }
 }
 
@@ -129,18 +168,6 @@ where
     }
 }
 
-impl<E, T, R, L> Steps<E, T, R, L>
-where
-    E: Environment,
-    T: Actor<E::Observation, E::Action>,
-    R: BorrowMut<Prng>,
-    L: StatsLogger,
-{
-    pub fn with_step_logging(self) -> LoggedSteps<E, T, R, L> {
-        LoggedSteps::new(self)
-    }
-}
-
 impl<E, T, R, L> Iterator for Steps<E, T, R, L>
 where
     E: Environment,
@@ -163,85 +190,11 @@ where
     }
 }
 
-impl<E, A, R, L> FusedIterator for Steps<E, A, R, L>
-where
-    E: Environment,
-    A: Actor<E::Observation, E::Action>,
-    R: BorrowMut<Prng>,
-    L: StatsLogger,
-{
-}
-
-/// Simulator steps with logging
-pub struct LoggedSteps<E, T, R, L>
-where
-    E: Environment,
-    T: Actor<E::Observation, E::Action>,
-{
-    simulator: Steps<E, T, R, L>,
-    episode_reward: f64,
-    episode_length: u64,
-}
-
-impl<E, T, R, L> LoggedSteps<E, T, R, L>
-where
-    E: Environment,
-    T: Actor<E::Observation, E::Action>,
-{
-    pub fn new(simulator: Steps<E, T, R, L>) -> Self {
-        Self {
-            simulator,
-            episode_reward: 0.0,
-            episode_length: 0,
-        }
-    }
-}
-
-impl<E, T, R, L> Iterator for LoggedSteps<E, T, R, L>
+impl<E, T, R, L> FusedIterator for Steps<E, T, R, L>
 where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
     R: BorrowMut<Prng>,
     L: StatsLogger,
 {
-    /// Cannot return a `TransientStep` without Generic Associated Types
-    type Item = PartialStep<E::Observation, E::Action>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let step = self.simulator.next()?;
-
-        let mut step_logger = (&mut self.simulator.logger).with_scope("step");
-        step_logger.log_scalar("reward", step.reward);
-        // TODO: Log action and observation
-        step_logger
-            .log_no_flush("count".into(), Loggable::CounterIncrement(1))
-            .unwrap();
-        self.episode_reward += step.reward;
-        self.episode_length += 1;
-        if step.next.episode_done() {
-            let mut episode_logger = (&mut self.simulator.logger).with_scope("episode");
-            episode_logger
-                .log_no_flush("reward".into(), Loggable::Scalar(self.episode_reward))
-                .unwrap();
-            episode_logger
-                .log_no_flush(
-                    "length".into(),
-                    Loggable::Scalar(self.episode_length as f64),
-                )
-                .unwrap();
-            episode_logger
-                .log_no_flush("count".into(), Loggable::CounterIncrement(1))
-                .unwrap();
-            self.episode_reward = 0.0;
-            self.episode_length = 0;
-        }
-
-        Some(step)
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        // infinite
-        (usize::MAX, None)
-    }
 }

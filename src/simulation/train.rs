@@ -1,4 +1,4 @@
-use super::{OnlineStepsSummary, Steps, StepsSummary};
+use super::{OnlineStepsSummary, Simulation, Steps, StepsSummary};
 use crate::agents::{ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
 use crate::envs::Environment;
 use crate::logging::StatsLogger;
@@ -29,7 +29,7 @@ pub fn train_serial<T, E>(
                 &mut *rng_agent,
                 &mut *logger,
             )
-            .with_step_logging(),
+            .log(),
         );
         assert!(ready);
         agent.batch_update_single(&mut buffer, logger);
@@ -103,7 +103,7 @@ pub fn train_parallel<T, E>(
                             &mut rngs.1,
                             thread_logger.unwrap_or(&mut ()),
                         )
-                        .with_step_logging()
+                        .log()
                         .map(|step| {
                             summary.push(&step);
                             step

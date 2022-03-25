@@ -1,15 +1,19 @@
 //! Simulating agent-environment interaction
+mod log_steps;
 mod steps;
 mod summary;
 mod take_episodes;
 mod train;
 
+pub use log_steps::LogSteps;
 pub use steps::Steps;
 pub use summary::{OnlineStepsSummary, StepsSummary};
 pub use take_episodes::TakeEpisodes;
 pub use train::{train_parallel, train_serial, TrainParallelConfig};
 
-use crate::envs::Successor;
+use crate::agents::Actor;
+use crate::envs::{Environment, Successor};
+use crate::logging::StatsLogger;
 use rand::{Rng, SeedableRng};
 
 /// Description of an environment step.
@@ -53,20 +57,6 @@ impl<O, A, U> Step<O, A, U> {
         }
     }
 }
-
-/// Trait for simulation step iterators.
-pub trait StepsIter<O, A>: Iterator<Item = PartialStep<O, A>> {
-    /// Creates an iterator that yields steps from the first `n` episodes.
-    #[inline]
-    fn take_episodes(self, n: usize) -> TakeEpisodes<Self>
-    where
-        Self: Sized,
-    {
-        TakeEpisodes::new(self, n)
-    }
-}
-
-impl<T, O, A> StepsIter<O, A> for T where T: Iterator<Item = PartialStep<O, A>> {}
 
 /// Description of an environment step where the successor observation is borrowed.
 pub type TransientStep<'a, O, A> = Step<O, A, &'a O>;
@@ -115,5 +105,44 @@ impl SimSeed {
             }
             SimSeed::Individual { env, agent } => (R::seed_from_u64(env), R::seed_from_u64(agent)),
         }
+    }
+}
+
+/// An iterator of simulation steps.
+pub trait StepsIter<O, A>: Iterator<Item = PartialStep<O, A>> {
+    /// Creates an iterator that yields steps from the first `n` episodes.
+    #[inline]
+    fn take_episodes(self, n: usize) -> TakeEpisodes<Self>
+    where
+        Self: Sized,
+    {
+        TakeEpisodes::new(self, n)
+    }
+}
+
+impl<T, O, A> StepsIter<O, A> for T where T: Iterator<Item = PartialStep<O, A>> {}
+
+/// An environment-actor simulation
+pub trait Simulation: StepsIter<Self::Observation, Self::Action> {
+    type Observation;
+    type Action;
+    type Environment: Environment<Observation = Self::Observation, Action = Self::Action>;
+    type Actor: Actor<Self::Observation, Self::Action>;
+    type Logger: StatsLogger;
+
+    fn env(&self) -> &Self::Environment;
+    fn env_mut(&mut self) -> &mut Self::Environment;
+    fn actor(&self) -> &Self::Actor;
+    fn actor_mut(&mut self) -> &mut Self::Actor;
+    fn logger(&self) -> &Self::Logger;
+    fn logger_mut(&mut self) -> &mut Self::Logger;
+
+    #[inline]
+    /// Creates an iterator that logs each step
+    fn log(self) -> LogSteps<Self>
+    where
+        Self: Sized,
+    {
+        LogSteps::new(self)
     }
 }

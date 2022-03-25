@@ -1,4 +1,4 @@
-use super::PartialStep;
+use super::{PartialStep, Simulation};
 use std::iter::FusedIterator;
 
 /// An iterator that iterates over the first `n` episodes of `steps`.
@@ -12,6 +12,42 @@ impl<I> TakeEpisodes<I> {
     #[inline]
     pub const fn new(steps: I, n: usize) -> Self {
         Self { steps, n }
+    }
+}
+
+impl<I> Simulation for TakeEpisodes<I>
+where
+    I: Simulation,
+{
+    type Observation = I::Observation;
+    type Action = I::Action;
+    type Environment = I::Environment;
+    type Actor = I::Actor;
+    type Logger = I::Logger;
+
+    #[inline]
+    fn env(&self) -> &Self::Environment {
+        self.steps.env()
+    }
+    #[inline]
+    fn env_mut(&mut self) -> &mut Self::Environment {
+        self.steps.env_mut()
+    }
+    #[inline]
+    fn actor(&self) -> &Self::Actor {
+        self.steps.actor()
+    }
+    #[inline]
+    fn actor_mut(&mut self) -> &mut Self::Actor {
+        self.steps.actor_mut()
+    }
+    #[inline]
+    fn logger(&self) -> &Self::Logger {
+        self.steps.logger()
+    }
+    #[inline]
+    fn logger_mut(&mut self) -> &mut Self::Logger {
+        self.steps.logger_mut()
     }
 }
 
