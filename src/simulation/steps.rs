@@ -1,4 +1,4 @@
-use super::{PartialStep, TransientStep};
+use super::{PartialStep, SimSeed, TransientStep};
 use crate::agents::Actor;
 use crate::envs::{Environment, Successor};
 use crate::logging::{Loggable, StatsLogger};
@@ -31,34 +31,6 @@ struct EpisodeState<ES, O, TS> {
     env: ES,
     observation: O,
     actor: TS,
-}
-
-/// Seed for simulation pseudo-random state.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum SimSeed {
-    /// Use a random seed derived from system entropy
-    Random,
-    /// A root seed from which both the environment and agent random states are derived.
-    Root(u64),
-    /// Individual seeds for the environment and agent random states.
-    Individual { env: u64, agent: u64 },
-}
-
-impl SimSeed {
-    /// Derive random number generators from this seed.
-    fn derive_rngs<R: Rng + SeedableRng>(self) -> (R, R) {
-        match self {
-            SimSeed::Random => (R::from_entropy(), R::from_entropy()),
-            SimSeed::Root(seed) => {
-                let mut env_rng = R::seed_from_u64(seed);
-                // For arbitrary R, R::from_rng might produce a PRNG correlated with
-                // the original. Use the slower R::seed_from_u64 instead to ensure independence.
-                let agent_rng = R::seed_from_u64(env_rng.gen());
-                (env_rng, agent_rng)
-            }
-            SimSeed::Individual { env, agent } => (R::seed_from_u64(env), R::seed_from_u64(agent)),
-        }
-    }
 }
 
 impl<E, T, R, L> SimulatorSteps<E, T, R, L>
