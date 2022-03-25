@@ -1,6 +1,7 @@
 use super::{PartialStep, Simulation};
 use crate::logging::{Loggable, StatsLogger};
 use serde::{Deserialize, Serialize};
+use std::iter::FusedIterator;
 
 /// Simulation steps with logging.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
@@ -99,3 +100,15 @@ where
         self.steps.size_hint()
     }
 }
+
+impl<S> ExactSizeIterator for LogSteps<S>
+where
+    S: Simulation + ExactSizeIterator,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.steps.len()
+    }
+}
+
+impl<S> FusedIterator for LogSteps<S> where S: Simulation + FusedIterator {}
