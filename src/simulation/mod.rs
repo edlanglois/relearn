@@ -110,6 +110,15 @@ impl SimSeed {
 
 /// An iterator of simulation steps.
 pub trait StepsIter<O, A>: Iterator<Item = PartialStep<O, A>> {
+    /// Consume all steps and produce a summary of the step statistics.
+    #[inline]
+    fn summarize(self) -> StepsSummary
+    where
+        Self: Sized,
+    {
+        self.collect()
+    }
+
     /// Creates an iterator that yields steps from the first `n` episodes.
     #[inline]
     fn take_episodes(self, n: usize) -> TakeEpisodes<Self>

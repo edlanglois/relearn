@@ -4,7 +4,7 @@ use relearn::envs::{
     BuildEnv, Environment, FirstPlayerView, FruitGame, VisibleStepLimit, WithVisibleStepLimit,
 };
 use relearn::logging::DisplayLogger;
-use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
+use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfig};
 use relearn::torch::{
     agents::{
         critic::GaeConfig, learning_critic::GradOptConfig, learning_policy::PpoConfig,
@@ -39,10 +39,10 @@ fn main() {
     let mut logger: DisplayLogger = DisplayLogger::default();
 
     {
-        let summary: StepsSummary = env
+        let summary = env
             .run(&agent.actor(ActorMode::Evaluation), SimSeed::Root(0), ())
             .take(10_000)
-            .collect();
+            .summarize();
         println!("Initial Stats\n{}", summary);
     }
 
@@ -55,9 +55,9 @@ fn main() {
         &mut logger,
     );
 
-    let summary: StepsSummary = env
+    let summary = env
         .run(&agent.actor(ActorMode::Evaluation), SimSeed::Root(0), ())
         .take(10_000)
-        .collect();
+        .summarize();
     println!("\nFinal Stats\n{}", summary);
 }

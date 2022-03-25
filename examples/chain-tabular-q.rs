@@ -2,7 +2,7 @@ use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent, TabularQLearningAgentConfig};
 use relearn::envs::{BuildEnv, Chain, Environment};
 use relearn::logging::{ByCounter, DisplayLogger};
-use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
+use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfig};
 use relearn::Prng;
 
 fn main() {
@@ -20,10 +20,10 @@ fn main() {
     let mut agent = agent_config.build_agent(&env, &mut rng).unwrap();
 
     {
-        let summary: StepsSummary = env
+        let summary = env
             .run(&agent.actor(ActorMode::Evaluation), SimSeed::Root(0), ())
             .take(10_000)
-            .collect();
+            .summarize();
         println!("Initial Stats\n{:.3}", summary);
     }
 
@@ -41,9 +41,9 @@ fn main() {
         );
     }
 
-    let summary: StepsSummary = env
+    let summary = env
         .run(&agent.actor(ActorMode::Evaluation), SimSeed::Root(0), ())
         .take(10_000)
-        .collect();
+        .summarize();
     println!("\nFinal Stats\n{:.3}", summary);
 }

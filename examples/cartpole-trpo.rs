@@ -3,7 +3,7 @@ use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent};
 use relearn::envs::{CartPole, EnvStructure, Environment, WithVisibleStepLimit};
 use relearn::logging::{ByCounter, DisplayLogger, TensorBoardLogger};
-use relearn::simulation::{train_parallel, SimSeed, StepsSummary, TrainParallelConfig};
+use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfig};
 use relearn::torch::agents::{
     critic::GaeConfig, learning_critic::GradOptConfig, learning_policy::TrpoConfig,
     ActorCriticConfig,
@@ -82,8 +82,10 @@ fn main() {
             >>::Agent as Agent<_, _>>::Actor =
                 serde_cbor::from_reader(File::open(&actor_path).unwrap()).unwrap();
 
-            let summary: StepsSummary =
-                env.run(&actor, SimSeed::Root(0), ()).take(10_000).collect();
+            let summary = env
+                .run(&actor, SimSeed::Root(0), ())
+                .take(10_000)
+                .summarize();
             println!("\nEvaluation Stats\n{:.3}", summary);
         }
         _ => eprintln!("Usage: {} [saved_agent_file]", args[0]),
