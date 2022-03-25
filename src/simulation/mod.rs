@@ -12,7 +12,7 @@ pub use take_episodes::TakeEpisodes;
 pub use train::{train_parallel, train_serial, TrainParallelConfig};
 
 use crate::agents::Actor;
-use crate::envs::{Environment, Successor};
+use crate::envs::{EnvStructure, Environment, StructuredEnvironment, Successor};
 use crate::logging::StatsLogger;
 use rand::{Rng, SeedableRng};
 
@@ -148,8 +148,15 @@ pub trait Simulation: StepsIter<Self::Observation, Self::Action> {
 
     #[inline]
     /// Creates an iterator that logs each step
-    fn log(self) -> LogSteps<Self>
+    fn log(
+        self,
+    ) -> LogSteps<
+        Self,
+        <Self::Environment as EnvStructure>::ObservationSpace,
+        <Self::Environment as EnvStructure>::ActionSpace,
+    >
     where
+        Self::Environment: StructuredEnvironment,
         Self: Sized,
     {
         LogSteps::new(self)

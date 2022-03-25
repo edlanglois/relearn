@@ -1,7 +1,8 @@
 use super::{OnlineStepsSummary, Simulation, Steps, StepsSummary};
 use crate::agents::{ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
-use crate::envs::Environment;
-use crate::logging::StatsLogger;
+use crate::envs::{EnvStructure, Environment, StructuredEnvironment};
+use crate::logging::{Loggable, StatsLogger};
+use crate::spaces::{ElementRefInto, Space};
 use crate::Prng;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
@@ -17,7 +18,9 @@ pub fn train_serial<T, E>(
     logger: &mut dyn StatsLogger,
 ) where
     T: Agent<E::Observation, E::Action> + ?Sized,
-    E: Environment + ?Sized,
+    E: StructuredEnvironment + ?Sized,
+    E::ObservationSpace: ElementRefInto<Loggable>,
+    E::ActionSpace: ElementRefInto<Loggable>,
 {
     let mut buffer = agent.buffer(agent.batch_size_hint());
     for _ in 0..num_periods {
@@ -59,10 +62,18 @@ pub fn train_parallel<T, E>(
     rng_agent: &mut Prng,
     logger: &mut dyn StatsLogger,
 ) where
-    E: Environment + Sync + ?Sized,
-    T: Agent<E::Observation, E::Action> + ?Sized,
+    // TODO: Why does the simpler bound work for train_serial but not here?
+    E: EnvStructure
+        + Environment<
+            Observation = <E::ObservationSpace as Space>::Element,
+            Action = <E::ActionSpace as Space>::Element,
+        > + Sync
+        + ?Sized,
+    T: Agent<<E::ObservationSpace as Space>::Element, <E::ActionSpace as Space>::Element> + ?Sized,
     T::Actor: Send,
     T::HistoryBuffer: Send,
+    E::ObservationSpace: ElementRefInto<Loggable>,
+    E::ActionSpace: ElementRefInto<Loggable>,
 {
     let capacity = agent
         .batch_size_hint()
