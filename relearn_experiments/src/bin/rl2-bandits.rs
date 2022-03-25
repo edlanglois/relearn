@@ -10,7 +10,7 @@ use relearn::envs::{
 };
 use relearn::logging::{ByCounter, DisplayLogger, StatsLogger, TensorBoardLogger};
 use relearn::simulation::{train_parallel, TrainParallelConfig};
-use relearn::simulation::{SimulatorSteps, StepsIter, StepsSummary};
+use relearn::simulation::{Steps, StepsIter, StepsSummary};
 use relearn::spaces::{IndexSpace, NonEmptySpace, SingletonSpace, Space};
 use relearn::torch::{
     agents::{
@@ -243,7 +243,7 @@ where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
 {
-    SimulatorSteps::new(env, actor, rng_env, rng_actor, ())
+    Steps::new(env, actor, rng_env, rng_actor, ())
         .take_episodes(num_episodes)
         .collect()
 }

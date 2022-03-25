@@ -1,4 +1,4 @@
-use super::{OnlineStepsSummary, SimulatorSteps, StepsSummary};
+use super::{OnlineStepsSummary, Steps, StepsSummary};
 use crate::agents::{ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
 use crate::envs::Environment;
 use crate::logging::StatsLogger;
@@ -22,7 +22,7 @@ pub fn train_serial<T, E>(
     let mut buffer = agent.buffer(agent.batch_size_hint());
     for _ in 0..num_periods {
         let ready = buffer.extend_until_ready(
-            SimulatorSteps::new(
+            Steps::new(
                 environment,
                 agent.actor(ActorMode::Training),
                 &mut *rng_env,
@@ -96,7 +96,7 @@ pub fn train_parallel<T, E>(
                 threads.push(scope.spawn(move |_scope| {
                     let mut summary = OnlineStepsSummary::default();
                     let ready = buffer.extend_until_ready(
-                        SimulatorSteps::new(
+                        Steps::new(
                             environment,
                             actor,
                             &mut rngs.0,

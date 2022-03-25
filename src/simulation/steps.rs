@@ -12,7 +12,7 @@ use std::iter::FusedIterator;
 /// Uses separate PRNGs for the environment and actor so that a change in one will not affect the
 /// other.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct SimulatorSteps<E, T, R, L>
+pub struct Steps<E, T, R, L>
 where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
@@ -33,7 +33,7 @@ struct EpisodeState<ES, O, TS> {
     actor: TS,
 }
 
-impl<E, T, R, L> SimulatorSteps<E, T, R, L>
+impl<E, T, R, L> Steps<E, T, R, L>
 where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
@@ -45,7 +45,7 @@ where
     }
 }
 
-impl<E, T, R, L> SimulatorSteps<E, T, R, L>
+impl<E, T, R, L> Steps<E, T, R, L>
 where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
@@ -62,7 +62,7 @@ where
     }
 }
 
-impl<E, T, R, L> SimulatorSteps<E, T, R, L>
+impl<E, T, R, L> Steps<E, T, R, L>
 where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
@@ -136,12 +136,12 @@ where
         f(&mut self.env, &mut self.actor, step, &mut self.logger)
     }
 
-    pub fn with_step_logging(self) -> LoggedSimulatorSteps<E, T, R, L> {
-        LoggedSimulatorSteps::new(self)
+    pub fn with_step_logging(self) -> LoggedSteps<E, T, R, L> {
+        LoggedSteps::new(self)
     }
 }
 
-impl<E, T, R, L> Iterator for SimulatorSteps<E, T, R, L>
+impl<E, T, R, L> Iterator for Steps<E, T, R, L>
 where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
@@ -163,7 +163,7 @@ where
     }
 }
 
-impl<E, A, R, L> FusedIterator for SimulatorSteps<E, A, R, L>
+impl<E, A, R, L> FusedIterator for Steps<E, A, R, L>
 where
     E: Environment,
     A: Actor<E::Observation, E::Action>,
@@ -173,22 +173,22 @@ where
 }
 
 /// Simulator steps with logging
-pub struct LoggedSimulatorSteps<E, T, R, L>
+pub struct LoggedSteps<E, T, R, L>
 where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
 {
-    simulator: SimulatorSteps<E, T, R, L>,
+    simulator: Steps<E, T, R, L>,
     episode_reward: f64,
     episode_length: u64,
 }
 
-impl<E, T, R, L> LoggedSimulatorSteps<E, T, R, L>
+impl<E, T, R, L> LoggedSteps<E, T, R, L>
 where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
 {
-    pub fn new(simulator: SimulatorSteps<E, T, R, L>) -> Self {
+    pub fn new(simulator: Steps<E, T, R, L>) -> Self {
         Self {
             simulator,
             episode_reward: 0.0,
@@ -197,7 +197,7 @@ where
     }
 }
 
-impl<E, T, R, L> Iterator for LoggedSimulatorSteps<E, T, R, L>
+impl<E, T, R, L> Iterator for LoggedSteps<E, T, R, L>
 where
     E: Environment,
     T: Actor<E::Observation, E::Action>,

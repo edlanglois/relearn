@@ -4,7 +4,7 @@ mod summary;
 mod take_episodes;
 mod train;
 
-pub use steps::SimulatorSteps;
+pub use steps::Steps;
 pub use summary::{OnlineStepsSummary, StepsSummary};
 pub use take_episodes::TakeEpisodes;
 pub use train::{train_parallel, train_serial, TrainParallelConfig};

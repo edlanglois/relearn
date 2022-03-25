@@ -30,7 +30,7 @@ pub use wrappers::{
 
 use crate::agents::Actor;
 use crate::logging::StatsLogger;
-use crate::simulation::{SimSeed, SimulatorSteps};
+use crate::simulation::{SimSeed, Steps};
 use crate::spaces::Space;
 use crate::Prng;
 use serde::{Deserialize, Serialize};
@@ -127,13 +127,13 @@ pub trait Environment {
     ) -> (Successor<Self::State>, f64);
 
     /// Run this environment with the given actor.
-    fn run<T, L>(self, actor: T, seed: SimSeed, logger: L) -> SimulatorSteps<Self, T, Prng, L>
+    fn run<T, L>(self, actor: T, seed: SimSeed, logger: L) -> Steps<Self, T, Prng, L>
     where
         T: Actor<Self::Observation, Self::Action>,
         L: StatsLogger,
         Self: Sized,
     {
-        SimulatorSteps::new_seeded(self, actor, seed, logger)
+        Steps::new_seeded(self, actor, seed, logger)
     }
 
     /// Wrap the environment in an episode step limit without changing the observation space.
