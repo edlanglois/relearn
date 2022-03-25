@@ -1,5 +1,5 @@
 use super::{PartialStep, Simulation};
-use crate::logging::{Loggable, StatsLogger};
+use crate::logging::StatsLogger;
 use serde::{Deserialize, Serialize};
 use std::iter::FusedIterator;
 
@@ -66,28 +66,18 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let step = self.steps.next()?;
 
-        let mut step_logger = self.steps.logger_mut().with_scope("step");
+        let mut group = self.steps.logger_mut().group();
+        let mut step_logger = (&mut group).with_scope("step");
         step_logger.log_scalar("reward", step.reward);
         // TODO: Log action and observation
-        step_logger
-            .log_no_flush("count".into(), Loggable::CounterIncrement(1))
-            .unwrap();
+        step_logger.log_counter_increment("count", 1);
         self.episode_reward += step.reward;
         self.episode_length += 1;
         if step.next.episode_done() {
-            let mut episode_logger = self.steps.logger_mut().with_scope("episode");
-            episode_logger
-                .log_no_flush("reward".into(), Loggable::Scalar(self.episode_reward))
-                .unwrap();
-            episode_logger
-                .log_no_flush(
-                    "length".into(),
-                    Loggable::Scalar(self.episode_length as f64),
-                )
-                .unwrap();
-            episode_logger
-                .log_no_flush("count".into(), Loggable::CounterIncrement(1))
-                .unwrap();
+            let mut episode_logger = group.with_scope("episode");
+            episode_logger.log_scalar("reward", self.episode_reward);
+            episode_logger.log_scalar("length", self.episode_length as f64);
+            episode_logger.log_counter_increment("count", 1);
             self.episode_reward = 0.0;
             self.episode_length = 0;
         }

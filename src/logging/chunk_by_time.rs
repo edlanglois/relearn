@@ -1,7 +1,5 @@
-use super::chunk::{ChunkSummary, Chunker, Flush, Node};
-use super::{Id, Loggable};
+use super::chunk::Chunker;
 use coarsetime::{Duration as CDuration, Instant as CInstant};
-use std::collections::BTreeMap;
 use std::time::Duration;
 
 /// Chunk summaries at fixed time intervals (for [`ChunkLogger`][super::ChunkLogger]).
@@ -30,28 +28,16 @@ impl Default for ByTime {
     }
 }
 
-pub enum Unreachable {}
-
 impl Chunker for ByTime {
-    type Context = Unreachable;
-
-    fn flush_pre_log(&self, _: &BTreeMap<Id, Node>, _: &Id, _: &Loggable) -> Flush<Self::Context> {
+    #[inline]
+    fn flush_group_start(&mut self) -> bool {
         // Check whether the chunk duration has elapsed.
         // This is done before logging because logs are likely to occur in bursts with the duration
         // elapsing in between. Logging first would cause the first value of the burst to be split
         // into a separate chunk from the rest.
-        if self.coarse_chunk_start.elapsed() > self.chunk_duration {
-            Flush::PreLog
-        } else {
-            Flush::No
-        }
+        self.coarse_chunk_start.elapsed() > self.chunk_duration
     }
-
-    fn flush_post_log(&self, _: Self::Context, _: &ChunkSummary) -> bool {
-        unreachable!()
-    }
-
-    fn flushed(&mut self) {
+    fn note_flush(&mut self) {
         self.coarse_chunk_start = CInstant::now();
     }
 }

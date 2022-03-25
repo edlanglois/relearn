@@ -54,10 +54,12 @@ where
             let loss = f64::from(optimizer.backward_step(&loss_fn, logger).unwrap());
             let critic_opt_end = Instant::now();
 
-            let mut step_logger = logger.with_scope("step");
+            let mut step_logger = logger.with_scope("step").group();
             step_logger.log_scalar("loss", loss);
             step_logger.log_counter_increment("count", 1);
             step_logger.log_duration("time", critic_opt_end - critic_opt_start);
+            drop(step_logger);
+
             critic_opt_start = critic_opt_end;
 
             if i == 0 {

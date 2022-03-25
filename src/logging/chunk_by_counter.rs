@@ -1,6 +1,5 @@
-use super::chunk::{ChunkSummary, Chunker, Flush, Node};
+use super::chunk::{ChunkSummary, Chunker};
 use super::{Id, Loggable};
-use std::collections::BTreeMap;
 
 /// Chunk summaries at fixed multiples of a counter (for [`ChunkLogger`][super::ChunkLogger]).
 ///
@@ -13,44 +12,69 @@ pub struct ByCounter {
     pub counter: Id,
     /// Chunk length in terms of the counter.
     pub interval: u64,
+    state: State,
 }
 
 impl ByCounter {
     pub const fn new(counter: Id, interval: u64) -> Self {
-        Self { counter, interval }
+        Self {
+            counter,
+            interval,
+            state: State::NoFlush,
+        }
     }
 
     pub fn of_path<T: IntoIterator<Item = &'static str>>(path: T, interval: u64) -> Self {
-        Self {
-            counter: Id::from_iter(path),
-            interval,
-        }
+        Self::new(Id::from_iter(path), interval)
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+enum State {
+    NoFlush,
+    IdMatch,
+    Flush,
+}
+
 impl Chunker for ByCounter {
-    /// Whether the ID matches counter
-    type Context = bool;
-
-    fn flush_pre_log(&self, _: &BTreeMap<Id, Node>, id: &Id, _: &Loggable) -> Flush<Self::Context> {
-        Flush::MaybePostLog(&self.counter == id)
-    }
-
-    fn flush_post_log(&self, is_counter: Self::Context, updated: &ChunkSummary) -> bool {
-        if !is_counter {
-            return false;
-        }
-        if let ChunkSummary::Counter {
-            increment,
-            initial_value,
-        } = updated
-        {
-            // The increment is > 0 in most cases anyway so displaying on 0 shouldn't be a big risk
-            (increment + initial_value) % self.interval == 0
-        } else {
-            panic!("Target ID {} is not a counter", self.counter);
+    #[inline]
+    fn note_log(&mut self, id: &Id, _: &Loggable) {
+        debug_assert!(
+            matches!(self.state, State::NoFlush | State::Flush),
+            "note_log following note_log without note_log_summary in between"
+        );
+        if matches!(self.state, State::NoFlush) && &self.counter == id {
+            self.state = State::IdMatch;
         }
     }
 
-    fn flushed(&mut self) {}
+    #[inline]
+    fn note_log_summary(&mut self, summary: &ChunkSummary) {
+        if matches!(self.state, State::IdMatch) {
+            if let ChunkSummary::Counter {
+                increment,
+                initial_value,
+            } = summary
+            {
+                // The increment is > 0 in most cases anyway so flush on 0 shouldn't be a big risk
+                if (increment + initial_value) % self.interval == 0 {
+                    self.state = State::Flush;
+                } else {
+                    self.state = State::NoFlush;
+                }
+            } else {
+                panic!("Target ID {} is not a counter", self.counter);
+            }
+        }
+    }
+
+    #[inline]
+    fn flush_group_end(&mut self) -> bool {
+        matches!(self.state, State::Flush)
+    }
+
+    #[inline]
+    fn note_flush(&mut self) {
+        self.state = State::NoFlush;
+    }
 }

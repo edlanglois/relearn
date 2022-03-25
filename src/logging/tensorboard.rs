@@ -19,12 +19,16 @@ impl<C: Chunker> TensorBoardLogger<C> {
 
 impl<C: Chunker> StatsLogger for TensorBoardLogger<C> {
     #[inline]
-    fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
-        self.0.log(id, value)
+    fn group_start(&mut self) {
+        self.0.group_start()
     }
     #[inline]
-    fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
-        self.0.log_no_flush(id, value)
+    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+        self.0.group_log(id, value)
+    }
+    #[inline]
+    fn group_end(&mut self) {
+        self.0.group_end()
     }
     #[inline]
     fn flush(&mut self) {

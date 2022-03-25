@@ -121,7 +121,7 @@ pub fn train_parallel<T, E>(
         })
         .unwrap();
 
-        let mut sim_logger = logger.with_scope("sim");
+        let mut sim_logger = logger.with_scope("sim").group();
         let mut episode_logger = (&mut sim_logger).with_scope("ep");
         let num_episodes = summary.episode_length.count();
         if num_episodes > 0 {
@@ -140,10 +140,11 @@ pub fn train_parallel<T, E>(
         step_logger.log_counter_increment("count", num_steps);
         let update_start = Instant::now();
         sim_logger.log_duration("time", update_start - collect_start);
+        drop(sim_logger);
 
         agent.batch_update_slice(&mut buffers, &mut *logger);
 
-        let mut agent_logger = logger.with_scope("agent_update");
+        let mut agent_logger = logger.with_scope("agent_update").group();
         agent_logger.log_duration("time", update_start.elapsed());
         agent_logger.log_counter_increment("count", 1);
     }

@@ -7,39 +7,26 @@ use std::time::{Duration, Instant};
 
 /// Control the aggregation of logs into summaries and summaries into chunks.
 pub trait Chunker: Send {
-    /// Saved context for deciding whether to log post-flush
+    /// Start a new log group and decided whether to flush.
+    #[inline]
+    fn flush_group_start(&mut self) -> bool {
+        false
+    }
+    /// Note an entry to be logged
+    #[inline]
+    fn note_log(&mut self, _id: &Id, _value: &Loggable) {}
+    /// Note the value of the resulting post-log summary.
     ///
-    /// # Design Note
-    /// This complexity is necesary because Rust does not provide a way to get a reference to the
-    /// key after insertion so `flush_post_log` would not otherwise be able to depend on the value
-    /// of `Id` (without cloning Id).
-    /// See <https://stackoverflow.com/questions/32401857>
-    type Context;
-
-    /// Decide whether to flush the current chunk before the given value is added to the summary.
-    fn flush_pre_log(
-        &self,
-        summaries: &BTreeMap<Id, Node>,
-        id: &Id,
-        value: &Loggable,
-    ) -> Flush<Self::Context>;
-
-    /// Decide whether to flush the current chunk after the value has been added to the summary.
-    fn flush_post_log(&self, context: Self::Context, updated: &ChunkSummary) -> bool;
-
+    /// Must immediately follow the corresponding value of `note_log`.
+    #[inline]
+    fn note_log_summary(&mut self, _summary: &ChunkSummary) {}
+    /// End the current group and decide whether to flush.
+    #[inline]
+    fn flush_group_end(&mut self) -> bool {
+        false
+    }
     /// Indicate that the current chunk has been flushed
-    fn flushed(&mut self);
-}
-
-/// When and whether to flush the current chunk.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum Flush<T> {
-    /// Do not flush
-    No,
-    /// Flush before logging
-    PreLog,
-    /// Maybe flush after logging, determined by [`Chunker::flush_post_log`].
-    MaybePostLog(T),
+    fn note_flush(&mut self);
 }
 
 /// Write out summaries to a backend.
@@ -82,11 +69,14 @@ impl<C: Chunker + Default, W: SummaryWriter + Default> Default for ChunkLogger<C
 }
 
 impl<C: Chunker, W: SummaryWriter> StatsLogger for ChunkLogger<C, W> {
-    fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
-        let flush_request = self.chunker.flush_pre_log(&self.summaries, &id, &value);
-        if matches!(flush_request, Flush::PreLog) {
+    fn group_start(&mut self) {
+        if self.chunker.flush_group_start() {
             self.flush();
         }
+    }
+
+    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+        self.chunker.note_log(&id, &value);
 
         let node = match self.summaries.entry(id) {
             Entry::Vacant(e) => e.insert(Node::new(value.into())),
@@ -97,24 +87,15 @@ impl<C: Chunker, W: SummaryWriter> StatsLogger for ChunkLogger<C, W> {
             }
         };
 
-        if let Flush::MaybePostLog(context) = flush_request {
-            if self.chunker.flush_post_log(context, &node.summary) {
-                self.flush()
-            }
-        }
+        self.chunker.note_log_summary(&node.summary);
+
         Ok(())
     }
 
-    fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
-        match self.summaries.entry(id) {
-            Entry::Vacant(e) => {
-                e.insert(Node::new(value.into()));
-            }
-            Entry::Occupied(e) => {
-                e.into_mut().push(value)?;
-            }
-        };
-        Ok(())
+    fn group_end(&mut self) {
+        if self.chunker.flush_group_end() {
+            self.flush()
+        }
     }
 
     fn flush(&mut self) {
@@ -134,7 +115,7 @@ impl<C: Chunker, W: SummaryWriter> StatsLogger for ChunkLogger<C, W> {
             node.reset();
         }
         self.chunk_start = Instant::now();
-        self.chunker.flushed();
+        self.chunker.note_flush();
     }
 }
 

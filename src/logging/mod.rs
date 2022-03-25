@@ -16,6 +16,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
 use std::iter;
+use std::ops::Drop;
 use std::slice;
 use std::time::Duration;
 use thiserror::Error;
@@ -41,17 +42,36 @@ pub trait StatsLogger: Send {
     ///     Loggers may append inner namespaces.
     ///
     /// * `value` - The value to log.
-    fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError>;
+    #[inline]
+    fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+        self.group_start();
+        let result = self.group_log(id, value);
+        self.group_end();
+        result
+    }
 
-    /// Log a value without checking whether the logger should be flushed.
-    ///
-    /// Useful in a sequence of logs or in high frequency logs to avoid the cost of checking each
-    /// time.
-    /// See [`StatsLogger::log`] for more documentation.
-    fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError>;
+    /// Internal helper. Do not call directly. Handle the creation of a `LogGroup`. May flush.
+    fn group_start(&mut self);
+    /// Internal helper. Do not call directly. Log a value within a `LogGroup`. May not flush.
+    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError>;
+    /// Internal helper. Do not call directly. Handle the drop of a `LogGroup`. May flush.
+    fn group_end(&mut self);
 
     /// Record any remaining data in the logger that has not yet been recorded.
     fn flush(&mut self);
+
+    /// Create a logger for a group of related values.
+    ///
+    /// Once the group has been created, no flushing will occur until the group is dropped.
+    ///
+    /// This can be called on a reference for a temporary group: `(&mut logger).group()`
+    #[inline]
+    fn group(self) -> LogGroup<Self>
+    where
+        Self: Sized,
+    {
+        LogGroup(self)
+    }
 
     /// Wrap this logger such that an inner scope is added to all logged ids.
     ///
@@ -119,15 +139,17 @@ macro_rules! impl_wrapped_stats_logger {
             T: StatsLogger + ?Sized,
         {
             #[inline]
-            fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
-                T::log(self, id, value)
+            fn group_start(&mut self) {
+                T::group_start(self)
             }
-
             #[inline]
-            fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
-                T::log_no_flush(self, id, value)
+            fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+                T::group_log(self, id, value)
             }
-
+            #[inline]
+            fn group_end(&mut self) {
+                T::group_end(self)
+            }
             #[inline]
             fn flush(&mut self) {
                 T::flush(self)
@@ -322,14 +344,15 @@ pub enum LogError {
 
 /// No-op logger
 impl StatsLogger for () {
-    fn log(&mut self, _: Id, _: Loggable) -> Result<(), LogError> {
+    #[inline]
+    fn group_start(&mut self) {}
+    #[inline]
+    fn group_log(&mut self, _: Id, _: Loggable) -> Result<(), LogError> {
         Ok(())
     }
-
-    fn log_no_flush(&mut self, _: Id, _: Loggable) -> Result<(), LogError> {
-        Ok(())
-    }
-
+    #[inline]
+    fn group_end(&mut self) {}
+    #[inline]
     fn flush(&mut self) {}
 }
 
@@ -339,20 +362,20 @@ where
     A: StatsLogger,
     B: StatsLogger,
 {
-    fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+    fn group_start(&mut self) {
+        self.0.group_start();
+        self.1.group_start();
+    }
+    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
         // Log to both even if one fails
-        let r1 = self.0.log(id.clone(), value.clone());
-        let r2 = self.1.log(id, value);
+        let r1 = self.0.group_log(id.clone(), value.clone());
+        let r2 = self.1.group_log(id, value);
         r1.and(r2)
     }
-
-    fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
-        // Log to both even if one fails
-        let r1 = self.0.log_no_flush(id.clone(), value.clone());
-        let r2 = self.1.log_no_flush(id, value);
-        r1.and(r2)
+    fn group_end(&mut self) {
+        self.0.group_end();
+        self.1.group_end();
     }
-
     fn flush(&mut self) {
         self.0.flush();
         self.1.flush();
@@ -375,18 +398,50 @@ impl<L> ScopedLogger<L> {
 
 impl<L: StatsLogger> StatsLogger for ScopedLogger<L> {
     #[inline]
-    fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
-        self.logger.log(id.with_inner_scope(self.scope), value)
+    fn group_start(&mut self) {
+        self.logger.group_start()
     }
-
     #[inline]
-    fn log_no_flush(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
         self.logger
-            .log_no_flush(id.with_inner_scope(self.scope), value)
+            .group_log(id.with_inner_scope(self.scope), value)
     }
-
+    #[inline]
+    fn group_end(&mut self) {
+        self.logger.group_end()
+    }
     #[inline]
     fn flush(&mut self) {
         self.logger.flush()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+/// Context manager for logging a group of related entries in rapid succession. Prevents flushing.
+pub struct LogGroup<L: StatsLogger>(L);
+impl<L: StatsLogger> LogGroup<L> {
+    #[inline]
+    pub fn new(mut logger: L) -> Self {
+        logger.group_start();
+        Self(logger)
+    }
+}
+impl<L: StatsLogger> StatsLogger for LogGroup<L> {
+    #[inline]
+    fn group_start(&mut self) {}
+    #[inline]
+    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+        self.0.group_log(id, value)
+    }
+    #[inline]
+    fn group_end(&mut self) {}
+    #[inline]
+    fn flush(&mut self) {}
+}
+
+impl<L: StatsLogger> Drop for LogGroup<L> {
+    #[inline]
+    fn drop(&mut self) {
+        self.0.group_end()
     }
 }
