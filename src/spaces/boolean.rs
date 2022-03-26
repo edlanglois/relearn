@@ -20,6 +20,7 @@ use tch::{Device, Kind, Tensor};
 pub struct BooleanSpace;
 
 impl BooleanSpace {
+    #[must_use]
     #[inline]
     pub const fn new() -> Self {
         BooleanSpace
@@ -96,7 +97,7 @@ impl ReprSpace<Tensor> for BooleanSpace {
         I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
-        let elements: Vec<_> = elements.into_iter().cloned().collect();
+        let elements: Vec<_> = elements.into_iter().copied().collect();
         Tensor::of_slice(&elements)
     }
 }

@@ -14,6 +14,7 @@ pub struct ByTime {
 }
 
 impl ByTime {
+    #[must_use]
     pub fn new(chunk_duration: Duration) -> Self {
         Self {
             chunk_duration: CDuration::new(chunk_duration.as_secs(), chunk_duration.subsec_nanos()),

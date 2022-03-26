@@ -16,6 +16,8 @@ pub struct LatentStepLimit {
 }
 
 impl LatentStepLimit {
+    #[must_use]
+    #[inline]
     pub const fn new(max_steps_per_episode: u64) -> Self {
         Self {
             max_steps_per_episode,
@@ -24,6 +26,7 @@ impl LatentStepLimit {
 }
 
 impl Default for LatentStepLimit {
+    #[inline]
     fn default() -> Self {
         Self {
             max_steps_per_episode: 100,
@@ -101,6 +104,8 @@ pub struct VisibleStepLimit {
 }
 
 impl VisibleStepLimit {
+    #[must_use]
+    #[inline]
     pub const fn new(max_steps_per_episode: u64) -> Self {
         Self {
             max_steps_per_episode,
@@ -109,6 +114,7 @@ impl VisibleStepLimit {
 }
 
 impl Default for VisibleStepLimit {
+    #[inline]
     fn default() -> Self {
         Self {
             max_steps_per_episode: 100,
@@ -228,6 +234,7 @@ mod visible {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)] // expecting exact values
     fn step_limit() {
         let mut rng = Prng::seed_from_u64(110);
         let env = WithVisibleStepLimit::new(Chain::default(), VisibleStepLimit::new(2));

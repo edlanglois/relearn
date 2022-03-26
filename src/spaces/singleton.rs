@@ -24,6 +24,7 @@ use tch::{Device, Kind, Tensor};
 pub struct SingletonSpace;
 
 impl SingletonSpace {
+    #[must_use]
     #[inline]
     pub const fn new() -> Self {
         SingletonSpace

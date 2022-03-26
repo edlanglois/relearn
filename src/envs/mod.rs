@@ -335,8 +335,7 @@ impl<T> Successor<T> {
     #[inline]
     pub fn into_inner(self) -> Option<T> {
         match self {
-            Self::Continue(s) => Some(s),
-            Self::Interrupt(s) => Some(s),
+            Self::Continue(s) | Self::Interrupt(s) => Some(s),
             Self::Terminate => None,
         }
     }
@@ -356,6 +355,7 @@ impl<T, U: Borrow<T>> Successor<T, U> {
 
 impl<T: Clone, U: Clone> Successor<&'_ T, &'_ U> {
     /// Convert `Successor<&T, &U>` to `Successor<T, U>` by cloning its contents
+    #[must_use]
     #[inline]
     pub fn cloned(self) -> Successor<T, U> {
         match self {

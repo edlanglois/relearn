@@ -10,6 +10,7 @@ pub struct DeterministicEmptyVec {
 }
 
 impl DeterministicEmptyVec {
+    #[must_use]
     pub fn new(mut batch_shape: Vec<i64>) -> Self {
         batch_shape.push(0);
         Self {

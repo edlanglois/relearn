@@ -31,6 +31,7 @@ pub struct TabularQLearningAgentConfig {
 }
 
 impl TabularQLearningAgentConfig {
+    #[must_use]
     pub const fn new(exploration_rate: f64) -> Self {
         Self {
             exploration_rate,

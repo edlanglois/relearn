@@ -21,16 +21,25 @@
 //! [`train_parallel`](crate::simulation::train_parallel).
 //!
 //! This library uses [PyTorch](https://pytorch.org/) via [tch].
-#![warn(clippy::cast_lossless)]
-#![warn(clippy::cast_possible_truncation)]
-#![warn(clippy::doc_markdown)]
-#![warn(clippy::explicit_iter_loop)]
-#![warn(clippy::for_kv_map)] // part of warn(clippy::all), specifically style?
+#![warn(clippy::pedantic)]
+// Nursery level
 #![warn(clippy::missing_const_for_fn)] // has some false positives
-#![warn(clippy::needless_borrow)]
-#![warn(clippy::needless_pass_by_value)]
-#![warn(clippy::redundant_closure_for_method_calls)]
 #![warn(clippy::use_self)] // also triggered by macro expansions
+// Excluded Pedantic Lints
+#![allow(
+    clippy::cast_precision_loss,  // The precision loss is often expected
+    clippy::default_trait_access, // Alternative can be complex types, not more clear
+    clippy::enum_glob_use,        // Use Enum globs in match statements
+    clippy::let_underscore_drop,  // Typical of Tensor in-place ops.
+    clippy::missing_errors_doc,   // Errors obvious or complex --- easier to look at error type
+    clippy::missing_panics_doc,   // Maybe be logically impossible or only in extreme cases
+    clippy::module_name_repetitions, // Types pub exported in different modeule.
+    clippy::semicolon_if_nothing_returned, // Conceptually returning "result" of inner operation
+    clippy::similar_names,        // Sometimes prefer names that are similar. Consider removing.
+    clippy::single_match_else,    // Match statement can be more readable.
+    clippy::type_repetition_in_bounds, // Frequent false positives
+    clippy::wildcard_imports,     // Used in test modules
+)]
 
 /// Allow referring to this crate as `relearn` so that `relearn_derive` macros  will work both in
 /// this crate and by third-party crates that use `relearn`.

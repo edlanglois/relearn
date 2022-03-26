@@ -1,7 +1,7 @@
 use super::{BufferCapacityBound, WriteHistoryBuffer};
 use crate::simulation::PartialStep;
 use crate::utils::iter::SizedChain;
-use std::iter::{Cloned, ExactSizeIterator, FusedIterator};
+use std::iter::{Copied, ExactSizeIterator, FusedIterator};
 use std::{option, slice, vec};
 
 /// Simple history buffer. Stores and replays observed steps without additional processing.
@@ -21,6 +21,7 @@ pub struct SimpleBuffer<O, A> {
 }
 
 impl<O, A> SimpleBuffer<O, A> {
+    #[must_use]
     pub fn new(capacity: BufferCapacityBound) -> Self {
         let known_max_steps = capacity
             .min_incomplete_episode_len
@@ -32,18 +33,21 @@ impl<O, A> SimpleBuffer<O, A> {
         }
     }
 
+    #[must_use]
     pub fn num_steps(&self) -> usize {
         self.steps.len()
     }
 
+    #[must_use]
     pub fn num_episodes(&self) -> usize {
-        if self.steps.len() > self.episode_ends.last().cloned().unwrap_or(0) {
+        if self.steps.len() > self.episode_ends.last().copied().unwrap_or(0) {
             self.episode_ends.len() + 1
         } else {
             self.episode_ends.len()
         }
     }
 
+    #[must_use]
     pub fn steps(&self) -> slice::Iter<PartialStep<O, A>> {
         self.steps.iter()
     }
@@ -52,9 +56,10 @@ impl<O, A> SimpleBuffer<O, A> {
         self.steps.drain(..)
     }
 
+    #[must_use]
     pub fn episodes(&self) -> EpisodesIter<O, A> {
         // Check for an incomplete episode at the end to include
-        let last_complete_end: usize = self.episode_ends.last().cloned().unwrap_or(0);
+        let last_complete_end: usize = self.episode_ends.last().copied().unwrap_or(0);
         let num_steps = self.steps.len();
         let incomplete_end = if num_steps > last_complete_end {
             Some(num_steps)
@@ -65,7 +70,7 @@ impl<O, A> SimpleBuffer<O, A> {
         let ends_iter: SizedChain<_, _> = self
             .episode_ends
             .iter()
-            .cloned()
+            .copied()
             .chain(incomplete_end)
             .into();
         SliceChunksAtIter::new(&self.steps, ends_iter)
@@ -75,7 +80,7 @@ impl<O, A> SimpleBuffer<O, A> {
 pub type EpisodesIter<'a, O, A> = SliceChunksAtIter<
     'a,
     PartialStep<O, A>,
-    SizedChain<Cloned<slice::Iter<'a, usize>>, option::IntoIter<usize>>,
+    SizedChain<Copied<slice::Iter<'a, usize>>, option::IntoIter<usize>>,
 >;
 
 impl<O, A> WriteHistoryBuffer<O, A> for SimpleBuffer<O, A> {
@@ -93,7 +98,7 @@ impl<O, A> WriteHistoryBuffer<O, A> for SimpleBuffer<O, A> {
                     .capacity
                     .min_incomplete_episode_len
                     .map_or(false, |min_len| {
-                        num_steps - self.episode_ends.last().cloned().unwrap_or(0) >= min_len
+                        num_steps - self.episode_ends.last().copied().unwrap_or(0) >= min_len
                     }))
     }
 

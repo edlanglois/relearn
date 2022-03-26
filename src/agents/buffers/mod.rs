@@ -27,6 +27,7 @@ pub struct BufferCapacityBound {
 
 impl BufferCapacityBound {
     /// Minimal lower bound; accept empty buffers
+    #[must_use]
     pub const fn empty() -> Self {
         Self {
             min_steps: 0,
@@ -36,18 +37,21 @@ impl BufferCapacityBound {
     }
 
     /// Set `min_steps` to the maximum of the current value and the given value.
+    #[must_use]
     pub fn with_steps_at_least(mut self, min_steps: usize) -> Self {
         self.min_steps = self.min_steps.max(min_steps);
         self
     }
 
     /// Set `min_episodes` to the maximum of the current value and the given value.
+    #[must_use]
     pub fn with_episodes_at_least(mut self, min_episodes: usize) -> Self {
         self.min_episodes = self.min_episodes.max(min_episodes);
         self
     }
 
     /// Set `min_incomplete_episode_len` to the maximum of the current value and the given value.
+    #[must_use]
     pub fn with_incomplete_len_at_least(mut self, min_incomplete_episode_len: usize) -> Self {
         self.min_incomplete_episode_len = Some(
             self.min_incomplete_episode_len
@@ -59,6 +63,7 @@ impl BufferCapacityBound {
     }
 
     /// The maximum of two bounds (field-by-field)
+    #[must_use]
     pub fn max(self, other: Self) -> Self {
         Self {
             min_steps: self.min_steps.max(other.min_steps),
@@ -73,6 +78,7 @@ impl BufferCapacityBound {
     /// Divide the capacity into a bound of `1 / n` the size, rounding up.
     ///
     /// `n` buffers meeting the smaller bound will collectively meet the larger bound.
+    #[must_use]
     pub const fn divide(self, n: usize) -> Self {
         Self {
             min_steps: div_ceil(self.min_steps, n),

@@ -64,6 +64,7 @@ pub struct IndexedTypeSpace<T> {
 }
 
 impl<T> IndexedTypeSpace<T> {
+    #[must_use]
     #[inline]
     pub fn new() -> Self {
         Self {

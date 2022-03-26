@@ -23,10 +23,10 @@ pub enum Supervisor {
 }
 
 impl Supervisor {
-    const fn classify(&self, element: &Element) -> Classification {
+    const fn classify(self, element: &Element) -> Classification {
         match self {
             Self::AxisAligned(axis) => {
-                if element[*axis] {
+                if element[axis] {
                     Classification::Right
                 } else {
                     Classification::Left
@@ -110,8 +110,8 @@ impl Environment for PartitionGame {
     ) -> (Successor<Self::State>, f64) {
         let label = state.supervisor.classify(&state.element);
         let reward = match (label, action) {
-            (Classification::Left, Action::ClassifyLeft) => 1.0,
-            (Classification::Right, Action::ClassifyRight) => 1.0,
+            (Classification::Left, Action::ClassifyLeft)
+            | (Classification::Right, Action::ClassifyRight) => 1.0,
             _ => -1.0,
         };
         (

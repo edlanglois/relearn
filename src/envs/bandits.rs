@@ -20,6 +20,7 @@ pub struct Bandit<D> {
 impl<D: Clone> CloneBuild for Bandit<D> {}
 
 impl<D> Bandit<D> {
+    #[must_use]
     pub fn new(distributions: Vec<D>) -> Self {
         Self { distributions }
     }
@@ -125,6 +126,7 @@ pub struct UniformBernoulliBandits {
 }
 
 impl UniformBernoulliBandits {
+    #[must_use]
     pub const fn new(num_arms: usize) -> Self {
         Self { num_arms }
     }
@@ -177,6 +179,7 @@ pub struct OneHotBandits {
 }
 
 impl OneHotBandits {
+    #[must_use]
     pub const fn new(num_arms: usize) -> Self {
         Self { num_arms }
     }

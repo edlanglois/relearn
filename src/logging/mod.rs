@@ -322,11 +322,11 @@ impl Id {
     /// Iterator over namespace / name components.
     pub fn components(
         &self,
-    ) -> iter::Chain<iter::Cloned<iter::Rev<slice::Iter<&str>>>, iter::Once<&str>> {
+    ) -> iter::Chain<iter::Copied<iter::Rev<slice::Iter<&str>>>, iter::Once<&str>> {
         self.namespace
             .iter()
             .rev()
-            .cloned() // &&str -> &str
+            .copied() // &&str -> &str
             .chain(iter::once(self.name.as_ref()))
     }
 }

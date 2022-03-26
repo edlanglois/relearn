@@ -26,6 +26,7 @@ pub struct BetaThompsonSamplingAgentConfig {
 }
 
 impl BetaThompsonSamplingAgentConfig {
+    #[must_use]
     pub const fn new(num_samples: usize) -> Self {
         Self { num_samples }
     }

@@ -22,6 +22,7 @@ pub struct IndexSpace {
 }
 
 impl IndexSpace {
+    #[must_use]
     #[inline]
     pub const fn new(size: usize) -> Self {
         Self { size }
@@ -370,6 +371,7 @@ mod parameterized_sample_space_tensor {
     }
 
     #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_sign_loss)] // negative f64 casts to 0.0 as desired
     fn bernoulli_confidence_interval(p: f64, n: u64) -> RangeInclusive<u64> {
         // Using Wald method <https://en.wikipedia.org/wiki/Binomial_distribution#Wald_method>
         // Quantile for error rate of 1e-5

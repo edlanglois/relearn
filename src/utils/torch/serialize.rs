@@ -49,6 +49,7 @@ pub enum ByteOrder {
 
 impl ByteOrder {
     /// Native byte order for this system
+    #[must_use]
     pub const fn native() -> Self {
         if cfg!(target_endian = "big") {
             Self::BigEndian
@@ -185,7 +186,7 @@ mod tests {
 
     #[test]
     fn ser_de_tokens_0d_u32_tensor() {
-        let tensor = STensor(Tensor::of_slice(&[0x12345678_i32]).reshape(&[]));
+        let tensor = STensor(Tensor::of_slice(&[0x1234_5678_i32]).reshape(&[]));
 
         let byte_order = ByteOrder::native();
         let bytes: &'static [u8] = match byte_order {

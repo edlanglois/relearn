@@ -17,6 +17,7 @@ use tch::{Device, Tensor};
 /// A self-contained part of a neural network.
 pub trait Module {
     /// Create a clone of this module sharing the same variables (tensors).
+    #[must_use]
     fn shallow_clone(&self) -> Self
     where
         Self: Sized;
@@ -25,6 +26,7 @@ pub trait Module {
     ///
     /// A shallow clone is created if the given device is the same as the current device
     /// otherwise the tensors are copied.
+    #[must_use]
     fn clone_to_device(&self, device: Device) -> Self
     where
         Self: Sized;

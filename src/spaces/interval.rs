@@ -92,7 +92,7 @@ where
         I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
-        let elements: Vec<_> = elements.into_iter().cloned().collect();
+        let elements: Vec<_> = elements.into_iter().copied().collect();
         Tensor::of_slice(&elements)
     }
 }

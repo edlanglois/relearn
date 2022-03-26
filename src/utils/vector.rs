@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn default() {
-        let v: Vector<i64, 3> = Default::default();
+        let v: Vector<i64, 3> = Vector::default();
         assert_eq!(Vector([0, 0, 0]), v);
     }
 

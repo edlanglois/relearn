@@ -29,6 +29,7 @@ impl fmt::Display for PrettyPrint<Duration> {
 pub struct Frequency(pub f64);
 
 impl Frequency {
+    #[must_use]
     pub fn from_period(period: Duration) -> Self {
         Self(period.as_secs_f64().recip())
     }

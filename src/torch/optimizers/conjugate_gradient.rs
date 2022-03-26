@@ -94,6 +94,7 @@ pub struct ConjugateGradientOptimizer {
 }
 
 impl ConjugateGradientOptimizer {
+    #[must_use]
     pub fn new(variables: Vec<Tensor>, config: ConjugateGradientOptimizerConfig) -> Self {
         Self {
             params: variables,

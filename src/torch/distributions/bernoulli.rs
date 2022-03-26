@@ -17,6 +17,7 @@ pub struct Bernoulli {
 
 impl Bernoulli {
     /// Initialize from logits
+    #[must_use]
     pub fn new(logits: Tensor) -> Self {
         Self {
             logits,
@@ -124,16 +125,16 @@ mod tests {
 
     #[test]
     fn log_probs() {
-        let logits = Tensor::of_slice(&[f32::NEG_INFINITY, -2.0, 0.0, 1.0, 1.0, f32::INFINITY]);
-        let d = Bernoulli::new(logits);
-        let log_probs = d.log_probs(&Tensor::of_slice(&[true, true, true, true, false, true]));
-        assert_eq!(log_probs.size(), [6]);
-
         // Use f64 in calculations for reduced error
         #[allow(clippy::cast_possible_truncation)]
         fn log_sigmoid(logit: f64) -> f32 {
             -(-logit).exp().ln_1p() as f32
         }
+
+        let logits = Tensor::of_slice(&[f32::NEG_INFINITY, -2.0, 0.0, 1.0, 1.0, f32::INFINITY]);
+        let d = Bernoulli::new(logits);
+        let log_probs = d.log_probs(&Tensor::of_slice(&[true, true, true, true, false, true]));
+        assert_eq!(log_probs.size(), [6]);
 
         let expected = [
             f32::NEG_INFINITY,
@@ -156,11 +157,6 @@ mod tests {
 
     #[test]
     fn entropies() {
-        let logits = Tensor::of_slice(&[f32::NEG_INFINITY, -2.0, 0.0, 1.0, f32::INFINITY]);
-        let d = Bernoulli::new(logits);
-        let entropies = d.entropy();
-        assert_eq!(entropies.size(), [5]);
-
         // Use f64 in calculations for reduced error
         #[allow(clippy::cast_possible_truncation)]
         fn logit_entropy(logit: f64) -> f32 {
@@ -168,6 +164,11 @@ mod tests {
             let h = -p * p.ln() - (1.0 - p) * (1.0 - p).ln();
             h as f32
         }
+
+        let logits = Tensor::of_slice(&[f32::NEG_INFINITY, -2.0, 0.0, 1.0, f32::INFINITY]);
+        let d = Bernoulli::new(logits);
+        let entropies = d.entropy();
+        assert_eq!(entropies.size(), [5]);
 
         let expected = [
             0.0,
@@ -184,6 +185,16 @@ mod tests {
 
     #[test]
     fn kl_divergence() {
+        // Use f64 in calculations for reduced error
+        #[allow(clippy::cast_possible_truncation)]
+        fn kl_div(lp: f64, lq: f64) -> f32 {
+            // logits to probabilities
+            let p = (1.0 + (-lp).exp()).recip();
+            let q = (1.0 + (-lq).exp()).recip();
+            let kl = p * (p / q).ln() + (1.0 - p) * ((1.0 - p) / (1.0 - q)).ln();
+            kl as f32
+        }
+
         let logit_pairs = [
             (0.0, 0.0),
             (1.0, 2.0),
@@ -207,16 +218,6 @@ mod tests {
 
         let kl_divs = p.kl_divergence_from(&q);
         assert_eq!(kl_divs.size(), [logit_pairs.len() as i64]);
-
-        // Use f64 in calculations for reduced error
-        #[allow(clippy::cast_possible_truncation)]
-        fn kl_div(lp: f64, lq: f64) -> f32 {
-            // logits to probabilities
-            let p = (1.0 + (-lp).exp()).recip();
-            let q = (1.0 + (-lq).exp()).recip();
-            let kl = p * (p / q).ln() + (1.0 - p) * ((1.0 - p) / (1.0 - q)).ln();
-            kl as f32
-        }
 
         let expected = [
             0.0,

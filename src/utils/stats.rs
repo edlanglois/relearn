@@ -46,6 +46,7 @@ impl<T: Real + fmt::Display> fmt::Display for OnlineMeanVariance<T> {
 
 impl<T: Zero> OnlineMeanVariance<T> {
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -104,7 +105,7 @@ impl<T: Real> OnlineMeanVariance<T> {
     /// Calculate mean and variance of a slice using numerically-stable divide-and-conquer
     pub fn from_slice(data: &[T]) -> Self {
         if data.len() <= 8 {
-            return data.iter().cloned().collect();
+            return data.iter().copied().collect();
         }
         let mid = data.len() / 2;
         Self::from_slice(&data[..mid]) + Self::from_slice(&data[mid..])
@@ -205,7 +206,7 @@ mod tests {
     #[test]
     fn from_slice() {
         let data: Vec<_> = (0..20u8).map(f32::from).collect();
-        let collected: OnlineMeanVariance<_> = data.iter().cloned().collect();
+        let collected: OnlineMeanVariance<_> = data.iter().copied().collect();
         assert_eq!(OnlineMeanVariance::from_slice(&data), collected);
     }
 

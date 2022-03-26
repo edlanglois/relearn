@@ -14,6 +14,7 @@ use std::fmt;
 pub struct RandomAgentConfig;
 
 impl RandomAgentConfig {
+    #[must_use]
     pub const fn new() -> Self {
         Self
     }
@@ -123,8 +124,7 @@ mod tests {
         );
         let action_space = env.action_space();
 
-        let mut logger = ();
-        let steps = env.run(&actor, SimSeed::Root(117), &mut logger);
+        let steps = env.run(&actor, SimSeed::Root(117), ());
         for step in steps.take(1000) {
             assert!(action_space.contains(&step.action));
         }

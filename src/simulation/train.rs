@@ -176,7 +176,6 @@ mod tests {
         };
         let mut rng_env = Prng::seed_from_u64(0);
         let mut rng_actor = Prng::seed_from_u64(1);
-        let mut logger = ();
 
         let env = DeterministicBandit::from_values(vec![0.0, 1.0]);
         let mut agent = TabularQLearningAgentConfig::default()
@@ -189,7 +188,7 @@ mod tests {
             &config,
             &mut rng_env,
             &mut rng_actor,
-            &mut logger,
+            &mut (),
         );
 
         testing::eval_deterministic_bandit(agent.actor(ActorMode::Evaluation), &env, 0.9);

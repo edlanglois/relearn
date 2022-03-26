@@ -17,15 +17,15 @@ pub trait Sequence {
 
 impl<'a, T> Sequence for &'a [T] {
     type Item = &'a T;
-    #[inline(always)]
+    #[inline]
     fn len(&self) -> usize {
         <[T]>::len(self)
     }
-    #[inline(always)]
+    #[inline]
     fn is_empty(&self) -> bool {
         <[T]>::is_empty(self)
     }
-    #[inline(always)]
+    #[inline]
     fn get(&self, idx: usize) -> Option<Self::Item> {
         <[T]>::get(self, idx)
     }
@@ -34,12 +34,12 @@ impl<'a, T> Sequence for &'a [T] {
 impl Sequence for Range<usize> {
     type Item = usize;
 
-    #[inline(always)]
+    #[inline]
     fn len(&self) -> usize {
         ExactSizeIterator::len(self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn is_empty(&self) -> bool {
         self.is_empty()
     }

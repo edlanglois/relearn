@@ -87,7 +87,6 @@ impl TensorBoardBackend {
 
         #[allow(clippy::cast_possible_truncation)]
         match summary {
-            Nothing => {}
             Counter {
                 increment,
                 initial_value,
@@ -95,12 +94,7 @@ impl TensorBoardBackend {
                 self.writer
                     .add_scalar(tag, (initial_value + increment) as f32, self.summary_index)
             }
-            Duration { stats } => {
-                if let Some(mean) = stats.mean() {
-                    self.writer.add_scalar(tag, mean as f32, self.summary_index)
-                }
-            }
-            Scalar { stats } => {
+            Duration { stats } | Scalar { stats } => {
                 if let Some(mean) = stats.mean() {
                     self.writer.add_scalar(tag, mean as f32, self.summary_index)
                 }
@@ -125,7 +119,7 @@ impl TensorBoardBackend {
                     self.summary_index,
                 )
             }
-            Message { counts: _ } => {}
+            Nothing | Message { counts: _ } => {}
         }
     }
 }

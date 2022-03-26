@@ -169,7 +169,7 @@ where
         if self.num_elements == 0 {
             NonNull::dangling()
         } else {
-            NonNull::new(self.tensor.data_ptr() as _).expect("unexpected null data_ptr")
+            NonNull::new(self.tensor.data_ptr().cast()).expect("unexpected null data_ptr")
         }
     }
 }

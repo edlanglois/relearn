@@ -146,12 +146,12 @@ impl_wrapped_subset_ord!(Box<S>);
 /// * `Less` if both factors are `Equal` or `Less` and at least one is `Less`,
 /// * `Greater` if both factors are `Equal` or `Greater` and at least one is `Greater`,
 /// * `None` otherwise.
+#[must_use]
 #[inline]
 pub const fn product_subset_ord(a: Ordering, b: Option<Ordering>) -> Option<Ordering> {
     use Ordering::*;
     match (a, b) {
-        (Equal, Some(x)) => Some(x),
-        (x, Some(Equal)) => Some(x),
+        (Equal, Some(x)) | (x, Some(Equal)) => Some(x),
         (Less, Some(Less)) => Some(Less),
         (Greater, Some(Greater)) => Some(Greater),
         _ => None,

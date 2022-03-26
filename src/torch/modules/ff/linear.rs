@@ -49,6 +49,7 @@ pub struct Linear {
 }
 
 impl Linear {
+    #[must_use]
     pub fn new(in_dim: usize, out_dim: usize, device: Device, config: &LinearConfig) -> Self {
         // Total fan_in is the weigths in_dim + 1 for the bias.
         let fan_in = in_dim + 1;
@@ -147,7 +148,12 @@ impl IterativeModule for Linear {
 }
 
 #[cfg(test)]
-#[allow(clippy::needless_pass_by_value)]
+// Confusion with rstest hack when passing the _runner arg
+#[allow(
+    clippy::needless_pass_by_value,
+    clippy::used_underscore_binding,
+    clippy::no_effect_underscore_binding
+)]
 mod tests {
     use super::super::super::testing::{
         self, RunForward, RunIterStep, RunModule, RunSeqPacked, RunSeqSerial,

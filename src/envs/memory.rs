@@ -44,6 +44,7 @@ impl MemoryGame {
     /// # Args
     /// * `num_actions` - Number of possible actions.
     /// * `history_len` - Length of remembered history required to solve the environment.
+    #[must_use]
     pub const fn new(num_actions: usize, history_len: usize) -> Self {
         Self {
             num_actions,

@@ -104,6 +104,7 @@ pub fn check_features_out_excess_return_len<S: FeatureSpace>(space: &S, element:
 }
 
 /// Check that any excess output passed to [`FeatureSpace::features_out`] remains unchanged.
+#[allow(clippy::float_cmp)] // expecting exact values
 pub fn check_features_out_excess_unchanged<S: FeatureSpace>(space: &S, element: &S::Element) {
     let mut out = vec![-2.0; space.num_features() + 5];
     let result = space.features_out(element, &mut out, true);

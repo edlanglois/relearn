@@ -71,6 +71,7 @@ pub fn f_unflatten_tensors(vector: &Tensor, shapes: &[Vec<i64>]) -> Result<Vec<T
 ///
 /// # Panics
 /// If [`f_unflatten_tensors`] fails.
+#[must_use]
 pub fn unflatten_tensors(vector: &Tensor, shapes: &[Vec<i64>]) -> Vec<Tensor> {
     f_unflatten_tensors(vector, shapes).unwrap()
 }

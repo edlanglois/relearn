@@ -25,6 +25,7 @@ pub struct Chain {
 impl CloneBuild for Chain {}
 
 impl Chain {
+    #[must_use]
     pub const fn new(size: usize, discount_factor: f64) -> Self {
         Self {
             size,

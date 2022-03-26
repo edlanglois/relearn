@@ -268,8 +268,7 @@ impl ChunkSummary {
                 *initial_value += *increment;
                 *increment = 0
             }
-            Self::Duration { stats } => *stats = OnlineMeanVariance::new(),
-            Self::Scalar { stats } => *stats = OnlineMeanVariance::new(),
+            Self::Duration { stats } | Self::Scalar { stats } => *stats = OnlineMeanVariance::new(),
             Self::Index { counts } => counts.iter_mut().for_each(|c| *c = 0),
             Self::Message { counts } => counts.clear(),
         }

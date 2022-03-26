@@ -25,6 +25,7 @@ impl Categorical {
     ///
     /// The unnormalized input log probabilities `log(q_i)` are normalized as
     /// `log(p_i) = log(q_i / sum_i(q_i))`.
+    #[must_use]
     pub fn new(unnormalized_log_probs: &Tensor) -> Self {
         Self {
             log_probs: unnormalized_log_probs.log_softmax(-1, Kind::Float),

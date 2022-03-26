@@ -16,6 +16,8 @@ pub struct ByCounter {
 }
 
 impl ByCounter {
+    #[must_use]
+    #[inline]
     pub const fn new(counter: Id, interval: u64) -> Self {
         Self {
             counter,

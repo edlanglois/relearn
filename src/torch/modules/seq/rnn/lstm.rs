@@ -80,11 +80,13 @@ impl SequenceModule for Lstm {
     }
 
     fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
-        if batch_sizes.device() != Device::Cpu {
-            // Panic here to prevent torch from segfaulting.
-            // See https://github.com/pytorch/pytorch/issues/59418
-            panic!("Batch sizes must be on the CPU");
-        }
+        // Otherwise torch will segfault
+        // See https://github.com/pytorch/pytorch/issues/59418
+        assert_eq!(
+            batch_sizes.device(),
+            Device::Cpu,
+            "batch_sizes must be on the CPU"
+        );
         let initial_batch_size: i64 = batch_sizes.i(0).into();
         let num_layers: i64 = self.weights.num_layers() as i64;
         let zeros = Tensor::zeros(
@@ -109,7 +111,12 @@ impl SequenceModule for Lstm {
 }
 
 #[cfg(test)]
-#[allow(clippy::needless_pass_by_value)]
+// Confusion with rstest hack when passing the _runner arg
+#[allow(
+    clippy::needless_pass_by_value,
+    clippy::used_underscore_binding,
+    clippy::no_effect_underscore_binding
+)]
 mod tests {
     use super::super::super::super::testing::{
         self, RunIterStep, RunModule, RunSeqPacked, RunSeqSerial,

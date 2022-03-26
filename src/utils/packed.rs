@@ -174,21 +174,20 @@ where
     type Item = <<I::Item as Deref>::Target as Sequence>::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self
+        if let Some(value) = self
             .sequences_iter
             .next()
             .and_then(|seq| seq.get(self.offset))
         {
-            Some(value) => Some(value), // Next value at this offset
-            None => {
-                // Increment offset and restart the loop
-                self.offset += 1;
-                self.sequences_iter = self.sequences.clone();
-                // If this fails then there are no more items left
-                self.sequences_iter
-                    .next()
-                    .and_then(|seq| seq.get(self.offset))
-            }
+            Some(value)
+        } else {
+            // Increment offset and restart the loop
+            self.offset += 1;
+            self.sequences_iter = self.sequences.clone();
+            // If this fails then there are no more items left
+            self.sequences_iter
+                .next()
+                .and_then(|seq| seq.get(self.offset))
         }
     }
 
@@ -232,6 +231,7 @@ where
 /// Has length equal to `batch_sizes`.
 /// Each tensor in the output has the same shape as `packed` except for the first dimension
 /// which has length `batch_sizes[i]`.
+#[must_use]
 pub fn packed_tensor_batched_steps(packed: &Tensor, batch_sizes: &[i64]) -> Vec<Tensor> {
     packed.split_with_sizes(batch_sizes, 0)
 }

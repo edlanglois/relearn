@@ -47,6 +47,7 @@ pub struct CartPole {
 }
 
 impl CartPole {
+    #[must_use]
     pub fn new(phys: PhysicalConstants, env: EnvironmentParams) -> Self {
         Self {
             phys: phys.into(),
@@ -371,10 +372,10 @@ impl InternalPhysicalConstants {
 
         CartPoleInternalState {
             physical: CartPolePhysicalState {
-                cart_velocity,
                 cart_position,
-                pole_angular_velocity,
+                cart_velocity,
                 pole_angle,
+                pole_angular_velocity,
             },
             cached_normal_velocity_is_positive: normal_velocity_is_positive,
         }

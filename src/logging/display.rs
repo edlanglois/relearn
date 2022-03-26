@@ -148,10 +148,10 @@ impl<'a> fmt::Display for DisplaySummary<'a> {
                 write!(f, "(n {})  [", n)?;
                 let mut first = true;
                 for c in counts {
-                    if !first {
-                        write!(f, " ")?;
-                    } else {
+                    if first {
                         first = false;
+                    } else {
+                        write!(f, " ")?;
                     }
                     write!(f, "{}", c * 100 / n)?;
                 }

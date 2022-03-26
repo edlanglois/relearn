@@ -115,6 +115,7 @@ pub struct RoundRobinDeterministicBandits {
 impl CloneBuild for RoundRobinDeterministicBandits {}
 
 impl RoundRobinDeterministicBandits {
+    #[must_use]
     pub const fn new(num_arms: usize) -> Self {
         Self {
             num_arms,

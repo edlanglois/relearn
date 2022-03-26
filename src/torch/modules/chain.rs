@@ -324,7 +324,12 @@ where
 }
 
 #[cfg(test)]
-#[allow(clippy::needless_pass_by_value)]
+// Confusion with rstest hack when passing the _runner arg
+#[allow(
+    clippy::needless_pass_by_value,
+    clippy::used_underscore_binding,
+    clippy::no_effect_underscore_binding
+)]
 mod tests {
     use super::super::testing::{
         self, RunForward, RunIterStep, RunModule, RunSeqPacked, RunSeqSerial,

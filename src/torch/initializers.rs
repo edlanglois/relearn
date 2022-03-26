@@ -94,8 +94,8 @@ impl VarianceScale {
 /// [1]: https://github.com/pytorch/pytorch/blob/f87f753bb997b2da82f7d2a561ccb40ab4f6bd9d/torch/nn/init.py#L284-L300
 fn calculate_fan_in_and_fan_out(shape: &[usize]) -> (usize, usize) {
     // Use feature size of 1 if the dimensions are missing instead of returning an error
-    let num_input_fmaps = shape.get(1).cloned().unwrap_or(1);
-    let num_output_fmaps = shape.get(0).cloned().unwrap_or(1);
+    let num_input_fmaps = shape.get(1).copied().unwrap_or(1);
+    let num_output_fmaps = shape.get(0).copied().unwrap_or(1);
     let receptive_field_size: usize = if shape.len() >= 2 {
         shape[2..].iter().product()
     } else {
@@ -110,6 +110,7 @@ impl Initializer {
     /// Start building a new [`Tensor`] using this initializer.
     ///
     /// See the [`TensorBuilder`] methods for more configuration options.
+    #[must_use]
     #[inline]
     pub const fn tensor<'a>(&'a self, shape: &'a [usize]) -> TensorBuilder<'a> {
         TensorBuilder::new(self, shape)
@@ -130,6 +131,7 @@ pub struct TensorBuilder<'a> {
 }
 
 impl<'a> TensorBuilder<'a> {
+    #[must_use]
     #[inline]
     pub const fn new(initializer: &'a Initializer, shape: &'a [usize]) -> Self {
         Self {
@@ -177,6 +179,7 @@ impl<'a> TensorBuilder<'a> {
     /// See PyTorch's [`calculate_gain`][1] function for more information.
     ///
     /// [1]: https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.calculate_gain
+    #[must_use]
     #[inline]
     pub const fn gain(mut self, gain: f64) -> Self {
         self.gain = gain;
@@ -189,6 +192,7 @@ impl<'a> TensorBuilder<'a> {
     /// a layer to implement a mapping from a collectively larger number of input features.
     /// For example, a weights tensor and a bias tensors might be initialized with a `fan_in` value
     /// of `weights_input_dim + 1`.
+    #[must_use]
     #[inline]
     pub const fn fan_in(mut self, fan_in: usize) -> Self {
         self.fan_in = Some(fan_in);
@@ -199,6 +203,7 @@ impl<'a> TensorBuilder<'a> {
     ///
     /// This can be useful when multiple tensors are initialized separately but their outputs
     /// features are concatenated together in a layer.
+    #[must_use]
     #[inline]
     pub const fn fan_out(mut self, fan_out: usize) -> Self {
         self.fan_out = Some(fan_out);
@@ -206,6 +211,7 @@ impl<'a> TensorBuilder<'a> {
     }
 
     /// Set whether the tensor requires gradient tracking. Defaults to true.
+    #[must_use]
     #[inline]
     pub const fn requires_grad(mut self, requires_grad: bool) -> Self {
         self.requires_grad = requires_grad;
@@ -227,6 +233,7 @@ impl<'a> TensorBuilder<'a> {
     }
 
     /// Set the [`Device`] on which the tensor will be created. Defaults to CPU.
+    #[must_use]
     #[inline]
     pub const fn device(mut self, device: Device) -> Self {
         self.device = device;
@@ -343,6 +350,7 @@ fn init_orthogonal(shape: &[i64], gain: f64, options: (Kind, Device)) -> Tensor 
         let _ = q.t_();
     }
 
+    #[allow(clippy::float_cmp)] // Should be exact
     if gain != 1.0 {
         q *= gain;
     }

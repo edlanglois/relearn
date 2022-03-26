@@ -37,6 +37,7 @@ where
 
 /// Evaluate a trained agent on the 0-1 deterministic bandit environment.
 #[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
 pub fn eval_deterministic_bandit<T>(actor: T, env: &DeterministicBandit, threshold: f64)
 where
     T: Actor<(), usize>,
@@ -49,6 +50,7 @@ where
         }
     }
 
+    assert!((0.0..=1.0).contains(&threshold));
     let threshold = ((num_eval_steps as f64) * threshold) as u64;
     assert!(
         action_1_count >= threshold,

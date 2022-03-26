@@ -301,6 +301,7 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> FruitGame
     ///
     /// # Args
     /// * `num_fruit` - Number of fruit of each type.
+    #[must_use]
     pub const fn new(num_fruit: usize) -> Self {
         Self { num_fruit }
     }

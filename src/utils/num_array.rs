@@ -57,19 +57,19 @@ impl<T: NumArray2D> BuildFromArray2D for T {
 
 impl<A: Clone + Zero + One> NumArray1D for Array1<A> {
     type Elem = A;
-    #[inline(always)]
+    #[inline]
     fn zeros(size: usize) -> Self {
         Self::zeros(size)
     }
-    #[inline(always)]
+    #[inline]
     fn ones(size: usize) -> Self {
         Self::ones(size)
     }
-    #[inline(always)]
+    #[inline]
     fn as_slice(&self) -> &[Self::Elem] {
         self.as_slice().unwrap()
     }
-    #[inline(always)]
+    #[inline]
     fn as_slice_mut(&mut self) -> &mut [Self::Elem] {
         self.as_slice_mut().unwrap()
     }
@@ -77,19 +77,19 @@ impl<A: Clone + Zero + One> NumArray1D for Array1<A> {
 
 impl<A: Clone + Zero + One> NumArray2D for Array2<A> {
     type Elem = A;
-    #[inline(always)]
+    #[inline]
     fn zeros(size: (usize, usize)) -> Self {
         Self::zeros(size)
     }
-    #[inline(always)]
+    #[inline]
     fn ones(size: (usize, usize)) -> Self {
         Self::ones(size)
     }
-    #[inline(always)]
+    #[inline]
     fn view(&self) -> ArrayView<Self::Elem, Ix2> {
         self.view()
     }
-    #[inline(always)]
+    #[inline]
     fn view_mut(&mut self) -> ArrayViewMut<Self::Elem, Ix2> {
         self.view_mut()
     }
@@ -98,19 +98,19 @@ impl<A: Clone + Zero + One> NumArray2D for Array2<A> {
 impl<A: Element> NumArray1D for ExclusiveTensor<A, Ix1> {
     type Elem = A;
 
-    #[inline(always)]
+    #[inline]
     fn zeros(size: usize) -> Self {
         Self::zeros(size)
     }
-    #[inline(always)]
+    #[inline]
     fn ones(size: usize) -> Self {
         Self::ones(size)
     }
-    #[inline(always)]
+    #[inline]
     fn as_slice(&self) -> &[Self::Elem] {
         self.as_slice()
     }
-    #[inline(always)]
+    #[inline]
     fn as_slice_mut(&mut self) -> &mut [Self::Elem] {
         self.as_slice_mut()
     }
@@ -119,19 +119,19 @@ impl<A: Element> NumArray1D for ExclusiveTensor<A, Ix1> {
 impl<A: Element> NumArray2D for ExclusiveTensor<A, Ix2> {
     type Elem = A;
 
-    #[inline(always)]
+    #[inline]
     fn zeros(size: (usize, usize)) -> Self {
         Self::zeros(size)
     }
-    #[inline(always)]
+    #[inline]
     fn ones(size: (usize, usize)) -> Self {
         Self::ones(size)
     }
-    #[inline(always)]
+    #[inline]
     fn view(&self) -> ArrayView<Self::Elem, Ix2> {
         self.array_view()
     }
-    #[inline(always)]
+    #[inline]
     fn view_mut(&mut self) -> ArrayViewMut<Self::Elem, Ix2> {
         self.array_view_mut()
     }

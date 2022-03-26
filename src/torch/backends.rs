@@ -7,6 +7,7 @@ pub struct WithCudnnEnabled {
 }
 
 impl WithCudnnEnabled {
+    #[must_use]
     pub fn new(enabled: bool) -> Self {
         let previous_state = Cuda::user_enabled_cudnn();
         Cuda::set_user_enabled_cudnn(enabled);
