@@ -12,111 +12,6 @@ use std::iter;
 use std::ops::Deref;
 use tch::{IndexOp, Scalar, Tensor};
 
-/// Iterator that packs together multiple sequences.
-///
-/// # Example
-/// ```
-/// use relearn::utils::packed::PackedIter;
-///
-/// let sequences = [vec![0, 1, 2, 3], vec![10, 11], vec![100, 101]];
-/// let packed: Vec<_> = PackedIter::from_sorted(&sequences).map(|&x| x).collect();
-/// assert_eq!(packed, vec![0, 10, 100, 1, 11, 101, 2, 3]);
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PackedIter<T> {
-    /// Sequences from which elements are obtained.
-    sequences: Vec<T>,
-    /// Current sequence index
-    seq_idx: usize,
-    /// Number of sequences that might still have elements.
-    batch_size: usize,
-}
-
-impl<T> PackedIter<T>
-where
-    T: ExactSizeIterator,
-{
-    /// Create a new [`PackedIter`] instance.
-    ///
-    /// # Args
-    /// * `sequences` - A iterator of sequence iterators.
-    ///     The inner sequence iterators must have fixed lengths.
-    ///
-    /// # Note
-    /// Sequences will be reordered (stably) so that
-    /// they are in order of monotonically decreasing length.
-    pub fn new<U>(sequences: U) -> Self
-    where
-        U: IntoIterator,
-        U::Item: IntoIterator<IntoIter = T>,
-    {
-        let mut sequences: Vec<_> = sequences.into_iter().map(IntoIterator::into_iter).collect();
-        // Sort in descending order of length.
-        sequences.sort_by(|a, b| a.len().cmp(&b.len()).reverse());
-        let batch_size = sequences.len();
-        Self {
-            sequences,
-            seq_idx: 0,
-            batch_size,
-        }
-    }
-
-    /// Create a new [`PackedIter`] from sequences sorted in descending order of length.
-    ///
-    /// # Args
-    /// * `sequences` - A iterator of sequence iterators.
-    ///     The inner sequence iterators must have fixed lengths
-    ///     and be sorted in order of monotonically decreasing length.
-    pub fn from_sorted<U>(sequences: U) -> Self
-    where
-        U: IntoIterator,
-        U::Item: IntoIterator<IntoIter = T>,
-    {
-        let sequences: Vec<_> = sequences.into_iter().map(IntoIterator::into_iter).collect();
-        assert!(
-            sequences.windows(2).all(|w| w[0].len() >= w[1].len()),
-            "sequences not in monotonic decreasing order of length"
-        );
-        let batch_size = sequences.len();
-        Self {
-            sequences,
-            seq_idx: 0,
-            batch_size,
-        }
-    }
-}
-
-impl<T> Iterator for PackedIter<T>
-where
-    T: ExactSizeIterator,
-{
-    type Item = T::Item;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut result = self.sequences[self.seq_idx].next();
-        if result.is_none() {
-            if self.batch_size == 0 {
-                return None;
-            }
-            self.batch_size = self.seq_idx;
-            self.seq_idx = 0;
-            result = self.sequences[self.seq_idx].next();
-        }
-        self.seq_idx += 1;
-        if self.seq_idx >= self.batch_size {
-            self.seq_idx = 0;
-        }
-        result
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.sequences.iter().map(ExactSizeIterator::len).sum();
-        (len, Some(len))
-    }
-}
-
-impl<T> ExactSizeIterator for PackedIter<T> where T: ExactSizeIterator {}
-
 /// Iterator that packs together the elements of multiple sequences.
 ///
 /// Does not allocate any heap memory.
@@ -126,7 +21,7 @@ impl<T> ExactSizeIterator for PackedIter<T> where T: ExactSizeIterator {}
 /// use relearn::utils::packed::PackedSeqIter;
 ///
 /// let sequences: [&[_]; 3] = [&[0, 1, 2, 3], &[10, 11], &[100, 101]];
-/// let packed: Vec<_> = PackedSeqIter::from_sorted(&sequences).map(|&x| x).collect();
+/// let packed: Vec<_> = PackedSeqIter::from_sorted(&sequences).copied().collect();
 /// assert_eq!(packed, vec![0, 10, 100, 1, 11, 101, 2, 3]);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -435,45 +330,6 @@ pub fn packed_tensor_discounted_cumsum_from_end(
     }
 
     packed_output
-}
-
-#[cfg(test)]
-mod packed_iter {
-    use super::*;
-
-    #[test]
-    fn iter_from_sorted() {
-        let sequences = [vec![0, 1, 2, 3], vec![10, 11], vec![100, 101]];
-        let packed: Vec<_> = PackedIter::from_sorted(sequences).collect();
-        let expected = vec![0, 10, 100, 1, 11, 101, 2, 3];
-        assert_eq!(packed, expected);
-    }
-
-    #[test]
-    fn iter_from_unsorted() {
-        let sequences = [vec![10, 11], vec![0, 1, 2, 3], vec![100, 101]];
-        let packed: Vec<_> = PackedIter::new(sequences).collect();
-        // First sorts the sequences then packs them.
-        let expected = vec![0, 10, 100, 1, 11, 101, 2, 3];
-        assert_eq!(packed, expected);
-    }
-
-    #[test]
-    fn size_hint() {
-        let sequences = [vec![10, 11], vec![0, 1, 2, 3], vec![100, 101]];
-        let packed_iter = PackedIter::new(&sequences);
-        assert_eq!(packed_iter.size_hint(), (8, Some(8)));
-    }
-
-    #[test]
-    fn size_hint_after_next() {
-        let sequences = [vec![10, 11], vec![0, 1, 2, 3], vec![100, 101]];
-        let mut packed_iter = PackedIter::new(&sequences);
-        let _ = packed_iter.next();
-        assert_eq!(packed_iter.size_hint(), (7, Some(7)));
-        let _ = packed_iter.next();
-        assert_eq!(packed_iter.size_hint(), (6, Some(6)));
-    }
 }
 
 #[cfg(test)]
