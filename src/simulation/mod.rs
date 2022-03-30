@@ -48,6 +48,11 @@ impl<O, A, U> Step<O, A, U> {
         }
     }
 
+    /// Whether this step is the last of an episode.
+    pub const fn episode_done(&self) -> bool {
+        self.next.episode_done()
+    }
+
     pub fn into_partial(self) -> PartialStep<O, A> {
         Step {
             observation: self.observation,

@@ -62,7 +62,7 @@ where
         if self.n > 0 {
             let step = self.steps.next();
             if let Some(s) = &step {
-                if s.next.episode_done() {
+                if s.episode_done() {
                     self.n -= 1;
                 }
             }

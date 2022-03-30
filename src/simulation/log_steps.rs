@@ -99,7 +99,7 @@ where
         step_logger.log_counter_increment("count", 1);
         self.episode_reward += step.reward;
         self.episode_length += 1;
-        if step.next.episode_done() {
+        if step.episode_done() {
             let mut episode_logger = group.with_scope("episode");
             episode_logger.log_scalar("reward", self.episode_reward);
             episode_logger.log_scalar("length", self.episode_length as f64);

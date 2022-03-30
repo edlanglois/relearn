@@ -85,7 +85,7 @@ pub type EpisodesIter<'a, O, A> = SliceChunksAtIter<
 
 impl<O, A> WriteHistoryBuffer<O, A> for SimpleBuffer<O, A> {
     fn push(&mut self, step: PartialStep<O, A>) -> bool {
-        let episode_done = step.next.episode_done();
+        let episode_done = step.episode_done();
         self.steps.push(step);
         let num_steps = self.steps.len();
         if episode_done {
