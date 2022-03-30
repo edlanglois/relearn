@@ -2,7 +2,6 @@
 pub mod agents;
 pub mod backends;
 pub mod distributions;
-pub mod features;
 pub mod initializers;
 pub mod modules;
 pub mod optimizers;
