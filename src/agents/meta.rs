@@ -248,7 +248,7 @@ mod resetting_meta {
             .take(1000)
         {
             current_episode_reward += step.reward;
-            if step.next.continue_().is_none() {
+            if step.next.episode_done() {
                 total_episode_reward += current_episode_reward;
                 current_episode_reward = 0.0;
                 num_episodes += 1;

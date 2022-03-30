@@ -208,7 +208,7 @@ mod latent {
         // Step 1
         let (successor, _) = env.step(state, &Move::Left, &mut rng, &mut ());
         assert!(matches!(successor, Successor::Continue(_)));
-        let state = successor.continue_().unwrap();
+        let state = successor.into_continue().unwrap();
 
         // Step 2
         let (successor, _) = env.step(state, &Move::Left, &mut rng, &mut ());
@@ -244,7 +244,7 @@ mod visible {
         // Step 1
         let (successor, _) = env.step(state, &Move::Left, &mut rng, &mut ());
         assert!(matches!(successor, Successor::Continue(_)));
-        let state = successor.continue_().unwrap();
+        let state = successor.into_continue().unwrap();
         assert_eq!(env.observe(&state, &mut rng).1, 0.5);
 
         // Step 2

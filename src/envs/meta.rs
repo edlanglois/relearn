@@ -383,7 +383,7 @@ mod meta_env_bandits {
         // Inner state is terminal.
         let (successor, reward) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 1.0);
-        let state = successor.continue_().unwrap();
+        let state = successor.into_continue().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {
@@ -400,7 +400,7 @@ mod meta_env_bandits {
         // The action is ignored and a new inner episode is started.
         let (successor, reward) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
-        let state = successor.continue_().unwrap();
+        let state = successor.into_continue().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {
@@ -415,7 +415,7 @@ mod meta_env_bandits {
         // Inner state is terminal
         let (successor, reward) = env.step(state, &1, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
-        let state = successor.continue_().unwrap();
+        let state = successor.into_continue().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {
@@ -432,7 +432,7 @@ mod meta_env_bandits {
         // The action is ignored and a new inner episode is started.
         let (successor, reward) = env.step(state, &1, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
-        let state = successor.continue_().unwrap();
+        let state = successor.into_continue().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {
@@ -448,7 +448,7 @@ mod meta_env_bandits {
         // This inner episode was the last in the trial so the trial is done.
         let (successor, reward) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 1.0);
-        let state = successor.interrupt().unwrap();
+        let state = successor.into_interrupt().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {
@@ -477,7 +477,7 @@ mod meta_env_bandits {
         // Inner state is terminal.
         let (successor, reward) = env.step(state, &0, &mut rng, &mut ());
         assert_eq!(reward, 0.0);
-        let state = successor.continue_().unwrap();
+        let state = successor.into_continue().unwrap();
         assert_eq!(
             env.observe(&state, &mut rng),
             MetaObservation {

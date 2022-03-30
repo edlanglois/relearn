@@ -99,7 +99,7 @@ where
             env_state = env
                 .step(env_state, &action, &mut rng, &mut ())
                 .0
-                .continue_()
+                .into_continue()
                 .unwrap();
             obs = env.observe(&env_state, &mut rng);
         })

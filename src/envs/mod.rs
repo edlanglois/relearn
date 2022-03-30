@@ -257,20 +257,20 @@ pub enum Successor<T, U = T> {
 }
 
 impl<T, U> Successor<T, U> {
-    /// Get the inner state of `Successor::Continue`
+    /// Unwrap into the contained `Continue` value if possible.
     #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
     #[inline]
-    pub fn continue_(self) -> Option<U> {
+    pub fn into_continue(self) -> Option<U> {
         match self {
             Self::Continue(s) => Some(s),
             _ => None,
         }
     }
 
-    /// Get the inner state of `Successor::Interrupt`
+    /// Unwrap into the contained `Interrupt` value if possible.
     #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
     #[inline]
-    pub fn interrupt(self) -> Option<T> {
+    pub fn into_interrupt(self) -> Option<T> {
         match self {
             Self::Interrupt(s) => Some(s),
             _ => None,
