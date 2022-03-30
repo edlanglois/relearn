@@ -125,20 +125,6 @@ where
     pub fn is_empty(&self) -> bool {
         self.episodes.is_empty()
     }
-
-    /// Finalize this into a structure of the current values in cache.
-    pub fn finalize(self) -> PackedHistoryFeatures {
-        PackedHistoryFeatures {
-            discount_factor: self.discount_factor,
-            batch_sizes: self.cached_batch_sizes.into_inner(),
-            batch_sizes_tensor: self.cached_batch_sizes_tensor.into_inner(),
-            observation_features: self.cached_observation_features.into_inner(),
-            actions: self.cached_actions.into_inner(),
-            returns: self.cached_returns.into_inner(),
-            rewards: self.cached_rewards.into_inner(),
-            device: self.device,
-        }
-    }
 }
 
 impl<'a, OS, AS> PackedHistoryFeaturesView for LazyPackedHistoryFeatures<'a, OS, AS>
@@ -216,70 +202,6 @@ where
 
     fn discount_factor(&self) -> f64 {
         self.discount_factor
-    }
-
-    fn device(&self) -> Device {
-        self.device
-    }
-}
-
-/// Packed history features.
-///
-/// # Panics
-/// The [`PackedHistoryFeaturesView`] this provides will panic
-/// if the requested features is not available.
-#[derive(Debug, PartialEq)]
-pub struct PackedHistoryFeatures {
-    pub discount_factor: f64,
-    pub batch_sizes: Option<Vec<i64>>,
-    pub batch_sizes_tensor: Option<Tensor>,
-    pub observation_features: Option<Tensor>,
-    pub actions: Option<Tensor>,
-    pub returns: Option<Tensor>,
-    pub rewards: Option<Tensor>,
-    pub device: Device,
-}
-
-impl PackedHistoryFeaturesView for PackedHistoryFeatures {
-    fn discount_factor(&self) -> f64 {
-        self.discount_factor
-    }
-
-    fn batch_sizes(&self) -> &[i64] {
-        self.batch_sizes
-            .as_ref()
-            .expect("batch_sizes has not been evaluated")
-    }
-
-    fn batch_sizes_tensor(&self) -> &Tensor {
-        self.batch_sizes_tensor
-            .as_ref()
-            .expect("batch_sizes has not been evaluated")
-    }
-
-    fn observation_features(&self) -> &Tensor {
-        self.observation_features
-            .as_ref()
-            .expect("observation_features has not been evaluated")
-    }
-
-    fn actions(&self) -> &Tensor {
-        self.actions
-            .as_ref()
-            .expect("actions has not been evaluated")
-    }
-
-    fn returns(&self) -> &Tensor {
-        self.returns
-            .as_ref()
-            .expect("returns has not been evaluated")
-    }
-
-    /// Packed rewards. A 1D f32 tensor.
-    fn rewards(&self) -> &Tensor {
-        self.rewards
-            .as_ref()
-            .expect("rewards has not been evaluated")
     }
 
     fn device(&self) -> Device {
