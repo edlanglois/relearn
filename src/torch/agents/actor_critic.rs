@@ -13,7 +13,7 @@ use crate::{
     logging::StatsLogger,
     spaces::{FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace},
     torch::modules::Module,
-    utils::torch::DeviceDef,
+    torch::serialize::DeviceDef,
     Prng,
 };
 use serde::{Deserialize, Serialize};

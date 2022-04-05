@@ -19,7 +19,6 @@ fn seq_serial_map<F>(inputs: &Tensor, seq_lengths: &[usize], f_seq: F) -> Tensor
 where
     F: Fn(Tensor) -> Tensor,
 {
-    // TODO: Write into an ExclusiveTensor?
     Tensor::cat(
         &seq_lengths
             .iter()

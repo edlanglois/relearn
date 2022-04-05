@@ -1,6 +1,5 @@
 //! Numeric array interfaces.
-
-use super::torch::ExclusiveTensor;
+use crate::torch::ExclusiveTensor;
 use ndarray::{Array1, Array2, ArrayView, ArrayViewMut, Ix1, Ix2};
 use num_traits::{One, Zero};
 use tch::{kind::Element, Tensor};

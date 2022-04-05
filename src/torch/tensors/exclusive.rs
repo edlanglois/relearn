@@ -9,12 +9,13 @@ use tch::{kind::Element, Device, Kind, Tensor};
 /// Given an ordinary `Tensor`, it is impossible to reason about the lifetime of the data at
 /// [`Tensor::data_ptr`]. Copies created by [`Tensor::shallow_clone`] share the same underlying
 /// tensor object and can cause the data memory to be moved or reallocated at any time (for
-/// example, by calling `Tensor::resize_`].
+/// example, by calling `Tensor::resize_`]).
 ///
-/// To avoid this issue `ExclusiveTensor` manages the creation of the tensor such that it has
-/// exclusive access to the underlying data.
+/// To avoid this issue, `ExclusiveTensor` manages the creation of the tensor such that it has
+/// exclusive access to the underlying data. An `ExclusiveTensor` can never provide `&Tensor`
+/// references to the managed tensor.
 ///
-/// The managed tensor always lives on the CPU.
+/// The managed tensor always lives on the CPU device.
 #[derive(Debug)]
 pub struct ExclusiveTensor<E, D>
 where

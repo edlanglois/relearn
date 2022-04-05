@@ -5,7 +5,11 @@ pub mod distributions;
 pub mod initializers;
 pub mod modules;
 pub mod optimizers;
+pub mod serialize;
+mod tensors;
 pub mod utils;
+
+pub use tensors::ExclusiveTensor;
 
 /// Initialization function for unit tests using CUDA.
 ///

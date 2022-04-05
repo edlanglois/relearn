@@ -7,7 +7,7 @@ pub use lstm::{Lstm, LstmConfig};
 
 use super::super::super::initializers::{Initializer, VarianceScale};
 use super::super::{BuildModule, IterativeModule, Module, ModuleExtras};
-use crate::utils::torch::TensorDef;
+use crate::torch::serialize::TensorDef;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use smallvec::SmallVec;

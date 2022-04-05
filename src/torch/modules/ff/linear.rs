@@ -3,7 +3,7 @@ use super::super::{
     BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras, SequenceModule,
 };
 use crate::torch::initializers::Initializer;
-use crate::utils::torch::TensorDef;
+use crate::torch::serialize::TensorDef;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::iter::{self, Chain, Once};
