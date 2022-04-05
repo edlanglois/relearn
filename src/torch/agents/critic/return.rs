@@ -10,8 +10,8 @@ use tch::{Device, Tensor};
 /// Also known as the Monte Carlo reward-to-go.
 ///
 /// # Warning
-/// Does not properly handle interrupted episodes.
-/// This assumes that all episodes end with a reward of 0.
+/// This assumes that all episodes end with a reward of 0 (including interrupted episodes).
+/// There is no alternative since this critic lacks an estimated value model.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Return;
 
@@ -55,6 +55,7 @@ impl Module for Return {
 impl Critic for Return {
     #[inline]
     fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> Tensor {
+        // Note: This assumes that all episodes end with 0 return.
         features.returns().shallow_clone()
     }
 

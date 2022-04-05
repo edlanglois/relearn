@@ -1,10 +1,14 @@
 //! Utilities for calculating step history features.
+use crate::envs::Successor;
 use crate::simulation::PartialStep;
 use crate::spaces::{FeatureSpace, ReprSpace, Space};
 use crate::torch::ExclusiveTensor;
 use crate::utils::packed::PackedSeqIter;
+use crate::utils::sequence::Sequence;
 use lazycell::LazyCell;
-use tch::{Device, Tensor};
+use ndarray::Axis;
+use std::iter;
+use tch::{Device, IndexOp, Tensor};
 
 /// View history features as packed tensors.
 pub trait PackedHistoryFeaturesView {
@@ -13,11 +17,34 @@ pub trait PackedHistoryFeaturesView {
     /// Note: Batch sizes are always >= 0 but the [tch] API uses i64.
     fn batch_sizes(&self) -> &[i64];
 
-    /// Batch sizes in the packing. A 1D i64 tensor.
+    /// Batch sizes in the extended packing.
+    ///
+    /// Note: Batch sizes are always >= 0 but the [tch] API uses i64.
+    ///
+    /// Equal to `[num_episodes]` followed by `batch_sizes()`.
+    fn extended_batch_sizes(&self) -> &[i64];
+
+    /// Batch sizes in the packing. A 1D non-negative i64 tensor.
     fn batch_sizes_tensor(&self) -> &Tensor;
+
+    /// Batch sizes in the extended packing. A 1D non-negative i64 tensor.
+    ///
+    /// Equal to `[num_episodes]` followed by `batch_sizes()`.
+    fn extended_batch_sizes_tensor(&self) -> &Tensor;
 
     /// Packed observation features. A 2D f64 tensor.
     fn observation_features(&self) -> &Tensor;
+
+    /// Packed extended observation features. Includes interrupted successor observations.
+    ///
+    /// # Returns
+    /// * `extended_observations` - A 2D f64 tensor. Rows are the features of `step.observation`
+    ///     for each step in an episode followed by the features of `step.next` on the last step of
+    ///     the episode if it is `Step::Interrupt` or zeros otherwise.
+    /// * `is_invalid` - A 1D boolean tensor with length equal to the number of rows of
+    ///     `extended_observations`. Is `true` where the corresponding row of
+    ///     `extended_observations` is invalid (non-interrupted end-of-episode).
+    fn extended_observation_features(&self) -> (&Tensor, &Tensor);
 
     /// Packed action values.
     ///
@@ -37,8 +64,8 @@ pub trait PackedHistoryFeaturesView {
     /// starting from each step in the episode to the end of the episode.
     ///
     /// # Warning
-    /// In the case of interrupted episodes (`Successor::Terminate`), this incorrectly assumes that
-    /// all future rewards are zero.
+    /// In the case of interrupted episodes (`Successor::Terminate`),
+    /// this incorrectly assumes that all future rewards are zero.
     // TODO: Allow specifying an estimator for terminated episodes.
     fn returns(&self) -> &Tensor;
 
@@ -65,9 +92,11 @@ pub struct LazyPackedHistoryFeatures<'a, OS: Space + ?Sized, AS: Space + ?Sized>
     /// the `i`-the step of each episode that is long enough.
     step_offsets: Vec<usize>,
 
-    cached_batch_sizes: LazyCell<Vec<i64>>,
+    cached_extended_batch_sizes: LazyCell<Vec<i64>>,
     cached_batch_sizes_tensor: LazyCell<Tensor>,
+    cached_extended_batch_sizes_tensor: LazyCell<Tensor>,
     cached_observation_features: LazyCell<Tensor>,
+    cached_extended_observation_features: LazyCell<(Tensor, Tensor)>,
     cached_actions: LazyCell<Tensor>,
     cached_returns: LazyCell<Tensor>,
     cached_rewards: LazyCell<Tensor>,
@@ -94,7 +123,7 @@ where
         let step_offsets = step_offsets(&episodes);
         assert_eq!(
             *step_offsets.last().unwrap(),
-            episodes.iter().map(|ep| ep.len()).sum::<usize>()
+            episodes.iter().map(Sequence::len).sum::<usize>()
         );
 
         Self {
@@ -104,9 +133,11 @@ where
             discount_factor,
             device,
             step_offsets,
-            cached_batch_sizes: LazyCell::new(),
+            cached_extended_batch_sizes: LazyCell::new(),
             cached_batch_sizes_tensor: LazyCell::new(),
+            cached_extended_batch_sizes_tensor: LazyCell::new(),
             cached_observation_features: LazyCell::new(),
+            cached_extended_observation_features: LazyCell::new(),
             cached_actions: LazyCell::new(),
             cached_returns: LazyCell::new(),
             cached_rewards: LazyCell::new(),
@@ -133,10 +164,13 @@ where
     AS: ReprSpace<Tensor> + ?Sized,
 {
     fn batch_sizes(&self) -> &[i64] {
-        self.cached_batch_sizes.borrow_with(|| {
-            self.step_offsets
-                .windows(2)
-                .map(|w| (w[1] - w[0]) as i64)
+        &self.extended_batch_sizes()[1..]
+    }
+
+    fn extended_batch_sizes(&self) -> &[i64] {
+        self.cached_extended_batch_sizes.borrow_with(|| {
+            iter::once(self.episodes.len() as i64)
+                .chain(self.step_offsets.windows(2).map(|w| (w[1] - w[0]) as i64))
                 .collect()
         })
     }
@@ -144,7 +178,13 @@ where
     fn batch_sizes_tensor(&self) -> &Tensor {
         // Must stay on the CPU
         self.cached_batch_sizes_tensor
-            .borrow_with(|| Tensor::of_slice(self.batch_sizes()))
+            .borrow_with(|| self.extended_batch_sizes_tensor().i(1..))
+    }
+
+    fn extended_batch_sizes_tensor(&self) -> &Tensor {
+        // Must stay on the CPU
+        self.cached_extended_batch_sizes_tensor
+            .borrow_with(|| Tensor::of_slice(self.extended_batch_sizes()))
     }
 
     fn observation_features(&self) -> &Tensor {
@@ -155,6 +195,48 @@ where
                 )
                 .to(self.device)
         })
+    }
+
+    fn extended_observation_features(&self) -> (&Tensor, &Tensor) {
+        let (extended_observations, is_invalid) =
+            self.cached_extended_observation_features.borrow_with(|| {
+                let observations = PackedSeqIter::from_sorted(
+                    self.episodes
+                        .iter()
+                        .copied()
+                        .map(ExtendedEpisodeObservations::from),
+                );
+                let num_observations = observations.len();
+                let num_features = self.observation_space.num_features();
+
+                let mut extended_observations =
+                    ExclusiveTensor::<f32, _>::zeros((num_observations, num_features));
+                let mut is_invalid = ExclusiveTensor::<bool, _>::zeros(num_observations);
+                {
+                    let mut extended_observations = extended_observations.array_view_mut();
+                    let mut is_invalid = is_invalid.array_view_mut();
+                    for (i, obs) in observations.enumerate() {
+                        if let Some(obs) = obs {
+                            self.observation_space.features_out(
+                                obs,
+                                extended_observations
+                                    .index_axis_mut(Axis(0), i)
+                                    .as_slice_mut()
+                                    .unwrap(),
+                                true,
+                            );
+                        } else {
+                            is_invalid[i] = true;
+                        }
+                    }
+                }
+
+                (
+                    Tensor::from(extended_observations).to(self.device),
+                    Tensor::from(is_invalid).to(self.device),
+                )
+            });
+        (extended_observations, is_invalid)
     }
 
     fn actions(&self) -> &Tensor {
@@ -184,7 +266,6 @@ where
             let mut returns = ExclusiveTensor::zeros(*self.step_offsets.last().unwrap());
             let returns_view = returns.as_slice_mut();
             for (ep_idx, episode) in self.episodes.iter().enumerate() {
-                // TODO: Allow specifying an estimated value for non-terminal-end-of-episode.
                 let mut return_ = 0.0;
                 for (step, i) in episode
                     .iter()
@@ -214,7 +295,7 @@ where
 /// # Args
 /// * `sorted_episode_lengths` - Sequences lengths sorted in monotonic decreasing order.
 fn step_offsets<T>(sequences: &[&[T]]) -> Vec<usize> {
-    let max_episode_len = sequences.first().map_or(0, |seq| seq.len());
+    let max_episode_len = sequences.first().map_or(0, Sequence::len);
     let mut step_offsets = Vec::with_capacity(max_episode_len + 1);
     let mut batch_size = sequences.len();
     let mut offset = 0;
@@ -245,6 +326,51 @@ fn packed_sequence_indices(
         debug_assert!(idx < w[1]);
         idx
     })
+}
+
+/// View an episode as a `Sequence` of observations: one per step followed by the final successor.
+///
+/// All items are `Some` except possibly the final successor observation, which is `None` for
+/// `Successor::Terminate` or empty episodes.
+struct ExtendedEpisodeObservations<'a, O, A> {
+    episode: &'a [PartialStep<O, A>],
+}
+
+impl<'a, O, A> From<&'a [PartialStep<O, A>]> for ExtendedEpisodeObservations<'a, O, A> {
+    fn from(episode: &'a [PartialStep<O, A>]) -> Self {
+        Self { episode }
+    }
+}
+
+impl<'a, O, A> Sequence for ExtendedEpisodeObservations<'a, O, A> {
+    type Item = Option<&'a O>;
+    fn len(&self) -> usize {
+        // Each step plus the final successor.
+        self.episode.len() + 1
+    }
+    fn is_empty(&self) -> bool {
+        false
+    }
+    fn get(&self, idx: usize) -> Option<Self::Item> {
+        let ep_len = self.episode.len();
+        if idx < ep_len {
+            // Within episode
+            Some(Some(&self.episode[idx].observation))
+        } else if idx == 0 {
+            // One past the end of an empty episode
+            Some(None)
+        } else if idx == ep_len {
+            // One past the end of a non-empty episode.
+            // Return step.next if the episode was interrupted, otherwise None.
+            Some(match &self.episode[idx - 1].next {
+                Successor::Interrupt(obs) => Some(obs),
+                _ => None,
+            })
+        } else {
+            // More than one past the end of the episode.
+            None
+        }
+    }
 }
 
 #[cfg(test)]

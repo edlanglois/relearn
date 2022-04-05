@@ -208,16 +208,39 @@ where
     (old_group_sizes, new_group_sizes)
 }
 
-/// Copy a packed tensor without the last n elements of each sequence.
+/// View a packed tensor without the first `n` elements of each sequence.
 ///
 /// # Args
-/// * `packed`: A tensor of sequences packed along the first dimension.
-/// * `batch_sizes`: Batch sizes along the first dimension of `packed`.
+/// * `packed` - A tensor of sequences packed along the first dimensionl.
+/// * `batch_sizes` - Batch sizes along the first dimension of `packed`.
+/// * `n` - Number of elements to trim off the start of each sequence.
 ///
 /// # Returns
-/// * `packed`: Packed values from `packed` excluding the last `n` steps of each
-///     sequence. Has the same shape as `packed` except for the first dimension.
-/// * `batch_sizes`: Batch sizes for the output packed tensor.
+/// * `packed` - View of `packed` excluding the first `n` steps of each sequence.
+///              Has the same shape as `packed` (input) except for the first dimension.
+/// * `batch_sizes` - Batch sizes for the output packed tensor. Equal to `&batch_sizes[n..]`.
+pub fn packed_tensor_trim_start<'a>(
+    packed: &Tensor,
+    batch_sizes: &'a [i64],
+    n: usize,
+) -> (Tensor, &'a [i64]) {
+    let (removed_batches, new_batch_sizes) = batch_sizes.split_at(n);
+    let steps_to_remove: i64 = removed_batches.iter().sum();
+    let new_packed = packed.i(steps_to_remove..);
+    (new_packed, new_batch_sizes)
+}
+
+/// Copy a packed tensor without the last `n` elements of each sequence.
+///
+/// # Args
+/// * `packed` - A tensor of sequences packed along the first dimension.
+/// * `batch_sizes` -  Batch sizes along the first dimension of `packed`.
+/// * `n` - Number of elements to trim off the end of each sequence.
+///
+/// # Returns
+/// * `packed` - Copy of `packed` excluding the last `n` steps of each sequence.
+///              Has the same shape as `packed` (input) except for the first dimension.
+/// * `batch_sizes` - Batch sizes for the output packed tensor. Equal to `&batch_sizes[n..]`.
 ///
 pub fn packed_tensor_trim_end<'a>(
     packed: &Tensor,
@@ -391,6 +414,28 @@ mod packed_tensor {
     }
 
     #[test]
+    fn trim_start_n1() {
+        // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
+        let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
+        let batch_sizes = [3, 3, 1, 1];
+        let (packed_out, batch_sizes_out) = packed_tensor_trim_start(&packed, &batch_sizes, 1);
+        // Sequences: [1, 2, 3], [11], [101]
+        assert_eq!(packed_out, Tensor::of_slice(&[1, 11, 101, 2, 3]));
+        assert_eq!(batch_sizes_out, &[3, 1, 1]);
+    }
+
+    #[test]
+    fn trim_start_n3() {
+        // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
+        let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
+        let batch_sizes = [3, 3, 1, 1];
+        let (packed_out, batch_sizes_out) = packed_tensor_trim_start(&packed, &batch_sizes, 3);
+        // Sequences: [3]
+        assert_eq!(packed_out, Tensor::of_slice(&[3]));
+        assert_eq!(batch_sizes_out, &[1]);
+    }
+
+    #[test]
     fn trim_end_n1() {
         // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
         let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
@@ -399,6 +444,17 @@ mod packed_tensor {
         // Sequences: [0, 1, 2], [10], [100]
         assert_eq!(packed_out, Tensor::of_slice(&[0, 10, 100, 1, 2]));
         assert_eq!(batch_sizes_out, &[3, 1, 1]);
+    }
+
+    #[test]
+    fn trim_end_n3() {
+        // Sequences: [0, 1, 2, 3], [10, 11], [100, 101]
+        let packed = Tensor::of_slice(&[0, 10, 100, 1, 11, 101, 2, 3]);
+        let batch_sizes = [3, 3, 1, 1];
+        let (packed_out, batch_sizes_out) = packed_tensor_trim_end(&packed, &batch_sizes, 3);
+        // Sequences: [0]
+        assert_eq!(packed_out, Tensor::of_slice(&[0]));
+        assert_eq!(batch_sizes_out, &[1]);
     }
 
     #[test]

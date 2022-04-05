@@ -106,23 +106,29 @@ where
     V: SequenceModule,
 {
     fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> Tensor {
-        // Packed estimated values of the observed states
-        let estimated_values = self
-            .value_fn
-            .seq_packed(
-                features.observation_features(),
-                features.batch_sizes_tensor(),
-            )
-            .squeeze_dim(-1);
+        let (extended_observation_features, is_invalid) = features.extended_observation_features();
+        let extended_batch_sizes = features.extended_batch_sizes_tensor();
 
-        // Packed estimated value for the observed successor states.
-        // Assumes that all end-of-episodes are terminal and have value 0.
-        //
-        // More generally, we should apply the value function to last_step.next_observation.
-        // But this is tricky since the value function can be a sequential module and require the
-        // state from the rest of the episode.
-        let estimated_next_values =
-            packed::packed_tensor_push_shift(&estimated_values, features.batch_sizes(), 0.0);
+        // Packed estimated values of the observed states
+        let mut extended_estimated_values = self
+            .value_fn
+            .seq_packed(extended_observation_features, extended_batch_sizes)
+            .squeeze_dim(-1);
+        let _ = extended_estimated_values.masked_fill_(is_invalid, 0.0);
+
+        // Estimated values for each of `step.observation`
+        let (estimated_values, _) = packed::packed_tensor_trim_end(
+            &extended_estimated_values,
+            features.extended_batch_sizes(),
+            1,
+        );
+
+        // Estimated value for each of `step.next.into_inner().observation`
+        let (estimated_next_values, _) = packed::packed_tensor_trim_start(
+            &extended_estimated_values,
+            features.extended_batch_sizes(),
+            1,
+        );
 
         let discount_factor = features.discount_factor();
 
