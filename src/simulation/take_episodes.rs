@@ -60,16 +60,40 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.n > 0 {
-            let step = self.steps.next();
-            if let Some(s) = &step {
-                if s.episode_done() {
-                    self.n -= 1;
-                }
+            let step = self.steps.next()?;
+            if step.episode_done() {
+                self.n -= 1;
             }
-            step
+            Some(step)
         } else {
             None
         }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (min, max) = self.steps.size_hint();
+        // Each episode requires at least one step
+        (min.min(self.n), max)
+    }
+
+    #[inline]
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let mut n = self.n;
+        self.take_while(move |step| {
+            if n > 0 {
+                if step.episode_done() {
+                    n -= 1;
+                }
+                true
+            } else {
+                false
+            }
+        })
+        .fold(init, f)
     }
 }
 

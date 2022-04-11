@@ -134,8 +134,6 @@ where
         );
 
         // Store the next state and observation if the environment continues.
-        // Collect the successor observation information (converting Continue into a reference)
-        // for passing to the callback function.
         debug_assert!(self.state.is_none());
         let next = match successor {
             // Get the next state from `successor`.

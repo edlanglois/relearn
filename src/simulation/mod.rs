@@ -3,12 +3,14 @@ mod log_steps;
 mod steps;
 mod summary;
 mod take_episodes;
+mod take_steps;
 mod train;
 
 pub use log_steps::LogSteps;
 pub use steps::Steps;
 pub use summary::{OnlineStepsSummary, StepsSummary};
 pub use take_episodes::TakeEpisodes;
+pub use take_steps::TakeAlignedSteps;
 pub use train::{train_parallel, train_serial, TrainParallelConfig};
 
 use crate::agents::Actor;
@@ -131,6 +133,17 @@ pub trait StepsIter<O, A>: Iterator<Item = PartialStep<O, A>> {
         Self: Sized,
     {
         TakeEpisodes::new(self, n)
+    }
+
+    /// Creates an iterator of at least `min_steps` and at most `min_steps + slack` steps.
+    ///
+    /// Ends on the first episode boundary in this interval.
+    #[inline]
+    fn take_aligned_steps(self, min_steps: usize, slack: usize) -> TakeAlignedSteps<Self>
+    where
+        Self: Sized,
+    {
+        TakeAlignedSteps::new(self, min_steps, slack)
     }
 }
 
