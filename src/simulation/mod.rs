@@ -17,6 +17,7 @@ use crate::agents::Actor;
 use crate::envs::{EnvStructure, Environment, StructuredEnvironment, Successor};
 use crate::logging::StatsLogger;
 use rand::{Rng, SeedableRng};
+use std::mem;
 
 /// Description of an environment step.
 ///
@@ -87,6 +88,37 @@ impl<O: Clone, A> TransientStep<'_, O, A> {
 /// Using this can help avoid copying the observation.
 pub type PartialStep<O, A> = Step<O, A, ()>;
 
+impl<O, A> PartialStep<O, A> {
+    /// Convert a partial step into a transient step using the given reference to the next step.
+    #[inline]
+    pub fn into_transient_with(self, next: &Self) -> TransientStep<O, A> {
+        Step {
+            observation: self.observation,
+            action: self.action,
+            reward: self.reward,
+            next: self.next.map_continue(|_: ()| &next.observation),
+        }
+    }
+
+    /// Try to convert into a transient step with no successor.
+    ///
+    /// Succeeds so long as `self.next` is not `Successor::Continue`.
+    #[inline]
+    #[allow(clippy::missing_const_for_fn)] // false positive
+    pub fn try_into_transient<'a>(self) -> Option<TransientStep<'a, O, A>> {
+        Some(Step {
+            observation: self.observation,
+            action: self.action,
+            reward: self.reward,
+            next: match self.next {
+                Successor::Continue(()) => return None,
+                Successor::Terminate => Successor::Terminate,
+                Successor::Interrupt(obs) => Successor::Interrupt(obs),
+            },
+        })
+    }
+}
+
 /// Seed for simulation pseudo-random state.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum SimSeed {
@@ -138,12 +170,69 @@ pub trait StepsIter<O, A>: Iterator<Item = PartialStep<O, A>> {
     /// Creates an iterator of at least `min_steps` and at most `min_steps + slack` steps.
     ///
     /// Ends on the first episode boundary in this interval.
+    /// If the maximum step count is reached then the episode is interrupted
+    /// (`Successor::Continue` changed to `Successor::Interrupt`).
     #[inline]
     fn take_aligned_steps(self, min_steps: usize, slack: usize) -> TakeAlignedSteps<Self>
     where
         Self: Sized,
     {
         TakeAlignedSteps::new(self, min_steps, slack)
+    }
+
+    /// Fold each step viewed as a [`TransientStep`] into an accumulator using a closure.
+    ///
+    /// This is the equivalent of [`Iterator::fold`] on an iterator of `TransientStep`
+    /// except that such an iterator cannot be created with generic associated types.
+    ///
+    /// If the final `step.next` is `Successor::Continue` then that step is skipped since the
+    /// successor observation is missing. The code in this module avoids creating such an
+    /// abruptly-ending steps iterator but it is possible with the standard iterator methods like
+    /// `take(n)`.
+    #[inline]
+    fn fold_transient_steps<B, F>(mut self, init: B, mut f: F) -> B
+    where
+        F: FnMut(B, TransientStep<O, A>) -> B,
+        Self: Sized,
+    {
+        let mut stored = match self.next() {
+            Some(step) => step,
+            None => return init,
+        };
+
+        // Fold on self with a lag of one step:
+        // At the start of each call to the closure, `stored` is the previous step.
+        // We replace it with the current step (`next`) then convert the previous step
+        // into a transient step with the next step reference of `stored`.
+        let acc = self.fold(init, |acc, next| {
+            let step = mem::replace(&mut stored, next);
+            f(acc, step.into_transient_with(&stored))
+        });
+
+        // Stored now holds the last step.
+        // We can include it so long as it does not expect a successor.
+        if let Some(step) = stored.try_into_transient() {
+            f(acc, step)
+        } else {
+            acc
+        }
+    }
+
+    /// Call a closure on each step viewed as a [`TransientStep`].
+    ///
+    /// This is the equivalent of [`Iterator::for_each`] on an iterator of `TransientStep`
+    /// except that such an iterator cannot be created with generic associated types.
+    ///
+    /// If the final `step.next` is `Successor::Continue` then that step is skipped since the
+    /// successor observation is missing. This situation should not arise if using `take_episodes`
+    /// or `take_aligned_steps`.
+    #[inline]
+    fn for_each_transient_step<F>(self, mut f: F)
+    where
+        F: FnMut(TransientStep<O, A>),
+        Self: Sized,
+    {
+        self.fold_transient_steps((), |_, step| f(step));
     }
 }
 

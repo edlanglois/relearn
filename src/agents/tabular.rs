@@ -1,12 +1,11 @@
 //! Tabular agents
 use super::{
-    buffers::{for_each_transient_step, SimpleBuffer},
-    finite::FiniteSpaceAgent,
-    Actor, ActorMode, Agent, BatchUpdate, BufferCapacityBound, BuildAgent, BuildAgentError,
+    buffers::SimpleBuffer, finite::FiniteSpaceAgent, Actor, ActorMode, Agent, BatchUpdate,
+    BufferCapacityBound, BuildAgent, BuildAgentError,
 };
 use crate::envs::EnvStructure;
 use crate::logging::StatsLogger;
-use crate::simulation::TransientStep;
+use crate::simulation::{StepsIter, TransientStep};
 use crate::spaces::FiniteSpace;
 use crate::Prng;
 use ndarray::{Array, Array2, Axis};
@@ -200,7 +199,9 @@ impl BatchUpdate<usize, usize> for BaseTabularQLearningAgent {
         Self::HistoryBuffer: 'a,
     {
         for buffer in buffers {
-            for_each_transient_step(buffer.drain_steps(), |step| self.step_update(step));
+            buffer
+                .drain_steps()
+                .for_each_transient_step(|step| self.step_update(step));
         }
     }
 

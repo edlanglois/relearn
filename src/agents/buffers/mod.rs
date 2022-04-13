@@ -5,8 +5,7 @@ mod simple;
 pub use null::NullBuffer;
 pub use simple::SimpleBuffer;
 
-use crate::envs::Successor;
-use crate::simulation::{PartialStep, TransientStep};
+use crate::simulation::PartialStep;
 
 /// Lower bound on the amount of data required by a buffer to ready itself.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
@@ -142,31 +141,3 @@ macro_rules! impl_wrapped_write_history_buffer {
 }
 impl_wrapped_write_history_buffer!(&'_ mut T);
 impl_wrapped_write_history_buffer!(Box<T>);
-
-/// Call a closure on each step of a [`PartialStep`] iterator as a [`TransientStep`].
-///
-/// Skips the final step if its `next` is `Successor::Continue` since the following observation is
-/// not available.
-pub fn for_each_transient_step<I, F, O, A>(steps: I, mut f: F)
-where
-    I: Iterator<Item = PartialStep<O, A>>,
-    F: FnMut(TransientStep<O, A>),
-{
-    let mut steps = steps.peekable();
-    while let Some(step) = steps.next() {
-        let transient_step = TransientStep {
-            observation: step.observation,
-            action: step.action,
-            reward: step.reward,
-            next: match step.next {
-                Successor::Continue(()) => match steps.peek() {
-                    Some(next_step) => Successor::Continue(&next_step.observation),
-                    None => break, // Missing successor step
-                },
-                Successor::Terminate => Successor::Terminate,
-                Successor::Interrupt(o) => Successor::Interrupt(o),
-            },
-        };
-        f(transient_step)
-    }
-}
