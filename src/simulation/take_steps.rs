@@ -211,6 +211,7 @@ mod tests {
     }
 
     #[rstest]
+    #[allow(clippy::needless_pass_by_value)]
     fn take_unaligned_slack(steps: Steps) {
         assert_eq!(
             steps
