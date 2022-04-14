@@ -17,7 +17,7 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
-pub use buffers::{BufferCapacityBound, WriteHistoryBuffer};
+pub use buffers::{HistoryDataBound, WriteHistoryBuffer};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
 pub use pair::AgentPair;
 pub use r#dyn::{BoxActor, BoxAgent, DynAgent};
@@ -160,32 +160,32 @@ pub enum ActorMode {
 }
 
 /// Update an agent with steps collected into history buffers.
+///
+/// The user is only responsible for adding data to the history buffer.
+/// If old data in the buffer needs to be cleared that is the reponsibility of either the buffer
+/// or the `batch_update` method.
 pub trait BatchUpdate<O, A> {
     type HistoryBuffer: WriteHistoryBuffer<O, A>;
 
-    /// Requested total capacity of all buffers used on `batch_update`.
-    ///
-    /// This bound may be increased by the caller or divided across multiple buffers.
-    /// For example, to facilitate efficient multithread collection.
-    /// The caller may also ignore the bound entirely and create buffers of any size but doing so
-    /// can negatively impact learning performance.
-    fn batch_size_hint(&self) -> BufferCapacityBound;
+    /// Create a new history buffer.
+    fn buffer(&self) -> Self::HistoryBuffer;
 
-    /// Create a new history buffer, with capacity at least the given bound if possible.
-    ///
-    /// The caller should try to ensure that the total capacity of all buffers is at least at large
-    /// as the bound given by [`BatchUpdate::batch_size_hint`].
-    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer;
+    /// Request a minimum amount of on-policy data for the next batch update.
+    fn min_update_size(&self) -> HistoryDataBound;
 
     /// Update the agent from a collection of history buffers.
     ///
-    /// This function is responsible for draining the buffer if the data should not be reused.
-    /// Any data left in the buffer should remain for the next call to `batch_update`.
-    ///
     /// All new data inserted into the buffers since the last call must be on-policy.
+    /// The last step inserted into the buffer must end its episode -- either by termination or
+    /// interruption. (Non-final steps are also allowed to end episodes).
     ///
-    /// The buffers can be of any size but callers should try to match (ideally) or exceed the size
-    /// given by [`BatchUpdate::batch_size_hint`].
+    /// This function and the history buffer itself are jointly reponsible for managing the data
+    /// within the buffer. The buffers may be emptied by the call.
+    ///
+    /// # Implementation Note
+    /// This iterator-generic `batch_update` is necessary because some agents modify the given
+    /// buffer references before passing to `batch_update` of an inner agent. This would not work
+    /// if the inner agent only took a slice of buffers.
     fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
     where
         Self: Sized,
@@ -219,12 +219,15 @@ macro_rules! impl_wrapped_batch_update {
             T: BatchUpdate<O, A> + ?Sized,
         {
             type HistoryBuffer = T::HistoryBuffer;
-            fn batch_size_hint(&self) -> BufferCapacityBound {
-                T::batch_size_hint(self)
+
+            fn buffer(&self) -> Self::HistoryBuffer {
+                T::buffer(self)
             }
-            fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
-                T::buffer(self, capacity)
+
+            fn min_update_size(&self) -> HistoryDataBound {
+                T::min_update_size(self)
             }
+
             fn batch_update<'a, I>(&mut self, _buffers: I, _logger: &mut dyn StatsLogger)
             where
                 Self: Sized,

@@ -5,85 +5,81 @@ mod simple;
 pub use null::NullBuffer;
 pub use simple::SimpleBuffer;
 
-use crate::simulation::PartialStep;
+use crate::simulation::{PartialStep, Step, StepsIter, TakeAlignedSteps};
+use serde::{Deserialize, Serialize};
 
-/// Lower bound on the amount of data required by a buffer to ready itself.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct BufferCapacityBound {
-    /// Minimum number of steps for the buffer to store.
+/// Lower bound on an amount of actor-environment simulation steps.
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct HistoryDataBound {
+    /// Minimum number of steps.
     pub min_steps: usize,
 
-    /// Minimum number of episodes for the buffer to store.
-    pub min_episodes: usize,
-
-    /// Minimum length of an incomplete episode at which the buffer may indicate ready.
-    ///
-    /// Buffers will generally try to indicate `ready` only at episode boundaries.
-    /// Setting this allows the buffer to ready itself on environments with unbounded or infinitely
-    /// long episodes.
-    pub min_incomplete_episode_len: Option<usize>,
+    /// Min number of slack steps in excess of `min_steps` when waiting for the episode to end.
+    pub slack_steps: usize,
 }
 
-impl BufferCapacityBound {
-    /// Minimal lower bound; accept empty buffers
+impl HistoryDataBound {
+    #[inline]
     #[must_use]
     pub const fn empty() -> Self {
         Self {
             min_steps: 0,
-            min_episodes: 0,
-            min_incomplete_episode_len: Some(0),
+            slack_steps: 0,
         }
     }
 
-    /// Set `min_steps` to the maximum of the current value and the given value.
+    #[inline]
     #[must_use]
-    pub fn with_steps_at_least(mut self, min_steps: usize) -> Self {
-        self.min_steps = self.min_steps.max(min_steps);
-        self
+    pub const fn new(min_steps: usize, slack_steps: usize) -> Self {
+        Self {
+            min_steps,
+            slack_steps,
+        }
     }
 
-    /// Set `min_episodes` to the maximum of the current value and the given value.
-    #[must_use]
-    pub fn with_episodes_at_least(mut self, min_episodes: usize) -> Self {
-        self.min_episodes = self.min_episodes.max(min_episodes);
-        self
-    }
-
-    /// Set `min_incomplete_episode_len` to the maximum of the current value and the given value.
-    #[must_use]
-    pub fn with_incomplete_len_at_least(mut self, min_incomplete_episode_len: usize) -> Self {
-        self.min_incomplete_episode_len = Some(
-            self.min_incomplete_episode_len
-                .map_or(min_incomplete_episode_len, |len| {
-                    len.max(min_incomplete_episode_len)
-                }),
-        );
-        self
-    }
-
-    /// The maximum of two bounds (field-by-field)
+    /// The maximum of two bounds (maximum of each field).
+    #[inline]
     #[must_use]
     pub fn max(self, other: Self) -> Self {
         Self {
             min_steps: self.min_steps.max(other.min_steps),
-            min_episodes: self.min_episodes.max(other.min_episodes),
-            min_incomplete_episode_len: self
-                .min_incomplete_episode_len
-                .zip(other.min_incomplete_episode_len)
-                .map(|(a, b)| a.max(b)),
+            slack_steps: self.slack_steps.max(other.slack_steps),
         }
     }
 
-    /// Divide the capacity into a bound of `1 / n` the size, rounding up.
+    /// Divide the bound into one of `1 / n` the size, rounding up.
     ///
-    /// `n` buffers meeting the smaller bound will collectively meet the larger bound.
+    /// `n` buffers metting the smaller bound will collectively meet the larger bound.
+    #[inline]
     #[must_use]
     pub const fn divide(self, n: usize) -> Self {
         Self {
             min_steps: div_ceil(self.min_steps, n),
-            min_episodes: div_ceil(self.min_episodes, n),
-            min_incomplete_episode_len: self.min_incomplete_episode_len,
+            slack_steps: self.slack_steps,
         }
+    }
+
+    /// Check whether a sequence of steps satisfies the bound.
+    ///
+    /// # Args
+    /// * `num_steps` - The number of steps in the sequence.
+    /// * `last`      - The last step in the sequence (or `None` if the sequence is empty).
+    #[inline]
+    #[must_use]
+    pub fn is_satisfied<O, A, U>(&self, num_steps: usize, last: Option<&Step<O, A, U>>) -> bool {
+        num_steps >= self.min_steps && last.map_or(true, Step::episode_done)
+            || num_steps >= self.min_steps + self.slack_steps
+    }
+
+    /// Apply the bound to an iterator of steps, taking the required number of steps.
+    #[inline]
+    pub fn take<I, O, A>(self, steps: I) -> TakeAlignedSteps<I::IntoIter>
+    where
+        I: IntoIterator<Item = PartialStep<O, A>>,
+    {
+        steps
+            .into_iter()
+            .take_aligned_steps(self.min_steps, self.slack_steps)
     }
 }
 
@@ -99,27 +95,19 @@ const fn div_ceil(numerator: usize, denominator: usize) -> usize {
 
 /// Add data to a history buffer.
 pub trait WriteHistoryBuffer<O, A> {
-    /// Insert a step into the buffer and return whether the buffer is ready for use.
-    fn push(&mut self, step: PartialStep<O, A>) -> bool;
+    /// Insert a step into the buffer.
+    fn push(&mut self, step: PartialStep<O, A>);
 
-    /// Extend the buffer with steps from an iterator, stopping once ready for use.
-    ///
-    /// Returns whether the buffer is ready.
-    fn extend_until_ready<I>(&mut self, steps: I) -> bool
+    /// Insert a sequence of steps into the buffer.
+    fn extend<I>(&mut self, steps: I)
     where
         I: IntoIterator<Item = PartialStep<O, A>>,
         Self: Sized,
     {
         for step in steps {
-            if self.push(step) {
-                return true;
-            }
+            self.push(step)
         }
-        false
     }
-
-    /// Clear the buffer, removing all values.
-    fn clear(&mut self);
 }
 
 /// Implement `WriteHistoryBuffer<O, A>` for a deref-able generic wrapper type.
@@ -129,12 +117,8 @@ macro_rules! impl_wrapped_write_history_buffer {
         where
             T: WriteHistoryBuffer<O, A> + ?Sized,
         {
-            fn push(&mut self, step: PartialStep<O, A>) -> bool {
+            fn push(&mut self, step: PartialStep<O, A>) {
                 T::push(self, step)
-            }
-
-            fn clear(&mut self) {
-                T::clear(self)
             }
         }
     };

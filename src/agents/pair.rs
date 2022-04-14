@@ -1,5 +1,5 @@
 use super::{
-    Actor, ActorMode, Agent, BatchUpdate, BufferCapacityBound, BuildAgent, BuildAgentError,
+    Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, HistoryDataBound,
     WriteHistoryBuffer,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
@@ -63,12 +63,12 @@ where
 {
     type HistoryBuffer = HistoryBufferPair<T0::HistoryBuffer, T1::HistoryBuffer>;
 
-    fn batch_size_hint(&self) -> BufferCapacityBound {
-        self.0.batch_size_hint().max(self.1.batch_size_hint())
+    fn buffer(&self) -> Self::HistoryBuffer {
+        HistoryBufferPair(self.0.buffer(), self.1.buffer())
     }
 
-    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
-        HistoryBufferPair(self.0.buffer(capacity), self.1.buffer(capacity))
+    fn min_update_size(&self) -> HistoryDataBound {
+        self.0.min_update_size().max(self.1.min_update_size())
     }
 
     fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
@@ -111,17 +111,11 @@ where
     B0: WriteHistoryBuffer<O0, A0>,
     B1: WriteHistoryBuffer<O1, A1>,
 {
-    fn push(&mut self, step: PartialStep<(O0, O1), (A0, A1)>) -> bool {
+    fn push(&mut self, step: PartialStep<(O0, O1), (A0, A1)>) {
         // wait until both buffers are full
         let (step1, step2) = split_partial_step(step);
-        let full1 = self.0.push(step1);
-        let full2 = self.1.push(step2);
-        full1 && full2
-    }
-
-    fn clear(&mut self) {
-        self.0.clear();
-        self.1.clear();
+        self.0.push(step1);
+        self.1.push(step2);
     }
 }
 

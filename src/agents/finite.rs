@@ -1,4 +1,4 @@
-use super::{Actor, ActorMode, Agent, BatchUpdate, BufferCapacityBound, WriteHistoryBuffer};
+use super::{Actor, ActorMode, Agent, BatchUpdate, HistoryDataBound, WriteHistoryBuffer};
 use crate::envs::Successor;
 use crate::logging::StatsLogger;
 use crate::simulation::{PartialStep, Step};
@@ -84,16 +84,16 @@ where
 {
     type HistoryBuffer = FiniteSpaceBuffer<T::HistoryBuffer, OS, AS>;
 
-    fn batch_size_hint(&self) -> BufferCapacityBound {
-        self.agent.batch_size_hint()
-    }
-
-    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
+    fn buffer(&self) -> Self::HistoryBuffer {
         FiniteSpaceBuffer {
-            buffer: self.agent.buffer(capacity),
+            buffer: self.agent.buffer(),
             observation_space: self.observation_space.clone(),
             action_space: self.action_space.clone(),
         }
+    }
+
+    fn min_update_size(&self) -> HistoryDataBound {
+        self.agent.min_update_size()
     }
 
     fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
@@ -136,7 +136,7 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn push(&mut self, step: PartialStep<OS::Element, AS::Element>) -> bool {
+    fn push(&mut self, step: PartialStep<OS::Element, AS::Element>) {
         self.buffer.push(indexed_partial_step(
             &step,
             &self.observation_space,
@@ -144,19 +144,15 @@ where
         ))
     }
 
-    fn extend_until_ready<I>(&mut self, steps: I) -> bool
+    fn extend<I>(&mut self, steps: I)
     where
         I: IntoIterator<Item = PartialStep<OS::Element, AS::Element>>,
     {
-        self.buffer.extend_until_ready(
+        self.buffer.extend(
             steps.into_iter().map(|step| {
                 indexed_partial_step(&step, &self.observation_space, &self.action_space)
             }),
         )
-    }
-
-    fn clear(&mut self) {
-        self.buffer.clear()
     }
 }
 

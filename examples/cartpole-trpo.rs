@@ -40,7 +40,7 @@ fn main() {
             let training_config = TrainParallelConfig {
                 num_periods: 50,
                 num_threads: num_cpus::get(),
-                min_workers_steps: 10_000,
+                min_worker_steps: 10_000,
             };
             println!("Training Config\n{:#?}\n", training_config);
 

@@ -1,6 +1,8 @@
 //! Dynamic agent
-use super::buffers::{BufferCapacityBound, WriteHistoryBuffer};
-use super::{Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError};
+use super::{
+    Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, HistoryDataBound,
+    WriteHistoryBuffer,
+};
 use crate::envs::EnvStructure;
 use crate::logging::StatsLogger;
 use crate::spaces::Space;
@@ -110,12 +112,12 @@ where
 {
     type HistoryBuffer = Box<dyn AnyWriteHistoryBuffer<O, A>>;
 
-    fn batch_size_hint(&self) -> BufferCapacityBound {
-        self.0.batch_size_hint()
+    fn buffer(&self) -> Self::HistoryBuffer {
+        Box::new(self.0.buffer())
     }
 
-    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
-        Box::new(self.0.buffer(capacity))
+    fn min_update_size(&self) -> HistoryDataBound {
+        self.0.min_update_size()
     }
 
     fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)

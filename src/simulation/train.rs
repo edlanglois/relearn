@@ -1,5 +1,5 @@
 use super::{OnlineStepsSummary, Simulation, Steps, StepsSummary};
-use crate::agents::{ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
+use crate::agents::{buffers::HistoryDataBound, ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
 use crate::envs::{EnvStructure, Environment, StructuredEnvironment};
 use crate::logging::{Loggable, StatsLogger};
 use crate::spaces::{ElementRefInto, Space};
@@ -22,19 +22,20 @@ pub fn train_serial<T, E>(
     E::ObservationSpace: ElementRefInto<Loggable>,
     E::ActionSpace: ElementRefInto<Loggable>,
 {
-    let mut buffer = agent.buffer(agent.batch_size_hint());
+    let mut buffer = agent.buffer();
     for _ in 0..num_periods {
-        let ready = buffer.extend_until_ready(
-            Steps::new(
-                environment,
-                agent.actor(ActorMode::Training),
-                &mut *rng_env,
-                &mut *rng_agent,
-                &mut *logger,
-            )
-            .log(),
+        let update_size = agent.min_update_size();
+        buffer.extend(
+            update_size
+                .take(Steps::new(
+                    environment,
+                    agent.actor(ActorMode::Training),
+                    &mut *rng_env,
+                    &mut *rng_agent,
+                    &mut *logger,
+                ))
+                .log(),
         );
-        assert!(ready);
         agent.batch_update_single(&mut buffer, logger);
     }
 }
@@ -47,7 +48,7 @@ pub struct TrainParallelConfig {
     /// Number of simulation threads.
     pub num_threads: usize,
     /// Minimum step capacity of each worker buffer.
-    pub min_workers_steps: usize,
+    pub min_worker_steps: usize,
 }
 
 /// Train a batch learning agent in parallel across several threads.
@@ -75,13 +76,7 @@ pub fn train_parallel<T, E>(
     E::ObservationSpace: ElementRefInto<Loggable>,
     E::ActionSpace: ElementRefInto<Loggable>,
 {
-    let capacity = agent
-        .batch_size_hint()
-        .divide(config.num_threads)
-        .with_steps_at_least(config.min_workers_steps);
-    let mut buffers: Vec<_> = (0..config.num_threads)
-        .map(|_| agent.buffer(capacity))
-        .collect();
+    let mut buffers: Vec<_> = (0..config.num_threads).map(|_| agent.buffer()).collect();
     let mut thread_rngs: Vec<_> = (0..config.num_threads)
         .map(|_| {
             (
@@ -93,6 +88,15 @@ pub fn train_parallel<T, E>(
 
     for _ in 0..config.num_periods {
         let collect_start = Instant::now();
+
+        let worker_update_size =
+            agent
+                .min_update_size()
+                .divide(config.num_threads)
+                .max(HistoryDataBound {
+                    min_steps: config.min_worker_steps,
+                    slack_steps: 0,
+                });
 
         // Send the logger to the first thread
         let mut worker0_logger = logger.with_scope("worker0");
@@ -106,21 +110,21 @@ pub fn train_parallel<T, E>(
                 let thread_logger = send_logger.take();
                 threads.push(scope.spawn(move |_scope| {
                     let mut summary = OnlineStepsSummary::default();
-                    let ready = buffer.extend_until_ready(
-                        Steps::new(
-                            environment,
-                            actor,
-                            &mut rngs.0,
-                            &mut rngs.1,
-                            thread_logger.unwrap_or(&mut ()),
-                        )
-                        .log()
-                        .map(|step| {
-                            summary.push(&step);
-                            step
-                        }),
+                    buffer.extend(
+                        worker_update_size
+                            .take(Steps::new(
+                                environment,
+                                actor,
+                                &mut rngs.0,
+                                &mut rngs.1,
+                                thread_logger.unwrap_or(&mut ()),
+                            ))
+                            .log()
+                            .map(|step| {
+                                summary.push(&step);
+                                step
+                            }),
                     );
-                    assert!(ready);
                     StepsSummary::from(summary)
                 }));
             }
@@ -172,7 +176,7 @@ mod tests {
         let config = TrainParallelConfig {
             num_periods: 10,
             num_threads: 4,
-            min_workers_steps: 100,
+            min_worker_steps: 100,
         };
         let mut rng_env = Prng::seed_from_u64(0);
         let mut rng_actor = Prng::seed_from_u64(1);

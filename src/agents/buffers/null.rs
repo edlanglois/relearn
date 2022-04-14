@@ -6,16 +6,6 @@ use crate::simulation::PartialStep;
 pub struct NullBuffer;
 
 impl<O, A> WriteHistoryBuffer<O, A> for NullBuffer {
-    fn push(&mut self, _step: PartialStep<O, A>) -> bool {
-        true
-    }
-
-    fn extend_until_ready<I>(&mut self, _steps: I) -> bool
-    where
-        I: IntoIterator<Item = PartialStep<O, A>>,
-    {
-        true
-    }
-
-    fn clear(&mut self) {}
+    fn push(&mut self, _: PartialStep<O, A>) {}
+    fn extend<I: IntoIterator<Item = PartialStep<O, A>>>(&mut self, _: I) {}
 }

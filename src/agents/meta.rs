@@ -1,7 +1,7 @@
 //! Meta agents
 use super::{
     buffers::NullBuffer, serial::SerialActorAgent, Actor, ActorMode, Agent, BatchUpdate,
-    BufferCapacityBound, BuildAgent, BuildAgentError,
+    BuildAgent, BuildAgentError, HistoryDataBound,
 };
 use crate::envs::{
     EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
@@ -193,12 +193,12 @@ where
 {
     type HistoryBuffer = NullBuffer;
 
-    fn batch_size_hint(&self) -> BufferCapacityBound {
-        BufferCapacityBound::empty()
+    fn buffer(&self) -> Self::HistoryBuffer {
+        NullBuffer
     }
 
-    fn buffer(&self, _: BufferCapacityBound) -> Self::HistoryBuffer {
-        NullBuffer
+    fn min_update_size(&self) -> HistoryDataBound {
+        HistoryDataBound::empty()
     }
 
     fn batch_update<'a, I>(&mut self, _buffers: I, _logger: &mut dyn StatsLogger)

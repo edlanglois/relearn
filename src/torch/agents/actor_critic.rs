@@ -7,7 +7,7 @@ use super::{
     learning_policy::{BuildLearningPolicy, LearningPolicy},
 };
 use crate::{
-    agents::buffers::{BufferCapacityBound, SimpleBuffer, WriteHistoryBuffer},
+    agents::buffers::{HistoryDataBound, SimpleBuffer},
     agents::{ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError},
     envs::EnvStructure,
     logging::StatsLogger,
@@ -184,16 +184,16 @@ where
 {
     type HistoryBuffer = SimpleBuffer<OS::Element, AS::Element>;
 
-    fn batch_size_hint(&self) -> BufferCapacityBound {
-        BufferCapacityBound {
-            min_steps: self.min_batch_steps,
-            min_episodes: 0,
-            min_incomplete_episode_len: Some(100),
-        }
+    fn buffer(&self) -> Self::HistoryBuffer {
+        SimpleBuffer::with_capacity_for(self.min_update_size())
     }
 
-    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
-        SimpleBuffer::new(capacity)
+    fn min_update_size(&self) -> HistoryDataBound {
+        HistoryDataBound {
+            min_steps: self.min_batch_steps,
+            // 1% of min_steps, between 5 and 100
+            slack_steps: 1000.min(self.min_batch_steps / 100).max(5),
+        }
     }
 
     fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)

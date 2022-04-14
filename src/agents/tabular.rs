@@ -1,7 +1,7 @@
 //! Tabular agents
 use super::{
     buffers::SimpleBuffer, finite::FiniteSpaceAgent, Actor, ActorMode, Agent, BatchUpdate,
-    BufferCapacityBound, BuildAgent, BuildAgentError,
+    BuildAgent, BuildAgentError, HistoryDataBound,
 };
 use crate::envs::EnvStructure;
 use crate::logging::StatsLogger;
@@ -181,16 +181,15 @@ impl BaseTabularQLearningAgent {
 impl BatchUpdate<usize, usize> for BaseTabularQLearningAgent {
     type HistoryBuffer = SimpleBuffer<usize, usize>;
 
-    fn batch_size_hint(&self) -> BufferCapacityBound {
-        BufferCapacityBound {
-            min_steps: 1,
-            min_incomplete_episode_len: Some(0),
-            ..BufferCapacityBound::default()
-        }
+    fn buffer(&self) -> Self::HistoryBuffer {
+        SimpleBuffer::new()
     }
 
-    fn buffer(&self, capacity: BufferCapacityBound) -> Self::HistoryBuffer {
-        SimpleBuffer::new(capacity)
+    fn min_update_size(&self) -> HistoryDataBound {
+        HistoryDataBound {
+            min_steps: 1,
+            slack_steps: 0, // does not matter if the episode has ended
+        }
     }
 
     fn batch_update<'a, I>(&mut self, buffers: I, _logger: &mut dyn StatsLogger)

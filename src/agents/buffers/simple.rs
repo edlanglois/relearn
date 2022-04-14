@@ -1,4 +1,4 @@
-use super::{BufferCapacityBound, WriteHistoryBuffer};
+use super::{HistoryDataBound, WriteHistoryBuffer};
 use crate::simulation::PartialStep;
 use crate::utils::iter::SizedChain;
 use std::iter::{Copied, ExactSizeIterator, FusedIterator};
@@ -12,8 +12,6 @@ use std::{option, slice, vec};
 /// * at least `hard_threshold` steps have been collected.
 #[derive(Debug, Clone)]
 pub struct SimpleBuffer<O, A> {
-    capacity: BufferCapacityBound,
-
     /// Steps from all episodes with each episode stored contiguously
     steps: Vec<PartialStep<O, A>>,
     /// One past the end index of each episode within `steps`.
@@ -22,13 +20,18 @@ pub struct SimpleBuffer<O, A> {
 
 impl<O, A> SimpleBuffer<O, A> {
     #[must_use]
-    pub fn new(capacity: BufferCapacityBound) -> Self {
-        let known_max_steps = capacity
-            .min_incomplete_episode_len
-            .map(|x| capacity.min_steps + x);
+    pub const fn new() -> Self {
         Self {
-            capacity,
-            steps: Vec::with_capacity(known_max_steps.unwrap_or(0)),
+            steps: Vec::new(),
+            episode_ends: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    /// Create a new buffer with capacity for the given amount of history data
+    pub fn with_capacity_for(bound: HistoryDataBound) -> Self {
+        Self {
+            steps: Vec::with_capacity(bound.min_steps.saturating_add(bound.slack_steps)),
             episode_ends: Vec::new(),
         }
     }
@@ -75,6 +78,26 @@ impl<O, A> SimpleBuffer<O, A> {
             .into();
         SliceChunksAtIter::new(&self.steps, ends_iter)
     }
+
+    /// Clear all stored data
+    pub fn clear(&mut self) {
+        self.steps.clear();
+        self.episode_ends.clear();
+    }
+}
+
+impl<O, A> From<Vec<PartialStep<O, A>>> for SimpleBuffer<O, A> {
+    fn from(steps: Vec<PartialStep<O, A>>) -> Self {
+        let episode_ends = steps
+            .iter()
+            .enumerate()
+            .filter_map(|(i, step)| if step.episode_done() { Some(i) } else { None })
+            .collect();
+        Self {
+            steps,
+            episode_ends,
+        }
+    }
 }
 
 pub type EpisodesIter<'a, O, A> = SliceChunksAtIter<
@@ -84,33 +107,29 @@ pub type EpisodesIter<'a, O, A> = SliceChunksAtIter<
 >;
 
 impl<O, A> WriteHistoryBuffer<O, A> for SimpleBuffer<O, A> {
-    fn push(&mut self, step: PartialStep<O, A>) -> bool {
+    fn push(&mut self, step: PartialStep<O, A>) {
         let episode_done = step.episode_done();
         self.steps.push(step);
-        let num_steps = self.steps.len();
         if episode_done {
-            self.episode_ends.push(num_steps)
+            self.episode_ends.push(self.steps.len());
         }
-        (num_steps >= self.capacity.min_steps)
-            && (self.episode_ends.len() >= self.capacity.min_episodes)
-            && (episode_done
-                || self
-                    .capacity
-                    .min_incomplete_episode_len
-                    .map_or(false, |min_len| {
-                        num_steps - self.episode_ends.last().copied().unwrap_or(0) >= min_len
-                    }))
     }
 
-    fn clear(&mut self) {
-        self.steps.clear();
-        self.episode_ends.clear();
+    fn extend<I: IntoIterator<Item = PartialStep<O, A>>>(&mut self, steps: I) {
+        let offset = self.steps.len();
+        self.steps.extend(steps);
+        for (i, step) in self.steps[offset..].iter().enumerate() {
+            if step.episode_done() {
+                self.episode_ends.push(offset + i + 1)
+            }
+        }
     }
 }
 
 /// Iterator that partitions a data into chunks based on an iterator of end indices.
 ///
 /// Does not include any data past the last end index.
+#[derive(Debug, Clone, PartialEq)]
 pub struct SliceChunksAtIter<'a, T, I> {
     data: &'a [T],
     start: usize,
@@ -186,48 +205,15 @@ mod tests {
             next,
         }
     }
-    const STEP_NOT_DONE: PartialStep<usize, bool> = step(0, Continue(()));
-    const STEP_TERMINAL: PartialStep<usize, bool> = step(0, Terminate);
 
-    #[test]
-    fn fill_episodic() {
-        let mut buffer = SimpleBuffer::new(BufferCapacityBound {
-            min_steps: 3,
-            min_episodes: 0,
-            min_incomplete_episode_len: Some(5),
-        });
-        assert!(!buffer.push(STEP_NOT_DONE));
-        assert!(!buffer.push(STEP_TERMINAL));
-        assert!(!buffer.push(STEP_NOT_DONE)); // min_steps reached but episode not done
-        assert!(buffer.push(STEP_TERMINAL)); // min_steps reached and episode done
-    }
-
-    #[test]
-    fn fill_non_episodic() {
-        let mut buffer = SimpleBuffer::new(BufferCapacityBound {
-            min_steps: 3,
-            min_episodes: 0,
-            min_incomplete_episode_len: Some(5),
-        });
-        assert!(!buffer.push(STEP_NOT_DONE));
-        assert!(!buffer.push(STEP_NOT_DONE));
-        assert!(!buffer.push(STEP_NOT_DONE));
-        assert!(!buffer.push(STEP_NOT_DONE));
-        assert!(buffer.push(STEP_NOT_DONE)); // Incomplete episode threshold
-    }
-
-    #[fixture]
     /// A buffer containing (in order)
     /// * an episode of length 1,
     /// * an episode of length 2, and
     /// * 2 steps of an incomplete episode.
+    #[fixture]
     fn full_buffer() -> SimpleBuffer<usize, bool> {
-        let mut buffer = SimpleBuffer::new(BufferCapacityBound {
-            min_steps: 5,
-            min_episodes: 0,
-            min_incomplete_episode_len: Some(2),
-        });
-        buffer.extend_until_ready([
+        let mut buffer = SimpleBuffer::new();
+        buffer.extend([
             step(0, Terminate),
             step(1, Continue(())),
             step(2, Terminate),
@@ -278,15 +264,15 @@ mod tests {
         let mut episodes_iter = full_buffer.episodes();
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(0, Terminate)]
+            [&step(0, Terminate)]
         );
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(1, Continue(())), &step(2, Terminate)]
+            [&step(1, Continue(())), &step(2, Terminate)]
         );
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
-            vec![&step(3, Continue(())), &step(4, Continue(()))]
+            [&step(3, Continue(())), &step(4, Continue(()))]
         );
         assert!(episodes_iter.next().is_none());
     }

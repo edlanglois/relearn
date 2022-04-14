@@ -1,5 +1,5 @@
 //! Combined actor-agent. Prefer using simulation functions instead.
-use super::{Actor, ActorMode, Agent, WriteHistoryBuffer};
+use super::{Actor, ActorMode, Agent, HistoryDataBound, WriteHistoryBuffer};
 use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::Prng;
@@ -17,6 +17,8 @@ where
     agent: T,
     actor: Option<T::Actor>,
     buffer: T::HistoryBuffer,
+    update_size: HistoryDataBound,
+    num_collected_steps: usize,
 }
 
 // Avoid depending on O: Debug & A: Debug
@@ -31,6 +33,8 @@ where
             .field("agent", &self.agent)
             .field("actor", &self.actor)
             .field("buffer", &self.buffer)
+            .field("update_size", &self.update_size)
+            .field("num_collected_steps", &self.num_collected_steps)
             .finish()
     }
 }
@@ -42,8 +46,10 @@ where
     pub fn new(agent: T) -> Self {
         Self {
             actor: Some(agent.actor(ActorMode::Training)),
-            buffer: agent.buffer(agent.batch_size_hint()),
+            buffer: agent.buffer(),
+            update_size: agent.min_update_size(),
             agent,
+            num_collected_steps: 0,
         }
     }
 
@@ -51,8 +57,13 @@ where
     ///
     /// This step must correspond to the most recent call to `Actor::act`.
     pub fn update(&mut self, step: PartialStep<O, A>, logger: &mut dyn StatsLogger) {
-        let full = self.buffer.push(step);
-        if full {
+        self.num_collected_steps += 1;
+        let ready = self
+            .update_size
+            .is_satisfied(self.num_collected_steps, Some(&step));
+        self.buffer.push(step);
+
+        if ready {
             self.actor = None; // Agent cannot be updated while an actor exists.
             self.agent.batch_update_single(&mut self.buffer, logger);
             self.actor = Some(self.agent.actor(ActorMode::Training));

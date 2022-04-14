@@ -12,7 +12,7 @@ fn main() {
     let training_config = TrainParallelConfig {
         num_periods: 10,
         num_threads: num_cpus::get(),
-        min_workers_steps: 10_000,
+        min_worker_steps: 10_000,
     };
 
     let mut rng = Prng::seed_from_u64(0);

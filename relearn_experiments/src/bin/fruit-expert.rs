@@ -1,5 +1,5 @@
 use rand::SeedableRng;
-use relearn::agents::buffers::{BufferCapacityBound, NullBuffer};
+use relearn::agents::buffers::{HistoryDataBound, NullBuffer};
 use relearn::agents::{
     Actor, ActorMode, Agent, AgentPair, BatchUpdate, BuildAgent, BuildAgentError,
 };
@@ -112,11 +112,11 @@ impl<const W: usize, const H: usize> Actor<fruit::PrincipalObs<W, H>, fruit::Mov
 
 impl<O, A> BatchUpdate<O, A> for FruitLazyExpert {
     type HistoryBuffer = NullBuffer;
-    fn batch_size_hint(&self) -> BufferCapacityBound {
-        BufferCapacityBound::empty()
-    }
-    fn buffer(&self, _: BufferCapacityBound) -> Self::HistoryBuffer {
+    fn buffer(&self) -> Self::HistoryBuffer {
         NullBuffer
+    }
+    fn min_update_size(&self) -> HistoryDataBound {
+        HistoryDataBound::empty()
     }
     fn batch_update<'a, I>(&mut self, _: I, _: &mut dyn StatsLogger)
     where
@@ -147,7 +147,7 @@ fn main() {
     let training_config = TrainParallelConfig {
         num_periods: 200,
         num_threads: num_cpus::get(),
-        min_workers_steps: 10_000,
+        min_worker_steps: 10_000,
     };
 
     let mut rng = Prng::seed_from_u64(0);

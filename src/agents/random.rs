@@ -1,6 +1,6 @@
 use super::{
-    buffers::NullBuffer, Actor, ActorMode, Agent, BatchUpdate, BufferCapacityBound, BuildAgent,
-    BuildAgentError,
+    buffers::NullBuffer, Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError,
+    HistoryDataBound,
 };
 use crate::envs::EnvStructure;
 use crate::logging::StatsLogger;
@@ -74,12 +74,12 @@ impl<O, AS: SampleSpace + Clone> Actor<O, AS::Element> for RandomAgent<AS> {
 impl<O, AS: Space> BatchUpdate<O, AS::Element> for RandomAgent<AS> {
     type HistoryBuffer = NullBuffer;
 
-    fn batch_size_hint(&self) -> BufferCapacityBound {
-        BufferCapacityBound::empty()
+    fn buffer(&self) -> Self::HistoryBuffer {
+        NullBuffer
     }
 
-    fn buffer(&self, _: BufferCapacityBound) -> Self::HistoryBuffer {
-        NullBuffer
+    fn min_update_size(&self) -> HistoryDataBound {
+        HistoryDataBound::empty()
     }
 
     fn batch_update<'a, I>(&mut self, _buffers: I, _logger: &mut dyn StatsLogger)

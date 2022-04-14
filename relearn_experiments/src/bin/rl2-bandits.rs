@@ -423,7 +423,7 @@ impl TrainConfig {
         let training_config = TrainParallelConfig {
             num_periods: self.num_trials,
             num_threads: self.num_workers,
-            min_workers_steps: 10_000,
+            min_worker_steps: 10_000,
         };
 
         let log_chunker = ByCounter::of_path(["agent_update", "count"], 1);
