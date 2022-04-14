@@ -3,7 +3,7 @@ mod null;
 mod vec;
 
 pub use null::NullBuffer;
-pub use vec::VecBuffer;
+pub use vec::{VecBuffer, VecBufferEpisodes};
 
 use crate::simulation::{PartialStep, Step, StepsIter, TakeAlignedSteps};
 use serde::{Deserialize, Serialize};
@@ -93,7 +93,7 @@ const fn div_ceil(numerator: usize, denominator: usize) -> usize {
     quotient
 }
 
-/// Add data to a history buffer.
+/// Add a batch of data to a history buffer.
 pub trait WriteHistoryBuffer<O, A> {
     /// Insert a step into the buffer.
     fn push(&mut self, step: PartialStep<O, A>);

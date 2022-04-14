@@ -176,8 +176,11 @@ pub trait BatchUpdate<O, A> {
     /// Update the agent from a collection of history buffers.
     ///
     /// All new data inserted into the buffers since the last call must be on-policy.
-    /// The last step inserted into the buffer must end its episode -- either by termination or
-    /// interruption. (Non-final steps are also allowed to end episodes).
+    ///
+    /// It is preferable but not required for the last step of the newly added data to end its
+    /// episode --- either by termination or interruption. If instead the last `step.next` is
+    /// `Successor::Continue` then that one step may be dropped or ignored by agents that depend
+    /// on well-formed step successors.
     ///
     /// This function and the history buffer itself are jointly reponsible for managing the data
     /// within the buffer. The buffers may be emptied by the call.

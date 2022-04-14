@@ -7,7 +7,7 @@ use super::{
     learning_policy::{BuildLearningPolicy, LearningPolicy},
 };
 use crate::{
-    agents::buffers::{HistoryDataBound, VecBuffer},
+    agents::buffers::{HistoryDataBound, VecBuffer, VecBufferEpisodes},
     agents::{ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError},
     envs::EnvStructure,
     logging::StatsLogger,
@@ -201,7 +201,13 @@ where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,
     {
-        self.batch_update_slice_refs(&mut buffers.into_iter().collect::<Vec<_>>(), logger);
+        self.batch_update_slice_refs(
+            &mut buffers
+                .into_iter()
+                .map(VecBuffer::finalize)
+                .collect::<Vec<_>>(),
+            logger,
+        );
     }
 
     fn batch_update_single(
@@ -209,7 +215,7 @@ where
         buffer: &mut Self::HistoryBuffer,
         logger: &mut dyn StatsLogger,
     ) {
-        self.batch_update_slice_refs(&mut [buffer], logger)
+        self.batch_update_slice_refs(&mut [buffer.finalize()], logger)
     }
 
     fn batch_update_slice(
@@ -239,14 +245,14 @@ where
     /// Batch update given a slice of buffer references
     fn batch_update_slice_refs(
         &mut self,
-        buffers: &mut [&mut VecBuffer<OS::Element, AS::Element>],
+        buffers: &mut [VecBufferEpisodes<OS::Element, AS::Element>],
         logger: &mut dyn StatsLogger,
     ) {
         // About to update the policy so clear any existing CPU policy copy
         self.cpu_policy = RefCell::new(None);
 
         let features = LazyPackedHistoryFeatures::new(
-            buffers.iter().flat_map(|b| b.episodes()),
+            buffers.iter_mut().flat_map(|b| b.episodes()),
             &self.observation_space,
             &self.action_space,
             self.discount_factor,
