@@ -170,8 +170,6 @@ pub trait StepsIter<O, A>: Iterator<Item = PartialStep<O, A>> {
     /// Creates an iterator of at least `min_steps` and at most `min_steps + slack` steps.
     ///
     /// Ends on the first episode boundary in this interval.
-    /// If the maximum step count is reached then the episode is interrupted
-    /// (`Successor::Continue` changed to `Successor::Interrupt`).
     #[inline]
     fn take_aligned_steps(self, min_steps: usize, slack: usize) -> TakeAlignedSteps<Self>
     where
