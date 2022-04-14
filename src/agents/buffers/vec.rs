@@ -4,21 +4,21 @@ use crate::utils::iter::SizedChain;
 use std::iter::{Copied, ExactSizeIterator, FusedIterator};
 use std::{option, slice, vec};
 
-/// Simple history buffer. Stores and replays observed steps without additional processing.
+/// Simple vector history buffer. Stores steps in a vector.
 ///
 /// The buffer records steps from a series of episodes one after another.
 /// The buffer is ready when either
 /// * the current episode is done and at least `soft_threshold` steps have been collected; or
 /// * at least `hard_threshold` steps have been collected.
 #[derive(Debug, Clone)]
-pub struct SimpleBuffer<O, A> {
+pub struct VecBuffer<O, A> {
     /// Steps from all episodes with each episode stored contiguously
     steps: Vec<PartialStep<O, A>>,
     /// One past the end index of each episode within `steps`.
     episode_ends: Vec<usize>,
 }
 
-impl<O, A> SimpleBuffer<O, A> {
+impl<O, A> VecBuffer<O, A> {
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -86,7 +86,7 @@ impl<O, A> SimpleBuffer<O, A> {
     }
 }
 
-impl<O, A> From<Vec<PartialStep<O, A>>> for SimpleBuffer<O, A> {
+impl<O, A> From<Vec<PartialStep<O, A>>> for VecBuffer<O, A> {
     fn from(steps: Vec<PartialStep<O, A>>) -> Self {
         let episode_ends = steps
             .iter()
@@ -106,7 +106,7 @@ pub type EpisodesIter<'a, O, A> = SliceChunksAtIter<
     SizedChain<Copied<slice::Iter<'a, usize>>, option::IntoIter<usize>>,
 >;
 
-impl<O, A> WriteHistoryBuffer<O, A> for SimpleBuffer<O, A> {
+impl<O, A> WriteHistoryBuffer<O, A> for VecBuffer<O, A> {
     fn push(&mut self, step: PartialStep<O, A>) {
         let episode_done = step.episode_done();
         self.steps.push(step);
@@ -211,8 +211,8 @@ mod tests {
     /// * an episode of length 2, and
     /// * 2 steps of an incomplete episode.
     #[fixture]
-    fn full_buffer() -> SimpleBuffer<usize, bool> {
-        let mut buffer = SimpleBuffer::new();
+    fn full_buffer() -> VecBuffer<usize, bool> {
+        let mut buffer = VecBuffer::new();
         buffer.extend([
             step(0, Terminate),
             step(1, Continue(())),
@@ -224,17 +224,17 @@ mod tests {
     }
 
     #[rstest]
-    fn num_steps(full_buffer: SimpleBuffer<usize, bool>) {
+    fn num_steps(full_buffer: VecBuffer<usize, bool>) {
         assert_eq!(full_buffer.num_steps(), 5);
     }
 
     #[rstest]
-    fn num_episodes(full_buffer: SimpleBuffer<usize, bool>) {
+    fn num_episodes(full_buffer: VecBuffer<usize, bool>) {
         assert_eq!(full_buffer.num_episodes(), 3);
     }
 
     #[rstest]
-    fn steps(full_buffer: SimpleBuffer<usize, bool>) {
+    fn steps(full_buffer: VecBuffer<usize, bool>) {
         let mut steps_iter = full_buffer.steps();
         assert_eq!(steps_iter.next(), Some(&step(0, Terminate)));
         assert_eq!(steps_iter.next(), Some(&step(1, Continue(()))));
@@ -245,7 +245,7 @@ mod tests {
     }
 
     #[rstest]
-    fn steps_is_fused(full_buffer: SimpleBuffer<usize, bool>) {
+    fn steps_is_fused(full_buffer: VecBuffer<usize, bool>) {
         let mut steps_iter = full_buffer.steps();
         for _ in 0..5 {
             assert!(steps_iter.next().is_some());
@@ -255,12 +255,12 @@ mod tests {
     }
 
     #[rstest]
-    fn steps_len(full_buffer: SimpleBuffer<usize, bool>) {
+    fn steps_len(full_buffer: VecBuffer<usize, bool>) {
         assert_eq!(full_buffer.steps().len(), full_buffer.num_steps());
     }
 
     #[rstest]
-    fn episodes_incomplete_ge_1(full_buffer: SimpleBuffer<usize, bool>) {
+    fn episodes_incomplete_ge_1(full_buffer: VecBuffer<usize, bool>) {
         let mut episodes_iter = full_buffer.episodes();
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
@@ -278,12 +278,12 @@ mod tests {
     }
 
     #[rstest]
-    fn episodes_len(full_buffer: SimpleBuffer<usize, bool>) {
+    fn episodes_len(full_buffer: VecBuffer<usize, bool>) {
         assert_eq!(full_buffer.episodes().len(), full_buffer.num_episodes());
     }
 
     #[rstest]
-    fn episode_len_sum(full_buffer: SimpleBuffer<usize, bool>) {
+    fn episode_len_sum(full_buffer: VecBuffer<usize, bool>) {
         assert_eq!(
             full_buffer.episodes().map(<[_]>::len).sum::<usize>(),
             full_buffer.num_steps()

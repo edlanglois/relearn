@@ -1,9 +1,9 @@
 //! History buffers
 mod null;
-mod simple;
+mod vec;
 
 pub use null::NullBuffer;
-pub use simple::SimpleBuffer;
+pub use vec::VecBuffer;
 
 use crate::simulation::{PartialStep, Step, StepsIter, TakeAlignedSteps};
 use serde::{Deserialize, Serialize};

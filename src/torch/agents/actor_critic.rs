@@ -7,7 +7,7 @@ use super::{
     learning_policy::{BuildLearningPolicy, LearningPolicy},
 };
 use crate::{
-    agents::buffers::{HistoryDataBound, SimpleBuffer},
+    agents::buffers::{HistoryDataBound, VecBuffer},
     agents::{ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError},
     envs::EnvStructure,
     logging::StatsLogger,
@@ -182,10 +182,10 @@ where
     P: LearningPolicy,
     C: LearningCritic,
 {
-    type HistoryBuffer = SimpleBuffer<OS::Element, AS::Element>;
+    type HistoryBuffer = VecBuffer<OS::Element, AS::Element>;
 
     fn buffer(&self) -> Self::HistoryBuffer {
-        SimpleBuffer::with_capacity_for(self.min_update_size())
+        VecBuffer::with_capacity_for(self.min_update_size())
     }
 
     fn min_update_size(&self) -> HistoryDataBound {
@@ -239,7 +239,7 @@ where
     /// Batch update given a slice of buffer references
     fn batch_update_slice_refs(
         &mut self,
-        buffers: &mut [&mut SimpleBuffer<OS::Element, AS::Element>],
+        buffers: &mut [&mut VecBuffer<OS::Element, AS::Element>],
         logger: &mut dyn StatsLogger,
     ) {
         // About to update the policy so clear any existing CPU policy copy

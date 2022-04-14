@@ -1,7 +1,7 @@
 //! Upper confidence bound bandit agent.
 use super::super::{
-    buffers::SimpleBuffer, finite::FiniteSpaceAgent, Actor, ActorMode, Agent, BatchUpdate,
-    BuildAgent, BuildAgentError, HistoryDataBound,
+    buffers::VecBuffer, finite::FiniteSpaceAgent, Actor, ActorMode, Agent, BatchUpdate, BuildAgent,
+    BuildAgentError, HistoryDataBound,
 };
 use crate::envs::EnvStructure;
 use crate::logging::StatsLogger;
@@ -164,10 +164,10 @@ impl Agent<usize, usize> for Arc<BaseUCB1Agent> {
 }
 
 impl BatchUpdate<usize, usize> for Arc<BaseUCB1Agent> {
-    type HistoryBuffer = SimpleBuffer<usize, usize>;
+    type HistoryBuffer = VecBuffer<usize, usize>;
 
     fn buffer(&self) -> Self::HistoryBuffer {
-        SimpleBuffer::new()
+        VecBuffer::new()
     }
 
     fn min_update_size(&self) -> HistoryDataBound {
