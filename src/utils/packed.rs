@@ -167,13 +167,10 @@ pub fn packed_tensor_from_offset<'a>(
 /// * `new_group_sizes` - A vector with the new size for each group in `old_group_sizes`.
 ///                       Has the same length as `old_group_sizes`.
 ///
-fn group_batches_for_resize<'a, 'b, T, U>(
-    old_batch_sizes: T,
-    new_batch_sizes: U,
-) -> (Vec<i64>, Vec<i64>)
+fn group_batches_for_resize<T, U>(old_batch_sizes: T, new_batch_sizes: U) -> (Vec<i64>, Vec<i64>)
 where
-    T: IntoIterator<Item = &'a i64>,
-    U: IntoIterator<Item = &'b i64>,
+    T: IntoIterator<Item = i64>,
+    U: IntoIterator<Item = i64>,
 {
     let mut old_group_sizes: Vec<i64> = Vec::new(); // i64 required by tch interface
     let mut new_group_sizes: Vec<i64> = Vec::new();
@@ -184,9 +181,9 @@ where
     let mut new_batch_size_iter = new_batch_sizes.into_iter().fuse();
     loop {
         let (old, new, tail) = match (old_batch_size_iter.next(), new_batch_size_iter.next()) {
-            (Some(old), Some(new)) => (*old, *new, false),
-            (Some(old), None) => (*old, 0, true),
-            (None, Some(new)) => (0, *new, true),
+            (Some(old), Some(new)) => (old, new, false),
+            (Some(old), None) => (old, 0, true),
+            (None, Some(new)) => (0, new, true),
             (None, None) => break,
         };
         next_old_group_size += old;
@@ -250,7 +247,8 @@ pub fn packed_tensor_trim_end<'a>(
     // Batch sizes are the same as if we had dropped from the start of each sequence
     let new_batch_sizes = &batch_sizes[n..];
 
-    let (old_group_sizes, new_group_sizes) = group_batches_for_resize(batch_sizes, new_batch_sizes);
+    let (old_group_sizes, new_group_sizes) =
+        group_batches_for_resize(batch_sizes.iter().copied(), new_batch_sizes.iter().copied());
     let groups = packed.split_with_sizes(&old_group_sizes, 0);
 
     let new_groups: Vec<_> = groups
@@ -278,8 +276,10 @@ pub fn packed_tensor_push_shift<S>(packed: &Tensor, batch_sizes: &[i64], value: 
 where
     S: Into<Scalar> + Copy,
 {
-    let (old_group_sizes, new_group_sizes) =
-        group_batches_for_resize(batch_sizes, iter::once(&0).chain(batch_sizes.iter()));
+    let (old_group_sizes, new_group_sizes) = group_batches_for_resize(
+        batch_sizes.iter().copied(),
+        iter::once(0).chain(batch_sizes.iter().copied()),
+    );
 
     let input_groups = packed.split_with_sizes(&old_group_sizes, 0);
 
