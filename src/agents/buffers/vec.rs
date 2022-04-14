@@ -182,7 +182,7 @@ impl<'a, O, A> VecBufferEpisodes<'a, O, A> {
 pub type EpisodesIter<'a, O, A> =
     SliceChunksAtIter<'a, PartialStep<O, A>, Copied<slice::Iter<'a, usize>>>;
 
-/// Iterator that partitions slice into chunks based on an iterator of end indices.
+/// Iterator that partitions a slice into chunks based on an iterator of end indices.
 ///
 /// Does not include any data past the last end index.
 #[derive(Debug, Clone, PartialEq)]
