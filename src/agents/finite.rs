@@ -1,4 +1,7 @@
-use super::{Actor, ActorMode, Agent, BatchUpdate, HistoryDataBound, WriteHistoryBuffer};
+use super::{
+    Actor, ActorMode, Agent, BatchUpdate, HistoryDataBound, WriteExperience,
+    WriteExperienceIncremental,
+};
 use crate::envs::Successor;
 use crate::logging::StatsLogger;
 use crate::simulation::{PartialStep, Step};
@@ -130,29 +133,41 @@ pub struct FiniteSpaceBuffer<B, OS, AS> {
     action_space: AS,
 }
 
-impl<B, OS, AS> WriteHistoryBuffer<OS::Element, AS::Element> for FiniteSpaceBuffer<B, OS, AS>
+impl<B, OS, AS> WriteExperience<OS::Element, AS::Element> for FiniteSpaceBuffer<B, OS, AS>
 where
-    B: WriteHistoryBuffer<usize, usize>,
+    B: WriteExperience<usize, usize>,
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn push(&mut self, step: PartialStep<OS::Element, AS::Element>) {
-        self.buffer.push(indexed_partial_step(
+    fn write_experience<I>(&mut self, steps: I)
+    where
+        I: IntoIterator<Item = PartialStep<OS::Element, AS::Element>>,
+    {
+        self.buffer.write_experience(
+            steps.into_iter().map(|step| {
+                indexed_partial_step(&step, &self.observation_space, &self.action_space)
+            }),
+        )
+    }
+}
+
+impl<B, OS, AS> WriteExperienceIncremental<OS::Element, AS::Element>
+    for FiniteSpaceBuffer<B, OS, AS>
+where
+    B: WriteExperienceIncremental<usize, usize>,
+    OS: FiniteSpace,
+    AS: FiniteSpace,
+{
+    fn write_step(&mut self, step: PartialStep<OS::Element, AS::Element>) {
+        self.buffer.write_step(indexed_partial_step(
             &step,
             &self.observation_space,
             &self.action_space,
         ))
     }
 
-    fn extend<I>(&mut self, steps: I)
-    where
-        I: IntoIterator<Item = PartialStep<OS::Element, AS::Element>>,
-    {
-        self.buffer.extend(
-            steps.into_iter().map(|step| {
-                indexed_partial_step(&step, &self.observation_space, &self.action_space)
-            }),
-        )
+    fn end_experience(&mut self) {
+        self.buffer.end_experience()
     }
 }
 

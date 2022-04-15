@@ -3,7 +3,7 @@ mod null;
 mod vec;
 
 pub use null::NullBuffer;
-pub use vec::{VecBuffer, VecBufferEpisodes};
+pub use vec::VecBuffer;
 
 use crate::simulation::{PartialStep, Step, StepsIter, TakeAlignedSteps};
 use serde::{Deserialize, Serialize};
@@ -93,35 +93,84 @@ const fn div_ceil(numerator: usize, denominator: usize) -> usize {
     quotient
 }
 
-/// Add a batch of data to a history buffer.
-pub trait WriteHistoryBuffer<O, A> {
-    /// Insert a step into the buffer.
-    fn push(&mut self, step: PartialStep<O, A>);
-
-    /// Insert a sequence of steps into the buffer.
-    fn extend<I>(&mut self, steps: I)
+/// Write threads of experience into a history buffer.
+///
+/// A thread of experience is sequence of simulation steps generated from the same `Actor`
+/// and `Environment` in which each step either:
+/// * ends its episode (`step.episode_done()`),
+/// * is followed by the next step in the same episode, or
+/// * is the last step of the iterator.
+///
+/// In particular, a step with `step.next == Successor::Continue` must not be followed by
+/// a step from a different episode.
+pub trait WriteExperience<O, A>: WriteExperienceIncremental<O, A> {
+    /// Write a thread of experience into the buffer.
+    fn write_experience<I>(&mut self, steps: I)
     where
         I: IntoIterator<Item = PartialStep<O, A>>,
         Self: Sized,
     {
         for step in steps {
-            self.push(step)
+            self.write_step(step);
         }
+        self.end_experience()
     }
 }
 
-/// Implement `WriteHistoryBuffer<O, A>` for a deref-able generic wrapper type.
-macro_rules! impl_wrapped_write_history_buffer {
+/// Implement `WriteExperience<O, A>` for a deref-able generic wrapper type.
+macro_rules! impl_wrapped_write_experience {
     ($wrapper:ty) => {
-        impl<T, O, A> WriteHistoryBuffer<O, A> for $wrapper
+        impl<T, O, A> WriteExperience<O, A> for $wrapper where T: WriteExperience<O, A> + ?Sized {}
+    };
+}
+impl_wrapped_write_experience!(&'_ mut T);
+impl_wrapped_write_experience!(Box<T>);
+
+/// Write threads of experience into a history history buffer one step at a time.
+///
+/// Prefer using [`WriteExperience`] if possible.
+///
+/// # Design Note
+/// This interface requires that the user call `end_experience()` before reading from the buffer.
+/// This could be enforced by the type system by making the incremental writer a separate object
+/// (wrapping a `&mut SomeHistoryBuffer`) to be created for each experience thread and invoking the
+/// `end_experience()` functionality in its destructor, when it would also release its exclusive
+/// access to the buffer. This is not done for two reasons:
+///     1. It is excessively complicated for an interface that is rarely used.
+///     2. An important use-case of this interface is for things like [`SerialActorAgent`] that
+///        persist the incremental writer while receiving steps one-by-one. The above change would
+///        make this use-case even more complicated as it would require storing both the history
+///        buffer and the incremental writer together when the writer (mutably) references the
+///        buffer.
+pub trait WriteExperienceIncremental<O, A> {
+    /// Write a step into the the buffer.
+    ///
+    /// Successive steps must be from the same thread of experience unless `end_experience()` is
+    /// called in between.
+    fn write_step(&mut self, step: PartialStep<O, A>);
+
+    /// End the current thread of experience.
+    ///
+    /// This must be called before reading data from the buffer and when changing the thread of
+    /// experience used for generating the steps passed to `write_step`.
+    fn end_experience(&mut self);
+}
+
+/// Implement `WriteExperienceIncremental<O, A>` for a deref-able generic wrapper type.
+macro_rules! impl_wrapped_write_experience_incremental {
+    ($wrapper:ty) => {
+        impl<T, O, A> WriteExperienceIncremental<O, A> for $wrapper
         where
-            T: WriteHistoryBuffer<O, A> + ?Sized,
+            T: WriteExperienceIncremental<O, A> + ?Sized,
         {
-            fn push(&mut self, step: PartialStep<O, A>) {
-                T::push(self, step)
+            fn write_step(&mut self, step: PartialStep<O, A>) {
+                T::write_step(self, step)
+            }
+            fn end_experience(&mut self) {
+                T::end_experience(self)
             }
         }
     };
 }
-impl_wrapped_write_history_buffer!(&'_ mut T);
-impl_wrapped_write_history_buffer!(Box<T>);
+impl_wrapped_write_experience_incremental!(&'_ mut T);
+impl_wrapped_write_experience_incremental!(Box<T>);

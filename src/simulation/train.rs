@@ -1,5 +1,5 @@
 use super::{OnlineStepsSummary, Simulation, Steps, StepsSummary};
-use crate::agents::{buffers::HistoryDataBound, ActorMode, Agent, BatchUpdate, WriteHistoryBuffer};
+use crate::agents::{buffers::HistoryDataBound, ActorMode, Agent, BatchUpdate, WriteExperience};
 use crate::envs::{EnvStructure, Environment, StructuredEnvironment};
 use crate::logging::{Loggable, StatsLogger};
 use crate::spaces::{ElementRefInto, Space};
@@ -25,7 +25,7 @@ pub fn train_serial<T, E>(
     let mut buffer = agent.buffer();
     for _ in 0..num_periods {
         let update_size = agent.min_update_size();
-        buffer.extend(
+        buffer.write_experience(
             update_size
                 .take(Steps::new(
                     environment,
@@ -110,7 +110,7 @@ pub fn train_parallel<T, E>(
                 let thread_logger = send_logger.take();
                 threads.push(scope.spawn(move |_scope| {
                     let mut summary = OnlineStepsSummary::default();
-                    buffer.extend(
+                    buffer.write_experience(
                         worker_update_size
                             .take(Steps::new(
                                 environment,

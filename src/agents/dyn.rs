@@ -1,7 +1,7 @@
 //! Dynamic agent
 use super::{
     Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, HistoryDataBound,
-    WriteHistoryBuffer,
+    WriteExperience,
 };
 use crate::envs::EnvStructure;
 use crate::logging::StatsLogger;
@@ -16,7 +16,7 @@ pub trait DynAgent<O, A>:
     O,
     A,
     Actor = Box<dyn Actor<O, A, EpisodeState = Box<dyn Any>>>,
-    HistoryBuffer = Box<dyn AnyWriteHistoryBuffer<O, A>>,
+    HistoryBuffer = Box<dyn AnyWriteExperience<O, A>>,
 >
 {
 }
@@ -25,7 +25,7 @@ impl<T, O, A> DynAgent<O, A> for T where
         O,
         A,
         Actor = Box<dyn Actor<O, A, EpisodeState = Box<dyn Any>>>,
-        HistoryBuffer = Box<dyn AnyWriteHistoryBuffer<O, A>>,
+        HistoryBuffer = Box<dyn AnyWriteExperience<O, A>>,
     >
 {
 }
@@ -79,24 +79,24 @@ where
     }
 }
 
-/// Subtrait of `WriteHistoryBuffer` and `Any`.
+/// Subtrait of `WriteExperience` and `Any`.
 ///
 /// See <https://users.rust-lang.org/t/why-does-downcasting-not-work-for-subtraits/33286>
 /// for a discussion of why the casting is so complicated in this case.
-pub trait AnyWriteHistoryBuffer<O, A>: WriteHistoryBuffer<O, A> + Any {
+pub trait AnyWriteExperience<O, A>: WriteExperience<O, A> + Any {
     /// Upcast to a mutable `dyn Any` reference
     fn upcast_any_mut(&mut self) -> &mut dyn Any;
 }
-impl<T, O, A> AnyWriteHistoryBuffer<O, A> for T
+impl<T, O, A> AnyWriteExperience<O, A> for T
 where
-    T: WriteHistoryBuffer<O, A> + Any,
+    T: WriteExperience<O, A> + Any,
 {
     #[inline]
     fn upcast_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 }
-impl<O, A> dyn AnyWriteHistoryBuffer<O, A> {
+impl<O, A> dyn AnyWriteExperience<O, A> {
     /// Downcast to a mutable reference
     fn downcast_mut<U: 'static>(&mut self) -> Option<&mut U> {
         self.upcast_any_mut().downcast_mut()
@@ -110,7 +110,7 @@ where
     O: 'static,
     A: 'static,
 {
-    type HistoryBuffer = Box<dyn AnyWriteHistoryBuffer<O, A>>;
+    type HistoryBuffer = Box<dyn AnyWriteExperience<O, A>>;
 
     fn buffer(&self) -> Self::HistoryBuffer {
         Box::new(self.0.buffer())

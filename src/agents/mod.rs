@@ -17,7 +17,7 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
-pub use buffers::{HistoryDataBound, WriteHistoryBuffer};
+pub use buffers::{HistoryDataBound, WriteExperience, WriteExperienceIncremental};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
 pub use pair::AgentPair;
 pub use r#dyn::{BoxActor, BoxAgent, DynAgent};
@@ -165,7 +165,7 @@ pub enum ActorMode {
 /// If old data in the buffer needs to be cleared that is the reponsibility of either the buffer
 /// or the `batch_update` method.
 pub trait BatchUpdate<O, A> {
-    type HistoryBuffer: WriteHistoryBuffer<O, A>;
+    type HistoryBuffer: WriteExperience<O, A>;
 
     /// Create a new history buffer.
     fn buffer(&self) -> Self::HistoryBuffer;

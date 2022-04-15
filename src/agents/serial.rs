@@ -1,5 +1,5 @@
 //! Combined actor-agent. Prefer using simulation functions instead.
-use super::{Actor, ActorMode, Agent, HistoryDataBound, WriteHistoryBuffer};
+use super::{Actor, ActorMode, Agent, HistoryDataBound, WriteExperienceIncremental};
 use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::Prng;
@@ -61,9 +61,10 @@ where
         let ready = self
             .update_size
             .is_satisfied(self.num_collected_steps, Some(&step));
-        self.buffer.push(step);
+        self.buffer.write_step(step);
 
         if ready {
+            self.buffer.end_experience();
             self.actor = None; // Agent cannot be updated while an actor exists.
             self.agent.batch_update_single(&mut self.buffer, logger);
             self.actor = Some(self.agent.actor(ActorMode::Training));

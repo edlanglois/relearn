@@ -1,8 +1,7 @@
-use super::{HistoryDataBound, WriteHistoryBuffer};
+use super::{HistoryDataBound, WriteExperience, WriteExperienceIncremental};
 use crate::envs::Successor;
 use crate::simulation::PartialStep;
 use std::iter::{Copied, ExactSizeIterator, FusedIterator};
-use std::ops::{Deref, DerefMut};
 use std::{slice, vec};
 
 /// Simple vector history buffer. Stores steps in a vector.
@@ -11,7 +10,7 @@ use std::{slice, vec};
 /// The buffer is ready when either
 /// * the current episode is done and at least `soft_threshold` steps have been collected; or
 /// * at least `hard_threshold` steps have been collected.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VecBuffer<O, A> {
     /// Steps from all episodes with each episode stored contiguously
     steps: Vec<PartialStep<O, A>>,
@@ -44,11 +43,37 @@ impl<O, A> VecBuffer<O, A> {
         self.episode_ends.clear();
     }
 
-    /// Finalize the buffer in-place so that all episodes are well-formed.
-    ///
-    /// Returns a [`VecBufferEpisodes`] wrapper from which episodes can be read.
-    /// The return value can ignored if one only wants to access the steps.
-    pub fn finalize(&mut self) -> VecBufferEpisodes<O, A> {
+    /// The number of steps stored in the buffer.
+    #[must_use]
+    pub fn num_steps(&self) -> usize {
+        self.steps.len()
+    }
+
+    /// The number of episodes stored in the buffer.
+    #[must_use]
+    pub fn num_episodes(&self) -> usize {
+        self.episode_ends.len()
+    }
+
+    /// Iterator over all steps stored in the buffer.
+    #[must_use]
+    pub fn steps(&self) -> slice::Iter<PartialStep<O, A>> {
+        self.steps.iter()
+    }
+
+    /// Draining iterator over all steps stored in the buffer.
+    pub fn drain_steps(&mut self) -> vec::Drain<PartialStep<O, A>> {
+        self.steps.drain(..)
+    }
+
+    /// Iterator over all episode slices stored in the buffer.
+    #[must_use]
+    pub fn episodes(&self) -> EpisodesIter<O, A> {
+        SliceChunksAtIter::new(&self.steps, self.episode_ends.iter().copied())
+    }
+
+    /// Ensure the most recent episode is well-formed.
+    fn fix_last_episode(&mut self) {
         // If the last step of the last episode does not end the episode
         // then drop that step and interrupt the episode at the step before it.
         // Cannot interrupt at the last step because the following observation is missing.
@@ -65,30 +90,6 @@ impl<O, A> VecBuffer<O, A> {
                 }
             }
         }
-        VecBufferEpisodes { buffer: self }
-    }
-
-    /// The number of steps stored in the buffer.
-    #[must_use]
-    pub fn num_steps(&self) -> usize {
-        self.steps.len()
-    }
-
-    /// Iterator over all steps stored in the buffer.
-    ///
-    /// The final episode may not end properly.
-    /// Use `finalize().steps()` to ensure all episodes are well-formed.
-    #[must_use]
-    pub fn steps(&self) -> slice::Iter<PartialStep<O, A>> {
-        self.steps.iter()
-    }
-
-    /// Draining iterator over all steps stored in the buffer.
-    ///
-    /// The final episode may not end properly.
-    /// Use `finalize().steps()` to ensure all episodes are well-formed.
-    pub fn drain_steps(&mut self) -> vec::Drain<PartialStep<O, A>> {
-        self.steps.drain(..)
     }
 }
 
@@ -97,25 +98,39 @@ impl<O, A> From<Vec<PartialStep<O, A>>> for VecBuffer<O, A> {
         let episode_ends = steps
             .iter()
             .enumerate()
-            .filter_map(|(i, step)| if step.episode_done() { Some(i) } else { None })
+            .filter_map(|(i, step)| {
+                if step.episode_done() {
+                    Some(i + 1)
+                } else {
+                    None
+                }
+            })
             .collect();
-        Self {
+        let mut buffer = Self {
             steps,
             episode_ends,
-        }
+        };
+        buffer.fix_last_episode();
+        buffer
     }
 }
 
-impl<O, A> WriteHistoryBuffer<O, A> for VecBuffer<O, A> {
-    fn push(&mut self, step: PartialStep<O, A>) {
-        let episode_done = step.episode_done();
-        self.steps.push(step);
-        if episode_done {
-            self.episode_ends.push(self.steps.len());
-        }
+impl<O, A> FromIterator<PartialStep<O, A>> for VecBuffer<O, A> {
+    fn from_iter<I>(steps: I) -> Self
+    where
+        I: IntoIterator<Item = PartialStep<O, A>>,
+    {
+        let mut buffer = Self::new();
+        buffer.write_experience(steps);
+        buffer
     }
+}
 
-    fn extend<I: IntoIterator<Item = PartialStep<O, A>>>(&mut self, steps: I) {
+impl<O, A> WriteExperience<O, A> for VecBuffer<O, A> {
+    fn write_experience<I>(&mut self, steps: I)
+    where
+        I: IntoIterator<Item = PartialStep<O, A>>,
+    {
         let offset = self.steps.len();
         self.steps.extend(steps);
         for (i, step) in self.steps[offset..].iter().enumerate() {
@@ -123,59 +138,21 @@ impl<O, A> WriteHistoryBuffer<O, A> for VecBuffer<O, A> {
                 self.episode_ends.push(offset + i + 1)
             }
         }
+        self.fix_last_episode();
     }
 }
 
-/// An interface for reading episodes from a [`VecBuffer`]
-///
-/// The purpose of this struct is to ensure that all episodes in the buffer are well-formed before
-/// providing access. This invariant cannot be guaranteed at all times because `VecBuffer` allows
-/// pushing steps one-at-a-time and the final episode is malformed whenever it ends with
-/// a continuing step.
-#[derive(Debug)]
-pub struct VecBufferEpisodes<'a, O, A> {
-    buffer: &'a mut VecBuffer<O, A>,
-}
-
-impl<O, A> Deref for VecBufferEpisodes<'_, O, A> {
-    type Target = VecBuffer<O, A>;
-    fn deref(&self) -> &Self::Target {
-        self.buffer
-    }
-}
-
-impl<O, A> DerefMut for VecBufferEpisodes<'_, O, A> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.buffer
-    }
-}
-
-impl<O, A> AsRef<VecBuffer<O, A>> for VecBufferEpisodes<'_, O, A> {
-    fn as_ref(&self) -> &VecBuffer<O, A> {
-        self.buffer
-    }
-}
-
-impl<O, A> AsMut<VecBuffer<O, A>> for VecBufferEpisodes<'_, O, A> {
-    fn as_mut(&mut self) -> &mut VecBuffer<O, A> {
-        self.buffer
-    }
-}
-
-impl<'a, O, A> VecBufferEpisodes<'a, O, A> {
-    #[must_use]
-    pub fn num_episodes(&self) -> usize {
-        self.buffer.episode_ends.len()
+impl<O, A> WriteExperienceIncremental<O, A> for VecBuffer<O, A> {
+    fn write_step(&mut self, step: PartialStep<O, A>) {
+        let episode_done = step.episode_done();
+        self.steps.push(step);
+        if episode_done {
+            self.episode_ends.push(self.steps.len());
+        }
     }
 
-    #[must_use]
-    pub fn episodes<'b: 'a>(&'b self) -> EpisodesIter<'a, O, A> {
-        SliceChunksAtIter::new(&self.buffer.steps, self.buffer.episode_ends.iter().copied())
-    }
-
-    #[must_use]
-    pub fn into_episodes(self) -> EpisodesIter<'a, O, A> {
-        SliceChunksAtIter::new(&self.buffer.steps, self.buffer.episode_ends.iter().copied())
+    fn end_experience(&mut self) {
+        self.fix_last_episode();
     }
 }
 
@@ -267,48 +244,58 @@ mod tests {
     /// * an episode of length 2, and
     /// * 2 steps of an incomplete episode.
     #[fixture]
-    fn full_buffer() -> VecBuffer<usize, bool> {
-        let mut buffer = VecBuffer::new();
-        buffer.extend([
+    fn buffer() -> VecBuffer<usize, bool> {
+        [
+            step(0, Terminate),
+            step(1, Continue(())),
+            step(2, Terminate),
+            step(3, Continue(())),
+            step(4, Continue(())),
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    #[rstest]
+    fn from_vec(buffer: VecBuffer<usize, bool>) {
+        let test: VecBuffer<_, _> = vec![
+            step(0, Terminate),
+            step(1, Continue(())),
+            step(2, Terminate),
+            step(3, Continue(())),
+            step(4, Continue(())),
+        ]
+        .into();
+        assert_eq!(test, buffer);
+    }
+
+    #[rstest]
+    fn write_experience(buffer: VecBuffer<usize, bool>) {
+        let mut test = VecBuffer::new();
+        test.write_experience([
             step(0, Terminate),
             step(1, Continue(())),
             step(2, Terminate),
             step(3, Continue(())),
             step(4, Continue(())),
         ]);
-        buffer
+        assert_eq!(test, buffer);
     }
 
     #[rstest]
-    fn num_steps(full_buffer: VecBuffer<usize, bool>) {
-        assert_eq!(full_buffer.num_steps(), 5);
+    fn num_steps(buffer: VecBuffer<usize, bool>) {
+        // The last step is dropped in finalization
+        assert_eq!(buffer.num_steps(), 4);
     }
 
     #[rstest]
-    fn num_steps_finalized(mut full_buffer: VecBuffer<usize, bool>) {
-        assert_eq!(full_buffer.finalize().num_steps(), 4);
+    fn num_episodes(buffer: VecBuffer<usize, bool>) {
+        assert_eq!(buffer.num_episodes(), 3);
     }
 
     #[rstest]
-    fn num_episodes(mut full_buffer: VecBuffer<usize, bool>) {
-        assert_eq!(full_buffer.finalize().num_episodes(), 3);
-    }
-
-    #[rstest]
-    fn steps(full_buffer: VecBuffer<usize, bool>) {
-        let mut steps_iter = full_buffer.steps();
-        assert_eq!(steps_iter.next(), Some(&step(0, Terminate)));
-        assert_eq!(steps_iter.next(), Some(&step(1, Continue(()))));
-        assert_eq!(steps_iter.next(), Some(&step(2, Terminate)));
-        assert_eq!(steps_iter.next(), Some(&step(3, Continue(()))));
-        assert_eq!(steps_iter.next(), Some(&step(4, Continue(()))));
-        assert_eq!(steps_iter.next(), None);
-    }
-
-    #[rstest]
-    fn steps_finalized(mut full_buffer: VecBuffer<usize, bool>) {
-        let full_buffer = full_buffer.finalize();
-        let mut steps_iter = full_buffer.steps();
+    fn steps(buffer: VecBuffer<usize, bool>) {
+        let mut steps_iter = buffer.steps();
         assert_eq!(steps_iter.next(), Some(&step(0, Terminate)));
         assert_eq!(steps_iter.next(), Some(&step(1, Continue(()))));
         assert_eq!(steps_iter.next(), Some(&step(2, Terminate)));
@@ -317,9 +304,9 @@ mod tests {
     }
 
     #[rstest]
-    fn steps_is_fused(full_buffer: VecBuffer<usize, bool>) {
-        let mut steps_iter = full_buffer.steps();
-        for _ in 0..5 {
+    fn steps_is_fused(buffer: VecBuffer<usize, bool>) {
+        let mut steps_iter = buffer.steps();
+        for _ in 0..4 {
             assert!(steps_iter.next().is_some());
         }
         assert!(steps_iter.next().is_none());
@@ -327,13 +314,13 @@ mod tests {
     }
 
     #[rstest]
-    fn steps_len(full_buffer: VecBuffer<usize, bool>) {
-        assert_eq!(full_buffer.steps().len(), full_buffer.num_steps());
+    fn steps_len(buffer: VecBuffer<usize, bool>) {
+        assert_eq!(buffer.steps().len(), buffer.num_steps());
     }
 
     #[rstest]
-    fn episodes(mut full_buffer: VecBuffer<usize, bool>) {
-        let mut episodes_iter = full_buffer.finalize().into_episodes();
+    fn episodes(buffer: VecBuffer<usize, bool>) {
+        let mut episodes_iter = buffer.episodes();
         assert_eq!(
             episodes_iter.next().unwrap().iter().collect::<Vec<_>>(),
             [&step(0, Terminate)]
@@ -350,14 +337,12 @@ mod tests {
     }
 
     #[rstest]
-    fn episodes_len(mut full_buffer: VecBuffer<usize, bool>) {
-        let buffer = full_buffer.finalize();
+    fn episodes_len(buffer: VecBuffer<usize, bool>) {
         assert_eq!(buffer.episodes().len(), buffer.num_episodes());
     }
 
     #[rstest]
-    fn episode_len_sum(mut full_buffer: VecBuffer<usize, bool>) {
-        let buffer = full_buffer.finalize();
+    fn episode_len_sum(buffer: VecBuffer<usize, bool>) {
         assert_eq!(
             buffer.episodes().map(<[_]>::len).sum::<usize>(),
             buffer.num_steps()
