@@ -1,7 +1,7 @@
 use super::{WriteExperience, WriteExperienceIncremental};
 use crate::simulation::PartialStep;
 
-/// Buffer that drops all steps without saving. Always reports being ready.
+/// Buffer that drops all steps without saving.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct NullBuffer;
 

@@ -1,4 +1,11 @@
 //! History buffers
+//!
+//! # Design Note
+//! There is no `ReadBuffer` trait because
+//! 1. It would require Generic Associated Types (GAT) for returning iterators of slices with
+//!    lifetimes tied to the lifetime of the buffer.
+//! 2. A trait is not necessary because each agent uses a single specific buffer type.
+//!    (Although a trait might be nice for organization).
 mod null;
 mod vec;
 
@@ -136,12 +143,13 @@ impl_wrapped_write_experience!(Box<T>);
 /// (wrapping a `&mut SomeHistoryBuffer`) to be created for each experience thread and invoking the
 /// `end_experience()` functionality in its destructor, when it would also release its exclusive
 /// access to the buffer. This is not done for two reasons:
-///     1. It is excessively complicated for an interface that is rarely used.
-///     2. An important use-case of this interface is for things like [`SerialActorAgent`] that
-///        persist the incremental writer while receiving steps one-by-one. The above change would
-///        make this use-case even more complicated as it would require storing both the history
-///        buffer and the incremental writer together when the writer (mutably) references the
-///        buffer.
+/// 1. It is excessively complicated for an interface that is rarely used.
+/// 2. An important use-case of this interface is for things like [`SerialActorAgent`][1] that
+///    persist the incremental writer while receiving steps one-by-one. The above change would make
+///    this use-case even more complicated as it would require storing both the history buffer and
+///    the incremental writer together when the writer (mutably) references the buffer.
+///
+/// [1]: super::SerialActorAgent
 pub trait WriteExperienceIncremental<O, A> {
     /// Write a step into the the buffer.
     ///
