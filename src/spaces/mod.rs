@@ -186,6 +186,7 @@ pub trait FiniteSpace: Space {
     ///
     /// The return value is `Some(elem)` if and only if
     /// `elem` is the unique element in the space with `to_index(elem) == index`.
+    #[allow(clippy::wrong_self_convention)] // `from_` here refers to element, not space
     fn from_index(&self, index: usize) -> Option<Self::Element>;
 
     /// Try to convert an index to an element.
@@ -194,6 +195,7 @@ pub trait FiniteSpace: Space {
     /// `Some(_)` may be returned even if the index is invalid.
     /// If the returned value must be validated then use [`FiniteSpace::from_index`].
     #[inline]
+    #[allow(clippy::wrong_self_convention)] // `from_` here refers to element, not space
     fn from_index_unchecked(&self, index: usize) -> Option<Self::Element> {
         self.from_index(index)
     }
