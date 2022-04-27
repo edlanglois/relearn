@@ -20,6 +20,8 @@ repos:
     -   id: cargo-check
         name: 'relearn-derive-check'
         args: ['--all-targets', '--manifest-path', 'relearn_derive/Cargo.toml']
+        always_run: true
     -   id: cargo-check
         name: 'relearn-experiments-check'
         args: ['--all-targets', '--manifest-path', 'relearn_experiments/Cargo.toml']
+        always_run: true
