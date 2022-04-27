@@ -25,7 +25,7 @@ rand_chacha = "0.3"
 rand_distr = "0.4"
 relearn_derive = { version = "0.2.0", path = "relearn_derive" }
 serde = { version = "1.0", features = ["derive", "rc"] }
-serde-big-array = { version = "0.3", features = ["const-generics"] }
+serde-big-array = { version = "0.4" }
 serde_with = "1.12"
 slice-of-array = "=0.3.1" # pinned b/c low popularity; audit code on change
 smallvec = { version = "1.7", features = ["union"] }
