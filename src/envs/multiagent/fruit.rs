@@ -370,9 +370,7 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Environme
         let mut cells = Box::new([[None; W]; H]);
         let cells_slice = cells.flat_mut();
         let num_cells = cells_slice.len();
-        if num_cells == 0 {
-            panic!("game grid must be nonempty")
-        }
+        assert!(num_cells != 0, "game grid must be nonempty");
 
         // Add fruit then shuffle
         // Want to leave the center cell (origin) empty for the agents
