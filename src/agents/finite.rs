@@ -1,5 +1,5 @@
 use super::{
-    Actor, ActorMode, Agent, BatchUpdate, HistoryDataBound, WriteExperience,
+    Actor, ActorMode, Agent, BatchUpdate, HistoryDataBound, WriteExperience, WriteExperienceError,
     WriteExperienceIncremental,
 };
 use crate::envs::Successor;
@@ -139,7 +139,7 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn write_experience<I>(&mut self, steps: I)
+    fn write_experience<I>(&mut self, steps: I) -> Result<(), WriteExperienceError>
     where
         I: IntoIterator<Item = PartialStep<OS::Element, AS::Element>>,
     {
@@ -158,7 +158,10 @@ where
     OS: FiniteSpace,
     AS: FiniteSpace,
 {
-    fn write_step(&mut self, step: PartialStep<OS::Element, AS::Element>) {
+    fn write_step(
+        &mut self,
+        step: PartialStep<OS::Element, AS::Element>,
+    ) -> Result<(), WriteExperienceError> {
         self.buffer.write_step(indexed_partial_step(
             &step,
             &self.observation_space,

@@ -12,8 +12,10 @@ mod vec;
 pub use null::NullBuffer;
 pub use vec::VecBuffer;
 
+use crate::logging::StatsLogger;
 use crate::simulation::{PartialStep, Step, StepsIter, TakeAlignedSteps};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 /// Lower bound on an amount of actor-environment simulation steps.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -112,15 +114,24 @@ const fn div_ceil(numerator: usize, denominator: usize) -> usize {
 /// a step from a different episode.
 pub trait WriteExperience<O, A>: WriteExperienceIncremental<O, A> {
     /// Write a thread of experience into the buffer.
-    fn write_experience<I>(&mut self, steps: I)
+    fn write_experience<I>(&mut self, steps: I) -> Result<(), WriteExperienceError>
     where
         I: IntoIterator<Item = PartialStep<O, A>>,
         Self: Sized,
     {
-        for step in steps {
-            self.write_step(step);
+        for (i, step) in steps.into_iter().enumerate() {
+            self.write_step(step).map_err(|e| match e {
+                WriteExperienceError::Full { written_steps } => {
+                    assert_eq!(
+                        written_steps, 0,
+                        "write_step `Full` has non-zero written steps"
+                    );
+                    WriteExperienceError::Full { written_steps: i }
+                }
+            })?;
         }
-        self.end_experience()
+        self.end_experience();
+        Ok(())
     }
 }
 
@@ -155,7 +166,7 @@ pub trait WriteExperienceIncremental<O, A> {
     ///
     /// Successive steps must be from the same thread of experience unless `end_experience()` is
     /// called in between.
-    fn write_step(&mut self, step: PartialStep<O, A>);
+    fn write_step(&mut self, step: PartialStep<O, A>) -> Result<(), WriteExperienceError>;
 
     /// End the current thread of experience.
     ///
@@ -171,7 +182,7 @@ macro_rules! impl_wrapped_write_experience_incremental {
         where
             T: WriteExperienceIncremental<O, A> + ?Sized,
         {
-            fn write_step(&mut self, step: PartialStep<O, A>) {
+            fn write_step(&mut self, step: PartialStep<O, A>) -> Result<(), WriteExperienceError> {
                 T::write_step(self, step)
             }
             fn end_experience(&mut self) {
@@ -182,3 +193,19 @@ macro_rules! impl_wrapped_write_experience_incremental {
 }
 impl_wrapped_write_experience_incremental!(&'_ mut T);
 impl_wrapped_write_experience_incremental!(Box<T>);
+
+#[derive(Error, Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum WriteExperienceError {
+    #[error("buffer full after writing {written_steps} steps")]
+    Full { written_steps: usize },
+}
+
+impl WriteExperienceError {
+    pub fn log<L: StatsLogger + ?Sized>(&self, logger: &mut L) {
+        match self {
+            WriteExperienceError::Full { written_steps: _ } => {
+                logger.log_message("buffer_full", "buffer full before writing all steps")
+            }
+        }
+    }
+}

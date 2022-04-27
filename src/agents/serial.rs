@@ -61,7 +61,9 @@ where
         let ready = self
             .update_size
             .is_satisfied(self.num_collected_steps, Some(&step));
-        self.buffer.write_step(step);
+        self.buffer
+            .write_step(step)
+            .unwrap_or_else(|err| err.log(logger));
 
         if ready {
             self.buffer.end_experience();

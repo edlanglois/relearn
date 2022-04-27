@@ -1,5 +1,7 @@
 use super::{OnlineStepsSummary, Simulation, Steps, StepsSummary};
-use crate::agents::{buffers::HistoryDataBound, ActorMode, Agent, BatchUpdate, WriteExperience};
+use crate::agents::{
+    buffers::HistoryDataBound, ActorMode, Agent, BatchUpdate, WriteExperience, WriteExperienceError,
+};
 use crate::envs::{EnvStructure, Environment, StructuredEnvironment};
 use crate::logging::{Loggable, StatsLogger};
 use crate::spaces::{ElementRefInto, Space};
@@ -25,17 +27,19 @@ pub fn train_serial<T, E>(
     let mut buffer = agent.buffer();
     for _ in 0..num_periods {
         let update_size = agent.min_update_size();
-        buffer.write_experience(
-            update_size
-                .take(Steps::new(
-                    environment,
-                    agent.actor(ActorMode::Training),
-                    &mut *rng_env,
-                    &mut *rng_agent,
-                    &mut *logger,
-                ))
-                .log(),
-        );
+        buffer
+            .write_experience(
+                update_size
+                    .take(Steps::new(
+                        environment,
+                        agent.actor(ActorMode::Training),
+                        &mut *rng_env,
+                        &mut *rng_agent,
+                        &mut *logger,
+                    ))
+                    .log(),
+            )
+            .unwrap_or_else(|err| err.log(logger));
         agent.batch_update_single(&mut buffer, logger);
     }
 }
@@ -110,21 +114,25 @@ pub fn train_parallel<T, E>(
                 let thread_logger = send_logger.take();
                 threads.push(scope.spawn(move |_scope| {
                     let mut summary = OnlineStepsSummary::default();
-                    buffer.write_experience(
-                        worker_update_size
-                            .take(Steps::new(
-                                environment,
-                                actor,
-                                &mut rngs.0,
-                                &mut rngs.1,
-                                thread_logger.unwrap_or(&mut ()),
-                            ))
-                            .log()
-                            .map(|step| {
-                                summary.push(&step);
-                                step
-                            }),
-                    );
+                    buffer
+                        .write_experience(
+                            worker_update_size
+                                .take(Steps::new(
+                                    environment,
+                                    actor,
+                                    &mut rngs.0,
+                                    &mut rngs.1,
+                                    thread_logger.unwrap_or(&mut ()),
+                                ))
+                                .log()
+                                .map(|step| {
+                                    summary.push(&step);
+                                    step
+                                }),
+                        )
+                        .unwrap_or_else(|err| match err {
+                            WriteExperienceError::Full { written_steps: _ } => {}
+                        });
                     StepsSummary::from(summary)
                 }));
             }

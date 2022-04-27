@@ -17,7 +17,9 @@ pub mod testing;
 pub use bandits::{
     BetaThompsonSamplingAgent, BetaThompsonSamplingAgentConfig, UCB1Agent, UCB1AgentConfig,
 };
-pub use buffers::{HistoryDataBound, WriteExperience, WriteExperienceIncremental};
+pub use buffers::{
+    HistoryDataBound, WriteExperience, WriteExperienceError, WriteExperienceIncremental,
+};
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
 pub use pair::AgentPair;
 pub use r#dyn::{BoxActor, BoxAgent, DynAgent};

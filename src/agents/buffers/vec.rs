@@ -1,4 +1,4 @@
-use super::{HistoryDataBound, WriteExperience, WriteExperienceIncremental};
+use super::{HistoryDataBound, WriteExperience, WriteExperienceError, WriteExperienceIncremental};
 use crate::envs::Successor;
 use crate::simulation::PartialStep;
 use std::iter::{Copied, ExactSizeIterator, FusedIterator};
@@ -121,13 +121,13 @@ impl<O, A> FromIterator<PartialStep<O, A>> for VecBuffer<O, A> {
         I: IntoIterator<Item = PartialStep<O, A>>,
     {
         let mut buffer = Self::new();
-        buffer.write_experience(steps);
+        buffer.write_experience(steps).unwrap(); // TODO: Maybe just ignore if full?
         buffer
     }
 }
 
 impl<O, A> WriteExperience<O, A> for VecBuffer<O, A> {
-    fn write_experience<I>(&mut self, steps: I)
+    fn write_experience<I>(&mut self, steps: I) -> Result<(), WriteExperienceError>
     where
         I: IntoIterator<Item = PartialStep<O, A>>,
     {
@@ -139,16 +139,18 @@ impl<O, A> WriteExperience<O, A> for VecBuffer<O, A> {
             }
         }
         self.fix_last_episode();
+        Ok(())
     }
 }
 
 impl<O, A> WriteExperienceIncremental<O, A> for VecBuffer<O, A> {
-    fn write_step(&mut self, step: PartialStep<O, A>) {
+    fn write_step(&mut self, step: PartialStep<O, A>) -> Result<(), WriteExperienceError> {
         let episode_done = step.episode_done();
         self.steps.push(step);
         if episode_done {
             self.episode_ends.push(self.steps.len());
         }
+        Ok(())
     }
 
     fn end_experience(&mut self) {
@@ -278,7 +280,8 @@ mod tests {
             step(2, Terminate),
             step(3, Continue(())),
             step(4, Continue(())),
-        ]);
+        ])
+        .unwrap();
         assert_eq!(test, buffer);
     }
 

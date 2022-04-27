@@ -1,4 +1,4 @@
-use super::{WriteExperience, WriteExperienceIncremental};
+use super::{WriteExperience, WriteExperienceError, WriteExperienceIncremental};
 use crate::simulation::PartialStep;
 
 /// Buffer that drops all steps without saving.
@@ -6,14 +6,17 @@ use crate::simulation::PartialStep;
 pub struct NullBuffer;
 
 impl<O, A> WriteExperience<O, A> for NullBuffer {
-    fn write_experience<I>(&mut self, _: I)
+    fn write_experience<I>(&mut self, _: I) -> Result<(), WriteExperienceError>
     where
         I: IntoIterator<Item = PartialStep<O, A>>,
     {
+        Ok(())
     }
 }
 
 impl<O, A> WriteExperienceIncremental<O, A> for NullBuffer {
-    fn write_step(&mut self, _: PartialStep<O, A>) {}
+    fn write_step(&mut self, _: PartialStep<O, A>) -> Result<(), WriteExperienceError> {
+        Ok(())
+    }
     fn end_experience(&mut self) {}
 }

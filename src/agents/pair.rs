@@ -1,6 +1,6 @@
 use super::{
     Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, HistoryDataBound,
-    WriteExperience, WriteExperienceIncremental,
+    WriteExperience, WriteExperienceError, WriteExperienceIncremental,
 };
 use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
 use crate::logging::StatsLogger;
@@ -119,10 +119,13 @@ where
     B0: WriteExperienceIncremental<O0, A0>,
     B1: WriteExperienceIncremental<O1, A1>,
 {
-    fn write_step(&mut self, step: PartialStep<(O0, O1), (A0, A1)>) {
+    fn write_step(
+        &mut self,
+        step: PartialStep<(O0, O1), (A0, A1)>,
+    ) -> Result<(), WriteExperienceError> {
         let (step1, step2) = split_partial_step(step);
-        self.0.write_step(step1);
-        self.1.write_step(step2);
+        self.0.write_step(step1)?;
+        self.1.write_step(step2)
     }
     fn end_experience(&mut self) {
         self.0.end_experience();
