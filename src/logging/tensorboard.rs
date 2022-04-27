@@ -119,7 +119,7 @@ impl TensorBoardBackend {
                     self.summary_index,
                 )
             }
-            Nothing | Message { counts: _ } => {}
+            Nothing => {}
         }
     }
 }

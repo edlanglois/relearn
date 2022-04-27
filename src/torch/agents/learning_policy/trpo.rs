@@ -11,6 +11,7 @@ use crate::torch::{
     },
 };
 use crate::utils::distributions::ArrayDistribution;
+use log::warn;
 use serde::{Deserialize, Serialize};
 use tch::{Kind, Tensor};
 
@@ -115,9 +116,7 @@ where
                 OptimizerStepError::NaNConstraint => {
                     panic!("NaN constraint in policy optimization")
                 }
-                e => logger
-                    .log("no_policy_step".into(), e.to_string().into())
-                    .unwrap(),
+                err => warn!("error in policy step: {}", err),
             };
         }
 

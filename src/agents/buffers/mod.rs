@@ -12,7 +12,6 @@ mod vec;
 pub use null::NullBuffer;
 pub use vec::VecBuffer;
 
-use crate::logging::StatsLogger;
 use crate::simulation::{PartialStep, Step, StepsIter, TakeAlignedSteps};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -198,14 +197,4 @@ impl_wrapped_write_experience_incremental!(Box<T>);
 pub enum WriteExperienceError {
     #[error("buffer full after writing {written_steps} steps")]
     Full { written_steps: usize },
-}
-
-impl WriteExperienceError {
-    pub fn log<L: StatsLogger + ?Sized>(&self, logger: &mut L) {
-        match self {
-            WriteExperienceError::Full { written_steps: _ } => {
-                logger.log_message("buffer_full", "buffer full before writing all steps")
-            }
-        }
-    }
 }

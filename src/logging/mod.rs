@@ -120,15 +120,6 @@ pub trait StatsLogger: Send {
         self.log(name.into(), Loggable::Index { value, size })
             .unwrap()
     }
-
-    /// Log a named message (convenience function).
-    ///
-    /// Panics if this name was previously used to log a value of a different type.
-    #[inline]
-    fn log_message(&mut self, name: &'static str, message: &'static str) {
-        self.log(name.into(), Loggable::Message(message.into()))
-            .unwrap()
-    }
 }
 
 /// Implement `StatsLogger` for a deref-able wrapper type generic over `T: StatsLogger + ?Sized`.
@@ -181,7 +172,6 @@ pub enum Loggable {
     Duration(Duration),
     Scalar(f64),
     Index { value: usize, size: usize },
-    Message(Cow<'static, str>),
 }
 
 impl From<f64> for Loggable {
@@ -196,18 +186,6 @@ impl From<Duration> for Loggable {
     }
 }
 
-impl From<&'static str> for Loggable {
-    fn from(s: &'static str) -> Self {
-        Self::Message(s.into())
-    }
-}
-
-impl From<String> for Loggable {
-    fn from(s: String) -> Self {
-        Self::Message(s.into())
-    }
-}
-
 impl Loggable {
     const fn variant_name(&self) -> &'static str {
         use Loggable::*;
@@ -217,7 +195,6 @@ impl Loggable {
             Duration(_) => "Duration",
             Scalar(_) => "Scalar",
             Index { value: _, size: _ } => "Index",
-            Message(_) => "Message",
         }
     }
 }

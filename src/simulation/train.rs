@@ -1,11 +1,10 @@
 use super::{OnlineStepsSummary, Simulation, Steps, StepsSummary};
-use crate::agents::{
-    buffers::HistoryDataBound, ActorMode, Agent, BatchUpdate, WriteExperience, WriteExperienceError,
-};
+use crate::agents::{buffers::HistoryDataBound, ActorMode, Agent, BatchUpdate, WriteExperience};
 use crate::envs::{EnvStructure, Environment, StructuredEnvironment};
 use crate::logging::{Loggable, StatsLogger};
 use crate::spaces::{ElementRefInto, Space};
 use crate::Prng;
+use log::warn;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -39,7 +38,7 @@ pub fn train_serial<T, E>(
                     ))
                     .log(),
             )
-            .unwrap_or_else(|err| err.log(logger));
+            .unwrap_or_else(|err| warn!("error filling buffer: {}", err));
         agent.batch_update_single(&mut buffer, logger);
     }
 }
@@ -130,9 +129,7 @@ pub fn train_parallel<T, E>(
                                     step
                                 }),
                         )
-                        .unwrap_or_else(|err| match err {
-                            WriteExperienceError::Full { written_steps: _ } => {}
-                        });
+                        .unwrap_or_else(|err| warn!("error filling buffer: {}", err));
                     StepsSummary::from(summary)
                 }));
             }

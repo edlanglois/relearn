@@ -157,12 +157,6 @@ impl<'a> fmt::Display for DisplaySummary<'a> {
                 }
                 write!(f, "]%")
             }
-            ChunkSummary::Message { counts } => {
-                for (msg, count) in counts.iter() {
-                    write!(f, "\n\t{}  \"{}\"", count, msg)?;
-                }
-                Ok(())
-            }
         }
     }
 }

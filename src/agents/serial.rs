@@ -3,6 +3,7 @@ use super::{Actor, ActorMode, Agent, HistoryDataBound, WriteExperienceIncrementa
 use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::Prng;
+use log::info;
 use std::fmt;
 
 /// A serial combined actor-agent.
@@ -63,7 +64,7 @@ where
             .is_satisfied(self.num_collected_steps, Some(&step));
         self.buffer
             .write_step(step)
-            .unwrap_or_else(|err| err.log(logger));
+            .unwrap_or_else(|err| info!("error writing step: {}", err));
 
         if ready {
             self.buffer.end_experience();

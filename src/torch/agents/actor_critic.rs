@@ -16,6 +16,7 @@ use crate::{
     torch::serialize::DeviceDef,
     Prng,
 };
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::time::Instant;
@@ -253,7 +254,7 @@ where
             self.device,
         );
         if features.is_empty() {
-            logger.log_message("no_model_update", "Skipping update; empty history");
+            info!("skipping model update; history buffer is empty");
             return;
         }
 

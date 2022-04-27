@@ -1,6 +1,5 @@
 use super::{Id, LogError, Loggable, StatsLogger};
 use crate::utils::stats::OnlineMeanVariance;
-use std::borrow::Cow;
 use std::collections::{btree_map::Entry, BTreeMap};
 use std::ops::Drop;
 use std::time::{Duration, Instant};
@@ -162,22 +161,10 @@ struct CounterSummary {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChunkSummary {
     Nothing,
-    Counter {
-        increment: u64,
-        initial_value: u64,
-    },
-    Duration {
-        stats: OnlineMeanVariance<f64>,
-    },
-    Scalar {
-        stats: OnlineMeanVariance<f64>,
-    },
-    Index {
-        counts: Vec<usize>,
-    },
-    Message {
-        counts: BTreeMap<Cow<'static, str>, usize>,
-    },
+    Counter { increment: u64, initial_value: u64 },
+    Duration { stats: OnlineMeanVariance<f64> },
+    Scalar { stats: OnlineMeanVariance<f64> },
+    Index { counts: Vec<usize> },
 }
 
 impl From<Loggable> for ChunkSummary {
@@ -202,12 +189,6 @@ impl From<Loggable> for ChunkSummary {
                 let mut counts = vec![0; size];
                 counts[v] += 1;
                 Self::Index { counts }
-            }
-            Loggable::Message(s) => {
-                let mut counts = BTreeMap::new();
-                let prev = counts.insert(s, 1);
-                assert!(prev.is_none());
-                Self::Message { counts }
             }
         }
     }
@@ -244,9 +225,6 @@ impl ChunkSummary {
                 }
                 counts[v] += 1;
             }
-            (Self::Message { counts }, Loggable::Message(s)) => {
-                *counts.entry(s).or_insert(0) += 1;
-            }
             (summary, value) => {
                 return Err(LogError::IncompatibleValue {
                     prev: summary.loggable_variant_name(),
@@ -270,7 +248,6 @@ impl ChunkSummary {
             }
             Self::Duration { stats } | Self::Scalar { stats } => *stats = OnlineMeanVariance::new(),
             Self::Index { counts } => counts.iter_mut().for_each(|c| *c = 0),
-            Self::Message { counts } => counts.clear(),
         }
     }
 
@@ -285,7 +262,6 @@ impl ChunkSummary {
             Self::Duration { stats: _ } => "Duration",
             Self::Scalar { stats: _ } => "Scalar",
             Self::Index { counts: _ } => "Index",
-            Self::Message { counts: _ } => "Message",
         }
     }
 }
