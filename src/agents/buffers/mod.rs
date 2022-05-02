@@ -7,13 +7,17 @@
 //! 2. A trait is not necessary because each agent uses a single specific buffer type.
 //!    (Although a trait might be nice for organization).
 mod null;
+mod replay;
 mod vec;
 
 pub use null::NullBuffer;
+pub use replay::ReplayBuffer;
 pub use vec::VecBuffer;
 
+use crate::envs::Successor;
 use crate::simulation::{PartialStep, Step, StepsIter, TakeAlignedSteps};
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use thiserror::Error;
 
 /// Lower bound on an amount of actor-environment simulation steps.
@@ -197,4 +201,75 @@ impl_wrapped_write_experience_incremental!(Box<T>);
 pub enum WriteExperienceError {
     #[error("buffer full after writing {written_steps} steps")]
     Full { written_steps: usize },
+}
+
+/// Ensure that the last episode in a sequence of steps ends properly.
+///
+/// Helper function for internal use by buffer implementations.
+///
+/// Returns whether a new episode was created.
+/// If a new episode was created then the last step was popped.
+/// If no new episode was created then the last step may or may not have been popped.
+fn finalize_last_episode<S, O, A>(steps: &mut S) -> bool
+where
+    S: Stack<PartialStep<O, A>>,
+{
+    // If the last step ends the episode (or if there is no last episode) then we're done.
+    if steps.top().map_or(true, PartialStep::episode_done) {
+        return false;
+    }
+
+    // If the last step of the last episode does not end the episode
+    // then drop that step and interrupt the episode at the step before it.
+    // Cannot interrupt at the last step because the following observation is missing.
+    let final_observation = steps.pop().unwrap().observation;
+    // Now check whether the formerly-second-last step ends its episode.
+    // If it does then we don't need to do anything else, the step we just popped was the only one
+    // in its episode. Otherwise, interrupt the episode at this new last step.
+    if let Some(step) = steps.top_mut() {
+        if !step.episode_done() {
+            step.next = Successor::Interrupt(final_observation);
+            return true;
+        }
+    }
+
+    false
+}
+
+/// A stack data structure.
+trait Stack<T> {
+    fn push(&mut self, value: T);
+    fn pop(&mut self) -> Option<T>;
+    fn top(&self) -> Option<&T>;
+    fn top_mut(&mut self) -> Option<&mut T>;
+}
+
+impl<T> Stack<T> for Vec<T> {
+    fn push(&mut self, value: T) {
+        Self::push(self, value)
+    }
+    fn pop(&mut self) -> Option<T> {
+        Self::pop(self)
+    }
+    fn top(&self) -> Option<&T> {
+        self.last()
+    }
+    fn top_mut(&mut self) -> Option<&mut T> {
+        self.last_mut()
+    }
+}
+
+impl<T> Stack<T> for VecDeque<T> {
+    fn push(&mut self, value: T) {
+        self.push_back(value)
+    }
+    fn pop(&mut self) -> Option<T> {
+        self.pop_back()
+    }
+    fn top(&self) -> Option<&T> {
+        self.back()
+    }
+    fn top_mut(&mut self) -> Option<&mut T> {
+        self.back_mut()
+    }
 }

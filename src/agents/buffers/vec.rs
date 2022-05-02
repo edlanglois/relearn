@@ -1,5 +1,4 @@
 use super::{HistoryDataBound, WriteExperience, WriteExperienceError, WriteExperienceIncremental};
-use crate::envs::Successor;
 use crate::simulation::PartialStep;
 use std::iter::{Copied, ExactSizeIterator, FusedIterator};
 use std::{slice, vec};
@@ -71,26 +70,6 @@ impl<O, A> VecBuffer<O, A> {
     pub fn episodes(&self) -> EpisodesIter<O, A> {
         SliceChunksAtIter::new(&self.steps, self.episode_ends.iter().copied())
     }
-
-    /// Ensure the most recent episode is well-formed.
-    fn fix_last_episode(&mut self) {
-        // If the last step of the last episode does not end the episode
-        // then drop that step and interrupt the episode at the step before it.
-        // Cannot interrupt at the last step because the following observation is missing.
-        if self.steps.last().map_or(false, |step| !step.episode_done()) {
-            let final_observation = self.steps.pop().unwrap().observation;
-            // Now check whether the formerly-second last step ends its episode.
-            // If it does then we don't need to do anything else, the step we just popped was the
-            // only one in its episode.
-            // Otherwise, interrupt the episode at this new last step.
-            if let Some(step) = self.steps.last_mut() {
-                if !step.episode_done() {
-                    step.next = Successor::Interrupt(final_observation);
-                    self.episode_ends.push(self.steps.len());
-                }
-            }
-        }
-    }
 }
 
 impl<O, A> From<Vec<PartialStep<O, A>>> for VecBuffer<O, A> {
@@ -110,7 +89,7 @@ impl<O, A> From<Vec<PartialStep<O, A>>> for VecBuffer<O, A> {
             steps,
             episode_ends,
         };
-        buffer.fix_last_episode();
+        buffer.end_experience();
         buffer
     }
 }
@@ -138,7 +117,7 @@ impl<O, A> WriteExperience<O, A> for VecBuffer<O, A> {
                 self.episode_ends.push(offset + i + 1)
             }
         }
-        self.fix_last_episode();
+        self.end_experience();
         Ok(())
     }
 }
@@ -154,7 +133,9 @@ impl<O, A> WriteExperienceIncremental<O, A> for VecBuffer<O, A> {
     }
 
     fn end_experience(&mut self) {
-        self.fix_last_episode();
+        if super::finalize_last_episode(&mut self.steps) {
+            self.episode_ends.push(self.steps.len())
+        }
     }
 }
 
@@ -231,7 +212,6 @@ mod tests {
     use crate::envs::Successor::{self, Continue, Interrupt, Terminate};
     use rstest::{fixture, rstest};
 
-    /// Make a step that either continues or is terminal.
     const fn step(observation: usize, next: Successor<usize, ()>) -> PartialStep<usize, bool> {
         PartialStep {
             observation,
