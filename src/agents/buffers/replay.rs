@@ -1,10 +1,8 @@
 use super::{WriteExperience, WriteExperienceError, WriteExperienceIncremental};
 use crate::simulation::PartialStep;
-use crate::utils::iter::SizedChain;
-use crate::utils::sequence::Sequence;
+use crate::utils::slice::SplitSlice;
 use std::collections::{vec_deque, VecDeque};
 use std::iter::{Copied, FusedIterator};
-use std::slice;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReplayBuffer<O, A> {
@@ -59,7 +57,10 @@ impl<O, A> ReplayBuffer<O, A> {
     /// Iterator over all episode slices stored in the buffer.
     #[must_use]
     pub fn episodes(&self) -> EpisodesIter<O, A> {
-        VecDequeChunksByLength::new(&self.steps, self.episode_lengths.iter().copied())
+        SplitSliceChunksByLength::new(
+            self.steps.as_slices().into(),
+            self.episode_lengths.iter().copied(),
+        )
     }
 }
 
@@ -99,139 +100,36 @@ impl<O, A> WriteExperienceIncremental<O, A> for ReplayBuffer<O, A> {
 impl<O, A> WriteExperience<O, A> for ReplayBuffer<O, A> {}
 
 pub type EpisodesIter<'a, O, A> =
-    VecDequeChunksByLength<'a, PartialStep<O, A>, Copied<vec_deque::Iter<'a, usize>>>;
+    SplitSliceChunksByLength<'a, PartialStep<O, A>, Copied<vec_deque::Iter<'a, usize>>>;
 
-/// A chunk (set of sequential elements) from a [`VecDeque`]
-#[derive(Debug, Copy, Clone)]
-pub enum VecDequeChunk<'a, T> {
-    Slice(&'a [T]),
-    Split(&'a [T], &'a [T]),
-}
-
-impl<'a, T, U> PartialEq<[U]> for VecDequeChunk<'a, T>
-where
-    T: PartialEq<U>,
-{
-    fn eq(&self, rhs: &[U]) -> bool {
-        match self {
-            Self::Slice(slice) => slice.eq(&rhs),
-            Self::Split(front, back) => {
-                front.eq(&&rhs[..front.len()]) && back.eq(&&rhs[front.len()..])
-            }
-        }
-    }
-}
-
-impl<'a, T, U> PartialEq<&'a [U]> for VecDequeChunk<'a, T>
-where
-    T: PartialEq<U>,
-{
-    fn eq(&self, rhs: &&'a [U]) -> bool {
-        self.eq(*rhs)
-    }
-}
-
-impl<'a, T> IntoIterator for VecDequeChunk<'a, T> {
-    type Item = &'a T;
-    type IntoIter = VecDequeChunkIter<'a, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-impl<'a, T> VecDequeChunk<'a, T> {
-    fn iter(&self) -> VecDequeChunkIter<'a, T> {
-        let (front, back) = match *self {
-            Self::Slice(slice) => (slice, &[] as &[_]),
-            Self::Split(front, back) => (front, back),
-        };
-        front.iter().chain(back).into()
-    }
-}
-
-impl<'a, T> Sequence for VecDequeChunk<'a, T> {
-    type Item = &'a T;
-
-    fn len(&self) -> usize {
-        match self {
-            Self::Slice(slice) => slice.len(),
-            Self::Split(front, back) => front.len() + back.len(),
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        match self {
-            Self::Slice(slice) => slice.is_empty(),
-            Self::Split(front, back) => front.is_empty() && back.is_empty(),
-        }
-    }
-
-    fn get(&self, idx: usize) -> Option<Self::Item> {
-        match self {
-            Self::Slice(slice) => slice.get(idx),
-            Self::Split(front, back) => front.get(idx).or_else(|| back.get(idx - front.len())),
-        }
-    }
-}
-
-/// Iterator over elements of a [`VecDequeChunk`].
-pub type VecDequeChunkIter<'a, T> = SizedChain<slice::Iter<'a, T>, slice::Iter<'a, T>>;
-
-/// Iterator over chunks from a `VecDeque` with chunk lengths given by an iterator.
+/// Iterator over chunks from a `SplitSlice` with chunk lengths given by an iterator.
 ///
-/// Panics if `lengths` takes more data than is available in the queue.
+/// Panics if `lengths` takes more data than is available in the slice.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct VecDequeChunksByLength<'a, T, I> {
-    front: &'a [T],
-    back: Option<&'a [T]>,
+pub struct SplitSliceChunksByLength<'a, T, I> {
+    data: SplitSlice<'a, T>,
     lengths: I,
 }
 
-impl<'a, T, I> VecDequeChunksByLength<'a, T, I> {
-    pub fn new<U: IntoIterator<IntoIter = I>>(data: &'a VecDeque<T>, lengths: U) -> Self {
-        let (front, back) = data.as_slices();
+impl<'a, T, I> SplitSliceChunksByLength<'a, T, I> {
+    pub fn new<U: IntoIterator<IntoIter = I>>(data: SplitSlice<'a, T>, lengths: U) -> Self {
         Self {
-            front,
-            back: Some(back),
+            data,
             lengths: lengths.into_iter(),
         }
     }
-
-    /// Take a slice of the given size from the start of `front`.
-    ///
-    /// If `front` is not long enough then takes all remaining data leaving an empty slice.
-    fn take_from_front(&mut self, size: usize) -> &'a [T] {
-        let (chunk, rest) = self.front.split_at(size.min(self.front.len()));
-        self.front = rest;
-        chunk
-    }
 }
 
-impl<'a, T, I> Iterator for VecDequeChunksByLength<'a, T, I>
+impl<'a, T, I> Iterator for SplitSliceChunksByLength<'a, T, I>
 where
     I: Iterator<Item = usize>,
 {
-    type Item = VecDequeChunk<'a, T>;
+    type Item = SplitSlice<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let chunk_length = self.lengths.next()?;
-
-        let chunk_front = self.take_from_front(chunk_length);
-        if chunk_front.len() == chunk_length {
-            return Some(VecDequeChunk::Slice(chunk_front));
-        }
-
-        // If the front was too small then replace with the back slice to get the rest.
-        self.front = self.back.take().expect("out of data for chunk");
-
-        let chunk_back = self.take_from_front(chunk_length - chunk_front.len());
-        assert_eq!(
-            chunk_front.len() + chunk_back.len(),
-            chunk_length,
-            "out of data for chunk"
-        );
-        Some(VecDequeChunk::Split(chunk_front, chunk_back))
+        let (next, data_rest) = self.data.split_at(self.lengths.next()?);
+        self.data = data_rest;
+        Some(next)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -243,7 +141,7 @@ where
     }
 }
 
-impl<'a, T, I> ExactSizeIterator for VecDequeChunksByLength<'a, T, I>
+impl<'a, T, I> ExactSizeIterator for SplitSliceChunksByLength<'a, T, I>
 where
     I: ExactSizeIterator<Item = usize>,
 {
@@ -252,7 +150,7 @@ where
     }
 }
 
-impl<'a, T, I> FusedIterator for VecDequeChunksByLength<'a, T, I> where
+impl<'a, T, I> FusedIterator for SplitSliceChunksByLength<'a, T, I> where
     I: FusedIterator<Item = usize>
 {
 }
