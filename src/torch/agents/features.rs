@@ -5,8 +5,8 @@ use crate::spaces::{FeatureSpace, ReprSpace, Space};
 use crate::torch::ExclusiveTensor;
 use crate::utils::packed::PackedSeqIter;
 use crate::utils::sequence::Sequence;
-use lazycell::LazyCell;
 use ndarray::Axis;
+use once_cell::unsync::OnceCell;
 use std::iter;
 use tch::{Device, IndexOp, Tensor};
 
@@ -92,14 +92,14 @@ pub struct LazyPackedHistoryFeatures<'a, OS: Space + ?Sized, AS: Space + ?Sized>
     /// the `i`-the step of each episode that is long enough.
     step_offsets: Vec<usize>,
 
-    cached_extended_batch_sizes: LazyCell<Vec<i64>>,
-    cached_batch_sizes_tensor: LazyCell<Tensor>,
-    cached_extended_batch_sizes_tensor: LazyCell<Tensor>,
-    cached_observation_features: LazyCell<Tensor>,
-    cached_extended_observation_features: LazyCell<(Tensor, Tensor)>,
-    cached_actions: LazyCell<Tensor>,
-    cached_returns: LazyCell<Tensor>,
-    cached_rewards: LazyCell<Tensor>,
+    cached_extended_batch_sizes: OnceCell<Vec<i64>>,
+    cached_batch_sizes_tensor: OnceCell<Tensor>,
+    cached_extended_batch_sizes_tensor: OnceCell<Tensor>,
+    cached_observation_features: OnceCell<Tensor>,
+    cached_extended_observation_features: OnceCell<(Tensor, Tensor)>,
+    cached_actions: OnceCell<Tensor>,
+    cached_returns: OnceCell<Tensor>,
+    cached_rewards: OnceCell<Tensor>,
 }
 
 impl<'a, OS, AS> LazyPackedHistoryFeatures<'a, OS, AS>
@@ -133,14 +133,14 @@ where
             discount_factor,
             device,
             step_offsets,
-            cached_extended_batch_sizes: LazyCell::new(),
-            cached_batch_sizes_tensor: LazyCell::new(),
-            cached_extended_batch_sizes_tensor: LazyCell::new(),
-            cached_observation_features: LazyCell::new(),
-            cached_extended_observation_features: LazyCell::new(),
-            cached_actions: LazyCell::new(),
-            cached_returns: LazyCell::new(),
-            cached_rewards: LazyCell::new(),
+            cached_extended_batch_sizes: OnceCell::new(),
+            cached_batch_sizes_tensor: OnceCell::new(),
+            cached_extended_batch_sizes_tensor: OnceCell::new(),
+            cached_observation_features: OnceCell::new(),
+            cached_extended_observation_features: OnceCell::new(),
+            cached_actions: OnceCell::new(),
+            cached_returns: OnceCell::new(),
+            cached_rewards: OnceCell::new(),
         }
     }
 
@@ -168,7 +168,7 @@ where
     }
 
     fn extended_batch_sizes(&self) -> &[i64] {
-        self.cached_extended_batch_sizes.borrow_with(|| {
+        self.cached_extended_batch_sizes.get_or_init(|| {
             iter::once(self.episodes.len() as i64)
                 .chain(self.step_offsets.windows(2).map(|w| (w[1] - w[0]) as i64))
                 .collect()
@@ -178,17 +178,17 @@ where
     fn batch_sizes_tensor(&self) -> &Tensor {
         // Must stay on the CPU
         self.cached_batch_sizes_tensor
-            .borrow_with(|| self.extended_batch_sizes_tensor().i(1..))
+            .get_or_init(|| self.extended_batch_sizes_tensor().i(1..))
     }
 
     fn extended_batch_sizes_tensor(&self) -> &Tensor {
         // Must stay on the CPU
         self.cached_extended_batch_sizes_tensor
-            .borrow_with(|| Tensor::of_slice(self.extended_batch_sizes()))
+            .get_or_init(|| Tensor::of_slice(self.extended_batch_sizes()))
     }
 
     fn observation_features(&self) -> &Tensor {
-        self.cached_observation_features.borrow_with(|| {
+        self.cached_observation_features.get_or_init(|| {
             self.observation_space
                 .batch_features::<_, Tensor>(
                     PackedSeqIter::from_sorted(&self.episodes).map(|step| &step.observation),
@@ -199,7 +199,7 @@ where
 
     fn extended_observation_features(&self) -> (&Tensor, &Tensor) {
         let (extended_observations, is_invalid) =
-            self.cached_extended_observation_features.borrow_with(|| {
+            self.cached_extended_observation_features.get_or_init(|| {
                 let observations = PackedSeqIter::from_sorted(
                     self.episodes
                         .iter()
@@ -240,7 +240,7 @@ where
     }
 
     fn actions(&self) -> &Tensor {
-        self.cached_actions.borrow_with(|| {
+        self.cached_actions.get_or_init(|| {
             self.action_space
                 .batch_repr(PackedSeqIter::from_sorted(&self.episodes).map(|step| &step.action))
                 .to(self.device)
@@ -249,7 +249,7 @@ where
 
     #[allow(clippy::cast_possible_truncation)]
     fn rewards(&self) -> &Tensor {
-        self.cached_rewards.borrow_with(|| {
+        self.cached_rewards.get_or_init(|| {
             Tensor::of_slice(
                 &PackedSeqIter::from_sorted(&self.episodes)
                     .map(|step| step.reward as f32)
@@ -261,7 +261,7 @@ where
 
     #[allow(clippy::cast_possible_truncation)]
     fn returns(&self) -> &Tensor {
-        self.cached_returns.borrow_with(|| {
+        self.cached_returns.get_or_init(|| {
             // Returns must be calculated from the end of the episode
             let mut returns = ExclusiveTensor::zeros(*self.step_offsets.last().unwrap());
             let returns_view = returns.as_slice_mut();
