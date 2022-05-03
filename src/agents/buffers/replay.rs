@@ -1,6 +1,7 @@
 use super::{WriteExperience, WriteExperienceError, WriteExperienceIncremental};
 use crate::simulation::PartialStep;
 use crate::utils::iter::SizedChain;
+use crate::utils::sequence::Sequence;
 use std::collections::{vec_deque, VecDeque};
 use std::iter::{Copied, FusedIterator};
 use std::slice;
@@ -146,6 +147,31 @@ impl<'a, T> VecDequeChunk<'a, T> {
             Self::Split(front, back) => (front, back),
         };
         front.iter().chain(back).into()
+    }
+}
+
+impl<'a, T> Sequence for VecDequeChunk<'a, T> {
+    type Item = &'a T;
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Slice(slice) => slice.len(),
+            Self::Split(front, back) => front.len() + back.len(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::Slice(slice) => slice.is_empty(),
+            Self::Split(front, back) => front.is_empty() && back.is_empty(),
+        }
+    }
+
+    fn get(&self, idx: usize) -> Option<Self::Item> {
+        match self {
+            Self::Slice(slice) => slice.get(idx),
+            Self::Split(front, back) => front.get(idx).or_else(|| back.get(idx - front.len())),
+        }
     }
 }
 
