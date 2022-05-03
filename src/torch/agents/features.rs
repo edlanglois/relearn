@@ -7,6 +7,7 @@ use crate::utils::packed::PackedSeqIter;
 use crate::utils::sequence::Sequence;
 use ndarray::Axis;
 use once_cell::unsync::OnceCell;
+use std::cmp::Reverse;
 use std::iter;
 use tch::{Device, IndexOp, Tensor};
 
@@ -78,9 +79,9 @@ pub trait PackedHistoryFeaturesView {
 
 /// Packed history features with lazy evaluation and caching.
 #[derive(Debug)]
-pub struct LazyPackedHistoryFeatures<'a, OS: Space + ?Sized, AS: Space + ?Sized> {
+pub struct LazyPackedHistoryFeatures<'a, OS: Space + ?Sized, AS: Space + ?Sized, E> {
     /// Episodes sorted in monotonic decreasing order of length
-    episodes: Vec<&'a [PartialStep<OS::Element, AS::Element>]>,
+    episodes: Vec<E>,
     observation_space: &'a OS,
     action_space: &'a AS,
     discount_factor: f64,
@@ -102,10 +103,11 @@ pub struct LazyPackedHistoryFeatures<'a, OS: Space + ?Sized, AS: Space + ?Sized>
     cached_rewards: OnceCell<Tensor>,
 }
 
-impl<'a, OS, AS> LazyPackedHistoryFeatures<'a, OS, AS>
+impl<'a, OS, AS, E> LazyPackedHistoryFeatures<'a, OS, AS, E>
 where
     OS: Space + ?Sized,
     AS: Space + ?Sized,
+    E: Sequence,
 {
     pub fn new<I>(
         episodes: I,
@@ -115,10 +117,10 @@ where
         device: Device,
     ) -> Self
     where
-        I: IntoIterator<Item = &'a [PartialStep<OS::Element, AS::Element>]>,
+        I: IntoIterator<Item = E>,
     {
         let mut episodes: Vec<_> = episodes.into_iter().collect();
-        episodes.sort_unstable_by(|&a, &b| b.len().cmp(&a.len()));
+        episodes.sort_unstable_by_key(|episode| Reverse(episode.len()));
 
         let step_offsets = step_offsets(&episodes);
         assert_eq!(
@@ -158,10 +160,15 @@ where
     }
 }
 
-impl<'a, OS, AS> PackedHistoryFeaturesView for LazyPackedHistoryFeatures<'a, OS, AS>
+impl<'a, OS, AS, E> PackedHistoryFeaturesView for LazyPackedHistoryFeatures<'a, OS, AS, E>
 where
     OS: FeatureSpace + ?Sized,
     AS: ReprSpace<Tensor> + ?Sized,
+    // Like &'a [PartialStep<O, A>]
+    E: Sequence<Item = &'a PartialStep<OS::Element, AS::Element>>
+        + IntoIterator<Item = &'a PartialStep<OS::Element, AS::Element>>
+        + Copy,
+    E::IntoIter: DoubleEndedIterator,
 {
     fn batch_sizes(&self) -> &[i64] {
         &self.extended_batch_sizes()[1..]
@@ -268,7 +275,7 @@ where
             for (ep_idx, episode) in self.episodes.iter().enumerate() {
                 let mut return_ = 0.0;
                 for (step, i) in episode
-                    .iter()
+                    .into_iter()
                     .rev()
                     .zip(packed_sequence_indices(&self.step_offsets, ep_idx, episode.len()).rev())
                 {
@@ -294,7 +301,7 @@ where
 ///
 /// # Args
 /// * `sorted_episode_lengths` - Sequences lengths sorted in monotonic decreasing order.
-fn step_offsets<T>(sequences: &[&[T]]) -> Vec<usize> {
+fn step_offsets<E: Sequence>(sequences: &[E]) -> Vec<usize> {
     let max_episode_len = sequences.first().map_or(0, Sequence::len);
     let mut step_offsets = Vec::with_capacity(max_episode_len + 1);
     let mut batch_size = sequences.len();
@@ -332,17 +339,22 @@ fn packed_sequence_indices(
 ///
 /// All items are `Some` except possibly the final successor observation, which is `None` for
 /// `Successor::Terminate` or empty episodes.
-struct ExtendedEpisodeObservations<'a, O, A> {
-    episode: &'a [PartialStep<O, A>],
+struct ExtendedEpisodeObservations<E> {
+    episode: E,
 }
 
-impl<'a, O, A> From<&'a [PartialStep<O, A>]> for ExtendedEpisodeObservations<'a, O, A> {
-    fn from(episode: &'a [PartialStep<O, A>]) -> Self {
+impl<E> From<E> for ExtendedEpisodeObservations<E> {
+    fn from(episode: E) -> Self {
         Self { episode }
     }
 }
 
-impl<'a, O, A> Sequence for ExtendedEpisodeObservations<'a, O, A> {
+impl<'a, E, O, A> Sequence for ExtendedEpisodeObservations<E>
+where
+    E: Sequence<Item = &'a PartialStep<O, A>>,
+    O: 'a,
+    A: 'a,
+{
     type Item = Option<&'a O>;
     fn len(&self) -> usize {
         // Each step plus the final successor.
@@ -352,23 +364,21 @@ impl<'a, O, A> Sequence for ExtendedEpisodeObservations<'a, O, A> {
         false
     }
     fn get(&self, idx: usize) -> Option<Self::Item> {
-        let ep_len = self.episode.len();
-        if idx < ep_len {
+        match self.episode.get(idx) {
             // Within episode
-            Some(Some(&self.episode[idx].observation))
-        } else if idx == 0 {
+            Some(step) => Some(Some(&step.observation)),
             // One past the end of an empty episode
-            Some(None)
-        } else if idx == ep_len {
-            // One past the end of a non-empty episode.
-            // Return step.next if the episode was interrupted, otherwise None.
-            Some(match &self.episode[idx - 1].next {
-                Successor::Interrupt(obs) => Some(obs),
-                _ => None,
-            })
-        } else {
-            // More than one past the end of the episode.
-            None
+            None if idx == 0 => Some(None),
+            // One past the end of a non-empty episode
+            None if idx == self.episode.len() => {
+                // Return step.next if the episode was interrupted, otherwise None
+                match &self.episode.get(idx - 1).unwrap().next {
+                    Successor::Interrupt(obs) => Some(Some(obs)),
+                    _ => Some(None),
+                }
+            }
+            // More than one past the end of the episode
+            _ => None,
         }
     }
 }
@@ -390,7 +400,10 @@ mod lazy_features {
     }
 
     impl<OS: Space, AS: Space> StoredHistory<OS, AS> {
-        fn features(&self) -> LazyPackedHistoryFeatures<OS, AS> {
+        #[allow(clippy::type_complexity)]
+        fn features(
+            &self,
+        ) -> LazyPackedHistoryFeatures<OS, AS, &[PartialStep<OS::Element, AS::Element>]> {
             LazyPackedHistoryFeatures::new(
                 self.episodes.iter().map(AsRef::as_ref),
                 &self.observation_space,
