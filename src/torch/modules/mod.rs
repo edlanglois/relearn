@@ -241,7 +241,7 @@ impl_wrapped_sequence_module!(&'_ T);
 impl_wrapped_sequence_module!(Box<T>);
 
 /// A module that operates iteratively on a sequence of data.
-pub trait IterativeModule {
+pub trait IterativeModule: Module {
     /// Sequence state managed by the module.
     type State;
 
