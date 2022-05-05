@@ -1,7 +1,7 @@
 use super::{HistoryDataBound, WriteExperience, WriteExperienceError, WriteExperienceIncremental};
 use crate::simulation::PartialStep;
-use crate::utils::iter::SplitChunksByLength;
-use std::iter::{Copied, FusedIterator};
+use crate::utils::iter::{Differences, SplitChunksByLength};
+use std::iter::Copied;
 use std::{slice, vec};
 
 /// Simple vector history buffer. Stores steps in a vector.
@@ -71,7 +71,7 @@ impl<O, A> VecBuffer<O, A> {
     pub fn episodes(&self) -> EpisodesIter<O, A> {
         SplitChunksByLength::new(
             &self.steps,
-            PositiveDifferences::new(self.episode_ends.iter().copied()),
+            Differences::new(self.episode_ends.iter().copied(), 0),
         )
     }
 }
@@ -145,60 +145,8 @@ impl<O, A> WriteExperienceIncremental<O, A> for VecBuffer<O, A> {
 
 pub type EpisodesIter<'a, O, A> = SplitChunksByLength<
     &'a [PartialStep<O, A>],
-    PositiveDifferences<Copied<slice::Iter<'a, usize>>>,
+    Differences<Copied<slice::Iter<'a, usize>>, usize>,
 >;
-
-/// Converts a monotonic increasing sequence of values into a sequence of differences.
-///
-/// Also returns the first value as a difference from 0.
-///
-/// # Panics
-/// If any item of the input iterator is less than the previous item.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct PositiveDifferences<I> {
-    iter: I,
-    prev: usize,
-}
-
-impl<I> PositiveDifferences<I> {
-    pub const fn new(iter: I) -> Self {
-        Self { iter, prev: 0 }
-    }
-}
-
-impl<I> Iterator for PositiveDifferences<I>
-where
-    I: Iterator<Item = usize>,
-{
-    type Item = usize;
-    fn next(&mut self) -> Option<Self::Item> {
-        let prev = self.prev;
-        self.prev = self.iter.next()?;
-        Some(self.prev.checked_sub(prev).unwrap())
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.iter.size_hint()
-    }
-
-    fn count(self) -> usize {
-        self.iter.count()
-    }
-
-    fn fold<B, F>(self, init: B, mut f: F) -> B
-    where
-        F: FnMut(B, Self::Item) -> B,
-    {
-        self.iter
-            .fold((init, self.prev), |(acc, prev), next| {
-                (f(acc, next.checked_sub(prev).unwrap()), next)
-            })
-            .0
-    }
-}
-
-impl<I: ExactSizeIterator<Item = usize>> ExactSizeIterator for PositiveDifferences<I> {}
-impl<I: FusedIterator<Item = usize>> FusedIterator for PositiveDifferences<I> {}
 
 #[allow(clippy::needless_pass_by_value)]
 #[cfg(test)]
