@@ -41,6 +41,19 @@ macro_rules! impl_wrapped_sequence {
 impl_wrapped_sequence!(&'_ T);
 impl_wrapped_sequence!(Box<T>);
 
+/// Take a prefix from the start of the sequence
+pub trait TakePrefx: Sequence + Sized {
+    /// Remove and return the prefix of length `len` from the start of the sequence.
+    ///
+    /// The returned sequence will contain all indices from `[0, len)` while `self` will contain
+    /// all indices from `[len, initial_len)`
+    ///
+    /// # Panics
+    /// Panics if `len > self.len()`.
+    #[allow(clippy::return_self_not_must_use)] // Has side-effect on &mut self
+    fn take_prefix(&mut self, len: usize) -> Self;
+}
+
 impl<'a, T> Sequence for &'a [T] {
     type Item = &'a T;
     #[inline]
@@ -54,6 +67,15 @@ impl<'a, T> Sequence for &'a [T] {
     #[inline]
     fn get(&self, idx: usize) -> Option<Self::Item> {
         <[T]>::get(self, idx)
+    }
+}
+
+impl<'a, T> TakePrefx for &'a [T] {
+    #[inline]
+    fn take_prefix(&mut self, index: usize) -> Self {
+        let (prefix, rest) = self.split_at(index);
+        *self = rest;
+        prefix
     }
 }
 

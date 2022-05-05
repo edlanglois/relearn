@@ -1,6 +1,7 @@
 use super::{HistoryDataBound, WriteExperience, WriteExperienceError, WriteExperienceIncremental};
 use crate::simulation::PartialStep;
-use std::iter::{Copied, ExactSizeIterator, FusedIterator};
+use crate::utils::iter::SplitChunksByLength;
+use std::iter::{Copied, FusedIterator};
 use std::{slice, vec};
 
 /// Simple vector history buffer. Stores steps in a vector.
@@ -68,7 +69,10 @@ impl<O, A> VecBuffer<O, A> {
     /// Iterator over all episode slices stored in the buffer.
     #[must_use]
     pub fn episodes(&self) -> EpisodesIter<O, A> {
-        SliceChunksAtIter::new(&self.steps, self.episode_ends.iter().copied())
+        SplitChunksByLength::new(
+            &self.steps,
+            PositiveDifferences::new(self.episode_ends.iter().copied()),
+        )
     }
 }
 
@@ -139,71 +143,62 @@ impl<O, A> WriteExperienceIncremental<O, A> for VecBuffer<O, A> {
     }
 }
 
-pub type EpisodesIter<'a, O, A> =
-    SliceChunksAtIter<'a, PartialStep<O, A>, Copied<slice::Iter<'a, usize>>>;
+pub type EpisodesIter<'a, O, A> = SplitChunksByLength<
+    &'a [PartialStep<O, A>],
+    PositiveDifferences<Copied<slice::Iter<'a, usize>>>,
+>;
 
-/// Iterator that partitions a slice into chunks based on an iterator of end indices.
+/// Converts a monotonic increasing sequence of values into a sequence of differences.
 ///
-/// Does not include any data past the last end index.
-#[derive(Debug, Clone, PartialEq)]
-pub struct SliceChunksAtIter<'a, T, I> {
-    data: &'a [T],
-    start: usize,
-    ends: I,
+/// Also returns the first value as a difference from 0.
+///
+/// # Panics
+/// If any item of the input iterator is less than the previous item.
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct PositiveDifferences<I> {
+    iter: I,
+    prev: usize,
 }
 
-impl<'a, T, I> SliceChunksAtIter<'a, T, I> {
-    pub fn new<U: IntoIterator<IntoIter = I>>(data: &'a [T], ends: U) -> Self {
-        Self {
-            data,
-            start: 0,
-            ends: ends.into_iter(),
-        }
+impl<I> PositiveDifferences<I> {
+    pub const fn new(iter: I) -> Self {
+        Self { iter, prev: 0 }
     }
 }
 
-impl<'a, T, I> Iterator for SliceChunksAtIter<'a, T, I>
+impl<I> Iterator for PositiveDifferences<I>
 where
     I: Iterator<Item = usize>,
 {
-    type Item = &'a [T];
-
+    type Item = usize;
     fn next(&mut self) -> Option<Self::Item> {
-        let end = self.ends.next()?;
-        let slice = &self.data[self.start..end];
-        self.start = end;
-        Some(slice)
+        let prev = self.prev;
+        self.prev = self.iter.next()?;
+        Some(self.prev.checked_sub(prev).unwrap())
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.ends.size_hint()
+        self.iter.size_hint()
     }
 
     fn count(self) -> usize {
-        self.ends.count()
+        self.iter.count()
     }
 
     fn fold<B, F>(self, init: B, mut f: F) -> B
     where
         F: FnMut(B, Self::Item) -> B,
     {
-        let (result, _) = self.ends.fold((init, self.start), |(acc, start), end| {
-            (f(acc, &self.data[start..end]), end)
-        });
-        result
+        self.iter
+            .fold((init, self.prev), |(acc, prev), next| {
+                (f(acc, next.checked_sub(prev).unwrap()), next)
+            })
+            .0
     }
 }
 
-impl<'a, T, I> ExactSizeIterator for SliceChunksAtIter<'a, T, I>
-where
-    I: ExactSizeIterator<Item = usize>,
-{
-    fn len(&self) -> usize {
-        self.ends.len()
-    }
-}
-
-impl<'a, T, I> FusedIterator for SliceChunksAtIter<'a, T, I> where I: FusedIterator<Item = usize> {}
+impl<I: ExactSizeIterator<Item = usize>> ExactSizeIterator for PositiveDifferences<I> {}
+impl<I: FusedIterator<Item = usize>> FusedIterator for PositiveDifferences<I> {}
 
 #[allow(clippy::needless_pass_by_value)]
 #[cfg(test)]

@@ -1,8 +1,9 @@
 use super::{WriteExperience, WriteExperienceError, WriteExperienceIncremental};
 use crate::simulation::PartialStep;
+use crate::utils::iter::SplitChunksByLength;
 use crate::utils::slice::SplitSlice;
 use std::collections::{vec_deque, VecDeque};
-use std::iter::{Copied, FusedIterator};
+use std::iter::Copied;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReplayBuffer<O, A> {
@@ -57,7 +58,7 @@ impl<O, A> ReplayBuffer<O, A> {
     /// Iterator over all episode slices stored in the buffer.
     #[must_use]
     pub fn episodes(&self) -> EpisodesIter<O, A> {
-        SplitSliceChunksByLength::new(
+        SplitChunksByLength::new(
             self.steps.as_slices().into(),
             self.episode_lengths.iter().copied(),
         )
@@ -100,60 +101,7 @@ impl<O, A> WriteExperienceIncremental<O, A> for ReplayBuffer<O, A> {
 impl<O, A> WriteExperience<O, A> for ReplayBuffer<O, A> {}
 
 pub type EpisodesIter<'a, O, A> =
-    SplitSliceChunksByLength<'a, PartialStep<O, A>, Copied<vec_deque::Iter<'a, usize>>>;
-
-/// Iterator over chunks from a `SplitSlice` with chunk lengths given by an iterator.
-///
-/// Panics if `lengths` takes more data than is available in the slice.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SplitSliceChunksByLength<'a, T, I> {
-    data: SplitSlice<'a, T>,
-    lengths: I,
-}
-
-impl<'a, T, I> SplitSliceChunksByLength<'a, T, I> {
-    pub fn new<U: IntoIterator<IntoIter = I>>(data: SplitSlice<'a, T>, lengths: U) -> Self {
-        Self {
-            data,
-            lengths: lengths.into_iter(),
-        }
-    }
-}
-
-impl<'a, T, I> Iterator for SplitSliceChunksByLength<'a, T, I>
-where
-    I: Iterator<Item = usize>,
-{
-    type Item = SplitSlice<'a, T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let (next, data_rest) = self.data.split_at(self.lengths.next()?);
-        self.data = data_rest;
-        Some(next)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.lengths.size_hint()
-    }
-
-    fn count(self) -> usize {
-        self.lengths.count()
-    }
-}
-
-impl<'a, T, I> ExactSizeIterator for SplitSliceChunksByLength<'a, T, I>
-where
-    I: ExactSizeIterator<Item = usize>,
-{
-    fn len(&self) -> usize {
-        self.lengths.len()
-    }
-}
-
-impl<'a, T, I> FusedIterator for SplitSliceChunksByLength<'a, T, I> where
-    I: FusedIterator<Item = usize>
-{
-}
+    SplitChunksByLength<SplitSlice<'a, PartialStep<O, A>>, Copied<vec_deque::Iter<'a, usize>>>;
 
 #[cfg(test)]
 mod tests {

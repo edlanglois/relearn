@@ -1,5 +1,5 @@
 //! Slice utilities
-use super::sequence::Sequence;
+use super::sequence::{Sequence, TakePrefx};
 use std::hash::{Hash, Hasher};
 use std::iter::Chain;
 use std::{fmt, slice};
@@ -109,7 +109,7 @@ impl<'a, T> SplitSlice<'a, T> {
     /// Panics if `mid > len`.
     #[inline]
     #[must_use]
-    pub fn split_at(self, mid: usize) -> (SplitSlice<'a, T>, SplitSlice<'a, T>) {
+    pub fn split_at(self, mid: usize) -> (Self, Self) {
         if let Some(back_split_at) = mid.checked_sub(self.front.len()) {
             let (first_back, second_back) = self.back.split_at(back_split_at);
             (
@@ -162,6 +162,15 @@ impl<'a, T> Sequence for SplitSlice<'a, T> {
         self.front
             .get(idx)
             .or_else(|| self.back.get(idx - self.front.len()))
+    }
+}
+
+impl<'a, T> TakePrefx for SplitSlice<'a, T> {
+    #[inline]
+    fn take_prefix(&mut self, len: usize) -> Self {
+        let (prefix, rest) = self.split_at(len);
+        *self = rest;
+        prefix
     }
 }
 
