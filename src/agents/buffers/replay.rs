@@ -151,7 +151,6 @@ impl<'a, O, A> Sequence for Episodes<'a, O, A> {
             (self.episode_ends.get(idx - 1).unwrap() - self.index_offset) as usize
         };
         assert!(end >= start);
-        println!("{start} .. {end}");
         Some(self.steps.split_at(start).1.split_at(end - start).0)
     }
 }
