@@ -120,6 +120,9 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
     ) -> Result<f64, OptimizerStepError> {
         let (loss, distance) = loss_distance_fn();
 
+        // NOTE: run_backward writes the gradients into a new vector of tensors, not `param.grad()`
+        // so it is not necessary to zero out any stored gradients.
+
         // Loss gradient. Save the graph so that HessianVectorProduct can reuse it.
         let loss_grads = Tensor::run_backward(&[&loss], &self.params, true, false);
 
