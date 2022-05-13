@@ -122,7 +122,7 @@ pub trait TrustRegionOptimizer: BaseOptimizer {
     /// # Returns
     /// The initial loss value on success.
     fn trust_region_backward_step(
-        &self,
+        &mut self,
         loss_distance_fn: &dyn Fn() -> (Tensor, Tensor),
         max_distance: f64,
         logger: &mut dyn StatsLogger,
@@ -208,7 +208,7 @@ mod testing {
         let b = Tensor::of_slice(&[2.0_f32, -3.0]);
 
         let x = Tensor::zeros(&[2], (Kind::Float, Device::Cpu)).requires_grad_(true);
-        let optimizer = optimizer_config.build_optimizer([&x]).unwrap();
+        let mut optimizer = optimizer_config.build_optimizer([&x]).unwrap();
 
         let x_last = x.detach().copy();
         let loss_distance_fn = || {

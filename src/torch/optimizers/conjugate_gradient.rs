@@ -113,7 +113,7 @@ impl BaseOptimizer for ConjugateGradientOptimizer {
 
 impl TrustRegionOptimizer for ConjugateGradientOptimizer {
     fn trust_region_backward_step(
-        &self,
+        &mut self,
         loss_distance_fn: &dyn Fn() -> (Tensor, Tensor),
         max_distance: f64,
         logger: &mut dyn StatsLogger,
@@ -415,7 +415,7 @@ mod cg_optimizer {
     }
 
     fn trpo_run<F, G>(
-        optimizer: &ConjugateGradientOptimizer,
+        optimizer: &mut ConjugateGradientOptimizer,
         loss_distance_fn: F,
         mut on_step: G,
         num_steps: u64,
@@ -443,7 +443,7 @@ mod cg_optimizer {
         let config = ConjugateGradientOptimizerConfig::default();
 
         let x = Tensor::ones(&[2], (Kind::Float, Device::Cpu)).requires_grad_(true);
-        let optimizer = config.build_optimizer([&x]).unwrap();
+        let mut optimizer = config.build_optimizer([&x]).unwrap();
 
         let y_prev = x.square().mean(Kind::Float).detach();
         let loss_distance_fn = || {
@@ -454,7 +454,7 @@ mod cg_optimizer {
         };
 
         trpo_run(
-            &optimizer,
+            &mut optimizer,
             loss_distance_fn,
             || {
                 y_prev.detach().copy_(&x.square().mean(Kind::Float));
@@ -478,7 +478,7 @@ mod cg_optimizer {
 
         let x = Tensor::ones(&[2], (Kind::Float, Device::Cpu)).requires_grad_(true);
         let unused = Tensor::zeros(&[3], (Kind::Float, Device::Cpu)).requires_grad_(true);
-        let optimizer = config.build_optimizer([&x, &unused]).unwrap();
+        let mut optimizer = config.build_optimizer([&x, &unused]).unwrap();
 
         let x_prev = x.detach().copy();
         let loss_distance_fn = || {
@@ -488,7 +488,7 @@ mod cg_optimizer {
         };
 
         trpo_run(
-            &optimizer,
+            &mut optimizer,
             loss_distance_fn,
             || x_prev.detach().copy_(&x),
             100,
