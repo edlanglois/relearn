@@ -1,5 +1,6 @@
 //! General-purpose utilities
 pub mod any;
+pub mod borrow;
 pub mod distributions;
 pub mod fmt;
 pub mod iter;
