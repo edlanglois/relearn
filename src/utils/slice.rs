@@ -175,7 +175,7 @@ impl<'a, T> TakePrefx for SplitSlice<'a, T> {
 }
 
 impl<'a, T: Hash> Hash for SplitSlice<'a, T> {
-    /// Matches the implementation of Hash for [T]
+    /// Matches the implementation of Hash for `[T]`
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Important to ensure that front & back are combined in the hash so that different splits
