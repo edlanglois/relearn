@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::{mem, slice};
 use tch::{kind::Element, Device, Kind, Tensor};
+use thiserror::Error;
 
 /// An exclusive owner of a [`Tensor`] and its data.
 ///
@@ -92,6 +93,38 @@ impl<E, D: Dimension> ExclusiveTensor<E, D> {
     /// Convert into the inner tensor.
     pub fn into_tensor(self) -> Tensor {
         self.tensor
+    }
+}
+
+impl<E> ExclusiveTensor<E, IxDyn>
+where
+    E: Element,
+{
+    /// Try to create a dynamic-shape tensor by deep copying from a `Tensor`.
+    ///
+    /// The tensor `dtype` must match the element type `E`.
+    pub fn try_copy_from(tensor: &Tensor) -> Result<Self, ExclusiveTensorError> {
+        let kind = tensor.kind();
+        if kind != E::KIND {
+            return Err(ExclusiveTensorError::MismatchedKind {
+                expected: E::KIND,
+                actual: kind,
+            });
+        }
+
+        let shape_vec: Vec<usize> = tensor
+            .size()
+            .into_iter()
+            .map(|d| d.try_into().unwrap()) // i64 -> usize
+            .collect();
+        let shape = IxDyn(&shape_vec);
+        unsafe {
+            Ok(Self::from_tensor_fn(shape, |shape, kind| {
+                let mut new_tensor = Tensor::zeros(shape, (kind, Device::Cpu));
+                new_tensor.copy_(tensor);
+                new_tensor
+            }))
+        }
     }
 }
 
@@ -266,6 +299,12 @@ impl IntoTorchShape for Dim<[Ix; 6]> {
     }
 }
 
+#[derive(Error, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ExclusiveTensorError {
+    #[error("expected kind {expected:?} but got {actual:?}")]
+    MismatchedKind { expected: Kind, actual: Kind },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,7 +314,7 @@ mod tests {
     fn zeros() {
         let u = ExclusiveTensor::<f32, _>::zeros([2, 4, 3]);
         let tensor: Tensor = u.into();
-        assert_eq!(tensor.size(), vec![2, 4, 3]);
+        assert_eq!(tensor.size(), [2, 4, 3]);
         assert_eq!(tensor.kind(), Kind::Float);
         assert_eq!(tensor.device(), Device::Cpu);
         assert_eq!(
@@ -288,10 +327,43 @@ mod tests {
     fn ones() {
         let u = ExclusiveTensor::<f32, _>::ones([2, 4, 3]);
         let tensor: Tensor = u.into();
-        assert_eq!(tensor.size(), vec![2, 4, 3]);
+        assert_eq!(tensor.size(), [2, 4, 3]);
         assert_eq!(tensor.kind(), Kind::Float);
         assert_eq!(tensor.device(), Device::Cpu);
         assert_eq!(tensor, Tensor::ones(&[2, 4, 3], (Kind::Float, Device::Cpu)));
+    }
+
+    #[test]
+    fn try_copy_from() {
+        let src = Tensor::of_slice(&[1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0]).reshape(&[2, 3]);
+        let copy = ExclusiveTensor::<f32, _>::try_copy_from(&src).unwrap();
+        let tensor: Tensor = copy.into();
+        assert_eq!(tensor.size(), [2, 3]);
+        assert_eq!(tensor.kind(), Kind::Float);
+        assert_eq!(tensor.device(), Device::Cpu);
+        assert_eq!(tensor, src);
+    }
+
+    #[test]
+    fn try_copy_from_cuda_if_available() {
+        let src = Tensor::of_slice(&[1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0])
+            .to_device(Device::cuda_if_available());
+        let copy = ExclusiveTensor::<f32, _>::try_copy_from(&src).unwrap();
+        let tensor: Tensor = copy.into();
+        assert_eq!(tensor.device(), Device::Cpu);
+        assert_eq!(tensor, src.to_device(Device::Cpu));
+    }
+
+    #[test]
+    fn try_copy_from_mismatched_type() {
+        let src = Tensor::of_slice(&[1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        assert_eq!(
+            ExclusiveTensor::<f64, _>::try_copy_from(&src).unwrap_err(),
+            ExclusiveTensorError::MismatchedKind {
+                expected: Kind::Double,
+                actual: Kind::Float
+            }
+        );
     }
 
     #[test]
