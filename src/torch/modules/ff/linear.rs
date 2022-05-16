@@ -3,6 +3,7 @@ use super::super::{
     BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras, SequenceModule,
 };
 use crate::torch::initializers::Initializer;
+use crate::torch::packed::PackedTensor;
 use crate::torch::serialize::TensorDef;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -129,8 +130,8 @@ impl SequenceModule for Linear {
     }
 
     #[inline]
-    fn seq_packed(&self, inputs: &Tensor, _batch_sizes: &Tensor) -> Tensor {
-        self.forward(inputs)
+    fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
+        inputs.batch_map_ref(|tensor| self.forward(tensor))
     }
 }
 

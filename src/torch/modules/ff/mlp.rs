@@ -3,6 +3,7 @@ use super::super::{
     BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras, SequenceModule,
 };
 use super::{Activation, Linear, LinearConfig};
+use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};
 use std::iter::{self, FlatMap};
 use std::slice;
@@ -155,8 +156,8 @@ impl SequenceModule for Mlp {
     fn seq_serial(&self, inputs: &Tensor, _seq_lengths: &[usize]) -> Tensor {
         self.forward(inputs)
     }
-    fn seq_packed(&self, inputs: &Tensor, _batch_sizes: &Tensor) -> Tensor {
-        self.forward(inputs)
+    fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
+        inputs.batch_map_ref(|tensor| self.forward(tensor))
     }
 }
 

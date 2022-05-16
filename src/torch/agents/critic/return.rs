@@ -1,6 +1,7 @@
 use super::super::learning_critic::{BuildLearningCritic, LearningCritic};
 use super::{BuildCritic, Critic, Module, PackedHistoryFeaturesView};
 use crate::logging::StatsLogger;
+use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};
 use std::iter;
 use tch::{Device, Tensor};
@@ -54,9 +55,9 @@ impl Module for Return {
 
 impl Critic for Return {
     #[inline]
-    fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> Tensor {
+    fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> PackedTensor {
         // Note: This assumes that all episodes end with 0 return.
-        features.returns().shallow_clone()
+        features.returns().clone()
     }
 
     #[inline]

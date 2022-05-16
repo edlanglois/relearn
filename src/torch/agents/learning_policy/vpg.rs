@@ -40,15 +40,12 @@ where
 
         let entropies = Cell::new(None);
         let policy_loss_fn = || {
-            let action_dist_params = policy.seq_packed(
-                features.observation_features(),
-                features.batch_sizes_tensor(),
-            );
+            let action_dist_params = policy.seq_packed(features.observation_features());
 
-            let action_distributions = action_space.distribution(&action_dist_params);
-            let log_probs = action_distributions.log_probs(features.actions());
+            let action_distributions = action_space.distribution(action_dist_params.tensor());
+            let log_probs = action_distributions.log_probs(features.actions().tensor());
             entropies.set(Some(action_distributions.entropy()));
-            -(log_probs * &step_values).mean(Kind::Float)
+            -(log_probs * step_values.tensor()).mean(Kind::Float)
         };
 
         let _ = optimizer.backward_step(&policy_loss_fn, logger).unwrap();

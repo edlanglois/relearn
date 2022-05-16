@@ -3,6 +3,7 @@ use super::{
     Activation, BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras,
     SequenceModule,
 };
+use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};
 use std::iter;
 use tch::{Device, Tensor};
@@ -153,10 +154,10 @@ where
         let hidden = self.activation.forward_owned(hidden);
         self.second.seq_serial(&hidden, seq_lengths)
     }
-    fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
-        let hidden = self.first.seq_packed(inputs, batch_sizes);
-        let hidden = self.activation.forward_owned(hidden);
-        self.second.seq_packed(&hidden, batch_sizes)
+    fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
+        let hidden = self.first.seq_packed(inputs);
+        let hidden = hidden.batch_map(|tensor| self.activation.forward_owned(tensor));
+        self.second.seq_packed(&hidden)
     }
 }
 
@@ -255,9 +256,9 @@ impl<M: SequenceModule> SequenceModule for [M] {
         })
     }
 
-    fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
-        fold_or_clone(self, inputs, |tensor, module| {
-            module.seq_packed(tensor, batch_sizes)
+    fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
+        fold_or_clone(self, inputs, |packed_tensor, module| {
+            module.seq_packed(packed_tensor)
         })
     }
 }
@@ -269,9 +270,9 @@ impl<M: SequenceModule, const N: usize> SequenceModule for [M; N] {
         })
     }
 
-    fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
-        fold_or_clone(self, inputs, |tensor, module| {
-            module.seq_packed(tensor, batch_sizes)
+    fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
+        fold_or_clone(self, inputs, |packed_tensor, module| {
+            module.seq_packed(packed_tensor)
         })
     }
 }
@@ -310,17 +311,34 @@ impl<M: IterativeModule, const N: usize> IterativeModule for [M; N] {
 }
 
 /// Either fold an iterator over an input or clone the input Tensor if the iterator is empty
-fn fold_or_clone<I, F>(modules: I, input: &Tensor, mut f: F) -> Tensor
+fn fold_or_clone<I, T, F>(modules: I, input: &T, mut f: F) -> T
 where
     I: IntoIterator,
-    F: FnMut(&Tensor, I::Item) -> Tensor,
+    T: Clone_,
+    F: FnMut(&T, I::Item) -> T,
 {
     let mut iter = modules.into_iter();
     let tensor = match iter.next() {
         Some(module) => f(input, module),
-        None => return input.shallow_clone(),
+        None => return input.clone_(),
     };
     iter.fold(tensor, |t, m| f(&t, m))
+}
+
+/// Like [`Clone`] but includes [`Tensor::shallow_clone`].
+trait Clone_ {
+    fn clone_(&self) -> Self;
+}
+
+impl Clone_ for Tensor {
+    fn clone_(&self) -> Self {
+        self.shallow_clone()
+    }
+}
+impl Clone_ for PackedTensor {
+    fn clone_(&self) -> Self {
+        self.clone()
+    }
 }
 
 #[cfg(test)]

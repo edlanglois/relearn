@@ -3,6 +3,7 @@ use criterion::{
     Throughput,
 };
 use relearn::torch::modules::{BuildModule, GruConfig, SequenceModule};
+use relearn::torch::packed::{PackedStructure, PackedTensor};
 use tch::{Device, Kind, Tensor};
 
 fn gru_rnn(c: &mut Criterion) {
@@ -51,15 +52,18 @@ fn gru_rnn(c: &mut Criterion) {
         );
 
         // n episodes of length 1, packed
-        let input = Tensor::ones(
+        let input_tensor = Tensor::ones(
             &[total_steps as i64, in_features as i64],
             (Kind::Float, Device::Cpu),
         );
-        let batch_sizes = Tensor::of_slice(&[total_steps as i64]);
+        let input = PackedTensor::from_parts(
+            input_tensor,
+            PackedStructure::from_batch_sizes([total_steps]).unwrap(),
+        );
         group.bench_with_input(
             BenchmarkId::new("seq_packed_n_episodes", total_steps),
             &input,
-            |b, input| b.iter_with_large_drop(|| gru.seq_packed(input, &batch_sizes)),
+            |b, input| b.iter_with_large_drop(|| gru.seq_packed(input)),
         );
     }
 }

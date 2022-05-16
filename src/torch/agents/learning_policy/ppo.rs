@@ -54,15 +54,14 @@ where
         logger: &mut dyn StatsLogger,
     ) -> PolicyStats {
         let observation_features = features.observation_features();
-        let batch_sizes = features.batch_sizes_tensor();
-        let actions = features.actions();
+        let actions = features.actions().tensor();
 
         let (step_values, initial_log_probs, initial_policy_entropy) = {
             let _no_grad = tch::no_grad_guard();
 
             let step_values = critic.step_values(features);
-            let policy_output = policy.seq_packed(observation_features, batch_sizes);
-            let distribution = action_space.distribution(&policy_output);
+            let policy_output = policy.seq_packed(observation_features);
+            let distribution = action_space.distribution(policy_output.tensor());
             let log_probs = distribution.log_probs(actions);
             let entropy = distribution.entropy().mean(Kind::Float);
 
@@ -70,16 +69,16 @@ where
         };
 
         let policy_surrogate_loss_fn = || {
-            let policy_output = policy.seq_packed(observation_features, batch_sizes);
-            let distribution = action_space.distribution(&policy_output);
+            let policy_output = policy.seq_packed(observation_features);
+            let distribution = action_space.distribution(policy_output.tensor());
             let log_probs = distribution.log_probs(actions);
 
             let likelihood_ratio = (log_probs - &initial_log_probs).exp();
             let clipped_likelihood_ratio =
                 likelihood_ratio.clip(1.0 - self.clip_distance, 1.0 + self.clip_distance);
 
-            (likelihood_ratio * &step_values)
-                .min_other(&(clipped_likelihood_ratio * &step_values))
+            (likelihood_ratio * step_values.tensor())
+                .min_other(&(clipped_likelihood_ratio * step_values.tensor()))
                 .mean(Kind::Float)
                 .neg()
         };

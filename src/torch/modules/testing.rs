@@ -2,6 +2,7 @@
 use super::{BuildModule, FeedForwardModule, IterativeModule, Module, SequenceModule};
 use crate::torch::initializers::{Initializer, VarianceScale};
 use crate::torch::optimizers::{BuildOptimizer, OnceOptimizer, SgdConfig};
+use crate::torch::packed::{PackedStructure, PackedTensor};
 use serde::{de::DeserializeOwned, Serialize};
 use smallvec::SmallVec;
 use std::fmt::Debug;
@@ -70,16 +71,20 @@ fn assert_allclose(input: &Tensor, other: &Tensor) {
 pub fn check_seq_packed<M: SequenceModule>(module: &M, in_dim: usize, out_dim: usize) {
     let _no_grad_guard = tch::no_grad_guard();
     // Input consists of 3 sequences: [0.1, 0.2, 0.3, 0.4], [0.1, 0.2, 0.3], and [0.1].
-    let data = [0.1_f32, 0.1, 0.1, 0.2, 0.2, 0.3, 0.3, 0.4];
-    let inputs = Tensor::of_slice(&data)
-        .unsqueeze(-1)
-        .expand(&[-1, in_dim as i64], false);
-    let batch_sizes = Tensor::of_slice(&[3_i64, 2, 2, 1]);
+    let input = PackedTensor::from_sorted_sequences([
+        &[0.1_f32, 0.2, 0.3, 0.4] as &[f32],
+        &[0.1, 0.2, 0.3],
+        &[0.1],
+    ])
+    .unwrap()
+    .batch_map(|t| t.unsqueeze(-1).expand(&[-1, in_dim as i64], false));
 
-    let output = module.seq_packed(&inputs, &batch_sizes);
+    let output = module.seq_packed(&input);
 
     // Check shape
-    assert_eq!(output.size(), vec![data.len() as i64, out_dim as i64],);
+    assert_eq!(output.tensor().size(), vec![8, out_dim as i64]);
+    // Check structure
+    assert_eq!(output.structure(), input.structure());
 
     // Compare the packed sequences.
     // The output should be the same for each since they have the same values.
@@ -88,12 +93,12 @@ pub fn check_seq_packed<M: SequenceModule>(module: &M, in_dim: usize, out_dim: u
     let seq_3_indices: &[i64] = &[2];
 
     assert_allclose(
-        &output.i((&seq_1_indices[..3], ..)),
-        &output.i((seq_2_indices, ..)),
+        &output.tensor().i((&seq_1_indices[..3], ..)),
+        &output.tensor().i((seq_2_indices, ..)),
     );
     assert_allclose(
-        &output.i((&seq_1_indices[..1], ..)),
-        &output.i((seq_3_indices, ..)),
+        &output.tensor().i((&seq_1_indices[..1], ..)),
+        &output.tensor().i((seq_3_indices, ..)),
     );
 }
 
@@ -124,21 +129,23 @@ where
 
     let seq_len = 5;
     let num_seqs = 2;
-    let input = Tensor::rand(
+    let input_data = Tensor::rand(
         &[seq_len, num_seqs, in_dim as i64],
         (Kind::Float, Device::Cpu),
     );
 
-    let packed_input = input.reshape(&[seq_len * num_seqs, in_dim as i64]);
-    let batch_sizes = Tensor::full(&[seq_len], num_seqs, (Kind::Int64, Device::Cpu));
-    let packed_output = module.seq_packed(&packed_input, &batch_sizes);
-    let output = packed_output.reshape(&[seq_len, num_seqs, out_dim as i64]);
+    let input = PackedTensor::from_aligned_tensor(&input_data).unwrap();
+    let output = module.seq_packed(&input);
+
+    let output_data = output
+        .tensor()
+        .reshape(&[seq_len, num_seqs, out_dim as i64]);
 
     for i in 0..num_seqs {
         let mut state = module.initial_state();
         for j in 0..seq_len {
-            let step_output = module.step(&mut state, &input.i((j, i, ..)));
-            let expected = output.i((j, i, ..));
+            let step_output = module.step(&mut state, &input_data.i((j, i, ..)));
+            let expected = output_data.i((j, i, ..));
             assert!(
                 step_output.allclose(&expected, 1e-6, 1e-6, false),
                 "seq {i}, step {j}; {step_output:?} != {:?}",
@@ -395,18 +402,17 @@ where
     M: SequenceModule + ?Sized,
 {
     /// (inputs, batch sizes)
-    type Input = (Tensor, Tensor);
+    type Input = PackedTensor;
 
     fn new_input(initializer: Initializer, in_dim: usize, device: Device) -> Self::Input {
         let total_steps = Self::BATCH_SIZES.iter().sum();
-        let input = initializer
+        let tensor = initializer
             .tensor(&[total_steps, in_dim])
             .device(device)
             .requires_grad(false)
             .build();
-        let batch_sizes_i64: [i64; 4] = array_init::array_init(|i| Self::BATCH_SIZES[i] as i64);
-        let batch_sizes = Tensor::of_slice(&batch_sizes_i64);
-        (input, batch_sizes)
+        let structure = PackedStructure::from_batch_sizes(Self::BATCH_SIZES).unwrap();
+        PackedTensor::from_parts(tensor, structure)
     }
 
     fn output_shape(out_dim: usize) -> SmallVec<[usize; 4]> {
@@ -415,7 +421,7 @@ where
     }
 
     fn run(module: &M, input: &Self::Input) -> Tensor {
-        module.seq_packed(&input.0, &input.1)
+        module.seq_packed(input).into_tensor()
     }
 }
 

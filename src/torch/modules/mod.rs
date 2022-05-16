@@ -12,6 +12,7 @@ pub use seq::{Gru, GruConfig, Lstm, LstmConfig};
 pub type GruMlpConfig = ChainConfig<GruConfig, MlpConfig>;
 pub type LstmMlpConfig = ChainConfig<GruConfig, MlpConfig>;
 
+use crate::torch::packed::PackedTensor;
 use tch::{Device, Tensor};
 
 /// A self-contained part of a neural network.
@@ -191,37 +192,20 @@ pub trait SequenceModule: Module {
     /// A tensor of shape `[BATCH_SHAPE, TOTAL_SEQ_LENGTH, NUM_OUTPUT_FEATURES]`.
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor;
 
-    /// Apply the network over multiple sequences packed together in heterogeneous batches.
+    /// Apply the network to a [`PackedTensor`]
     ///
     /// # Args
     /// * `inputs` - Packed input sequences.
     ///     An f32 tensor of shape `[TOTAL_STEPS, NUM_INPUT_FEATURES]`
-    ///     where the `TOTAL_STEPS` dimension consists of the packed and batched steps ordered
-    ///     first by index within a sequence, then by batch index.
-    ///     Sequences must be ordered from longest to shortest.
-    ///
-    ///     If all sequences have the same length then the `TOTAL_STEPS` dimension
-    ///     corresponds to a flattend Tensor of shape `[SEQ_LENGTH, BATCH_SIZE]`.
-    ///
-    /// * `batch_sizes` - The batch size of each in-sequence step index.
-    ///     A i64 tensor of shape `[MAX_SEQ_LENGTH]`. **Must be on the CPU.**
-    ///     Must be monotonically decreasing and positive.
-    ///
-    /// If `batch_sizes = [B0, B1, ..., BN]` then
-    /// `inputs[0..B0, ..]` are the batched first steps of all sequences,
-    /// `inptus[B0..B1, ..]` are the batched second steps, etc.
     ///
     /// # Returns
-    /// Packed output sequences in the same order as `inputs`.
-    /// A tensor of shape `[TOTAL_STEPS, NUM_OUTPUT_FEATURES]`.
+    /// Packed output sequences with the same structure as `inputs`.
     ///
     /// # Panics
     /// Panics if:
     /// * `inputs` device does not match the model device
     /// * `inputs` `NUM_INPUT_FEATURES` dimension does not match the model input features
-    /// * `inputs` `TOTAL_STEPS` dimension does not match the sum of `batch_size`
-    /// * `batch_sizes` device is not CPU
-    fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor;
+    fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor;
 }
 
 /// Implement [`SequenceModule`] for a deref-able generic wrapper type.
@@ -231,8 +215,8 @@ macro_rules! impl_wrapped_sequence_module {
             fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
                 T::seq_serial(self, inputs, seq_lengths)
             }
-            fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
-                T::seq_packed(self, inputs, batch_sizes)
+            fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
+                T::seq_packed(self, inputs)
             }
         }
     };

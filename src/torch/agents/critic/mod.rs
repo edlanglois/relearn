@@ -7,6 +7,7 @@ pub use r#return::Return;
 
 use super::features::PackedHistoryFeaturesView;
 use crate::torch::modules::Module;
+use crate::torch::packed::PackedTensor;
 use tch::{Device, Tensor};
 
 /// Critic for a reinforcement learning environment.
@@ -38,7 +39,7 @@ pub trait Critic: Module {
     /// Packed step values. A 1D f32 tensor with the same shape as `rewards` and `returns`.
     /// There is no meaning to the returned values apart from higher values representing better
     /// outcomes (in estimate).
-    fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> Tensor;
+    fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> PackedTensor;
 
     /// The loss of any trainable internal variables given the observed history features.
     ///

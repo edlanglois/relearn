@@ -2,8 +2,9 @@
 use super::super::super::SequenceModule;
 use super::super::seq_serial_map;
 use super::{RnnBase, RnnBaseConfig, RnnImpl, RnnLayerWeights};
+use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};
-use tch::{Device, IndexOp, Kind, Tensor};
+use tch::{Kind, Tensor};
 
 /// Configuration for [`Lstm`]
 pub type LstmConfig = RnnBaseConfig<LstmImpl>;
@@ -79,34 +80,36 @@ impl SequenceModule for Lstm {
         })
     }
 
-    fn seq_packed(&self, inputs: &Tensor, batch_sizes: &Tensor) -> Tensor {
-        // Otherwise torch will segfault
-        // See https://github.com/pytorch/pytorch/issues/59418
-        assert_eq!(
-            batch_sizes.device(),
-            Device::Cpu,
-            "batch_sizes must be on the CPU"
-        );
-        let initial_batch_size: i64 = batch_sizes.i(0).into();
+    fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
+        let initial_batch_size = match inputs.first_batch_size() {
+            Some(size) => size,
+            None => {
+                return inputs.clone();
+            }
+        };
         let num_layers: i64 = self.weights.num_layers() as i64;
         let zeros = Tensor::zeros(
             &[num_layers, initial_batch_size, self.hidden_size as i64],
             (inputs.kind(), inputs.device()),
         );
         let initial_state = [zeros.shallow_clone(), zeros];
+        let batch_sizes = inputs.batch_sizes_tensor();
 
-        let (outputs, _, _) = Tensor::lstm_data(
-            inputs,
-            batch_sizes,
-            &initial_state,
-            self.weights.flat_weights(),
-            self.weights.has_biases,
-            num_layers,
-            self.dropout,
-            true,  // train
-            false, // bidirectional
-        );
-        outputs
+        let lstm = |input_tensor| {
+            let (outputs, _, _) = Tensor::lstm_data(
+                input_tensor,
+                &batch_sizes,
+                &initial_state,
+                self.weights.flat_weights(),
+                self.weights.has_biases,
+                num_layers,
+                self.dropout,
+                true,  // train
+                false, // bidirectional
+            );
+            outputs
+        };
+        inputs.batch_map_ref(lstm)
     }
 }
 

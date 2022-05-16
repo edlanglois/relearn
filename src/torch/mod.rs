@@ -5,6 +5,7 @@ pub mod distributions;
 pub mod initializers;
 pub mod modules;
 pub mod optimizers;
+pub mod packed;
 pub mod serialize;
 mod tensors;
 pub mod utils;

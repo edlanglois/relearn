@@ -1,6 +1,6 @@
 use super::{BuildCritic, Critic, Module, PackedHistoryFeaturesView};
 use crate::torch::modules::{BuildModule, SequenceModule};
-use crate::utils::packed;
+use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};
 use tch::{Device, Reduction, Tensor};
 
@@ -105,56 +105,43 @@ impl<V> Critic for Gae<V>
 where
     V: SequenceModule,
 {
-    fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> Tensor {
+    fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> PackedTensor {
         let (extended_observation_features, is_invalid) = features.extended_observation_features();
-        let extended_batch_sizes = features.extended_batch_sizes_tensor();
 
         // Packed estimated values of the observed states
         let mut extended_estimated_values = self
             .value_fn
-            .seq_packed(extended_observation_features, extended_batch_sizes)
-            .squeeze_dim(-1);
-        let _ = extended_estimated_values.masked_fill_(is_invalid, 0.0);
+            .seq_packed(extended_observation_features)
+            .batch_map(|t| t.squeeze_dim(-1));
+        let _ = extended_estimated_values
+            .tensor_mut()
+            .masked_fill_(is_invalid.tensor(), 0.0);
 
         // Estimated values for each of `step.observation`
-        let (estimated_values, _) = packed::packed_tensor_trim_end(
-            &extended_estimated_values,
-            features.extended_batch_sizes(),
-            1,
-        );
+        let estimated_values = extended_estimated_values.trim_end(1);
 
         // Estimated value for each of `step.next.into_inner().observation`
-        let (estimated_next_values, _) = packed::packed_tensor_trim_start(
-            &extended_estimated_values,
-            features.extended_batch_sizes(),
-            1,
-        );
+        let estimated_next_values = extended_estimated_values.view_trim_start(1);
 
         let discount_factor = features.discount_factor();
 
         // Packed one-step TD residuals.
-        let residuals =
-            features.rewards() + discount_factor * estimated_next_values - estimated_values;
+        let residuals = features.rewards().batch_map_ref(|rewards| {
+            rewards + discount_factor * estimated_next_values.tensor() - estimated_values.tensor()
+        });
 
         // Packed step action advantages
-        let advantages = packed::packed_tensor_discounted_cumsum_from_end(
-            &residuals,
-            features.batch_sizes(),
-            self.lambda * discount_factor,
-        );
-
-        advantages
+        #[allow(clippy::cast_possible_truncation)]
+        residuals.discounted_cumsum_from_end((self.lambda * discount_factor) as f32)
     }
 
     fn loss(&self, features: &dyn PackedHistoryFeaturesView) -> Option<Tensor> {
         Some(
             self.value_fn
-                .seq_packed(
-                    features.observation_features(),
-                    features.batch_sizes_tensor(),
-                )
+                .seq_packed(features.observation_features())
+                .tensor()
                 .squeeze_dim(-1)
-                .mse_loss(features.returns(), Reduction::Mean),
+                .mse_loss(features.returns().tensor(), Reduction::Mean),
         )
     }
 
