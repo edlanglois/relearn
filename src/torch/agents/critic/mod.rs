@@ -29,7 +29,7 @@ use tch::{Device, Tensor};
 /// A value function is a function approximator that maps a sequence of episode history features to
 /// estimates of the expected future return of each observation or observation-action pair.
 /// May only use the past history within an episode, not from the future or across episodes.
-pub trait Critic: Module {
+pub trait Critic {
     /// Provide values for a packed sequence of steps.
     ///
     /// # Args

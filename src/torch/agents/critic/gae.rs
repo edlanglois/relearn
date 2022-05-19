@@ -1,5 +1,5 @@
 use super::{BuildCritic, Critic, HistoryFeatures, Module, RewardToGo};
-use crate::torch::modules::{BuildModule, SequenceModule};
+use crate::torch::modules::{BuildModule, SeqPacked};
 use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};
 use tch::{Device, Reduction, Tensor};
@@ -25,7 +25,7 @@ impl<VC: Default> Default for GaeConfig<VC> {
 impl<VC> BuildCritic for GaeConfig<VC>
 where
     VC: BuildModule,
-    VC::Module: SequenceModule,
+    VC::Module: SeqPacked,
 {
     type Critic = Gae<VC::Module>;
 
@@ -103,7 +103,7 @@ impl<V: Module> Module for Gae<V> {
 
 impl<V> Critic for Gae<V>
 where
-    V: SequenceModule,
+    V: SeqPacked,
 {
     fn step_values(&self, features: &dyn HistoryFeatures) -> PackedTensor {
         let (extended_observation_features, is_invalid) = features.extended_observation_features();

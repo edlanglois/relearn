@@ -1,6 +1,6 @@
 //! Linear layer
 use super::super::{
-    BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras, SequenceModule,
+    BuildModule, Forward, Module, ModuleExtras, SeqIterative, SeqPacked, SeqSerial,
 };
 use crate::torch::initializers::Initializer;
 use crate::torch::packed::PackedTensor;
@@ -115,7 +115,7 @@ impl<'a> ModuleExtras<'a> for Linear {
     }
 }
 
-impl FeedForwardModule for Linear {
+impl Forward for Linear {
     #[inline]
     fn forward(&self, input: &Tensor) -> Tensor {
         input.linear(&self.kernel, self.bias.as_ref())
@@ -123,12 +123,15 @@ impl FeedForwardModule for Linear {
 }
 
 /// Sequence processing by batching over the sequence dimension.
-impl SequenceModule for Linear {
+impl SeqSerial for Linear {
     #[inline]
     fn seq_serial(&self, inputs: &Tensor, _seq_lengths: &[usize]) -> Tensor {
         self.forward(inputs)
     }
+}
 
+/// Sequence processing by batching over the sequence dimension.
+impl SeqPacked for Linear {
     #[inline]
     fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
         inputs.batch_map_ref(|tensor| self.forward(tensor))
@@ -136,7 +139,7 @@ impl SequenceModule for Linear {
 }
 
 /// Iterate over a sequence by independently and identically transforming each step.
-impl IterativeModule for Linear {
+impl SeqIterative for Linear {
     type State = ();
 
     #[inline]

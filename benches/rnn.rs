@@ -2,7 +2,7 @@ use criterion::{
     criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration,
     Throughput,
 };
-use relearn::torch::modules::{BuildModule, GruConfig, SequenceModule};
+use relearn::torch::modules::{BuildModule, GruConfig, SeqPacked, SeqSerial};
 use relearn::torch::packed::{PackedStructure, PackedTensor};
 use tch::{Device, Kind, Tensor};
 

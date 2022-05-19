@@ -42,18 +42,6 @@ pub trait Module {
     fn has_cudnn_second_derivatives(&self) -> bool {
         true // usually true
     }
-
-    /// Chain another module after this one with an activation function in between.
-    fn chain<M>(self, other: M, activation: Activation) -> Chain<Self, M>
-    where
-        Self: Sized,
-    {
-        Chain {
-            first: self,
-            second: other,
-            activation,
-        }
-    }
 }
 
 /// Implement `Module` for a deref-able wrapper type generic over `T: Module + ?Sized`.
@@ -107,24 +95,6 @@ pub trait BuildModule {
     /// * `out_dim` - Number of output feature dimensions.
     /// * `device`  - Device on which to create the model tensors.
     fn build_module(&self, in_dim: usize, out_dim: usize, device: Device) -> Self::Module;
-
-    /// Chain another module configuration after this one with an activation function in between.
-    fn chain<MC>(
-        self,
-        other: MC,
-        hidden_dim: usize,
-        activation: Activation,
-    ) -> ChainConfig<Self, MC>
-    where
-        Self: Sized,
-    {
-        ChainConfig {
-            first_config: self,
-            second_config: other,
-            hidden_dim,
-            activation,
-        }
-    }
 }
 
 /// Implement [`BuildModule`] for a deref-able wrapper type generic over `T: BuildModule + ?Sized`.
@@ -142,14 +112,14 @@ macro_rules! impl_wrapped_build_module {
 impl_wrapped_build_module!(&'_ T);
 impl_wrapped_build_module!(Box<T>);
 
-/// A network module implementing a feed-forward transformation.
+/// A feed-forward function of a tensor.
 ///
 /// This is roughtly equivalent to PyTorch's [module][module] class except it is not treated as
 /// the base interface of all modules because not all modules implement the batch
 /// `Tensor -> Tensor` transformation.
 ///
 /// [module]: https://pytorch.org/docs/stable/generated/torch.nn.Module.html
-pub trait FeedForwardModule: Module {
+pub trait Forward {
     /// Apply a batch feed-forward transformation to a tensor.
     ///
     /// Applies a vector-to-vector map on the last dimension of the input tensor,
@@ -163,7 +133,7 @@ pub trait FeedForwardModule: Module {
 /// Implement [`FeedForwardModule`] for a deref-able generic wrapper type.
 macro_rules! impl_wrapped_feed_forward_module {
     ($wrapper:ty) => {
-        impl<T: FeedForwardModule + ?Sized> FeedForwardModule for $wrapper {
+        impl<T: Forward + ?Sized> Forward for $wrapper {
             fn forward(&self, input: &Tensor) -> Tensor {
                 T::forward(self, input)
             }
@@ -173,13 +143,13 @@ macro_rules! impl_wrapped_feed_forward_module {
 impl_wrapped_feed_forward_module!(&'_ T);
 impl_wrapped_feed_forward_module!(Box<T>);
 
-/// A network module implementing a sequence transformation.
-pub trait SequenceModule: Module {
-    /// Apply the network over multiple sequences arranged in series one after another.
+/// A sequence-to-sequence transformation on sequences arranged in series one after another.
+pub trait SeqSerial {
+    /// Apply a sequence-to-sequence transformation to a series of sequences.
     ///
     /// # Args
     /// * `inputs` - Batched input sequences arranged in series.
-    ///     An f32 tensor of shape `[BATCH_SIZE, TOTAL_SEQ_LENGTH, NUM_INPUT_FEATURES]`
+    ///     A tensor of shape `[BATCH_SIZE, TOTAL_SEQ_LENGTH, NUM_INPUT_FEATURES]`
     /// * `seq_lengths` - Length of each sequence.
     ///     The sequence length is the same across the batch dimension.
     ///
@@ -191,48 +161,56 @@ pub trait SequenceModule: Module {
     /// Batched output sequences arranged in series.
     /// A tensor of shape `[BATCH_SHAPE, TOTAL_SEQ_LENGTH, NUM_OUTPUT_FEATURES]`.
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor;
+}
 
-    /// Apply the network to a [`PackedTensor`]
+/// Implement [`SeqSerial`] for a deref-able generic wrapper type.
+macro_rules! impl_wrapped_seq_serial {
+    ($wrapper:ty) => {
+        impl<T: SeqSerial + ?Sized> SeqSerial for $wrapper {
+            fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
+                T::seq_serial(self, inputs, seq_lengths)
+            }
+        }
+    };
+}
+impl_wrapped_seq_serial!(&'_ T);
+impl_wrapped_seq_serial!(Box<T>);
+
+/// A sequence-to-sequence transformation on [`PackedTensor`].
+pub trait SeqPacked {
+    /// Apply a sequence-to-sequence transformation on a [`PackedTensor`].
     ///
     /// # Args
     /// * `inputs` - Packed input sequences.
-    ///     An f32 tensor of shape `[TOTAL_STEPS, NUM_INPUT_FEATURES]`
+    ///     A tensor of shape `[TOTAL_STEPS, NUM_INPUT_FEATURES]`
     ///
     /// # Returns
     /// Packed output sequences with the same structure as `inputs`.
-    ///
-    /// # Panics
-    /// Panics if:
-    /// * `inputs` device does not match the model device
-    /// * `inputs` `NUM_INPUT_FEATURES` dimension does not match the model input features
     fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor;
 }
 
 /// Implement [`SequenceModule`] for a deref-able generic wrapper type.
-macro_rules! impl_wrapped_sequence_module {
+macro_rules! impl_wrapped_seq_packed {
     ($wrapper:ty) => {
-        impl<T: SequenceModule + ?Sized> SequenceModule for $wrapper {
-            fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
-                T::seq_serial(self, inputs, seq_lengths)
-            }
+        impl<T: SeqPacked + ?Sized> SeqPacked for $wrapper {
             fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
                 T::seq_packed(self, inputs)
             }
         }
     };
 }
-impl_wrapped_sequence_module!(&'_ T);
-impl_wrapped_sequence_module!(Box<T>);
+impl_wrapped_seq_packed!(&'_ T);
+impl_wrapped_seq_packed!(Box<T>);
 
-/// A module that operates iteratively on a sequence of data.
-pub trait IterativeModule: Module {
+/// An iterative transformation of a sequence of input [`Tensor`].
+pub trait SeqIterative {
     /// Sequence state managed by the module.
     type State;
 
     /// Construct an initial state for the start of a new sequence.
     fn initial_state(&self) -> Self::State;
 
-    /// Apply one step of the module.
+    /// Transform the next value in the sequence.
     ///
     /// # Args
     /// * `input` - The input for one step.
@@ -245,29 +223,29 @@ pub trait IterativeModule: Module {
     fn step(&self, state: &mut Self::State, input: &Tensor) -> Tensor;
 
     /// Iterate over input tensors
-    fn iter<I>(&self, inputs: I) -> ModuleStepIter<&Self, I::IntoIter>
+    fn iter<I>(&self, inputs: I) -> SeqIterator<&Self, I::IntoIter>
     where
         I: IntoIterator,
         I::Item: AsRef<Tensor>,
     {
-        ModuleStepIter::new(self, inputs.into_iter())
+        SeqIterator::new(self, inputs.into_iter())
     }
 
     /// Convert into an iterator over input tensors.
-    fn into_iter<I>(self, inputs: I) -> ModuleStepIter<Self, I::IntoIter>
+    fn into_iter<I>(self, inputs: I) -> SeqIterator<Self, I::IntoIter>
     where
         I: IntoIterator,
         I::Item: AsRef<Tensor>,
         Self: Sized,
     {
-        ModuleStepIter::new(self, inputs.into_iter())
+        SeqIterator::new(self, inputs.into_iter())
     }
 }
 
-/// Implement [`IterativeModule`] for a deref-able generic wrapper type.
+/// Implement [`SeqIterative`] for a deref-able generic wrapper type.
 macro_rules! impl_wrapped_iterative_module {
     ($wrapper:ty) => {
-        impl<T: IterativeModule + ?Sized> IterativeModule for $wrapper {
+        impl<T: SeqIterative + ?Sized> SeqIterative for $wrapper {
             type State = T::State;
             fn initial_state(&self) -> Self::State {
                 T::initial_state(self)
@@ -281,15 +259,15 @@ macro_rules! impl_wrapped_iterative_module {
 impl_wrapped_iterative_module!(&'_ T);
 impl_wrapped_iterative_module!(Box<T>);
 
-/// Iterator over [`IterativeModule`] step outputs.
+/// Iterator over [`SeqIterative`] step outputs.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct ModuleStepIter<M: IterativeModule, I> {
+pub struct SeqIterator<M: SeqIterative, I> {
     module: M,
     state: M::State,
     inputs: I,
 }
 
-impl<M: IterativeModule, I> ModuleStepIter<M, I> {
+impl<M: SeqIterative, I> SeqIterator<M, I> {
     fn new(module: M, inputs: I) -> Self {
         Self {
             state: module.initial_state(),
@@ -299,9 +277,9 @@ impl<M: IterativeModule, I> ModuleStepIter<M, I> {
     }
 }
 
-impl<M, I> Iterator for ModuleStepIter<M, I>
+impl<M, I> Iterator for SeqIterator<M, I>
 where
-    M: IterativeModule,
+    M: SeqIterative,
     I: Iterator,
     I::Item: AsRef<Tensor>,
 {
@@ -338,9 +316,9 @@ where
     }
 }
 
-impl<M, I> ExactSizeIterator for ModuleStepIter<M, I>
+impl<M, I> ExactSizeIterator for SeqIterator<M, I>
 where
-    M: IterativeModule,
+    M: SeqIterative,
     I: ExactSizeIterator,
     I::Item: AsRef<Tensor>,
 {

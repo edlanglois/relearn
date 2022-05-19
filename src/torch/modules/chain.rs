@@ -1,7 +1,6 @@
 //! Modules applied one after another in sequence
 use super::{
-    Activation, BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras,
-    SequenceModule,
+    Activation, BuildModule, Forward, Module, ModuleExtras, SeqIterative, SeqPacked, SeqSerial,
 };
 use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};
@@ -132,10 +131,10 @@ where
     }
 }
 
-impl<A, B> FeedForwardModule for Chain<A, B>
+impl<A, B> Forward for Chain<A, B>
 where
-    A: FeedForwardModule + for<'a> ModuleExtras<'a>,
-    B: FeedForwardModule + for<'a> ModuleExtras<'a>,
+    A: Forward,
+    B: Forward,
 {
     fn forward(&self, input: &Tensor) -> Tensor {
         let hidden = self.first.forward(input);
@@ -144,16 +143,23 @@ where
     }
 }
 
-impl<A, B> SequenceModule for Chain<A, B>
+impl<A, B> SeqSerial for Chain<A, B>
 where
-    A: SequenceModule + for<'a> ModuleExtras<'a>,
-    B: SequenceModule + for<'a> ModuleExtras<'a>,
+    A: SeqSerial,
+    B: SeqSerial,
 {
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         let hidden = self.first.seq_serial(inputs, seq_lengths);
         let hidden = self.activation.forward_owned(hidden);
         self.second.seq_serial(&hidden, seq_lengths)
     }
+}
+
+impl<A, B> SeqPacked for Chain<A, B>
+where
+    A: SeqPacked,
+    B: SeqPacked,
+{
     fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
         let hidden = self.first.seq_packed(inputs);
         let hidden = hidden.batch_map(|tensor| self.activation.forward_owned(tensor));
@@ -161,10 +167,10 @@ where
     }
 }
 
-impl<A, B> IterativeModule for Chain<A, B>
+impl<A, B> SeqIterative for Chain<A, B>
 where
-    A: IterativeModule + for<'a> ModuleExtras<'a>,
-    B: IterativeModule + for<'a> ModuleExtras<'a>,
+    A: SeqIterative,
+    B: SeqIterative,
 {
     type State = (A::State, B::State);
 
@@ -237,25 +243,27 @@ impl<M: Module, const N: usize> Module for [M; N] {
     }
 }
 
-impl<M: FeedForwardModule> FeedForwardModule for [M] {
+impl<M: Forward> Forward for [M] {
     fn forward(&self, input: &Tensor) -> Tensor {
         fold_or_clone(self, input, |tensor, module| module.forward(tensor))
     }
 }
 
-impl<M: FeedForwardModule, const N: usize> FeedForwardModule for [M; N] {
+impl<M: Forward, const N: usize> Forward for [M; N] {
     fn forward(&self, input: &Tensor) -> Tensor {
         fold_or_clone(self, input, |tensor, module| module.forward(tensor))
     }
 }
 
-impl<M: SequenceModule> SequenceModule for [M] {
+impl<M: SeqSerial> SeqSerial for [M] {
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         fold_or_clone(self, inputs, |tensor, module| {
             module.seq_serial(tensor, seq_lengths)
         })
     }
+}
 
+impl<M: SeqPacked> SeqPacked for [M] {
     fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
         fold_or_clone(self, inputs, |packed_tensor, module| {
             module.seq_packed(packed_tensor)
@@ -263,13 +271,15 @@ impl<M: SequenceModule> SequenceModule for [M] {
     }
 }
 
-impl<M: SequenceModule, const N: usize> SequenceModule for [M; N] {
+impl<M: SeqSerial, const N: usize> SeqSerial for [M; N] {
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         fold_or_clone(self, inputs, |tensor, module| {
             module.seq_serial(tensor, seq_lengths)
         })
     }
+}
 
+impl<M: SeqPacked, const N: usize> SeqPacked for [M; N] {
     fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
         fold_or_clone(self, inputs, |packed_tensor, module| {
             module.seq_packed(packed_tensor)
@@ -277,7 +287,7 @@ impl<M: SequenceModule, const N: usize> SequenceModule for [M; N] {
     }
 }
 
-impl<M: IterativeModule> IterativeModule for [M] {
+impl<M: SeqIterative> SeqIterative for [M] {
     type State = Vec<M::State>;
 
     fn initial_state(&self) -> Self::State {
@@ -294,7 +304,7 @@ impl<M: IterativeModule> IterativeModule for [M] {
     }
 }
 
-impl<M: IterativeModule, const N: usize> IterativeModule for [M; N] {
+impl<M: SeqIterative, const N: usize> SeqIterative for [M; N] {
     type State = [M::State; N];
 
     fn initial_state(&self) -> Self::State {

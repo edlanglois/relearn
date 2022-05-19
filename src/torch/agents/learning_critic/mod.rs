@@ -7,6 +7,7 @@ use super::critic::{BuildCritic, Critic};
 use super::features::HistoryFeatures;
 use super::{RuleOpt, RuleOptConfig};
 use crate::logging::StatsLogger;
+use crate::torch::modules::Module;
 use crate::torch::optimizers::BuildOptimizer;
 use tch::Device;
 
@@ -76,6 +77,7 @@ where
 impl<CB, OB, U> BuildLearningCritic for RuleOptConfig<CB, OB, U>
 where
     CB: BuildCritic,
+    CB::Critic: Module,
     OB: BuildOptimizer,
     U: CriticUpdateRule<CB::Critic, OB::Optimizer> + Clone,
 {

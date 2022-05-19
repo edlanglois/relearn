@@ -1,7 +1,7 @@
 //! Torch actor definition
 use crate::agents::Actor;
 use crate::spaces::{FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace};
-use crate::torch::modules::IterativeModule;
+use crate::torch::modules::SeqIterative;
 use crate::Prng;
 use serde::{Deserialize, Serialize};
 use tch::Tensor;
@@ -28,7 +28,7 @@ impl<OS, AS, P> Actor<OS::Element, AS::Element> for PolicyActor<OS, AS, P>
 where
     OS: FeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
-    P: IterativeModule,
+    P: SeqIterative,
 {
     type EpisodeState = P::State;
 

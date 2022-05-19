@@ -1,5 +1,5 @@
 //! Module test utilities.
-use super::{BuildModule, FeedForwardModule, IterativeModule, Module, SequenceModule};
+use super::{BuildModule, Forward, Module, SeqIterative, SeqPacked, SeqSerial};
 use crate::torch::initializers::{Initializer, VarianceScale};
 use crate::torch::optimizers::{BuildOptimizer, OnceOptimizer, SgdConfig};
 use crate::torch::packed::{PackedStructure, PackedTensor};
@@ -10,7 +10,7 @@ use std::iter;
 use tch::{self, kind::Kind, Device, IndexOp, Tensor};
 
 /// Basic structural check of [`FeedForwardModule::forward`].
-pub fn check_forward<M: FeedForwardModule>(
+pub fn check_forward<M: Forward>(
     module: &M,
     in_dim: usize,
     out_dim: usize,
@@ -34,7 +34,7 @@ pub fn check_forward<M: FeedForwardModule>(
 ///
 /// * Checks that the output size is correct.
 /// * Checks that identical inner sequences produce identical output.
-pub fn check_seq_serial<M: SequenceModule>(module: &M, in_dim: usize, out_dim: usize) {
+pub fn check_seq_serial<M: SeqSerial>(module: &M, in_dim: usize, out_dim: usize) {
     let _no_grad_guard = tch::no_grad_guard();
     let batch_size: usize = 4;
 
@@ -68,7 +68,7 @@ fn assert_allclose(input: &Tensor, other: &Tensor) {
 ///
 /// * Checks that the output size is correct.
 /// * Checks that identical inner sequences produce identical output.
-pub fn check_seq_packed<M: SequenceModule>(module: &M, in_dim: usize, out_dim: usize) {
+pub fn check_seq_packed<M: SeqPacked>(module: &M, in_dim: usize, out_dim: usize) {
     let _no_grad_guard = tch::no_grad_guard();
     // Input consists of 3 sequences: [0.1, 0.2, 0.3, 0.4], [0.1, 0.2, 0.3], and [0.1].
     let input = PackedTensor::from_sorted_sequences([
@@ -106,7 +106,7 @@ pub fn check_seq_packed<M: SequenceModule>(module: &M, in_dim: usize, out_dim: u
 ///
 /// * Checks that the output size is correct.
 /// * Checks that the output state of a step can be used in the next step.
-pub fn check_step<M: IterativeModule>(module: &M, in_dim: usize, out_dim: usize) {
+pub fn check_step<M: SeqIterative>(module: &M, in_dim: usize, out_dim: usize) {
     let _no_grad_guard = tch::no_grad_guard();
 
     let mut state = module.initial_state();
@@ -123,7 +123,7 @@ pub fn check_step<M: IterativeModule>(module: &M, in_dim: usize, out_dim: usize)
 /// Check that [`SequenceModule::seq_packed`] output matches [`IterativeModule::step`].
 pub fn check_seq_packed_matches_iter_steps<M>(module: &M, in_dim: usize, out_dim: usize)
 where
-    M: SequenceModule + IterativeModule,
+    M: SeqPacked + SeqIterative,
 {
     let _no_grad_guard = tch::no_grad_guard();
 
@@ -335,7 +335,7 @@ impl RunForward {
 }
 impl<M> RunModule<M> for RunForward
 where
-    M: FeedForwardModule + ?Sized,
+    M: Forward + ?Sized,
 {
     type Input = Tensor;
 
@@ -364,7 +364,7 @@ impl RunSeqSerial {
 }
 impl<M> RunModule<M> for RunSeqSerial
 where
-    M: SequenceModule + ?Sized,
+    M: SeqSerial + ?Sized,
 {
     /// (inputs, sequence lengths)
     type Input = (Tensor, [usize; 3]);
@@ -399,7 +399,7 @@ impl RunSeqPacked {
 }
 impl<M> RunModule<M> for RunSeqPacked
 where
-    M: SequenceModule + ?Sized,
+    M: SeqPacked + ?Sized,
 {
     /// (inputs, batch sizes)
     type Input = PackedTensor;
@@ -432,7 +432,7 @@ impl RunIterStep {
 }
 impl<M> RunModule<M> for RunIterStep
 where
-    M: IterativeModule + ?Sized,
+    M: SeqIterative + ?Sized,
 {
     type Input = Vec<Tensor>;
 

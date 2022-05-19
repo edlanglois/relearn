@@ -6,7 +6,7 @@ pub use gru::{Gru, GruConfig};
 pub use lstm::{Lstm, LstmConfig};
 
 use super::super::super::initializers::{Initializer, VarianceScale};
-use super::super::{BuildModule, IterativeModule, Module, ModuleExtras};
+use super::super::{BuildModule, Module, ModuleExtras, SeqIterative};
 use crate::torch::serialize::TensorDef;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -163,7 +163,7 @@ impl<'a, T> ModuleExtras<'a> for RnnBase<T> {
     }
 }
 
-impl<T: RnnImpl> IterativeModule for RnnBase<T> {
+impl<T: RnnImpl> SeqIterative for RnnBase<T> {
     // Hold up to 4 layers without allocationg
     type State = SmallVec<[T::CellState; 4]>;
 

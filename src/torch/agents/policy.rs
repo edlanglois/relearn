@@ -1,10 +1,10 @@
 //! Policy modules
-use crate::torch::modules::{BuildModule, IterativeModule, SequenceModule};
+use crate::torch::modules::{BuildModule, SeqIterative, SeqPacked};
 use tch::Device;
 
-pub trait Policy: SequenceModule + IterativeModule {}
+pub trait Policy: SeqPacked + SeqIterative {}
 
-impl<T: SequenceModule + IterativeModule + ?Sized> Policy for T {}
+impl<T: SeqPacked + SeqIterative + ?Sized> Policy for T {}
 
 pub trait BuildPolicy {
     type Policy: Policy;
@@ -15,7 +15,7 @@ pub trait BuildPolicy {
 impl<T> BuildPolicy for T
 where
     T: BuildModule,
-    T::Module: SequenceModule + IterativeModule,
+    T::Module: SeqPacked + SeqIterative,
 {
     type Policy = T::Module;
 

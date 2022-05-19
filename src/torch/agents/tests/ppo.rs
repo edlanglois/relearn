@@ -8,12 +8,13 @@ use crate::torch::agents::{
     policy::BuildPolicy,
     ActorCriticConfig,
 };
-use crate::torch::modules::{GruMlpConfig, MlpConfig};
+use crate::torch::modules::{GruMlpConfig, MlpConfig, Module};
 use tch::Device;
 
 fn test_train_ppo<PB, LCB>(mut config: ActorCriticConfig<PpoConfig<PB>, LCB>)
 where
     PB: BuildPolicy,
+    PB::Policy: Module,
     LCB: BuildLearningCritic + SetLearningRate,
 {
     // Speed up learning for this simple environment

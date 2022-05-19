@@ -13,6 +13,7 @@ use super::policy::{BuildPolicy, Policy};
 use super::{RuleOpt, RuleOptConfig};
 use crate::logging::StatsLogger;
 use crate::spaces::ParameterizedDistributionSpace;
+use crate::torch::modules::Module;
 use crate::torch::optimizers::BuildOptimizer;
 use serde::{Deserialize, Serialize};
 use tch::{Device, Tensor};
@@ -20,7 +21,7 @@ use tch::{Device, Tensor};
 /// A [`Policy`] that can learn from collected history features and a critic.
 pub trait LearningPolicy {
     /// Type of the internal stored policy.
-    type Policy: Policy;
+    type Policy: Policy + Module;
 
     /// Cheap reference to the internal policy.
     fn policy_ref(&self) -> &Self::Policy;
@@ -84,7 +85,7 @@ pub trait PolicyUpdateRule<P, O> {
 
 impl<P, O, U> LearningPolicy for RuleOpt<P, O, U>
 where
-    P: Policy,
+    P: Policy + Module,
     U: PolicyUpdateRule<P, O>,
 {
     type Policy = P;
@@ -118,6 +119,7 @@ where
 impl<PB, OB, U> BuildLearningPolicy for RuleOptConfig<PB, OB, U>
 where
     PB: BuildPolicy,
+    PB::Policy: Module,
     OB: BuildOptimizer,
     U: PolicyUpdateRule<PB::Policy, OB::Optimizer> + Clone,
 {

@@ -5,6 +5,7 @@ use super::{
 };
 use crate::torch::{
     backends::WithCudnnEnabled,
+    modules::Module,
     optimizers::{
         ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig, OptimizerStepError,
         TrustRegionOptimizer,
@@ -46,7 +47,7 @@ pub type TrpoConfig<PB, OB = ConjugateGradientOptimizerConfig> = RuleOptConfig<P
 
 impl<P, O> PolicyUpdateRule<P, O> for TrpoRule
 where
-    P: Policy,
+    P: Policy + Module,
     O: TrustRegionOptimizer,
 {
     fn update_external_policy<AS: ParameterizedDistributionSpace<Tensor>>(

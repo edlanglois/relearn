@@ -1,6 +1,6 @@
 //! Multi-layer perceptron
 use super::super::{
-    BuildModule, FeedForwardModule, IterativeModule, Module, ModuleExtras, SequenceModule,
+    BuildModule, Forward, Module, ModuleExtras, SeqIterative, SeqPacked, SeqSerial,
 };
 use super::{Activation, Linear, LinearConfig};
 use crate::torch::packed::PackedTensor;
@@ -135,7 +135,7 @@ impl<'a> ModuleExtras<'a> for Mlp {
     }
 }
 
-impl FeedForwardModule for Mlp {
+impl Forward for Mlp {
     fn forward(&self, input: &Tensor) -> Tensor {
         let mut iter_layers = self.layers.iter();
         let mut hidden = iter_layers
@@ -152,17 +152,21 @@ impl FeedForwardModule for Mlp {
 }
 
 /// Sequence processing by batching over the sequence dimension.
-impl SequenceModule for Mlp {
+impl SeqSerial for Mlp {
     fn seq_serial(&self, inputs: &Tensor, _seq_lengths: &[usize]) -> Tensor {
         self.forward(inputs)
     }
+}
+
+/// Sequence processing by batching over the sequence dimension.
+impl SeqPacked for Mlp {
     fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
         inputs.batch_map_ref(|tensor| self.forward(tensor))
     }
 }
 
 /// Iterate over a sequence by independently and identically transforming each step.
-impl IterativeModule for Mlp {
+impl SeqIterative for Mlp {
     type State = ();
     fn initial_state(&self) -> Self::State {}
     fn step(&self, _: &mut Self::State, input: &Tensor) -> Tensor {

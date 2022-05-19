@@ -1,5 +1,5 @@
 //! Long Short-Term Memory
-use super::super::super::SequenceModule;
+use super::super::super::{SeqPacked, SeqSerial};
 use super::super::seq_serial_map;
 use super::{RnnBase, RnnBaseConfig, RnnImpl, RnnLayerWeights};
 use crate::torch::packed::PackedTensor;
@@ -49,7 +49,7 @@ impl RnnImpl for LstmImpl {
     }
 }
 
-impl SequenceModule for Lstm {
+impl SeqSerial for Lstm {
     fn seq_serial(&self, inputs: &Tensor, seq_lengths: &[usize]) -> Tensor {
         let shape = inputs.size();
         assert_eq!(
@@ -79,7 +79,9 @@ impl SequenceModule for Lstm {
             seq_output
         })
     }
+}
 
+impl SeqPacked for Lstm {
     fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
         let initial_batch_size = match inputs.first_batch_size() {
             Some(size) => size,

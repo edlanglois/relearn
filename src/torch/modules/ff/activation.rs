@@ -1,5 +1,5 @@
 //! Activation functions.
-use super::super::{FeedForwardModule, IterativeModule, Module, ModuleExtras, SequenceModule};
+use super::super::{Forward, Module, ModuleExtras, SeqIterative, SeqPacked, SeqSerial};
 use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};
 use std::iter;
@@ -79,7 +79,7 @@ impl<'a> ModuleExtras<'a> for Activation {
     }
 }
 
-impl FeedForwardModule for Activation {
+impl Forward for Activation {
     #[inline]
     fn forward(&self, input: &Tensor) -> Tensor {
         match self {
@@ -92,12 +92,15 @@ impl FeedForwardModule for Activation {
 }
 
 /// Sequence processing by batching over the sequence dimension.
-impl SequenceModule for Activation {
+impl SeqSerial for Activation {
     #[inline]
     fn seq_serial(&self, inputs: &Tensor, _seq_lengths: &[usize]) -> Tensor {
         self.forward(inputs)
     }
+}
 
+/// Sequence processing by batching over the sequence dimension.
+impl SeqPacked for Activation {
     #[inline]
     fn seq_packed(&self, inputs: &PackedTensor) -> PackedTensor {
         inputs.batch_map_ref(|tensor| self.forward(tensor))
@@ -105,7 +108,7 @@ impl SequenceModule for Activation {
 }
 
 /// Iterate over a sequence by independently and identically transforming each step.
-impl IterativeModule for Activation {
+impl SeqIterative for Activation {
     type State = ();
 
     #[inline]
