@@ -11,6 +11,8 @@ use std::cmp::Reverse;
 use tch::{Device, Tensor};
 
 /// View history features as packed tensors.
+///
+/// Floating-point tensors are `f32`.
 pub trait PackedHistoryFeaturesView {
     /// Packed observation features. A 2D f64 tensor.
     fn observation_features(&self) -> &PackedTensor;
@@ -37,19 +39,10 @@ pub trait PackedHistoryFeaturesView {
     /// Packed rewards. A 1D f32 tensor.
     fn rewards(&self) -> &PackedTensor;
 
-    /// Packed returns (discounted reward-to-go). A 1D f32 tensor.
+    /// Environment discount factor.
     ///
-    /// The return is the discounted sum of future rewards
-    /// (`return = sum_i { reward_i * discount_factor ** i }`)
-    /// starting from each step in the episode to the end of the episode.
-    ///
-    /// # Warning
-    /// In the case of interrupted episodes (`Successor::Terminate`),
-    /// this incorrectly assumes that all future rewards are zero.
-    // TODO: Allow specifying an estimator for terminated episodes.
-    fn returns(&self) -> &PackedTensor;
-
-    /// Discount factor for calculating returns.
+    /// This is included for convenience as it is often needed
+    /// when calculating value functions of these features.
     fn discount_factor(&self) -> f64;
 
     /// Device on which tensors will be placed.
@@ -72,7 +65,6 @@ pub struct LazyPackedHistoryFeatures<'a, OS: Space + ?Sized, AS: Space + ?Sized,
     cached_observation_features: OnceCell<PackedTensor>,
     cached_extended_observation_features: OnceCell<(PackedTensor, PackedTensor)>,
     cached_actions: OnceCell<PackedTensor>,
-    cached_returns: OnceCell<PackedTensor>,
     cached_rewards: OnceCell<PackedTensor>,
 }
 
@@ -109,7 +101,6 @@ where
             cached_observation_features: OnceCell::new(),
             cached_extended_observation_features: OnceCell::new(),
             cached_actions: OnceCell::new(),
-            cached_returns: OnceCell::new(),
             cached_rewards: OnceCell::new(),
         }
     }
@@ -225,14 +216,6 @@ where
         })
     }
 
-    #[allow(clippy::cast_possible_truncation)]
-    fn returns(&self) -> &PackedTensor {
-        self.cached_returns.get_or_init(|| {
-            self.rewards()
-                .discounted_cumsum_from_end(self.discount_factor as f32)
-        })
-    }
-
     fn discount_factor(&self) -> f64 {
         self.discount_factor
     }
@@ -292,13 +275,13 @@ where
 
 #[cfg(test)]
 #[allow(clippy::needless_pass_by_value)]
-mod lazy_features {
+pub(crate) mod tests {
     use super::*;
     use crate::envs::Successor::{Continue, Interrupt, Terminate};
     use crate::spaces::{BooleanSpace, IndexSpace};
     use rstest::{fixture, rstest};
 
-    struct StoredHistory<OS: Space, AS: Space> {
+    pub struct StoredHistory<OS: Space, AS: Space> {
         episodes: Vec<Vec<PartialStep<OS::Element, AS::Element>>>,
         observation_space: OS,
         action_space: AS,
@@ -308,7 +291,7 @@ mod lazy_features {
 
     impl<OS: Space, AS: Space> StoredHistory<OS, AS> {
         #[allow(clippy::type_complexity)]
-        fn features(
+        pub fn features(
             &self,
         ) -> LazyPackedHistoryFeatures<OS, AS, &[PartialStep<OS::Element, AS::Element>]> {
             LazyPackedHistoryFeatures::new(
@@ -322,7 +305,7 @@ mod lazy_features {
     }
 
     #[fixture]
-    fn history() -> StoredHistory<BooleanSpace, IndexSpace> {
+    pub fn history() -> StoredHistory<BooleanSpace, IndexSpace> {
         let episodes = vec![
             vec![
                 PartialStep::new(true, 0, 1.0, Continue(())),
@@ -441,20 +424,5 @@ mod lazy_features {
             1.0f32,
         ]);
         assert_eq!(actual.tensor(), expected);
-    }
-
-    #[rstest]
-    fn returns(history: StoredHistory<BooleanSpace, IndexSpace>) {
-        let features = history.features();
-        let actual = features.returns();
-        let expected = &Tensor::of_slice(&[
-            -0.65341, 3.439, 5.42, 3.0, //
-            0.3851, 2.71, 3.8, //
-            1.539, 1.9, 2.0, //
-            1.71, 1.0, //
-            1.9, //
-            1.0f32,
-        ]);
-        assert!(expected.allclose(actual.tensor(), 1e-5, 1e-5, false));
     }
 }

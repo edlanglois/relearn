@@ -55,9 +55,12 @@ impl Module for Return {
 
 impl Critic for Return {
     #[inline]
+    #[allow(clippy::cast_possible_truncation)]
     fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> PackedTensor {
         // Note: This assumes that all episodes end with 0 return.
-        features.returns().clone()
+        features
+            .rewards()
+            .discounted_cumsum_from_end(features.discount_factor() as f32)
     }
 
     #[inline]
@@ -90,4 +93,28 @@ impl LearningCritic for Return {
 
     #[inline]
     fn update_critic(&mut self, _: &dyn PackedHistoryFeaturesView, _: &mut dyn StatsLogger) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::spaces::{BooleanSpace, IndexSpace};
+    use crate::torch::agents::features::tests::{history, StoredHistory};
+    use rstest::rstest;
+
+    #[rstest]
+    #[allow(clippy::needless_pass_by_value)]
+    fn step_values(history: StoredHistory<BooleanSpace, IndexSpace>) {
+        let features = history.features();
+        let actual = Return.step_values(&features);
+        let expected = &Tensor::of_slice(&[
+            -0.65341, 3.439, 5.42, 3.0, //
+            0.3851, 2.71, 3.8, //
+            1.539, 1.9, 2.0, //
+            1.71, 1.0, //
+            1.9, //
+            1.0f32,
+        ]);
+        assert!(expected.allclose(actual.tensor(), 1e-5, 1e-5, false));
+    }
 }
