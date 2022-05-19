@@ -245,10 +245,20 @@ pub trait IterativeModule: Module {
     fn step(&self, state: &mut Self::State, input: &Tensor) -> Tensor;
 
     /// Iterate over input tensors
-    fn iter<I>(&self, inputs: I) -> ModuleStepIter<Self, I::IntoIter>
+    fn iter<I>(&self, inputs: I) -> ModuleStepIter<&Self, I::IntoIter>
     where
         I: IntoIterator,
         I::Item: AsRef<Tensor>,
+    {
+        ModuleStepIter::new(self, inputs.into_iter())
+    }
+
+    /// Convert into an iterator over input tensors.
+    fn into_iter<I>(self, inputs: I) -> ModuleStepIter<Self, I::IntoIter>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<Tensor>,
+        Self: Sized,
     {
         ModuleStepIter::new(self, inputs.into_iter())
     }
@@ -273,14 +283,14 @@ impl_wrapped_iterative_module!(Box<T>);
 
 /// Iterator over [`IterativeModule`] step outputs.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct ModuleStepIter<'a, M: IterativeModule + ?Sized, I> {
-    module: &'a M,
+pub struct ModuleStepIter<M: IterativeModule, I> {
+    module: M,
     state: M::State,
     inputs: I,
 }
 
-impl<'a, M: IterativeModule + ?Sized, I> ModuleStepIter<'a, M, I> {
-    fn new(module: &'a M, inputs: I) -> Self {
+impl<M: IterativeModule, I> ModuleStepIter<M, I> {
+    fn new(module: M, inputs: I) -> Self {
         Self {
             state: module.initial_state(),
             module,
@@ -289,9 +299,9 @@ impl<'a, M: IterativeModule + ?Sized, I> ModuleStepIter<'a, M, I> {
     }
 }
 
-impl<'a, M, I> Iterator for ModuleStepIter<'a, M, I>
+impl<M, I> Iterator for ModuleStepIter<M, I>
 where
-    M: IterativeModule + ?Sized,
+    M: IterativeModule,
     I: Iterator,
     I::Item: AsRef<Tensor>,
 {
@@ -328,9 +338,9 @@ where
     }
 }
 
-impl<'a, M, I> ExactSizeIterator for ModuleStepIter<'a, M, I>
+impl<M, I> ExactSizeIterator for ModuleStepIter<M, I>
 where
-    M: IterativeModule + ?Sized,
+    M: IterativeModule,
     I: ExactSizeIterator,
     I::Item: AsRef<Tensor>,
 {
