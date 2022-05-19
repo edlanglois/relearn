@@ -1,5 +1,5 @@
 use super::super::learning_critic::{BuildLearningCritic, LearningCritic};
-use super::{BuildCritic, Critic, Module, PackedHistoryFeaturesView};
+use super::{BuildCritic, Critic, HistoryFeatures, Module};
 use crate::logging::StatsLogger;
 use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};
@@ -56,7 +56,7 @@ impl Module for Return {
 impl Critic for Return {
     #[inline]
     #[allow(clippy::cast_possible_truncation)]
-    fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> PackedTensor {
+    fn step_values(&self, features: &dyn HistoryFeatures) -> PackedTensor {
         // Note: This assumes that all episodes end with 0 return.
         features
             .rewards()
@@ -64,7 +64,7 @@ impl Critic for Return {
     }
 
     #[inline]
-    fn loss(&self, _: &dyn PackedHistoryFeaturesView) -> Option<Tensor> {
+    fn loss(&self, _: &dyn HistoryFeatures) -> Option<Tensor> {
         None
     }
 }
@@ -92,7 +92,7 @@ impl LearningCritic for Return {
     }
 
     #[inline]
-    fn update_critic(&mut self, _: &dyn PackedHistoryFeaturesView, _: &mut dyn StatsLogger) {}
+    fn update_critic(&mut self, _: &dyn HistoryFeatures, _: &mut dyn StatsLogger) {}
 }
 
 #[cfg(test)]

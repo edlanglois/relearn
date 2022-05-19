@@ -1,4 +1,4 @@
-use super::{BuildCritic, Critic, Module, PackedHistoryFeaturesView, Return};
+use super::{BuildCritic, Critic, HistoryFeatures, Module, Return};
 use crate::torch::modules::{BuildModule, SequenceModule};
 use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};
@@ -105,7 +105,7 @@ impl<V> Critic for Gae<V>
 where
     V: SequenceModule,
 {
-    fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> PackedTensor {
+    fn step_values(&self, features: &dyn HistoryFeatures) -> PackedTensor {
         let (extended_observation_features, is_invalid) = features.extended_observation_features();
 
         // Packed estimated values of the observed states
@@ -135,7 +135,7 @@ where
         residuals.discounted_cumsum_from_end((self.lambda * discount_factor) as f32)
     }
 
-    fn loss(&self, features: &dyn PackedHistoryFeaturesView) -> Option<Tensor> {
+    fn loss(&self, features: &dyn HistoryFeatures) -> Option<Tensor> {
         // Reward-to-go targets
         let targets = Return.step_values(features);
         Some(

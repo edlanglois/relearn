@@ -1,6 +1,4 @@
-use super::{
-    Critic, CriticUpdateRule, PackedHistoryFeaturesView, RuleOpt, RuleOptConfig, StatsLogger,
-};
+use super::{Critic, CriticUpdateRule, HistoryFeatures, RuleOpt, RuleOptConfig, StatsLogger};
 use crate::torch::optimizers::{AdamConfig, Optimizer};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -40,7 +38,7 @@ where
         &mut self,
         critic: &C,
         optimizer: &mut O,
-        features: &dyn PackedHistoryFeaturesView,
+        features: &dyn HistoryFeatures,
         logger: &mut dyn StatsLogger,
     ) {
         let loss_fn = || {

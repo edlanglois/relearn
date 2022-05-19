@@ -2,7 +2,7 @@
 use super::{
     actor::PolicyActor,
     critic::Critic,
-    features::LazyPackedHistoryFeatures,
+    features::LazyHistoryFeatures,
     learning_critic::{BuildLearningCritic, LearningCritic},
     learning_policy::{BuildLearningPolicy, LearningPolicy},
 };
@@ -246,7 +246,7 @@ where
         // About to update the policy so clear any existing CPU policy copy
         self.cpu_policy = RefCell::new(None);
 
-        let features = LazyPackedHistoryFeatures::new(
+        let features = LazyHistoryFeatures::new(
             buffers.iter_mut().flat_map(|b| b.episodes()),
             &self.observation_space,
             &self.action_space,

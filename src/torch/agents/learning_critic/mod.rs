@@ -4,7 +4,7 @@ mod gradient;
 pub use gradient::{GradOpt, GradOptConfig, GradOptRule};
 
 use super::critic::{BuildCritic, Critic};
-use super::features::PackedHistoryFeaturesView;
+use super::features::HistoryFeatures;
 use super::{RuleOpt, RuleOptConfig};
 use crate::logging::StatsLogger;
 use crate::torch::optimizers::BuildOptimizer;
@@ -26,11 +26,7 @@ pub trait LearningCritic {
     /// # Args
     /// * `features` - Packed history features.
     /// * `logger`   - A logger for update statistics.
-    fn update_critic(
-        &mut self,
-        features: &dyn PackedHistoryFeaturesView,
-        logger: &mut dyn StatsLogger,
-    );
+    fn update_critic(&mut self, features: &dyn HistoryFeatures, logger: &mut dyn StatsLogger);
 }
 
 /// Build a [`LearningCritic`].
@@ -51,7 +47,7 @@ pub trait CriticUpdateRule<C, O> {
         &mut self,
         critic: &C,
         optimizer: &mut O,
-        features: &dyn PackedHistoryFeaturesView,
+        features: &dyn HistoryFeatures,
         logger: &mut dyn StatsLogger,
     );
 }
@@ -71,11 +67,7 @@ where
         self.module
     }
     #[inline]
-    fn update_critic(
-        &mut self,
-        features: &dyn PackedHistoryFeaturesView,
-        logger: &mut dyn StatsLogger,
-    ) {
+    fn update_critic(&mut self, features: &dyn HistoryFeatures, logger: &mut dyn StatsLogger) {
         self.update_rule
             .update_external_critic(&self.module, &mut self.optimizer, features, logger)
     }

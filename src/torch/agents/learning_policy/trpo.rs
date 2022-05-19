@@ -1,7 +1,7 @@
 //! Trust Region Policy Optimization (TRPO)
 use super::{
-    Critic, PackedHistoryFeaturesView, ParameterizedDistributionSpace, Policy, PolicyStats,
-    PolicyUpdateRule, RuleOpt, RuleOptConfig, StatsLogger,
+    Critic, HistoryFeatures, ParameterizedDistributionSpace, Policy, PolicyStats, PolicyUpdateRule,
+    RuleOpt, RuleOptConfig, StatsLogger,
 };
 use crate::torch::{
     backends::WithCudnnEnabled,
@@ -54,7 +54,7 @@ where
         policy: &P,
         optimizer: &mut O,
         critic: &dyn Critic,
-        features: &dyn PackedHistoryFeaturesView,
+        features: &dyn HistoryFeatures,
         action_space: &AS,
         logger: &mut dyn StatsLogger,
     ) -> PolicyStats {

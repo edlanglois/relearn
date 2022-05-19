@@ -10,17 +10,17 @@ use once_cell::unsync::OnceCell;
 use std::cmp::Reverse;
 use tch::{Device, Tensor};
 
-/// View history features as packed tensors.
+/// View features of a (mini-)batch of collected history.
 ///
 /// Floating-point tensors are `f32`.
-pub trait PackedHistoryFeaturesView {
-    /// Packed observation features. A 2D f64 tensor.
+pub trait HistoryFeatures {
+    /// Packed observation features. A 2D `f32` tensor.
     fn observation_features(&self) -> &PackedTensor;
 
     /// Packed extended observation features. Includes interrupted successor observations.
     ///
     /// # Returns
-    /// * `extended_observations` - A 2D f64 tensor. Rows are the features of `step.observation`
+    /// * `extended_observations` - A 2D `f32` tensor. Rows are the features of `step.observation`
     ///     for each step in an episode followed by the features of `step.next` on the last step of
     ///     the episode if it is `Step::Interrupt` or zeros otherwise.
     /// * `is_invalid` - A 1D boolean tensor with length equal to the number of rows of
@@ -51,7 +51,7 @@ pub trait PackedHistoryFeaturesView {
 
 /// Packed history features with lazy evaluation and caching.
 #[derive(Debug)]
-pub struct LazyPackedHistoryFeatures<'a, OS: Space + ?Sized, AS: Space + ?Sized, E> {
+pub struct LazyHistoryFeatures<'a, OS: Space + ?Sized, AS: Space + ?Sized, E> {
     /// Episodes sorted in monotonic decreasing order of length
     episodes: Vec<E>,
     observation_space: &'a OS,
@@ -68,7 +68,7 @@ pub struct LazyPackedHistoryFeatures<'a, OS: Space + ?Sized, AS: Space + ?Sized,
     cached_rewards: OnceCell<PackedTensor>,
 }
 
-impl<'a, OS, AS, E> LazyPackedHistoryFeatures<'a, OS, AS, E>
+impl<'a, OS, AS, E> LazyHistoryFeatures<'a, OS, AS, E>
 where
     OS: Space + ?Sized,
     AS: Space + ?Sized,
@@ -123,7 +123,7 @@ where
     }
 }
 
-impl<'a, OS, AS, E> PackedHistoryFeaturesView for LazyPackedHistoryFeatures<'a, OS, AS, E>
+impl<'a, OS, AS, E> HistoryFeatures for LazyHistoryFeatures<'a, OS, AS, E>
 where
     OS: FeatureSpace + ?Sized,
     AS: ReprSpace<Tensor> + ?Sized,
@@ -293,8 +293,8 @@ pub(crate) mod tests {
         #[allow(clippy::type_complexity)]
         pub fn features(
             &self,
-        ) -> LazyPackedHistoryFeatures<OS, AS, &[PartialStep<OS::Element, AS::Element>]> {
-            LazyPackedHistoryFeatures::new(
+        ) -> LazyHistoryFeatures<OS, AS, &[PartialStep<OS::Element, AS::Element>]> {
+            LazyHistoryFeatures::new(
                 self.episodes.iter().map(AsRef::as_ref),
                 &self.observation_space,
                 &self.action_space,

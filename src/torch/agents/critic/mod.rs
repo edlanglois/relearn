@@ -5,7 +5,7 @@ mod r#return;
 pub use gae::{Gae, GaeConfig};
 pub use r#return::Return;
 
-use super::features::PackedHistoryFeaturesView;
+use super::features::HistoryFeatures;
 use crate::torch::modules::Module;
 use crate::torch::packed::PackedTensor;
 use tch::{Device, Tensor};
@@ -39,12 +39,12 @@ pub trait Critic: Module {
     /// Packed step values. A 1D f32 tensor with the same shape as `rewards` and `returns`.
     /// There is no meaning to the returned values apart from higher values representing better
     /// outcomes (in estimate).
-    fn step_values(&self, features: &dyn PackedHistoryFeaturesView) -> PackedTensor;
+    fn step_values(&self, features: &dyn HistoryFeatures) -> PackedTensor;
 
     /// The loss of any trainable internal variables given the observed history features.
     ///
     /// Returns `None` if this critic has no trainable variables.
-    fn loss(&self, features: &dyn PackedHistoryFeaturesView) -> Option<Tensor>;
+    fn loss(&self, features: &dyn HistoryFeatures) -> Option<Tensor>;
 
     /// The discount factor to use when calculating step returns.
     ///

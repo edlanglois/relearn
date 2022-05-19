@@ -1,7 +1,7 @@
 //! Proximal Policy Optimization (PPO)
 use super::{
-    Critic, PackedHistoryFeaturesView, ParameterizedDistributionSpace, Policy, PolicyStats,
-    PolicyUpdateRule, RuleOpt, RuleOptConfig, StatsLogger,
+    Critic, HistoryFeatures, ParameterizedDistributionSpace, Policy, PolicyStats, PolicyUpdateRule,
+    RuleOpt, RuleOptConfig, StatsLogger,
 };
 use crate::torch::optimizers::{AdamConfig, Optimizer};
 use crate::utils::distributions::ArrayDistribution;
@@ -49,7 +49,7 @@ where
         policy: &P,
         optimizer: &mut O,
         critic: &dyn Critic,
-        features: &dyn PackedHistoryFeaturesView,
+        features: &dyn HistoryFeatures,
         action_space: &AS,
         logger: &mut dyn StatsLogger,
     ) -> PolicyStats {

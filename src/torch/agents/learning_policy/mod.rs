@@ -8,7 +8,7 @@ pub use trpo::{Trpo, TrpoConfig, TrpoRule};
 pub use vpg::{Vpg, VpgConfig, VpgRule};
 
 use super::critic::Critic;
-use super::features::PackedHistoryFeaturesView;
+use super::features::HistoryFeatures;
 use super::policy::{BuildPolicy, Policy};
 use super::{RuleOpt, RuleOptConfig};
 use crate::logging::StatsLogger;
@@ -38,7 +38,7 @@ pub trait LearningPolicy {
     fn update_policy<AS: ParameterizedDistributionSpace<Tensor>>(
         &mut self,
         critic: &dyn Critic,
-        features: &dyn PackedHistoryFeaturesView,
+        features: &dyn HistoryFeatures,
         action_space: &AS,
         logger: &mut dyn StatsLogger,
     ) -> PolicyStats;
@@ -76,7 +76,7 @@ pub trait PolicyUpdateRule<P, O> {
         policy: &P,
         optimizer: &mut O,
         critic: &dyn Critic,
-        features: &dyn PackedHistoryFeaturesView,
+        features: &dyn HistoryFeatures,
         action_space: &AS,
         logger: &mut dyn StatsLogger,
     ) -> PolicyStats;
@@ -100,7 +100,7 @@ where
     fn update_policy<AS: ParameterizedDistributionSpace<Tensor>>(
         &mut self,
         critic: &dyn Critic,
-        features: &dyn PackedHistoryFeaturesView,
+        features: &dyn HistoryFeatures,
         action_space: &AS,
         logger: &mut dyn StatsLogger,
     ) -> PolicyStats {
