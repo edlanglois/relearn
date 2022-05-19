@@ -123,7 +123,7 @@ where
         // Estimated value for each of `step.next.into_inner().observation`
         let estimated_next_values = extended_estimated_values.view_trim_start(1);
 
-        let discount_factor = features.discount_factor();
+        let discount_factor = features.discount_factor().min(self.gamma);
 
         // Packed one-step TD residuals.
         let residuals = features.rewards().batch_map_ref(|rewards| {
@@ -145,10 +145,5 @@ where
                 .squeeze_dim(-1)
                 .mse_loss(targets.tensor(), Reduction::Mean),
         )
-    }
-
-    #[inline]
-    fn discount_factor(&self, env_discount_factor: f64) -> f64 {
-        env_discount_factor.min(self.gamma)
     }
 }

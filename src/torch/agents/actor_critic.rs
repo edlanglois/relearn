@@ -1,7 +1,6 @@
 //! Actor-critic agent
 use super::{
     actor::PolicyActor,
-    critic::Critic,
     features::LazyHistoryFeatures,
     learning_critic::{BuildLearningCritic, LearningCritic},
     learning_policy::{BuildLearningPolicy, LearningPolicy},
@@ -129,9 +128,7 @@ where
         Self {
             observation_space,
             action_space,
-            discount_factor: learning_critic
-                .critic_ref()
-                .discount_factor(env.discount_factor()),
+            discount_factor: env.discount_factor(),
             min_batch_steps: config.min_batch_steps,
             learning_policy,
             learning_critic,

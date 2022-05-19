@@ -45,20 +45,6 @@ pub trait Critic: Module {
     ///
     /// Returns `None` if this critic has no trainable variables.
     fn loss(&self, features: &dyn HistoryFeatures) -> Option<Tensor>;
-
-    /// The discount factor to use when calculating step returns.
-    ///
-    /// Some critics will use a reduced discount factor for reduced variance
-    /// at the cost of extra bias.
-    ///
-    /// This information is required by the caller so that it can be provided to the
-    /// [`PackedHistoryFeaturesView`], which only supports a single choice of discount factor.
-    ///
-    /// # Args
-    /// * `env_discount_factor` - The discount factor specified by the environment.
-    fn discount_factor(&self, env_discount_factor: f64) -> f64 {
-        env_discount_factor
-    }
 }
 
 /// Build a [`Critic`] instance.
