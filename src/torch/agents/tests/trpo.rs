@@ -2,7 +2,7 @@
 use super::SetLearningRate;
 use crate::agents::testing;
 use crate::torch::agents::{
-    critic::{GaeConfig, Return},
+    critic::{GaeConfig, RewardToGo},
     learning_critic::{BuildLearningCritic, GradOptConfig},
     learning_policy::TrpoConfig,
     policy::BuildPolicy,
@@ -26,7 +26,7 @@ type OptGaeConfig<T> = GradOptConfig<GaeConfig<T>>;
 
 #[test]
 fn default_mlp_return_learns_derministic_bandit() {
-    test_train_trpo::<MlpConfig, Return>(Default::default())
+    test_train_trpo::<MlpConfig, RewardToGo>(Default::default())
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn default_mlp_return_learns_derministic_bandit_cuda_if_available() {
         device: Device::cuda_if_available(),
         ..ActorCriticConfig::default()
     };
-    test_train_trpo::<MlpConfig, Return>(config)
+    test_train_trpo::<MlpConfig, RewardToGo>(config)
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn default_mlp_gae_mlp_learns_derministic_bandit() {
 
 #[test]
 fn default_gru_mlp_return_learns_derministic_bandit() {
-    test_train_trpo::<GruMlpConfig, Return>(Default::default())
+    test_train_trpo::<GruMlpConfig, RewardToGo>(Default::default())
 }
 
 #[test]

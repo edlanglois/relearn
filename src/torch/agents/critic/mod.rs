@@ -3,7 +3,7 @@ mod gae;
 mod r#return;
 
 pub use gae::{Gae, GaeConfig};
-pub use r#return::Return;
+pub use r#return::RewardToGo;
 
 use super::features::HistoryFeatures;
 use crate::torch::modules::Module;

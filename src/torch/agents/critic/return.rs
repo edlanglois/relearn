@@ -6,17 +6,15 @@ use serde::{Deserialize, Serialize};
 use std::iter;
 use tch::{Device, Tensor};
 
-/// Value steps using the empirical discounted step return.
-///
-/// Also known as the Monte Carlo reward-to-go.
+/// Monte Carlo Reward-To-Go estimator.
 ///
 /// # Warning
 /// This assumes that all episodes end with a reward of 0 (including interrupted episodes).
 /// There is no alternative since this critic lacks an estimated value model.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Return;
+pub struct RewardToGo;
 
-impl BuildCritic for Return {
+impl BuildCritic for RewardToGo {
     type Critic = Self;
 
     #[inline]
@@ -25,7 +23,7 @@ impl BuildCritic for Return {
     }
 }
 
-impl Module for Return {
+impl Module for RewardToGo {
     #[inline]
     fn shallow_clone(&self) -> Self
     where
@@ -53,7 +51,7 @@ impl Module for Return {
     }
 }
 
-impl Critic for Return {
+impl Critic for RewardToGo {
     #[inline]
     #[allow(clippy::cast_possible_truncation)]
     fn step_values(&self, features: &dyn HistoryFeatures) -> PackedTensor {
@@ -69,7 +67,7 @@ impl Critic for Return {
     }
 }
 
-impl BuildLearningCritic for Return {
+impl BuildLearningCritic for RewardToGo {
     type LearningCritic = Self;
 
     fn build_learning_critic(&self, _in_dim: usize, _: Device) -> Self::LearningCritic {
@@ -78,7 +76,7 @@ impl BuildLearningCritic for Return {
 }
 
 /// Trivial "learning" --- nothing to learn
-impl LearningCritic for Return {
+impl LearningCritic for RewardToGo {
     type Critic = Self;
 
     #[inline]
@@ -106,7 +104,7 @@ mod tests {
     #[allow(clippy::needless_pass_by_value)]
     fn step_values(history: StoredHistory<BooleanSpace, IndexSpace>) {
         let features = history.features();
-        let actual = Return.step_values(&features);
+        let actual = RewardToGo.step_values(&features);
         let expected = &Tensor::of_slice(&[
             -0.65341, 3.439, 5.42, 3.0, //
             0.3851, 2.71, 3.8, //

@@ -1,4 +1,4 @@
-use super::{BuildCritic, Critic, HistoryFeatures, Module, Return};
+use super::{BuildCritic, Critic, HistoryFeatures, Module, RewardToGo};
 use crate::torch::modules::{BuildModule, SequenceModule};
 use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};
@@ -137,7 +137,7 @@ where
 
     fn loss(&self, features: &dyn HistoryFeatures) -> Option<Tensor> {
         // Reward-to-go targets
-        let targets = Return.step_values(features);
+        let targets = RewardToGo.step_values(features);
         Some(
             self.value_fn
                 .seq_packed(features.observation_features())
