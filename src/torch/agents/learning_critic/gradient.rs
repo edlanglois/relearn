@@ -41,7 +41,7 @@ where
         features: &dyn HistoryFeatures,
         logger: &mut dyn StatsLogger,
     ) {
-        let loss_fn = || {
+        let mut loss_fn = || {
             critic
                 .loss(features)
                 .expect("critic has no trainable parameters")
@@ -49,7 +49,7 @@ where
 
         let mut critic_opt_start = Instant::now();
         for i in 0..self.optimizer_iters {
-            let loss = f64::from(optimizer.backward_step(&loss_fn, logger).unwrap());
+            let loss = f64::from(optimizer.backward_step(&mut loss_fn, logger).unwrap());
             let critic_opt_end = Instant::now();
 
             let mut step_logger = logger.with_scope("step").group();

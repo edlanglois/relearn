@@ -80,7 +80,7 @@ where
             (step_values, distribution, log_probs, f64::from(entropy))
         };
 
-        let policy_loss_distance_fn = || {
+        let mut policy_loss_distance_fn = || {
             let policy_output = policy.seq_packed(observation_features);
             let distribution = action_space.distribution(policy_output.tensor());
 
@@ -105,7 +105,7 @@ where
         };
 
         let result = optimizer.trust_region_backward_step(
-            &policy_loss_distance_fn,
+            &mut policy_loss_distance_fn,
             self.max_policy_step_kl,
             logger,
         );

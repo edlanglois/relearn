@@ -68,7 +68,7 @@ where
             (step_values, log_probs, f64::from(entropy))
         };
 
-        let policy_surrogate_loss_fn = || {
+        let mut policy_surrogate_loss_fn = || {
             let policy_output = policy.seq_packed(observation_features);
             let distribution = action_space.distribution(policy_output.tensor());
             let log_probs = distribution.log_probs(actions);
@@ -84,7 +84,7 @@ where
         };
 
         let _ = optimizer
-            .backward_step(&policy_surrogate_loss_fn, logger)
+            .backward_step(&mut policy_surrogate_loss_fn, logger)
             .unwrap();
 
         PolicyStats {

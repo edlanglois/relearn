@@ -40,7 +40,7 @@ pub trait Optimizer: BaseOptimizer {
     /// [`COptimizer`]: tch::COptimizer
     fn backward_step(
         &mut self,
-        loss_fn: &dyn Fn() -> Tensor,
+        loss_fn: &mut dyn FnMut() -> Tensor,
         logger: &mut dyn StatsLogger,
     ) -> Result<Tensor, OptimizerStepError>;
 }
@@ -91,7 +91,7 @@ pub trait OnceOptimizer: BaseOptimizer {
 impl<T: OnceOptimizer> Optimizer for T {
     fn backward_step(
         &mut self,
-        loss_fn: &dyn Fn() -> Tensor,
+        loss_fn: &mut dyn FnMut() -> Tensor,
         logger: &mut dyn StatsLogger,
     ) -> Result<Tensor, OptimizerStepError> {
         let loss = loss_fn();
@@ -123,7 +123,7 @@ pub trait TrustRegionOptimizer: BaseOptimizer {
     /// The initial loss value on success.
     fn trust_region_backward_step(
         &mut self,
-        loss_distance_fn: &dyn Fn() -> (Tensor, Tensor),
+        loss_distance_fn: &mut dyn FnMut() -> (Tensor, Tensor),
         max_distance: f64,
         logger: &mut dyn StatsLogger,
     ) -> Result<f64, OptimizerStepError>;
@@ -179,10 +179,10 @@ mod testing {
         let x = Tensor::zeros(&[2], (Kind::Float, Device::Cpu)).requires_grad_(true);
         let mut optimizer = optimizer_config.build_optimizer([&x]).unwrap();
 
-        let loss_fn = || m.mv(&x).dot(&x) / 2 + b.dot(&x);
+        let mut loss_fn = || m.mv(&x).dot(&x) / 2 + b.dot(&x);
 
         for _ in 0..num_steps {
-            let _ = optimizer.backward_step(&loss_fn, &mut ()).unwrap();
+            let _ = optimizer.backward_step(&mut loss_fn, &mut ()).unwrap();
         }
 
         let expected = Tensor::of_slice(&[-1.0, 1.0]);
@@ -211,7 +211,7 @@ mod testing {
         let mut optimizer = optimizer_config.build_optimizer([&x]).unwrap();
 
         let x_last = x.detach().copy();
-        let loss_distance_fn = || {
+        let mut loss_distance_fn = || {
             let loss = m.mv(&x).dot(&x) / 2 + b.dot(&x);
             let distance = (&x - &x_last).square().sum(Kind::Float);
             (loss, distance)
@@ -219,7 +219,8 @@ mod testing {
 
         for _ in 0..num_steps {
             x_last.detach().copy_(&x);
-            let result = optimizer.trust_region_backward_step(&loss_distance_fn, 0.001, &mut ());
+            let result =
+                optimizer.trust_region_backward_step(&mut loss_distance_fn, 0.001, &mut ());
             match result {
                 Err(OptimizerStepError::LossNotImproving {
                     loss: _,

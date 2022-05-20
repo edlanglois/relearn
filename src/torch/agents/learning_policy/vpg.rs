@@ -6,7 +6,6 @@ use super::{
 use crate::torch::optimizers::{AdamConfig, Optimizer};
 use crate::utils::distributions::ArrayDistribution;
 use serde::{Deserialize, Serialize};
-use std::cell::Cell;
 use tch::{COptimizer, Kind, Tensor};
 
 /// Vanilla Policy Gradient (VPG) update rule.
@@ -38,19 +37,21 @@ where
     ) -> PolicyStats {
         let step_values = tch::no_grad(|| critic.step_values(features));
 
-        let entropies = Cell::new(None);
-        let policy_loss_fn = || {
+        let mut entropies = None;
+        let mut policy_loss_fn = || {
             let action_dist_params = policy.seq_packed(features.observation_features());
 
             let action_distributions = action_space.distribution(action_dist_params.tensor());
             let log_probs = action_distributions.log_probs(features.actions().tensor());
-            entropies.set(Some(action_distributions.entropy()));
+            entropies.get_or_insert_with(|| action_distributions.entropy());
             -(log_probs * step_values.tensor()).mean(Kind::Float)
         };
 
-        let _ = optimizer.backward_step(&policy_loss_fn, logger).unwrap();
+        let _ = optimizer
+            .backward_step(&mut policy_loss_fn, logger)
+            .unwrap();
 
-        let entropy = entropies.into_inner().map(|e| e.mean(Kind::Float).into());
+        let entropy = entropies.map(|e| e.mean(Kind::Float).into());
         PolicyStats { entropy }
     }
 }

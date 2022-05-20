@@ -235,7 +235,7 @@ mod coptimizer {
         let mut optimizer = SgdConfig::default().build_optimizer([&x]).unwrap();
         #[allow(clippy::eq_op)]
         let _ = optimizer
-            .backward_step(&(|| (&x / &x).sum(Kind::Float)), &mut ())
+            .backward_step(&mut (|| (&x / &x).sum(Kind::Float)), &mut ())
             .unwrap();
     }
 

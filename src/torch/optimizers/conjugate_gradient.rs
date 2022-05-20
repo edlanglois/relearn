@@ -114,7 +114,7 @@ impl BaseOptimizer for ConjugateGradientOptimizer {
 impl TrustRegionOptimizer for ConjugateGradientOptimizer {
     fn trust_region_backward_step(
         &mut self,
-        loss_distance_fn: &dyn Fn() -> (Tensor, Tensor),
+        loss_distance_fn: &mut dyn FnMut() -> (Tensor, Tensor),
         max_distance: f64,
         logger: &mut dyn StatsLogger,
     ) -> Result<f64, OptimizerStepError> {
@@ -180,18 +180,15 @@ impl TrustRegionOptimizer for ConjugateGradientOptimizer {
 }
 
 impl ConjugateGradientOptimizer {
-    fn backtracking_line_search<F>(
+    fn backtracking_line_search(
         &self,
         params: &[&Tensor],
         descent_step: &Tensor,
-        loss_constraint_fn: &F,
+        loss_constraint_fn: &mut dyn FnMut() -> (Tensor, Tensor),
         max_constraint_value: f64,
         initial_loss: f64,
         logger: &mut dyn StatsLogger,
-    ) -> Result<(), OptimizerStepError>
-    where
-        F: Fn() -> (Tensor, Tensor) + ?Sized,
-    {
+    ) -> Result<(), OptimizerStepError> {
         let mut params: Vec<_> = params.iter().map(|t| t.detach()).collect();
         let prev_params: Vec<_> = params.iter().map(Tensor::copy).collect();
         let param_shapes: Vec<_> = params.iter().map(Tensor::size).collect();
@@ -419,18 +416,18 @@ mod cg_optimizer {
 
     fn trpo_run<F, G>(
         optimizer: &mut ConjugateGradientOptimizer,
-        loss_distance_fn: F,
+        mut loss_distance_fn: F,
         mut on_step: G,
         num_steps: u64,
         max_distance: f64,
     ) where
-        F: Fn() -> (Tensor, Tensor),
+        F: FnMut() -> (Tensor, Tensor),
         G: FnMut(),
     {
         for _ in 0..num_steps {
             on_step();
             let result =
-                optimizer.trust_region_backward_step(&loss_distance_fn, max_distance, &mut ());
+                optimizer.trust_region_backward_step(&mut loss_distance_fn, max_distance, &mut ());
             match result {
                 Err(OptimizerStepError::LossNotImproving {
                     loss: _,
