@@ -88,7 +88,7 @@ where
 
     let mut env_state = env.initial_state(&mut rng);
     let mut obs = env.observe(&env_state, &mut rng);
-    let mut actor_state = actor.new_episode_state(&mut rng);
+    let mut actor_state = actor.initial_state(&mut rng);
     group.bench_function(name, |b| {
         b.iter(|| {
             // This is the thing we want to benchmark

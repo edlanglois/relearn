@@ -231,7 +231,7 @@ pub struct BaseTabularQLearningActor {
 impl Actor<usize, usize> for BaseTabularQLearningActor {
     type EpisodeState = ();
 
-    fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {}
+    fn initial_state(&self, _: &mut Prng) -> Self::EpisodeState {}
 
     fn act(&self, _: &mut Self::EpisodeState, observation: &usize, rng: &mut Prng) -> usize {
         if self.mode == ActorMode::Training && rng.gen::<f64>() < self.exploration_rate {

@@ -167,8 +167,8 @@ where
 {
     type EpisodeState = Box<dyn Any>;
 
-    fn new_episode_state(&self, rng: &mut Prng) -> Self::EpisodeState {
-        Box::new(self.0.new_episode_state(rng))
+    fn initial_state(&self, rng: &mut Prng) -> Self::EpisodeState {
+        Box::new(self.0.initial_state(rng))
     }
 
     fn act(&self, episode_state: &mut Self::EpisodeState, observation: &O, rng: &mut Prng) -> A {

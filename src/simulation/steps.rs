@@ -117,7 +117,7 @@ where
             None => {
                 let env_state = self.env.initial_state(self.rng_env.borrow_mut());
                 let observation = self.env.observe(&env_state, self.rng_env.borrow_mut());
-                let actor_state = self.actor.new_episode_state(self.rng_actor.borrow_mut());
+                let actor_state = self.actor.initial_state(self.rng_actor.borrow_mut());
                 (env_state, observation, actor_state)
             }
         };

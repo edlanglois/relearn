@@ -103,8 +103,8 @@ pub trait Actor<O: ?Sized, A> {
     /// Stores state for each episode.
     type EpisodeState;
 
-    /// Create episode state for the start of a new episode.
-    fn new_episode_state(&self, rng: &mut Prng) -> Self::EpisodeState;
+    /// Create the initial actor state for the start of a new episode.
+    fn initial_state(&self, rng: &mut Prng) -> Self::EpisodeState;
 
     /// Select an action in response to an observation.
     ///
@@ -122,8 +122,8 @@ macro_rules! impl_wrapped_actor {
             O: ?Sized,
         {
             type EpisodeState = T::EpisodeState;
-            fn new_episode_state(&self, rng: &mut Prng) -> Self::EpisodeState {
-                T::new_episode_state(self, rng)
+            fn initial_state(&self, rng: &mut Prng) -> Self::EpisodeState {
+                T::initial_state(self, rng)
             }
             fn act(
                 &self,

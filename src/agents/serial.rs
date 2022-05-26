@@ -81,8 +81,8 @@ where
 {
     type EpisodeState = <T::Actor as Actor<O, A>>::EpisodeState;
 
-    fn new_episode_state(&self, rng: &mut Prng) -> Self::EpisodeState {
-        self.actor.as_ref().unwrap().new_episode_state(rng)
+    fn initial_state(&self, rng: &mut Prng) -> Self::EpisodeState {
+        self.actor.as_ref().unwrap().initial_state(rng)
     }
 
     fn act(&self, episode_state: &mut Self::EpisodeState, observation: &O, rng: &mut Prng) -> A {

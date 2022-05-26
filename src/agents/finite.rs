@@ -60,8 +60,8 @@ where
 {
     type EpisodeState = T::EpisodeState;
 
-    fn new_episode_state(&self, rng: &mut Prng) -> Self::EpisodeState {
-        self.actor.new_episode_state(rng)
+    fn initial_state(&self, rng: &mut Prng) -> Self::EpisodeState {
+        self.actor.initial_state(rng)
     }
 
     fn act(

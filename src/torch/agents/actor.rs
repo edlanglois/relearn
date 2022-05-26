@@ -32,7 +32,7 @@ where
 {
     type EpisodeState = P::State;
 
-    fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {
+    fn initial_state(&self, _: &mut Prng) -> Self::EpisodeState {
         self.policy.initial_state()
     }
 

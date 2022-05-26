@@ -215,7 +215,7 @@ pub struct BaseUCB1Actor {
 
 impl Actor<usize, usize> for BaseUCB1Actor {
     type EpisodeState = ();
-    fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {}
+    fn initial_state(&self, _: &mut Prng) -> Self::EpisodeState {}
 
     fn act(&self, _: &mut Self::EpisodeState, obs: &usize, _: &mut Prng) -> usize {
         match self.mode {

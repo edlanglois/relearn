@@ -129,14 +129,14 @@ where
 {
     type EpisodeState = InnerEpisodeState<TC::Agent, OS::Element, AS::Element>;
 
-    fn new_episode_state(&self, rng: &mut Prng) -> Self::EpisodeState {
+    fn initial_state(&self, rng: &mut Prng) -> Self::EpisodeState {
         let inner_actor_agent = SerialActorAgent::new(
             self.inner_agent_config
                 .build_agent(&self.inner_env_structure, rng)
                 .expect("failed to build inner agent"),
         );
         InnerEpisodeState {
-            inner_actor_state: inner_actor_agent.new_episode_state(rng),
+            inner_actor_state: inner_actor_agent.initial_state(rng),
             inner_actor_agent,
             prev_observation: None,
         }
@@ -169,7 +169,7 @@ where
 
         if obs.episode_done {
             // This observation marks the end of the inner episode. Reset the inner agent.
-            state.inner_actor_state = state.inner_actor_agent.new_episode_state(rng);
+            state.inner_actor_state = state.inner_actor_agent.initial_state(rng);
             state.prev_observation = None;
             // The action will be ignored (since the inner episode is done); sample any action.
             self.inner_env_structure.action_space.some_element()

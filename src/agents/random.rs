@@ -64,7 +64,7 @@ impl<O, AS: SampleSpace + Clone> Agent<O, AS::Element> for RandomAgent<AS> {
 impl<O, AS: SampleSpace + Clone> Actor<O, AS::Element> for RandomAgent<AS> {
     type EpisodeState = ();
 
-    fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {}
+    fn initial_state(&self, _: &mut Prng) -> Self::EpisodeState {}
 
     fn act(&self, _: &mut Self::EpisodeState, _: &O, rng: &mut Prng) -> AS::Element {
         self.action_space.sample(rng)

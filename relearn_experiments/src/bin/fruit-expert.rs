@@ -65,7 +65,7 @@ impl<const W: usize, const H: usize> Actor<fruit::PrincipalObs<W, H>, fruit::Mov
     /// Whether a fruit has been collected.
     type EpisodeState = bool;
 
-    fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {
+    fn initial_state(&self, _: &mut Prng) -> Self::EpisodeState {
         false
     }
 

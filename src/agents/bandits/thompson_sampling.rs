@@ -193,7 +193,7 @@ pub struct BaseBetaThompsonSamplingActor {
 impl Actor<usize, usize> for BaseBetaThompsonSamplingActor {
     type EpisodeState = ();
 
-    fn new_episode_state(&self, _: &mut Prng) -> Self::EpisodeState {}
+    fn initial_state(&self, _: &mut Prng) -> Self::EpisodeState {}
 
     fn act(&self, _: &mut Self::EpisodeState, observation: &usize, rng: &mut Prng) -> usize {
         match self.mode {
