@@ -190,76 +190,9 @@ pub trait BatchUpdate<O, A> {
     /// if the inner agent only took a slice of buffers.
     fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
     where
-        Self: Sized,
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a;
-
-    /// Update the agent from a history buffer.
-    ///
-    /// Like [`BatchUpdate::batch_update`] but object-safe.
-    fn batch_update_single(
-        &mut self,
-        buffer: &mut Self::HistoryBuffer,
-        logger: &mut dyn StatsLogger,
-    );
-
-    /// Update the agent from a slice of history buffers.
-    ///
-    /// Like [`BatchUpdate::batch_update`] but object-safe.
-    fn batch_update_slice(
-        &mut self,
-        buffers: &mut [Self::HistoryBuffer],
-        logger: &mut dyn StatsLogger,
-    );
 }
-
-/// Implement `BatchUpdate<O, A>` for a deref-able wrapper over `T: BatchUpdate<O, A> + ?Sized`.
-macro_rules! impl_wrapped_batch_update {
-    ($wrapper:ty) => {
-        impl<T, O, A> BatchUpdate<O, A> for $wrapper
-        where
-            T: BatchUpdate<O, A> + ?Sized,
-        {
-            type HistoryBuffer = T::HistoryBuffer;
-
-            fn buffer(&self) -> Self::HistoryBuffer {
-                T::buffer(self)
-            }
-
-            fn min_update_size(&self) -> HistoryDataBound {
-                T::min_update_size(self)
-            }
-
-            fn batch_update<'a, I>(&mut self, _buffers: I, _logger: &mut dyn StatsLogger)
-            where
-                Self: Sized,
-                I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
-                Self::HistoryBuffer: 'a,
-            {
-                unimplemented!(
-                    "batch_update not implemented for wrappers; \
-                    try `batch_update_single` or `batch_update_slice`"
-                )
-            }
-            fn batch_update_single(
-                &mut self,
-                buffer: &mut Self::HistoryBuffer,
-                logger: &mut dyn StatsLogger,
-            ) {
-                T::batch_update_single(self, buffer, logger)
-            }
-            fn batch_update_slice(
-                &mut self,
-                buffers: &mut [Self::HistoryBuffer],
-                logger: &mut dyn StatsLogger,
-            ) {
-                T::batch_update_slice(self, buffers, logger)
-            }
-        }
-    };
-}
-impl_wrapped_batch_update!(&'_ mut T);
-impl_wrapped_batch_update!(Box<T>);
 
 /// Build an agent instance for a given environment structure.
 pub trait BuildAgent<OS: Space, AS: Space> {

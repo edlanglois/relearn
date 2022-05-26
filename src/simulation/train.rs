@@ -7,6 +7,7 @@ use crate::Prng;
 use log::warn;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
+use std::iter;
 use std::time::Instant;
 
 /// Train a batch learning agent in this thread.
@@ -39,7 +40,7 @@ pub fn train_serial<T, E>(
                     .log(),
             )
             .unwrap_or_else(|err| warn!("error filling buffer: {}", err));
-        agent.batch_update_single(&mut buffer, logger);
+        agent.batch_update(iter::once(&mut buffer), logger);
     }
 }
 
@@ -164,7 +165,7 @@ pub fn train_parallel<T, E>(
         sim_logger.log_duration("time", update_start - collect_start);
         drop(sim_logger);
 
-        agent.batch_update_slice(&mut buffers, &mut *logger);
+        agent.batch_update(&mut buffers, &mut *logger);
 
         let mut agent_logger = logger.with_scope("agent_update").group();
         agent_logger.log_duration("time", update_start.elapsed());

@@ -4,7 +4,7 @@ use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::Prng;
 use log::info;
-use std::fmt;
+use std::{fmt, iter};
 
 /// A serial combined actor-agent.
 ///
@@ -69,7 +69,8 @@ where
         if ready {
             self.buffer.end_experience();
             self.actor = None; // Agent cannot be updated while an actor exists.
-            self.agent.batch_update_single(&mut self.buffer, logger);
+            self.agent
+                .batch_update(iter::once(&mut self.buffer), logger);
             self.actor = Some(self.agent.actor(ActorMode::Training));
         }
     }

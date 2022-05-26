@@ -200,22 +200,6 @@ where
     {
         self.batch_update_slice_refs(&mut buffers.into_iter().collect::<Vec<_>>(), logger);
     }
-
-    fn batch_update_single(
-        &mut self,
-        buffer: &mut Self::HistoryBuffer,
-        logger: &mut dyn StatsLogger,
-    ) {
-        self.batch_update_slice_refs(&mut [buffer], logger)
-    }
-
-    fn batch_update_slice(
-        &mut self,
-        buffers: &mut [Self::HistoryBuffer],
-        logger: &mut dyn StatsLogger,
-    ) {
-        self.batch_update(buffers, logger)
-    }
 }
 
 impl<OS, AS, P, C> ActorCriticAgent<OS, AS, P, C>

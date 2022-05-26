@@ -8,7 +8,6 @@ use crate::simulation::PartialStep;
 use crate::spaces::{Space, TupleSpace2};
 use crate::Prng;
 use serde::{Deserialize, Serialize};
-use std::iter;
 
 /// A pair of agents / actors / configs for a two-agent environment.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -73,30 +72,10 @@ where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,
     {
-        let mut buffers1 = Vec::new();
-        let mut buffers2 = Vec::new();
-        for buffer in buffers {
-            buffers1.push(&mut buffer.0);
-            buffers2.push(&mut buffer.1);
-        }
+        let (buffers1, buffers2): (Vec<_>, Vec<_>) =
+            buffers.into_iter().map(|b| (&mut b.0, &mut b.1)).unzip();
         self.0.batch_update(buffers1.into_iter(), logger);
         self.1.batch_update(buffers2.into_iter(), logger);
-    }
-
-    fn batch_update_single(
-        &mut self,
-        buffer: &mut Self::HistoryBuffer,
-        logger: &mut dyn StatsLogger,
-    ) {
-        self.batch_update(iter::once(buffer), logger)
-    }
-
-    fn batch_update_slice(
-        &mut self,
-        buffers: &mut [Self::HistoryBuffer],
-        logger: &mut dyn StatsLogger,
-    ) {
-        self.batch_update(buffers, logger)
     }
 }
 

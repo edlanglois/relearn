@@ -13,7 +13,6 @@ use ndarray::{Array, Array1, Array2, Axis};
 use serde::{Deserialize, Serialize};
 use std::f64;
 use std::fmt;
-use std::iter;
 use std::sync::Arc;
 
 /// Configuration for a [`UCB1Agent`]
@@ -188,22 +187,6 @@ impl BatchUpdate<usize, usize> for Arc<BaseUCB1Agent> {
                 agent.step_update(step)
             }
         }
-    }
-
-    fn batch_update_single(
-        &mut self,
-        buffer: &mut Self::HistoryBuffer,
-        logger: &mut dyn StatsLogger,
-    ) {
-        self.batch_update(iter::once(buffer), logger)
-    }
-
-    fn batch_update_slice(
-        &mut self,
-        buffers: &mut [Self::HistoryBuffer],
-        logger: &mut dyn StatsLogger,
-    ) {
-        self.batch_update(buffers, logger)
     }
 }
 

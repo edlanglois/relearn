@@ -88,20 +88,6 @@ impl<O, AS: Space> BatchUpdate<O, AS::Element> for RandomAgent<AS> {
         Self::HistoryBuffer: 'a,
     {
     }
-
-    fn batch_update_single(
-        &mut self,
-        _buffer: &mut Self::HistoryBuffer,
-        _logger: &mut dyn StatsLogger,
-    ) {
-    }
-
-    fn batch_update_slice(
-        &mut self,
-        _buffers: &mut [Self::HistoryBuffer],
-        _logger: &mut dyn StatsLogger,
-    ) {
-    }
 }
 
 #[cfg(test)]

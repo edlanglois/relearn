@@ -13,7 +13,6 @@ use ndarray_stats::QuantileExt;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::iter;
 use std::sync::Arc;
 
 /// Configuration of an Epsilon-Greedy Tabular Q Learning Agent.
@@ -202,22 +201,6 @@ impl BatchUpdate<usize, usize> for BaseTabularQLearningAgent {
                 .drain_steps()
                 .for_each_transient(|step| self.step_update(step));
         }
-    }
-
-    fn batch_update_single(
-        &mut self,
-        buffer: &mut Self::HistoryBuffer,
-        logger: &mut dyn StatsLogger,
-    ) {
-        self.batch_update(iter::once(buffer), logger)
-    }
-
-    fn batch_update_slice(
-        &mut self,
-        buffers: &mut [Self::HistoryBuffer],
-        logger: &mut dyn StatsLogger,
-    ) {
-        self.batch_update(buffers, logger)
     }
 }
 
