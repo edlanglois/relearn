@@ -18,9 +18,6 @@ impl<T0, T1, O0, O1, A0, A1> Agent<(O0, O1), (A0, A1)> for AgentPair<T0, T1>
 where
     T0: Agent<O0, A0>,
     T1: Agent<O1, A1>,
-    // Compiler bug <https://github.com/rust-lang/rust/issues/85451>
-    T0::HistoryBuffer: 'static,
-    T1::HistoryBuffer: 'static,
 {
     type Actor = AgentPair<T0::Actor, T1::Actor>;
 

@@ -32,7 +32,6 @@ where
     T: Agent<usize, usize>,
     OS: FiniteSpace + Clone + 'static,
     AS: FiniteSpace + Clone + 'static,
-    T::HistoryBuffer: 'static,
 {
     type Actor = FiniteSpaceActor<T::Actor, OS, AS>;
     fn actor(&self, mode: ActorMode) -> Self::Actor {

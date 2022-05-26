@@ -18,7 +18,7 @@ pub fn train_serial<T, E>(
     rng_agent: &mut Prng,
     logger: &mut dyn StatsLogger,
 ) where
-    T: Agent<E::Observation, E::Action> + ?Sized,
+    T: Agent<E::Observation, E::Action> + BatchUpdate<E::Observation, E::Action> + ?Sized,
     E: StructuredEnvironment + ?Sized,
     E::ObservationSpace: ElementRefInto<Loggable>,
     E::ActionSpace: ElementRefInto<Loggable>,
@@ -73,7 +73,9 @@ pub fn train_parallel<T, E>(
             Action = <E::ActionSpace as Space>::Element,
         > + Sync
         + ?Sized,
-    T: Agent<<E::ObservationSpace as Space>::Element, <E::ActionSpace as Space>::Element> + ?Sized,
+    T: Agent<<E::ObservationSpace as Space>::Element, <E::ActionSpace as Space>::Element>
+        + BatchUpdate<<E::ObservationSpace as Space>::Element, <E::ActionSpace as Space>::Element>
+        + ?Sized,
     T::Actor: Send,
     T::HistoryBuffer: Send,
     E::ObservationSpace: ElementRefInto<Loggable>,

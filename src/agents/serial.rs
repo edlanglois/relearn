@@ -1,5 +1,5 @@
 //! Combined actor-agent. Prefer using simulation functions instead.
-use super::{Actor, ActorMode, Agent, HistoryDataBound, WriteExperienceIncremental};
+use super::{Actor, ActorMode, Agent, BatchUpdate, HistoryDataBound, WriteExperienceIncremental};
 use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::Prng;
@@ -13,7 +13,7 @@ use std::fmt;
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SerialActorAgent<T, O, A>
 where
-    T: Agent<O, A>,
+    T: Agent<O, A> + BatchUpdate<O, A>,
 {
     agent: T,
     actor: Option<T::Actor>,
@@ -25,7 +25,7 @@ where
 // Avoid depending on O: Debug & A: Debug
 impl<T, O, A> fmt::Debug for SerialActorAgent<T, O, A>
 where
-    T: Agent<O, A> + fmt::Debug,
+    T: Agent<O, A> + BatchUpdate<O, A> + fmt::Debug,
     T::Actor: fmt::Debug,
     T::HistoryBuffer: fmt::Debug,
 {
@@ -42,7 +42,7 @@ where
 
 impl<T, O, A> SerialActorAgent<T, O, A>
 where
-    T: Agent<O, A>,
+    T: Agent<O, A> + BatchUpdate<O, A>,
 {
     pub fn new(agent: T) -> Self {
         Self {
@@ -77,7 +77,7 @@ where
 
 impl<T, O, A> Actor<O, A> for SerialActorAgent<T, O, A>
 where
-    T: Agent<O, A>,
+    T: Agent<O, A> + BatchUpdate<O, A>,
 {
     type EpisodeState = <T::Actor as Actor<O, A>>::EpisodeState;
 

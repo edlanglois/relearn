@@ -145,7 +145,6 @@ where
     AS: ParameterizedDistributionSpace<Tensor> + Clone,
     AS::Element: 'static,
     P: LearningPolicy,
-    C: LearningCritic,
 {
     type Actor = PolicyActor<OS, AS, P::Policy>;
 
@@ -173,9 +172,9 @@ where
 
 impl<OS, AS, P, C> BatchUpdate<OS::Element, AS::Element> for ActorCriticAgent<OS, AS, P, C>
 where
-    OS: FeatureSpace,
+    OS: FeatureSpace + Clone,
     OS::Element: 'static,
-    AS: ParameterizedDistributionSpace<Tensor>,
+    AS: ParameterizedDistributionSpace<Tensor> + Clone,
     AS::Element: 'static,
     P: LearningPolicy,
     C: LearningCritic,

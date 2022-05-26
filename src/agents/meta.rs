@@ -30,6 +30,7 @@ impl<TC> ResettingMetaAgentConfig<TC> {
 impl<TC, OS, AS> BuildAgent<MetaObservationSpace<OS, AS>, AS> for ResettingMetaAgentConfig<TC>
 where
     TC: BuildAgent<OS, AS> + Clone,
+    TC::Agent: BatchUpdate<OS::Element, AS::Element>,
     OS: Space + Clone,
     AS: NonEmptySpace + Clone,
 {
@@ -83,6 +84,7 @@ impl<TC, OS, AS> Agent<MetaObservation<OS::Element, AS::Element>, AS::Element>
     for Arc<ResettingMetaAgent<TC, OS, AS>>
 where
     TC: BuildAgent<OS, AS>,
+    TC::Agent: BatchUpdate<OS::Element, AS::Element>,
     OS: Space + Clone,
     AS: NonEmptySpace + Clone,
 {
@@ -96,7 +98,7 @@ where
 
 pub struct InnerEpisodeState<T, O, A>
 where
-    T: Agent<O, A>,
+    T: Agent<O, A> + BatchUpdate<O, A>,
 {
     inner_actor_agent: SerialActorAgent<T, O, A>,
     inner_actor_state: <T::Actor as Actor<O, A>>::EpisodeState,
@@ -105,7 +107,7 @@ where
 
 impl<T, O, A> fmt::Debug for InnerEpisodeState<T, O, A>
 where
-    T: Agent<O, A> + fmt::Debug,
+    T: Agent<O, A> + BatchUpdate<O, A> + fmt::Debug,
     T::Actor: fmt::Debug,
     T::HistoryBuffer: fmt::Debug,
     <T::Actor as Actor<O, A>>::EpisodeState: fmt::Debug,
@@ -124,6 +126,7 @@ impl<TC, OS, AS> Actor<MetaObservation<OS::Element, AS::Element>, AS::Element>
     for ResettingMetaAgent<TC, OS, AS>
 where
     TC: BuildAgent<OS, AS>,
+    TC::Agent: BatchUpdate<OS::Element, AS::Element>,
     OS: Space + Clone,
     AS: NonEmptySpace + Clone,
 {

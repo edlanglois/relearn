@@ -1,8 +1,8 @@
 use clap::{ArgEnum, Parser, Subcommand};
 use rand::{Rng, SeedableRng};
 use relearn::agents::{
-    Actor, BetaThompsonSamplingAgentConfig, BuildAgent, RandomAgentConfig, ResettingMetaAgent,
-    TabularQLearningAgentConfig, UCB1AgentConfig,
+    Actor, BatchUpdate, BetaThompsonSamplingAgentConfig, BuildAgent, RandomAgentConfig,
+    ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use relearn::envs::{
     BuildEnv, Environment, MetaEnv, MetaObservationSpace, StructuredEnvironment,
@@ -231,6 +231,7 @@ fn eval_resetting_meta<E, TC, OS, AS>(
 where
     E: StructuredEnvironment<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
     TC: BuildAgent<OS, AS>,
+    TC::Agent: BatchUpdate<OS::Element, AS::Element>,
     OS: Space + Clone,
     AS: NonEmptySpace + Clone,
 {

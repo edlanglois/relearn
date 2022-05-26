@@ -1,5 +1,5 @@
 //! Agent testing utilities
-use crate::agents::{Actor, ActorMode, Agent, BuildAgent};
+use crate::agents::{Actor, ActorMode, Agent, BatchUpdate, BuildAgent};
 use crate::envs::{DeterministicBandit, Environment};
 use crate::simulation::{self, SimSeed};
 use crate::spaces::{IndexSpace, SingletonSpace};
@@ -13,6 +13,7 @@ use rand::SeedableRng;
 pub fn train_deterministic_bandit<TC>(agent_config: &TC, num_periods: usize, threshold: f64)
 where
     TC: BuildAgent<SingletonSpace, IndexSpace>,
+    TC::Agent: BatchUpdate<(), usize>,
 {
     let mut env_rng = Prng::seed_from_u64(18);
     let mut agent_rng = Prng::seed_from_u64(19);

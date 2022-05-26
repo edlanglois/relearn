@@ -34,7 +34,7 @@ use std::sync::Arc;
 use tch::TchError;
 use thiserror::Error;
 
-/// A reinforcement learning agent. Provides environment actors and learns from experience.
+/// A reinforcement learning agent. Provides environment actors.
 ///
 /// Generic over the observation type `O` and the action type `A`.
 ///
@@ -44,7 +44,7 @@ use thiserror::Error;
 /// For example, attempting to update `Agent` may panic if any `Actor`s exist.
 ///
 /// [GAT]: https://rust-lang.github.io/rfcs/1598-generic_associated_types.html
-pub trait Agent<O, A>: BatchUpdate<O, A> {
+pub trait Agent<O, A> {
     /// Produces actions for a sequence of environment observations.
     type Actor: Actor<O, A>;
 
