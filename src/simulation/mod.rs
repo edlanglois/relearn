@@ -17,6 +17,7 @@ use crate::agents::Actor;
 use crate::envs::{EnvStructure, Environment, StructuredEnvironment, Successor};
 use crate::logging::StatsLogger;
 use rand::{Rng, SeedableRng};
+use std::iter::{FusedIterator, Peekable};
 use std::mem;
 
 /// Description of an environment step.
@@ -181,60 +182,140 @@ pub trait StepsIter<O, A>: Iterator<Item = PartialStep<O, A>> {
     /// Fold each step viewed as a [`TransientStep`] into an accumulator using a closure.
     ///
     /// This is the equivalent of [`Iterator::fold`] on an iterator of `TransientStep`
-    /// except that such an iterator cannot be created with generic associated types.
+    /// except that such an iterator cannot be created without generic associated types.
     ///
     /// If the final `step.next` is `Successor::Continue` then that step is skipped since the
     /// successor observation is missing. The code in this module avoids creating such an
     /// abruptly-ending steps iterator but it is possible with the standard iterator methods like
     /// `take(n)`.
     #[inline]
-    fn fold_transient_steps<B, F>(mut self, init: B, mut f: F) -> B
+    fn fold_transient<B, F>(self, init: B, f: F) -> B
     where
         F: FnMut(B, TransientStep<O, A>) -> B,
         Self: Sized,
     {
-        let mut stored = match self.next() {
-            Some(step) => step,
-            None => return init,
-        };
-
-        // Fold on self with a lag of one step:
-        // At the start of each call to the closure, `stored` is the previous step.
-        // We replace it with the current step (`next`) then convert the previous step
-        // into a transient step with the next step reference of `stored`.
-        let acc = self.fold(init, |acc, next| {
-            let step = mem::replace(&mut stored, next);
-            f(acc, step.into_transient_with(&stored))
-        });
-
-        // Stored now holds the last step.
-        // We can include it so long as it does not expect a successor.
-        if let Some(step) = stored.try_into_transient() {
-            f(acc, step)
-        } else {
-            acc
-        }
+        fold_transient(self, init, f)
     }
 
     /// Call a closure on each step viewed as a [`TransientStep`].
     ///
     /// This is the equivalent of [`Iterator::for_each`] on an iterator of `TransientStep`
-    /// except that such an iterator cannot be created with generic associated types.
+    /// except that such an iterator cannot be created without generic associated types.
     ///
     /// If the final `step.next` is `Successor::Continue` then that step is skipped since the
     /// successor observation is missing. This situation should not arise if using `take_episodes`
     /// or `take_aligned_steps`.
     #[inline]
-    fn for_each_transient_step<F>(self, mut f: F)
+    fn for_each_transient<F>(self, mut f: F)
     where
         F: FnMut(TransientStep<O, A>),
         Self: Sized,
     {
-        self.fold_transient_steps((), |_, step| f(step));
+        self.fold_transient((), |_, step| f(step));
+    }
+
+    /// Map each step viewed as a [`TransientStep`].
+    ///
+    /// This is the equivalent of [`Iterator::map`] on an iterator of `TransientStep`
+    /// except that such an iterator cannot be created without generic associated types.
+    ///
+    /// If the final `step.next` is `Successor::Continue` then that step is skipped since the
+    /// successor observation is missing. This situation should not arise if using `take_episodes`
+    /// or `take_aligned_steps`.
+    #[inline]
+    fn map_transient<B, F>(self, f: F) -> MapTransient<Self, F>
+    where
+        F: FnMut(TransientStep<O, A>) -> B,
+        Self: Sized,
+    {
+        MapTransient::new(self, f)
     }
 }
 
 impl<T, O, A> StepsIter<O, A> for T where T: Iterator<Item = PartialStep<O, A>> {}
+
+#[must_use]
+pub struct MapTransient<I: Iterator, F> {
+    iter: Peekable<I>,
+    f: F,
+}
+
+impl<I: Iterator, F> MapTransient<I, F> {
+    pub fn new(iter: I, f: F) -> Self {
+        Self {
+            iter: iter.peekable(),
+            f,
+        }
+    }
+}
+
+impl<I, F, O, A, B> Iterator for MapTransient<I, F>
+where
+    I: Iterator<Item = PartialStep<O, A>>,
+    F: FnMut(TransientStep<O, A>) -> B,
+{
+    type Item = B;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let partial_step = self.iter.next()?;
+
+        let step = if let Some(next) = self.iter.peek() {
+            partial_step.into_transient_with(next)
+        } else {
+            // Drop the final step if it cannot be converted into a transient step.
+            partial_step.try_into_transient()?
+        };
+        Some((self.f)(step))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        // Either one shorter or the same length as self.iter
+        let (min, max) = self.iter.size_hint();
+        (min.saturating_sub(1), max)
+    }
+
+    fn fold<C, G>(mut self, init: C, mut g: G) -> C
+    where
+        G: FnMut(C, B) -> C,
+    {
+        fold_transient(self.iter, init, |acc, step| g(acc, (self.f)(step)))
+    }
+}
+
+fn fold_transient<I, B, F, O, A>(mut iter: I, init: B, mut f: F) -> B
+where
+    I: Iterator<Item = PartialStep<O, A>>,
+    F: FnMut(B, TransientStep<O, A>) -> B,
+{
+    let mut stored = match iter.next() {
+        Some(step) => step,
+        None => return init,
+    };
+
+    // Fold on `self.iter` with a lag of one step:
+    // At the start of each call to the closure, `stored` is the previous step.
+    // We replace it with the current step (`next`) then convert the previous step
+    // into a transient step with the next step reference of `stored`.
+    let acc = iter.fold(init, |acc, next| {
+        let step = mem::replace(&mut stored, next);
+        f(acc, step.into_transient_with(&stored))
+    });
+
+    // Stored now holds the last step.
+    // We can include it so long as it does not expect a successor.
+    if let Some(step) = stored.try_into_transient() {
+        f(acc, step)
+    } else {
+        acc
+    }
+}
+
+impl<I, F, O, A, B> FusedIterator for MapTransient<I, F>
+where
+    I: FusedIterator<Item = PartialStep<O, A>>,
+    F: FnMut(TransientStep<O, A>) -> B,
+{
+}
 
 /// An environment-actor simulation
 pub trait Simulation: StepsIter<Self::Observation, Self::Action> {

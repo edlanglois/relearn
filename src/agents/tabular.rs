@@ -200,7 +200,7 @@ impl BatchUpdate<usize, usize> for BaseTabularQLearningAgent {
         for buffer in buffers {
             buffer
                 .drain_steps()
-                .for_each_transient_step(|step| self.step_update(step));
+                .for_each_transient(|step| self.step_update(step));
         }
     }
 
