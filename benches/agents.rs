@@ -4,8 +4,8 @@ use criterion::{
 };
 use rand::SeedableRng;
 use relearn::agents::{
-    Actor, ActorMode, Agent, BetaThompsonSamplingAgentConfig, BoxAgent, BuildAgent,
-    RandomAgentConfig, TabularQLearningAgentConfig, UCB1AgentConfig,
+    Actor, ActorMode, Agent, BetaThompsonSamplingAgentConfig, BuildAgent, RandomAgentConfig,
+    TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use relearn::envs::{EnvStructure, Environment, Successor};
 use relearn::logging::StatsLogger;
@@ -119,11 +119,6 @@ fn bench_agents_act(c: &mut Criterion) {
         &mut group,
         "tabular_q_learning",
         &TabularQLearningAgentConfig::default(),
-    );
-    benchmark_agent_act(
-        &mut group,
-        "boxed_random",
-        &BoxAgent::<RandomAgentConfig>::default(),
     );
     benchmark_agent_act(
         &mut group,

@@ -4,7 +4,6 @@
 
 mod bandits;
 pub mod buffers;
-mod r#dyn;
 pub mod finite;
 mod meta;
 mod pair;
@@ -22,7 +21,6 @@ pub use buffers::{
 };
 pub use meta::{ResettingMetaAgent, ResettingMetaAgentConfig};
 pub use pair::AgentPair;
-pub use r#dyn::{BoxActor, BoxAgent, DynAgent};
 pub use random::{RandomAgent, RandomAgentConfig};
 pub use serial::SerialActorAgent;
 pub use tabular::{TabularQLearningAgent, TabularQLearningAgentConfig};
