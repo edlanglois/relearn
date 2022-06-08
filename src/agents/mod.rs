@@ -1,6 +1,7 @@
 //! Reinforcement learning agents
 //!
 //! More agents can be found in [`crate::torch::agents`].
+#![allow(clippy::use_self)] // false positive with serde derives
 
 mod bandits;
 pub mod buffers;

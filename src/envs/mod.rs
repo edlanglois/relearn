@@ -1,4 +1,5 @@
 //! Reinforcement learning environments
+#![allow(clippy::use_self)] // false positive with serde derives
 mod bandits;
 mod builders;
 mod cartpole;

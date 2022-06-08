@@ -91,6 +91,7 @@ where
 
 impl<E, D: Dimension> ExclusiveTensor<E, D> {
     /// Convert into the inner tensor.
+    #[allow(clippy::missing_const_for_fn)] // false positive; cannot run destructors
     pub fn into_tensor(self) -> Tensor {
         self.tensor
     }

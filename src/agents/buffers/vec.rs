@@ -56,7 +56,6 @@ impl<O, A> VecBuffer<O, A> {
     }
 
     /// Iterator over all steps stored in the buffer.
-    #[must_use]
     pub fn steps(&self) -> slice::Iter<PartialStep<O, A>> {
         self.steps.iter()
     }

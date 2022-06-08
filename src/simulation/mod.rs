@@ -135,15 +135,15 @@ impl SimSeed {
     /// Derive random number generators from this seed.
     fn derive_rngs<R: Rng + SeedableRng>(self) -> (R, R) {
         match self {
-            SimSeed::Random => (R::from_entropy(), R::from_entropy()),
-            SimSeed::Root(seed) => {
+            Self::Random => (R::from_entropy(), R::from_entropy()),
+            Self::Root(seed) => {
                 let mut env_rng = R::seed_from_u64(seed);
                 // For arbitrary R, R::from_rng might produce a PRNG correlated with
                 // the original. Use the slower R::seed_from_u64 instead to ensure independence.
                 let agent_rng = R::seed_from_u64(env_rng.gen());
                 (env_rng, agent_rng)
             }
-            SimSeed::Individual { env, agent } => (R::seed_from_u64(env), R::seed_from_u64(agent)),
+            Self::Individual { env, agent } => (R::seed_from_u64(env), R::seed_from_u64(agent)),
         }
     }
 }

@@ -55,7 +55,7 @@ impl<T: Zero> OnlineMeanVariance<T> {
 impl<T: Copy> OnlineMeanVariance<T> {
     /// The mean of all accumulated values if at least one value has been accumulated.
     #[inline]
-    pub fn mean(&self) -> Option<T> {
+    pub const fn mean(&self) -> Option<T> {
         if self.count > 0 {
             Some(self.mean)
         } else {
@@ -65,7 +65,7 @@ impl<T: Copy> OnlineMeanVariance<T> {
 
     /// The number of accumulated values.
     #[inline]
-    pub fn count(&self) -> u64 {
+    pub const fn count(&self) -> u64 {
         self.count
     }
 }

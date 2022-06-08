@@ -1,4 +1,5 @@
 //! Tensor initializers
+#![allow(clippy::use_self)] // false positive with serde derives
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tch::{Device, Kind, Tensor};

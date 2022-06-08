@@ -90,8 +90,8 @@ impl fmt::Display for PartialMaxError {
             f,
             "{}",
             match self {
-                PartialMaxError::Empty => "Empty",
-                PartialMaxError::Incomparable => "Incomparable",
+                Self::Empty => "Empty",
+                Self::Incomparable => "Incomparable",
             }
         )
     }

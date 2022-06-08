@@ -35,13 +35,13 @@ impl fmt::Display for StepsSummary {
 impl StepsSummary {
     #[must_use]
     #[inline]
-    pub fn num_steps(&self) -> u64 {
+    pub const fn num_steps(&self) -> u64 {
         self.step_reward.count()
     }
 
     #[must_use]
     #[inline]
-    pub fn num_episodes(&self) -> u64 {
+    pub const fn num_episodes(&self) -> u64 {
         self.episode_reward.count()
     }
 }
@@ -115,13 +115,13 @@ impl OnlineStepsSummary {
 
     #[must_use]
     #[inline]
-    pub fn num_steps(&self) -> u64 {
+    pub const fn num_steps(&self) -> u64 {
         self.completed.num_steps()
     }
 
     #[must_use]
     #[inline]
-    pub fn num_episodes(&self) -> u64 {
+    pub const fn num_episodes(&self) -> u64 {
         self.completed.num_episodes()
     }
 }

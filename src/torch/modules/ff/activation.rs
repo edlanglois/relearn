@@ -1,4 +1,5 @@
 //! Activation functions.
+#![allow(clippy::use_self)] // false positive with serde derives
 use super::super::{Forward, Module, ModuleExtras, SeqIterative, SeqPacked, SeqSerial};
 use crate::torch::packed::PackedTensor;
 use serde::{Deserialize, Serialize};

@@ -50,7 +50,7 @@ where
     E: Environment,
     T: Actor<E::Observation, E::Action>,
 {
-    pub fn new(env: E, actor: T, rng_env: R, rng_actor: R, logger: L) -> Self {
+    pub const fn new(env: E, actor: T, rng_env: R, rng_actor: R, logger: L) -> Self {
         Self {
             env,
             actor,

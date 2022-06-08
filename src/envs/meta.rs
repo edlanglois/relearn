@@ -111,7 +111,7 @@ where
     E: EnvStructure,
 {
     /// View the structure of the inner environment.
-    pub fn inner_structure(&self) -> InnerEnvStructure<&Self> {
+    pub const fn inner_structure(&self) -> InnerEnvStructure<&Self> {
         InnerEnvStructure::new(self)
     }
 }
