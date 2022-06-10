@@ -1,5 +1,5 @@
 use super::{Critic, CriticUpdateRule, HistoryFeatures, RuleOpt, RuleOptConfig, StatsLogger};
-use crate::torch::optimizers::{AdamConfig, Optimizer};
+use crate::torch::optimizers::{opt_expect_ok_log, AdamConfig, Optimizer};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use tch::COptimizer;
@@ -49,21 +49,26 @@ where
 
         let mut critic_opt_start = Instant::now();
         for i in 0..self.optimizer_iters {
-            let loss = f64::from(optimizer.backward_step(&mut loss_fn, logger).unwrap());
+            let result = optimizer.backward_step(&mut loss_fn, logger);
+            let opt_loss = opt_expect_ok_log(result, "policy step error").map(f64::from);
             let critic_opt_end = Instant::now();
 
             let mut step_logger = logger.with_scope("step").group();
-            step_logger.log_scalar("loss", loss);
+            if let Some(loss) = opt_loss {
+                step_logger.log_scalar("loss", loss);
+            }
             step_logger.log_counter_increment("count", 1);
             step_logger.log_duration("time", critic_opt_end - critic_opt_start);
             drop(step_logger);
 
             critic_opt_start = critic_opt_end;
 
-            if i == 0 {
-                logger.log_scalar("loss_initial", loss);
-            } else if i == self.optimizer_iters - 1 {
-                logger.log_scalar("loss_final", loss);
+            if let Some(loss) = opt_loss {
+                if i == 0 {
+                    logger.log_scalar("loss_initial", loss);
+                } else if i == self.optimizer_iters - 1 {
+                    logger.log_scalar("loss_final", loss);
+                }
             }
         }
     }

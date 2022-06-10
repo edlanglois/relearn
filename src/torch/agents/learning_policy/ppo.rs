@@ -3,7 +3,7 @@ use super::{
     Critic, HistoryFeatures, ParameterizedDistributionSpace, Policy, PolicyStats, PolicyUpdateRule,
     RuleOpt, RuleOptConfig, StatsLogger,
 };
-use crate::torch::optimizers::{AdamConfig, Optimizer};
+use crate::torch::optimizers::{opt_expect_ok_log, AdamConfig, Optimizer};
 use crate::utils::distributions::ArrayDistribution;
 use serde::{Deserialize, Serialize};
 use tch::{COptimizer, Kind, Tensor};
@@ -83,9 +83,8 @@ where
                 .neg()
         };
 
-        let _ = optimizer
-            .backward_step(&mut policy_surrogate_loss_fn, logger)
-            .unwrap();
+        let result = optimizer.backward_step(&mut policy_surrogate_loss_fn, logger);
+        opt_expect_ok_log(result, "policy step error");
 
         PolicyStats {
             entropy: Some(initial_policy_entropy),

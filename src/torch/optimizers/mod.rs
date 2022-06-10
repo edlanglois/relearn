@@ -6,6 +6,7 @@ pub use conjugate_gradient::{ConjugateGradientOptimizer, ConjugateGradientOptimi
 pub use coptimizer::{AdamConfig, AdamWConfig, RmsPropConfig, SgdConfig};
 
 use crate::logging::StatsLogger;
+use log::warn;
 use std::error::Error;
 use tch::Tensor;
 use thiserror::Error;
@@ -145,6 +146,34 @@ pub enum OptimizerStepError {
     NaNLoss,
     #[error("constraint is NaN")]
     NaNConstraint,
+}
+
+impl OptimizerStepError {
+    /// Whether it is possible to continue optimizing after receiving this error.
+    ///
+    /// If `can_continue()` is `false` then the stored graph variables may be corrupted.
+    #[must_use]
+    #[inline]
+    pub const fn can_continue(self) -> bool {
+        matches!(self, Self::NaNLoss | Self::NaNConstraint)
+    }
+}
+
+/// Convert optimizer result into `Option<T>` with logging or panic on error.
+///
+/// Panics if `err.can_continue()` is false.
+pub fn opt_expect_ok_log<T>(result: Result<T, OptimizerStepError>, msg: &str) -> Option<T> {
+    match result {
+        Ok(x) => Some(x),
+        Err(err) => {
+            if err.can_continue() {
+                warn!("{msg}\ncaused by: {err}");
+                None
+            } else {
+                panic!("{msg}\ncaused by: {err}");
+            }
+        }
+    }
 }
 
 /// Build an optimizer

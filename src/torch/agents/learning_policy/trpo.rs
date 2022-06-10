@@ -7,12 +7,11 @@ use crate::torch::{
     backends::WithCudnnEnabled,
     modules::Module,
     optimizers::{
-        ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig, OptimizerStepError,
+        opt_expect_ok_log, ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig,
         TrustRegionOptimizer,
     },
 };
 use crate::utils::distributions::ArrayDistribution;
-use log::warn;
 use serde::{Deserialize, Serialize};
 use tch::{Kind, Tensor};
 
@@ -109,16 +108,7 @@ where
             self.max_policy_step_kl,
             logger,
         );
-
-        if let Err(error) = result {
-            match error {
-                OptimizerStepError::NaNLoss => panic!("NaN loss in policy optimization"),
-                OptimizerStepError::NaNConstraint => {
-                    panic!("NaN constraint in policy optimization")
-                }
-                err => warn!("error in policy step: {}", err),
-            };
-        }
+        opt_expect_ok_log(result, "policy step error");
 
         PolicyStats {
             entropy: Some(initial_policy_entropy),
