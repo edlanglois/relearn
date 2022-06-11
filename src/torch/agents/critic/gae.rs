@@ -45,9 +45,10 @@ where
 /// This assumes that all episodes end with a reward of 0.
 ///
 /// # Reference
-/// High-Dimensional Continuous Control Using Generalized Advantage Estimation. ICLR  2016
-/// by John Schulman, Philipp Moritz, Sergey Levine, Michael I. Jordan, Pieter Abbeel
-/// <https://arxiv.org/pdf/1506.02438.pdf>
+/// "[High-Dimensional Continuous Control Using Generalized Advantage Estimation][gae]"
+/// by Schulman et al.
+///
+/// [gae]: https://arxiv.org/abs/1506.02438
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Gae<V> {
     /// Clips the environment discount factor to be no more than this.

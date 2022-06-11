@@ -118,7 +118,7 @@ impl DeterministicBandit {
 /// This environment distribution is used in the paper
 /// "[RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning][rl2]" by Duan et al.
 ///
-/// [rl2]: https://arxiv.org/pdf/1611.02779
+/// [rl2]: https://arxiv.org/abs/1611.02779
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct UniformBernoulliBandits {
     /// Number of bandit arms.

@@ -283,7 +283,7 @@ impl Move {
 /// Based on the paper "[Learning to Interactively Learn and Assist][l2ila]"
 /// by Woodward et al. (2020)
 ///
-/// [l2ila]: https://arxiv.org/pdf/1906.10187.pdf
+/// [l2ila]: https://arxiv.org/abs/1906.10187
 ///
 /// # Generic Parameters
 /// * `W` - Grid width

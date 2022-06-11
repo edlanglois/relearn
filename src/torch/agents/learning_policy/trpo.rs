@@ -18,7 +18,7 @@ use tch::{Kind, Tensor};
 /// Trust Region Policy Optimization (PPO) with a clipped objective.
 ///
 /// # Reference
-/// [Trust Region Policy Optimization][trpo] by Schulman et al.
+/// "[Trust Region Policy Optimization][trpo]" by Schulman et al.
 ///
 /// [trpo]: https://arxiv.org/abs/1502.05477
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
