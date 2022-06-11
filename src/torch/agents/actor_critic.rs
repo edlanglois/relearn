@@ -18,7 +18,6 @@ use crate::{
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::time::Instant;
 use tch::{Device, Tensor};
 
 /// Configuration for [`ActorCriticAgent`].
@@ -239,23 +238,23 @@ where
         }
 
         let mut policy_logger = logger.with_scope("policy");
-        let policy_update_start = Instant::now();
-        let policy_stats = self.learning_policy.update_policy(
-            self.learning_critic.critic_ref(),
-            &features,
-            &self.action_space,
-            &mut policy_logger,
-        );
-        policy_logger.log_duration("update_time", policy_update_start.elapsed());
+        let policy_stats = policy_logger.log_elapsed("update_time", |logger| {
+            self.learning_policy.update_policy(
+                self.learning_critic.critic_ref(),
+                &features,
+                &self.action_space,
+                logger,
+            )
+        });
         if let Some(entropy) = policy_stats.entropy {
             policy_logger.log_scalar("entropy", entropy);
         }
 
-        let mut critic_logger = logger.with_scope("critic");
-        let critic_update_start = Instant::now();
-        self.learning_critic
-            .update_critic(&features, &mut critic_logger);
-        critic_logger.log_duration("update_time", critic_update_start.elapsed());
+        logger
+            .with_scope("critic")
+            .log_elapsed("update_time", |logger| {
+                self.learning_critic.update_critic(&features, logger)
+            });
 
         for buffer in buffers {
             buffer.clear()

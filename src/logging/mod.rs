@@ -14,11 +14,9 @@ pub use tensorboard::{TensorBoardBackend, TensorBoardLogger};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::fmt;
-use std::iter;
 use std::ops::Drop;
-use std::slice;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use std::{fmt, iter, slice};
 use thiserror::Error;
 
 /// Log a time series of statistics.
@@ -101,6 +99,22 @@ pub trait StatsLogger: Send {
     #[inline]
     fn log_duration(&mut self, name: &'static str, duration: Duration) {
         self.log(name.into(), Loggable::Duration(duration)).unwrap()
+    }
+
+    /// Log a named duration as the elapsed time in evaluating a closure.
+    ///
+    /// The closure is passed a mutable reference to this logger so that it has the opportunity to
+    /// make its own logging calls.
+    #[inline]
+    fn log_elapsed<F, T>(&mut self, name: &'static str, f: F) -> T
+    where
+        F: FnOnce(&mut Self) -> T,
+        Self: Sized,
+    {
+        let start = Instant::now();
+        let result = f(self);
+        self.log_duration(name, start.elapsed());
+        result
     }
 
     /// Log a named scalar value (convenience function).
