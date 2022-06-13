@@ -10,6 +10,8 @@ use once_cell::unsync::OnceCell;
 use std::cmp::Reverse;
 use tch::{Device, Tensor};
 
+// TODO: Rename ExperienceFeatures
+
 /// View features of a (mini-)batch of collected history.
 ///
 /// Floating-point tensors are `f32`.
@@ -39,12 +41,6 @@ pub trait HistoryFeatures {
     /// Packed rewards. A 1D f32 tensor.
     fn rewards(&self) -> &PackedTensor;
 
-    /// Environment discount factor.
-    ///
-    /// This is included for convenience as it is often needed
-    /// when calculating value functions of these features.
-    fn discount_factor(&self) -> f64;
-
     /// Device on which tensors will be placed.
     fn device(&self) -> Device;
 }
@@ -56,7 +52,6 @@ pub struct LazyHistoryFeatures<'a, OS: Space + ?Sized, AS: Space + ?Sized, E> {
     episodes: Vec<E>,
     observation_space: &'a OS,
     action_space: &'a AS,
-    discount_factor: f64,
     device: Device,
 
     /// Structure representing sequences that are 1 longer than each episode
@@ -78,7 +73,6 @@ where
         episodes: I,
         observation_space: &'a OS,
         action_space: &'a AS,
-        discount_factor: f64,
         device: Device,
     ) -> Self
     where
@@ -95,7 +89,6 @@ where
             episodes,
             observation_space,
             action_space,
-            discount_factor,
             device,
             extended_structure,
             cached_observation_features: OnceCell::new(),
@@ -216,10 +209,6 @@ where
         })
     }
 
-    fn discount_factor(&self) -> f64 {
-        self.discount_factor
-    }
-
     fn device(&self) -> Device {
         self.device
     }
@@ -285,7 +274,6 @@ pub(crate) mod tests {
         episodes: Vec<Vec<PartialStep<OS::Element, AS::Element>>>,
         observation_space: OS,
         action_space: AS,
-        discount_factor: f64,
         device: Device,
     }
 
@@ -298,7 +286,6 @@ pub(crate) mod tests {
                 self.episodes.iter().map(AsRef::as_ref),
                 &self.observation_space,
                 &self.action_space,
-                self.discount_factor,
                 self.device,
             )
         }
@@ -341,7 +328,6 @@ pub(crate) mod tests {
             episodes,
             observation_space: BooleanSpace::new(),
             action_space: IndexSpace::new(31),
-            discount_factor: 0.9,
             device: Device::Cpu,
         }
     }
@@ -359,12 +345,6 @@ pub(crate) mod tests {
     #[rstest]
     fn is_empty(history: StoredHistory<BooleanSpace, IndexSpace>) {
         assert!(!history.features().is_empty());
-    }
-
-    #[rstest]
-    #[allow(clippy::float_cmp)]
-    fn discount_factor(history: StoredHistory<BooleanSpace, IndexSpace>) {
-        assert_eq!(history.features().discount_factor(), 0.9);
     }
 
     #[rstest]

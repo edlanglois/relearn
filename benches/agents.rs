@@ -11,7 +11,7 @@ use relearn::envs::{EnvStructure, Environment, Successor};
 use relearn::logging::StatsLogger;
 use relearn::spaces::{BooleanSpace, IndexSpace};
 use relearn::torch::{
-    agents::{critic::RewardToGo, learning_policy::VpgConfig, ActorCriticConfig},
+    agents::{critics::RewardToGoConfig, policies::ReinforceConfig, ActorCriticConfig},
     modules::{GruConfig, MlpConfig},
 };
 use relearn::Prng;
@@ -123,12 +123,12 @@ fn bench_agents_act(c: &mut Criterion) {
     benchmark_agent_act(
         &mut group,
         "actor_critic_mlp",
-        &ActorCriticConfig::<VpgConfig<MlpConfig>, RewardToGo>::default(),
+        &ActorCriticConfig::<ReinforceConfig<MlpConfig>, RewardToGoConfig>::default(),
     );
     benchmark_agent_act(
         &mut group,
         "actor_critic_gru",
-        &ActorCriticConfig::<VpgConfig<GruConfig>, RewardToGo>::default(),
+        &ActorCriticConfig::<ReinforceConfig<GruConfig>, RewardToGoConfig>::default(),
     );
 }
 

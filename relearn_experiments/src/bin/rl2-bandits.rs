@@ -1,8 +1,8 @@
 use clap::{ArgEnum, Parser, Subcommand};
 use rand::{Rng, SeedableRng};
 use relearn::agents::{
-    Actor, BatchUpdate, BetaThompsonSamplingAgentConfig, BuildAgent, RandomAgentConfig,
-    ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
+    Actor, BatchUpdate, BetaThompsonSamplingAgentConfig, BuildAgent, HistoryDataBound,
+    RandomAgentConfig, ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use relearn::envs::{
     BuildEnv, Environment, MetaEnv, MetaObservationSpace, StructuredEnvironment,
@@ -14,9 +14,8 @@ use relearn::simulation::{Steps, StepsIter, StepsSummary};
 use relearn::spaces::{IndexSpace, NonEmptySpace, SingletonSpace, Space};
 use relearn::torch::{
     agents::{
-        critic::{Gae, GaeConfig},
-        learning_critic::{GradOpt, GradOptConfig, GradOptRule},
-        learning_policy::{Trpo, TrpoConfig, TrpoRule},
+        critics::{AdvantageFn, StateValueTarget, ValuesOpt, ValuesOptConfig},
+        policies::{Trpo, TrpoConfig},
         ActorCriticAgent, ActorCriticConfig,
     },
     initializers::{Initializer, VarianceScale},
@@ -342,7 +341,7 @@ type Agent = ActorCriticAgent<
     MetaObservationSpace<SingletonSpace, IndexSpace>,
     IndexSpace,
     Trpo<Model>,
-    GradOpt<Gae<Model>>,
+    ValuesOpt<Model>,
 >;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -384,39 +383,34 @@ impl TrainConfig {
             activation: Activation::Relu,
         };
         let policy_config = TrpoConfig {
-            module_config: model_config,
+            policy_fn_config: model_config,
             // RL2 paper has "Policy Iters: Up to 1000".
             // I think this refers to number of update periods,
             // not the number of CG iterations when solving for for the descent direction.
             // They do not seem to specify any CG optimizer parameters.
             optimizer_config: ConjugateGradientOptimizerConfig::default(),
-            update_rule_config: TrpoRule {
-                // RL2 paper mentions "Mean KL" as a parameter that they set to 0.01.
-                // I do not know of such a parameter for TRPO.
-                // The TRPO paper has a max KL step size parameter that they set to 0.01 so
-                // I assume that either this is what was meant by the RL2 paper or
-                // that their strategy was not too different.
-                max_policy_step_kl: 0.01,
-            },
+            // RL2 paper mentions "Mean KL" as a parameter that they set to 0.01.
+            // I do not know of such a parameter for TRPO.
+            // The TRPO paper has a max KL step size parameter that they set to 0.01 so
+            // I assume that either this is what was meant by the RL2 paper or
+            // that their strategy was not too different.
+            max_policy_step_kl: 0.01,
         };
         // Note: I think they used CG optimization here as in the GAE paper
         // https://arxiv.org/pdf/1506.02438.pdf, not regular gradient descent.
         // TODO: Implement and use CG for critic updates.
-        let critic_config = GradOptConfig {
-            module_config: GaeConfig {
-                gamma: 0.99,
-                lambda: 0.3,
-                value_fn_config: model_config,
-            },
+        let critic_config = ValuesOptConfig {
+            state_value_fn_config: model_config,
             optimizer_config: AdamConfig::default(),
-            update_rule_config: GradOptRule {
-                optimizer_iters: 50,
-            },
+            advantage_fn: AdvantageFn::Gae { lambda: 0.3 },
+            target: StateValueTarget::default(),
+            opt_steps_per_update: 50,
+            max_discount_factor: 0.99,
         };
         let agent_config = ActorCriticConfig {
             policy_config,
             critic_config,
-            min_batch_steps: self.batch_size,
+            min_batch_size: HistoryDataBound::new(self.batch_size, 100),
             device: self.device.into(),
         };
         let mut agent = agent_config.build_agent(&env, &mut rng_agent).unwrap();

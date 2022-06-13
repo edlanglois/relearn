@@ -10,10 +10,7 @@ use relearn::logging::{DisplayLogger, StatsLogger};
 use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfig};
 use relearn::spaces::{IndexedTypeSpace, Space};
 use relearn::torch::{
-    agents::{
-        critic::GaeConfig, learning_critic::GradOptConfig, learning_policy::PpoConfig,
-        ActorCriticConfig,
-    },
+    agents::{critics::ValuesOptConfig, policies::PpoConfig, ActorCriticConfig},
     modules::{ChainConfig, GruConfig, MlpConfig},
 };
 use relearn::Prng;
@@ -132,13 +129,11 @@ fn main() {
     let env_config =
         WithLatentStepLimit::new(FruitGame::<5, 5, 5, 5>::default(), LatentStepLimit::new(50));
 
-    let assistant_config: ActorCriticConfig<
-        PpoConfig<ModelConfig>,
-        GradOptConfig<GaeConfig<ModelConfig>>,
-    > = ActorCriticConfig {
-        device: Device::Cuda(0),
-        ..Default::default()
-    };
+    let assistant_config: ActorCriticConfig<PpoConfig<ModelConfig>, ValuesOptConfig<ModelConfig>> =
+        ActorCriticConfig {
+            device: Device::Cuda(0),
+            ..Default::default()
+        };
     let principal_config = FruitLazyExpert;
     let agent_config = AgentPair(principal_config, assistant_config);
 

@@ -1,23 +1,16 @@
 //! Actor-critic agent
-use super::{
-    actor::PolicyActor,
-    features::LazyHistoryFeatures,
-    learning_critic::{BuildLearningCritic, LearningCritic},
-    learning_policy::{BuildLearningPolicy, LearningPolicy},
-};
-use crate::{
-    agents::buffers::{HistoryDataBound, VecBuffer},
-    agents::{ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError},
-    envs::EnvStructure,
-    logging::StatsLogger,
-    spaces::{FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace},
-    torch::modules::Module,
-    torch::serialize::DeviceDef,
-    Prng,
-};
+use super::critics::{BuildCritic, Critic};
+use super::features::LazyHistoryFeatures;
+use super::policies::{BuildPolicy, CpuActor, Policy, PolicyActor};
+use crate::agents::buffers::VecBuffer;
+use crate::agents::{ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, HistoryDataBound};
+use crate::envs::EnvStructure;
+use crate::logging::StatsLogger;
+use crate::spaces::{FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace};
+use crate::torch::serialize::DeviceDef;
+use crate::Prng;
 use log::info;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use tch::{Device, Tensor};
 
 /// Configuration for [`ActorCriticAgent`].
@@ -25,8 +18,7 @@ use tch::{Device, Tensor};
 pub struct ActorCriticConfig<PB, CB> {
     pub policy_config: PB,
     pub critic_config: CB,
-    /// Minimum number of collected steps per batch update
-    pub min_batch_steps: usize,
+    pub min_batch_size: HistoryDataBound,
     #[serde(with = "DeviceDef")]
     pub device: Device,
 }
@@ -41,7 +33,10 @@ where
         Self {
             policy_config: Default::default(),
             critic_config: Default::default(),
-            min_batch_steps: 10_000,
+            min_batch_size: HistoryDataBound {
+                min_steps: 10_000,
+                slack_steps: 100,
+            },
             device: Device::cuda_if_available(),
         }
     }
@@ -50,13 +45,11 @@ where
 impl<OS, AS, PB, CB> BuildAgent<OS, AS> for ActorCriticConfig<PB, CB>
 where
     OS: FeatureSpace + Clone,
-    OS::Element: 'static,
     AS: ParameterizedDistributionSpace<Tensor> + Clone,
-    AS::Element: 'static,
-    PB: BuildLearningPolicy,
-    CB: BuildLearningCritic,
+    PB: BuildPolicy,
+    CB: BuildCritic,
 {
-    type Agent = ActorCriticAgent<OS, AS, PB::LearningPolicy, CB::LearningCritic>;
+    type Agent = ActorCriticAgent<OS, AS, PB::Policy, CB::Critic>;
 
     fn build_agent(
         &self,
@@ -67,72 +60,50 @@ where
     }
 }
 
-/// Actor-crtic agent. Consists of a [`LearningPolicy`] and a [`LearningCritic`].
+/// Actor-crtic agent. Consists of a [`Policy`] and a [`Critic`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ActorCriticAgent<OS, AS, P, C>
-where
-    P: LearningPolicy,
-{
+pub struct ActorCriticAgent<OS, AS, P: Policy, C> {
     observation_space: NonEmptyFeatures<OS>,
     action_space: AS,
-    discount_factor: f64,
-    min_batch_steps: usize,
 
-    learning_policy: P,
-    learning_critic: C,
-
-    /// A copy of the policy stored on the CPU device for memory sharing with actors.
-    ///
-    /// Only created if `device` is not `Device::Cpu`.
-    /// Must be re-copied after each policy update.
-    #[serde(skip, default)]
-    cpu_policy: RefCell<Option<P::Policy>>,
-
-    // Tensors will deserialize to CPU
-    #[serde(skip, default = "cpu_device")]
-    device: Device,
+    policy: CpuActor<P>,
+    critic: C,
+    min_batch_size: HistoryDataBound,
 }
 
-const fn cpu_device() -> Device {
-    Device::Cpu
-}
-
-impl<OS, AS, P, C> ActorCriticAgent<OS, AS, P, C>
+impl<OS, AS, P: Policy, C> ActorCriticAgent<OS, AS, P, C>
 where
     OS: FeatureSpace,
     AS: ParameterizedDistributionSpace<Tensor>,
-    P: LearningPolicy,
-    C: LearningCritic,
 {
     pub fn new<E, PB, CB>(env: &E, config: &ActorCriticConfig<PB, CB>) -> Self
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
-        PB: BuildLearningPolicy<LearningPolicy = P>,
-        CB: BuildLearningCritic<LearningCritic = C>,
+        PB: BuildPolicy<Policy = P>,
+        CB: BuildCritic<Critic = C>,
     {
         let observation_space = NonEmptyFeatures::new(env.observation_space());
         let action_space = env.action_space();
         let num_observation_features = observation_space.num_features();
 
-        let learning_policy = config.policy_config.build_learning_policy(
+        let policy = config.policy_config.build_policy(
             num_observation_features,
             action_space.num_distribution_params(),
             config.device,
         );
 
-        let learning_critic = config
-            .critic_config
-            .build_learning_critic(num_observation_features, config.device);
+        let critic = config.critic_config.build_critic(
+            num_observation_features,
+            env.discount_factor(),
+            config.device,
+        );
 
         Self {
             observation_space,
             action_space,
-            discount_factor: env.discount_factor(),
-            min_batch_steps: config.min_batch_steps,
-            learning_policy,
-            learning_critic,
-            cpu_policy: RefCell::new(None),
-            device: config.device,
+            policy: CpuActor::new(policy, config.device),
+            critic,
+            min_batch_size: config.min_batch_size,
         }
     }
 }
@@ -140,56 +111,34 @@ where
 impl<OS, AS, P, C> Agent<OS::Element, AS::Element> for ActorCriticAgent<OS, AS, P, C>
 where
     OS: FeatureSpace + Clone,
-    OS::Element: 'static,
     AS: ParameterizedDistributionSpace<Tensor> + Clone,
-    AS::Element: 'static,
-    P: LearningPolicy,
+    P: Policy,
 {
-    type Actor = PolicyActor<OS, AS, P::Policy>;
+    type Actor = PolicyActor<OS, AS, P::Module>;
 
     fn actor(&self, _: ActorMode) -> Self::Actor {
-        let cpu_policy = if matches!(self.device, Device::Cpu) {
-            self.learning_policy.policy_ref().shallow_clone()
-        } else {
-            self.cpu_policy
-                .borrow_mut()
-                .get_or_insert_with(|| {
-                    self.learning_policy
-                        .policy_ref()
-                        .clone_to_device(Device::Cpu)
-                })
-                .shallow_clone()
-        };
-
-        PolicyActor::new(
-            self.observation_space.clone(),
-            self.action_space.clone(),
-            cpu_policy,
-        )
+        self.policy
+            .actor(self.observation_space.clone(), self.action_space.clone())
     }
 }
 
 impl<OS, AS, P, C> BatchUpdate<OS::Element, AS::Element> for ActorCriticAgent<OS, AS, P, C>
 where
-    OS: FeatureSpace + Clone,
+    OS: FeatureSpace,
     OS::Element: 'static,
-    AS: ParameterizedDistributionSpace<Tensor> + Clone,
+    AS: ParameterizedDistributionSpace<Tensor>,
     AS::Element: 'static,
-    P: LearningPolicy,
-    C: LearningCritic,
+    P: Policy,
+    C: Critic,
 {
     type HistoryBuffer = VecBuffer<OS::Element, AS::Element>;
 
     fn buffer(&self) -> Self::HistoryBuffer {
-        VecBuffer::with_capacity_for(self.min_update_size())
+        VecBuffer::with_capacity_for(self.min_batch_size)
     }
 
     fn min_update_size(&self) -> HistoryDataBound {
-        HistoryDataBound {
-            min_steps: self.min_batch_steps,
-            // 1% of min_steps, between 5 and 100
-            slack_steps: 1000.min(self.min_batch_steps / 100).max(5),
-        }
+        self.min_batch_size
     }
 
     fn batch_update<'a, I>(&mut self, buffers: I, logger: &mut dyn StatsLogger)
@@ -197,67 +146,177 @@ where
         I: IntoIterator<Item = &'a mut Self::HistoryBuffer>,
         Self::HistoryBuffer: 'a,
     {
-        self.batch_update_slice_refs(&mut buffers.into_iter().collect::<Vec<_>>(), logger);
+        let mut buffers: Vec<_> = buffers.into_iter().collect();
+        self.batch_update_slice(&mut buffers, logger);
     }
 }
 
 impl<OS, AS, P, C> ActorCriticAgent<OS, AS, P, C>
 where
     OS: FeatureSpace,
-    OS::Element: 'static,
     AS: ParameterizedDistributionSpace<Tensor>,
-    AS::Element: 'static,
-    P: LearningPolicy,
-    C: LearningCritic,
+    P: Policy,
+    C: Critic,
 {
-    // Takes a slice of references because
-    // * it iterates over the buffers twice and it is awkward to make the right bounds for
+    // Takes a slice of references because:
+    // * It iterates over the buffers twice and it is awkward to make the right bounds for
     //      a "clone-able" (actually, into_iter with shorter lifetimes) generic iterator.
-    // * the function is relatively large and this avoids duplicate monomorphizations
-    // * any inefficiency in the buffer access should be insignificant compared to the runtime
-    //      cost of the rest of the update
+    // * The function is relatively large (if updates are inlined) and this avoids duplicate
+    //      monomorphizations.
+    // * Any inefficiency in the buffer access should be insignificant compared to the runtime
+    //      cost of the rest of the update.
     /// Batch update given a slice of buffer references
-    fn batch_update_slice_refs(
+    fn batch_update_slice(
         &mut self,
         buffers: &mut [&mut VecBuffer<OS::Element, AS::Element>],
-        logger: &mut dyn StatsLogger,
+        mut logger: &mut dyn StatsLogger,
     ) {
-        // About to update the policy so clear any existing CPU policy copy
-        self.cpu_policy = RefCell::new(None);
-
         let features = LazyHistoryFeatures::new(
             buffers.iter_mut().flat_map(|b| b.episodes()),
             &self.observation_space,
             &self.action_space,
-            self.discount_factor,
-            self.device,
+            self.policy.device,
         );
         if features.is_empty() {
             info!("skipping model update; history buffer is empty");
             return;
         }
 
-        let mut policy_logger = logger.with_scope("policy");
-        let policy_stats = policy_logger.log_elapsed("update_time", |logger| {
-            self.learning_policy.update_policy(
-                self.learning_critic.critic_ref(),
-                &features,
-                &self.action_space,
-                logger,
-            )
-        });
-        if let Some(entropy) = policy_stats.entropy {
-            policy_logger.log_scalar("entropy", entropy);
-        }
+        let advantages =
+            (&mut logger).log_elapsed("adv_est_time", |_| self.critic.advantages(&features));
+
+        logger
+            .with_scope("policy")
+            .log_elapsed("update_time", |logger| {
+                self.policy
+                    .update(&features, advantages, &self.action_space, logger)
+            });
 
         logger
             .with_scope("critic")
             .log_elapsed("update_time", |logger| {
-                self.learning_critic.update_critic(&features, logger)
+                self.critic.update(&features, logger)
             });
 
         for buffer in buffers {
             buffer.clear()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::critics::{RewardToGoConfig, ValuesOptConfig};
+    use super::super::policies::{PpoConfig, ReinforceConfig, TrpoConfig};
+    use super::*;
+    use crate::agents::testing;
+    use crate::torch::modules::{BuildModule, GruMlpConfig, MlpConfig, SeqIterative, SeqPacked};
+    use crate::torch::optimizers::AdamConfig;
+    use rstest::rstest;
+    use std::marker::PhantomData;
+
+    trait FromModuleConfig<MB> {
+        fn from_module_config(module_config: MB) -> Self;
+    }
+
+    impl<MB> FromModuleConfig<MB> for ReinforceConfig<MB> {
+        fn from_module_config(module_config: MB) -> Self {
+            Self {
+                policy_fn_config: module_config,
+                optimizer_config: AdamConfig {
+                    learning_rate: 0.1,
+                    ..AdamConfig::default()
+                },
+            }
+        }
+    }
+
+    const fn reinforce<MB>() -> PhantomData<ReinforceConfig<MB>> {
+        PhantomData
+    }
+
+    impl<MB: Default> FromModuleConfig<MB> for PpoConfig<MB> {
+        fn from_module_config(module_config: MB) -> Self {
+            Self {
+                policy_fn_config: module_config,
+                optimizer_config: AdamConfig {
+                    learning_rate: 0.1,
+                    ..AdamConfig::default()
+                },
+                opt_steps_per_update: 1,
+                ..Self::default()
+            }
+        }
+    }
+
+    const fn ppo<MB>() -> PhantomData<ReinforceConfig<MB>> {
+        PhantomData
+    }
+
+    impl<MB: Default> FromModuleConfig<MB> for TrpoConfig<MB> {
+        fn from_module_config(module_config: MB) -> Self {
+            Self {
+                policy_fn_config: module_config,
+                ..Self::default()
+            }
+        }
+    }
+
+    const fn trpo<MB>() -> PhantomData<ReinforceConfig<MB>> {
+        PhantomData
+    }
+
+    impl<MB: Default> FromModuleConfig<MB> for ValuesOptConfig<MB> {
+        fn from_module_config(module_config: MB) -> Self {
+            Self {
+                state_value_fn_config: module_config,
+                optimizer_config: AdamConfig {
+                    learning_rate: 0.1,
+                    ..AdamConfig::default()
+                },
+                opt_steps_per_update: 1,
+                ..Self::default()
+            }
+        }
+    }
+
+    #[rstest]
+    #[allow(clippy::used_underscore_binding)] // confused by used of _policy_alg in macro expansion
+    fn learns_deterministic_bandit_r2g<MB, PB>(
+        #[values(MlpConfig::default(), GruMlpConfig::default())] policy_module: MB,
+        #[values(reinforce(), ppo(), trpo())] _policy_alg: PhantomData<PB>,
+        #[values(Device::Cpu, Device::cuda_if_available())] device: Device,
+    ) where
+        MB: BuildModule,
+        MB::Module: SeqPacked + SeqIterative,
+        PB: FromModuleConfig<MB> + BuildPolicy,
+    {
+        let config = ActorCriticConfig {
+            policy_config: PB::from_module_config(policy_module),
+            critic_config: RewardToGoConfig,
+            min_batch_size: HistoryDataBound::new(25, 1),
+            device,
+        };
+        testing::train_deterministic_bandit(&config, 10, 0.9);
+    }
+
+    #[rstest]
+    #[allow(clippy::used_underscore_binding)] // confused by used of _policy_alg in macro expansion
+    fn learns_deterministic_bandit_values_gae<MB, PB>(
+        #[values(MlpConfig::default(), GruMlpConfig::default())] module: MB,
+        #[values(reinforce(), ppo(), trpo())] _policy_alg: PhantomData<PB>,
+        #[values(Device::Cpu, Device::cuda_if_available())] device: Device,
+    ) where
+        MB: BuildModule + Default + Clone,
+        MB::Module: SeqPacked + SeqIterative,
+        PB: FromModuleConfig<MB> + BuildPolicy,
+    {
+        let config = ActorCriticConfig {
+            policy_config: PB::from_module_config(module.clone()),
+            critic_config: ValuesOptConfig::from_module_config(module),
+            min_batch_size: HistoryDataBound::new(25, 1),
+            device,
+        };
+        testing::train_deterministic_bandit(&config, 10, 0.9);
     }
 }

@@ -1,57 +1,54 @@
-//! Torch agents and associated components.
-mod actor;
 mod actor_critic;
-pub mod critic;
+pub mod critics;
 pub mod features;
-pub mod learning_critic;
-pub mod learning_policy;
-pub mod policy;
-#[cfg(test)]
-mod tests;
+pub mod policies;
 
-pub use actor::PolicyActor;
 pub use actor_critic::{ActorCriticAgent, ActorCriticConfig};
 
-use super::modules::Module;
-use super::optimizers::BuildOptimizer;
-use serde::{Deserialize, Serialize};
+use crate::logging::StatsLogger;
+use crate::torch::optimizers::{opt_expect_ok_log, Optimizer};
+use std::time::Instant;
+use tch::Tensor;
 
-/// Optimize a module using an optimizer and an update rule.
-///
-/// Many learning policies and critics take this form.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct RuleOpt<M, O, U> {
-    /// Optimize the variables of this module.
-    module: M,
-    /// Optimizer: updates the trainable varaibles of `module` to minimize a given loss function.
-    optimizer: O,
-    /// Implements the update of `module` using `optimizer`.
-    update_rule: U,
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+enum ToLog {
+    /// Don't log the absolute loss value (can log loss changes).
+    NoAbsLoss,
+    /// Log everything
+    All,
 }
 
-impl<M, O, U> RuleOpt<M, O, U>
-where
-    M: Module,
+/// Take n backward steps of a loss function with logging.
+fn n_backward_steps<O, F, L>(
+    optimizer: &mut O,
+    mut loss_fn: F,
+    n: u64,
+    mut logger: L,
+    to_log: ToLog,
+    err_msg: &str,
+) where
+    O: Optimizer + ?Sized,
+    F: FnMut() -> Tensor,
+    L: StatsLogger,
 {
-    #[inline]
-    pub fn new<OB>(module: M, optimizer_config: &OB, update_rule: U) -> Self
-    where
-        OB: BuildOptimizer<Optimizer = O>,
-    {
-        Self {
-            optimizer: optimizer_config
-                .build_optimizer(module.trainable_variables())
-                .unwrap(),
-            module,
-            update_rule,
+    let mut step_logger = (&mut logger).with_scope("step");
+    let mut prev_loss = None;
+    let mut prev_start = Instant::now();
+    for _ in 0..n {
+        let result = optimizer.backward_step(&mut loss_fn, &mut step_logger);
+        let loss = opt_expect_ok_log(result, err_msg).map(f64::from);
+
+        if let Some(loss_improvement) = prev_loss.and_then(|p| loss.map(|l| p - l)) {
+            step_logger.log_scalar("loss_improvement", loss_improvement);
+        }
+        prev_loss = loss;
+        let end = Instant::now();
+        step_logger.log_duration("time", end - prev_start);
+        prev_start = end;
+    }
+    if matches!(to_log, ToLog::All) {
+        if let Some(loss) = prev_loss {
+            logger.log_scalar("loss", loss);
         }
     }
-}
-
-/// Configuration for [`RuleOpt`].
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct RuleOptConfig<MB, OB, UB> {
-    pub module_config: MB,
-    pub optimizer_config: OB,
-    pub update_rule_config: UB,
 }

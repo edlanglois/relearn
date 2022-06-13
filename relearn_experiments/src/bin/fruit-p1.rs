@@ -6,10 +6,7 @@ use relearn::envs::{
 use relearn::logging::DisplayLogger;
 use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfig};
 use relearn::torch::{
-    agents::{
-        critic::GaeConfig, learning_critic::GradOptConfig, learning_policy::PpoConfig,
-        ActorCriticConfig,
-    },
+    agents::{critics::ValuesOptConfig, policies::PpoConfig, ActorCriticConfig},
     modules::GruMlpConfig,
 };
 use relearn::Prng;
@@ -21,13 +18,11 @@ fn main() {
         VisibleStepLimit::new(50),
     );
 
-    let agent_config: ActorCriticConfig<
-        PpoConfig<GruMlpConfig>,
-        GradOptConfig<GaeConfig<GruMlpConfig>>,
-    > = ActorCriticConfig {
-        device: Device::cuda_if_available(),
-        ..Default::default()
-    };
+    let agent_config: ActorCriticConfig<PpoConfig<GruMlpConfig>, ValuesOptConfig<GruMlpConfig>> =
+        ActorCriticConfig {
+            device: Device::cuda_if_available(),
+            ..Default::default()
+        };
     let training_config = TrainParallelConfig {
         num_periods: 200,
         num_threads: num_cpus::get(),

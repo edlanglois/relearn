@@ -4,10 +4,7 @@ use relearn::agents::{ActorMode, Agent, BuildAgent};
 use relearn::envs::{CartPole, EnvStructure, Environment, WithVisibleStepLimit};
 use relearn::logging::{ByCounter, DisplayLogger, TensorBoardLogger};
 use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfig};
-use relearn::torch::agents::{
-    critic::GaeConfig, learning_critic::GradOptConfig, learning_policy::TrpoConfig,
-    ActorCriticConfig,
-};
+use relearn::torch::agents::{critics::ValuesOptConfig, policies::TrpoConfig, ActorCriticConfig};
 use relearn::torch::modules::MlpConfig;
 use relearn::Prng;
 use std::env;
@@ -15,7 +12,7 @@ use std::fs::{self, File};
 use std::path::PathBuf;
 use tch::Device;
 
-type AgentConfig = ActorCriticConfig<TrpoConfig<MlpConfig>, GradOptConfig<GaeConfig<MlpConfig>>>;
+type AgentConfig = ActorCriticConfig<TrpoConfig<MlpConfig>, ValuesOptConfig<MlpConfig>>;
 
 fn main() {
     let env = CartPole::default().with_visible_step_limit(500);
