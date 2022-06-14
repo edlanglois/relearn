@@ -46,61 +46,6 @@ pub trait Optimizer: BaseOptimizer {
     ) -> Result<Tensor, OptimizerStepError>;
 }
 
-/// Optimizer that minimizes a loss tensor using a single gradient evaluation per step.
-///
-/// Specifically, each step may use the gradient at the initial point of the step
-/// and makes no further gradient evaluations.
-pub trait OnceOptimizer: BaseOptimizer {
-    /// Perform a loss minimization step (parameter update).
-    ///
-    /// Uses the existing gradients stored with the parameter tensor.
-    ///
-    /// If an error is detected, the parameters are guaranteed to be unchanged from (or reset to)
-    /// their initial values.
-    /// In general, error conditions are not guaranteed to be detected and an optimizer
-    /// may silently put itself or the parameters into a bad state.
-    /// For example, [`COptimizer`] sets parameters to NaN when the loss is NaN.
-    ///
-    /// [`COptimizer`]: tch::COptimizer
-    fn step_once(&self, logger: &mut dyn StatsLogger) -> Result<(), OptimizerStepError>;
-
-    /// Apply a backward step pass, update the gradients, and perform an optimization step.
-    ///
-    /// Obtains gradients by backpropagating the result of `loss_fn`.
-    ///
-    /// # Args
-    /// * `loss` - Loss tensor. Back-propagation is applied to this tensor to obtain a gradient.
-    /// * `logger` - Logger for statistics and other information about the step.
-    ///
-    /// # Returns
-    /// The initial value of `loss_fn` on success.
-    ///
-    /// If an error is detected, the parameters are guaranteed to be unchanged from (or reset to)
-    /// their initial values.
-    /// In general, error conditions are not guaranteed to be detected and an optimizer
-    /// may silently put itself or the parameters into a bad state.
-    /// For example, [`COptimizer`] sets parameters to NaN when the loss is NaN.
-    ///
-    /// [`COptimizer`]: tch::COptimizer
-    fn backward_step_once(
-        &mut self,
-        loss: &Tensor,
-        logger: &mut dyn StatsLogger,
-    ) -> Result<(), OptimizerStepError>;
-}
-
-impl<T: OnceOptimizer> Optimizer for T {
-    fn backward_step(
-        &mut self,
-        loss_fn: &mut dyn FnMut() -> Tensor,
-        logger: &mut dyn StatsLogger,
-    ) -> Result<Tensor, OptimizerStepError> {
-        let loss = loss_fn();
-        self.backward_step_once(&loss, logger)?;
-        Ok(loss)
-    }
-}
-
 /// Optimizer that minimizes a loss function subject to a trust region constraint on each step.
 pub trait TrustRegionOptimizer: BaseOptimizer {
     /// Take an optimization step subject to a distance constraint

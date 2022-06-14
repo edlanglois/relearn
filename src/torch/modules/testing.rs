@@ -1,7 +1,7 @@
 //! Module test utilities.
 use super::{BuildModule, Forward, Module, SeqIterative, SeqPacked, SeqSerial};
 use crate::torch::initializers::{Initializer, VarianceScale};
-use crate::torch::optimizers::{BuildOptimizer, OnceOptimizer, SgdConfig};
+use crate::torch::optimizers::{BuildOptimizer, Optimizer, SgdConfig};
 use crate::torch::packed::{PackedStructure, PackedTensor};
 use serde::{de::DeserializeOwned, Serialize};
 use smallvec::SmallVec;
@@ -180,10 +180,10 @@ where
         .unwrap();
 
     let initial_output = R::run(&module, &input);
-    let initial_loss = (&initial_output - &target).square().sum(Kind::Float);
+    let mut initial_loss_fn = || (&initial_output - &target).square().sum(Kind::Float);
 
-    optimizer
-        .backward_step_once(&initial_loss, &mut ())
+    let initial_loss = optimizer
+        .backward_step(&mut initial_loss_fn, &mut ())
         .unwrap();
 
     let final_output = R::run(&module, &input);

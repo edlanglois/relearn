@@ -1,5 +1,5 @@
 //! Torch optimizer wrappers and configuration
-use super::{BaseOptimizer, BuildOptimizer, OnceOptimizer, OptimizerStepError};
+use super::{BaseOptimizer, BuildOptimizer, Optimizer, OptimizerStepError};
 use crate::logging::StatsLogger;
 use serde::{Deserialize, Serialize};
 use tch::{COptimizer, TchError, Tensor};
@@ -10,22 +10,19 @@ impl BaseOptimizer for COptimizer {
     }
 }
 
-impl OnceOptimizer for COptimizer {
-    fn step_once(&self, _logger: &mut dyn StatsLogger) -> Result<(), OptimizerStepError> {
-        // I'm not sure what errors it is possible for torch to raise here
-        // Anything that isn't essentially a type error should be converted to OptimizerStepError.
-        Self::step(self).unwrap();
-        Ok(())
-    }
-
-    fn backward_step_once(
+impl Optimizer for COptimizer {
+    fn backward_step(
         &mut self,
-        loss: &Tensor,
-        logger: &mut dyn StatsLogger,
-    ) -> Result<(), OptimizerStepError> {
+        loss_fn: &mut dyn FnMut() -> Tensor,
+        _: &mut dyn StatsLogger,
+    ) -> Result<Tensor, OptimizerStepError> {
+        let loss = loss_fn();
         BaseOptimizer::zero_grad(self);
         loss.backward();
-        self.step_once(logger)
+        // I'm not sure what errors it is possible for torch to raise here
+        // Anything that isn't essentially a type error should be converted to OptimizerStepError.
+        self.step().unwrap();
+        Ok(loss)
     }
 }
 
