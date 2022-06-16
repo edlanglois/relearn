@@ -1,7 +1,8 @@
 //! Actor-critic agent
 use super::critics::{BuildCritic, Critic};
 use super::features::LazyHistoryFeatures;
-use super::policies::{BuildPolicy, CpuActor, Policy, PolicyActor};
+use super::policies::{BuildPolicy, Policy, PolicyActor};
+use super::WithCpuCopy;
 use crate::agents::buffers::VecBuffer;
 use crate::agents::{ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, HistoryDataBound};
 use crate::envs::EnvStructure;
@@ -66,7 +67,7 @@ pub struct ActorCriticAgent<OS, AS, P: Policy, C> {
     observation_space: NonEmptyFeatures<OS>,
     action_space: AS,
 
-    policy: CpuActor<P>,
+    policy: WithCpuCopy<P>,
     critic: C,
     min_batch_size: HistoryDataBound,
 }
@@ -101,7 +102,7 @@ where
         Self {
             observation_space,
             action_space,
-            policy: CpuActor::new(policy, config.device),
+            policy: WithCpuCopy::new(policy, config.device),
             critic,
             min_batch_size: config.min_batch_size,
         }

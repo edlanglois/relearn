@@ -1,9 +1,9 @@
 use super::{
-    BuildPolicy, HistoryFeatures, Module, PackedTensor, ParameterizedDistributionSpace, Policy,
+    BuildPolicy, HistoryFeatures, PackedTensor, ParameterizedDistributionSpace, Policy,
     SeqIterative, SeqPacked, StatsLogger,
 };
 use crate::torch::backends::WithCudnnEnabled;
-use crate::torch::modules::BuildModule;
+use crate::torch::modules::{AsModule, BuildModule, Module};
 use crate::torch::optimizers::{
     BuildOptimizer, ConjugateGradientOptimizer, ConjugateGradientOptimizerConfig,
     OptimizerStepError, TrustRegionOptimizer,
@@ -77,16 +77,22 @@ pub struct Trpo<M, O = ConjugateGradientOptimizer> {
     max_policy_step_kl: f64,
 }
 
+impl<M: Module, O> AsModule for Trpo<M, O> {
+    type Module = M;
+    fn as_module(&self) -> &Self::Module {
+        &self.policy_fn
+    }
+    fn as_module_mut(&mut self) -> &mut Self::Module {
+        &mut self.policy_fn
+    }
+}
+
 impl<M, O> Policy for Trpo<M, O>
 where
     M: Module + SeqPacked + SeqIterative,
     O: TrustRegionOptimizer,
 {
-    type Module = M;
-
-    fn policy_module(&self) -> &Self::Module {
-        &self.policy_fn
-    }
+    type PolicyModule = M;
 
     fn update<AS: ParameterizedDistributionSpace<Tensor> + ?Sized>(
         &mut self,

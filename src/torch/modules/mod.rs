@@ -112,6 +112,15 @@ macro_rules! impl_wrapped_build_module {
 impl_wrapped_build_module!(&'_ T);
 impl_wrapped_build_module!(Box<T>);
 
+/// A trait for module wrappers that allow borrowing the contained [`Module`].
+pub trait AsModule {
+    type Module: Module;
+
+    fn as_module(&self) -> &Self::Module;
+
+    fn as_module_mut(&mut self) -> &mut Self::Module;
+}
+
 /// A feed-forward function of a tensor.
 ///
 /// This is roughtly equivalent to PyTorch's [module][module] class except it is not treated as

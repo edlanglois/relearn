@@ -1,9 +1,9 @@
 use super::super::{n_backward_steps, ToLog};
 use super::{
-    BuildPolicy, HistoryFeatures, Module, PackedTensor, ParameterizedDistributionSpace, Policy,
+    BuildPolicy, HistoryFeatures, PackedTensor, ParameterizedDistributionSpace, Policy,
     SeqIterative, SeqPacked, StatsLogger,
 };
-use crate::torch::modules::BuildModule;
+use crate::torch::modules::{AsModule, BuildModule, Module};
 use crate::torch::optimizers::{AdamConfig, BuildOptimizer, Optimizer};
 use crate::utils::distributions::ArrayDistribution;
 use serde::{Deserialize, Serialize};
@@ -77,16 +77,22 @@ pub struct Ppo<M, O = COptimizer> {
     clip_distance: f64,
 }
 
+impl<M: Module, O> AsModule for Ppo<M, O> {
+    type Module = M;
+    fn as_module(&self) -> &Self::Module {
+        &self.policy_fn
+    }
+    fn as_module_mut(&mut self) -> &mut Self::Module {
+        &mut self.policy_fn
+    }
+}
+
 impl<M, O> Policy for Ppo<M, O>
 where
     M: Module + SeqPacked + SeqIterative,
     O: Optimizer,
 {
-    type Module = M;
-
-    fn policy_module(&self) -> &Self::Module {
-        &self.policy_fn
-    }
+    type PolicyModule = M;
 
     fn update<AS: ParameterizedDistributionSpace<Tensor> + ?Sized>(
         &mut self,
