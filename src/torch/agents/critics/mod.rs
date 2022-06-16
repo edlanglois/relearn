@@ -104,15 +104,17 @@ pub fn reward_to_go(discount_factor: f32, features: &dyn HistoryFeatures) -> Pac
         .discounted_cumsum_from_end(discount_factor)
 }
 
-/// One-step temporal difference residuals of a state value function
+/// Apply a state value function to `HistoryFeatures::extended_observations`.
 ///
 /// # Args:
 /// * `state_value_fn` - State value function estimator using past & present episode observations.
 /// * `discount_factor` - Discount factor on future rewards. In `[0, 1]`.
 /// * `features` - Experience features.
-pub fn temporal_differences<M: SeqPacked + ?Sized>(
+///
+/// Returns a [`PackedTensor`] of sequences that are one longer than the episode lengths.
+/// The final value is `0` if the episode ended and the next state value if interrupted.
+pub fn eval_extended_state_values<M: SeqPacked + ?Sized>(
     state_value_fn: &M,
-    discount_factor: f32,
     features: &dyn HistoryFeatures,
 ) -> PackedTensor {
     let (extended_observation_features, is_invalid) = features.extended_observation_features();
@@ -125,11 +127,46 @@ pub fn temporal_differences<M: SeqPacked + ?Sized>(
         .tensor_mut()
         .masked_fill_(is_invalid.tensor(), 0.0);
 
+    extended_estimated_values
+}
+
+/// One-step targets of a state value function.
+///
+/// # Args:
+/// * `state_value_fn` - State value function estimator using past & present episode observations.
+/// * `discount_factor` - Discount factor on future rewards. In `[0, 1]`.
+/// * `features` - Experience features.
+pub fn one_step_values<M: SeqPacked + ?Sized>(
+    state_value_fn: &M,
+    discount_factor: f32,
+    features: &dyn HistoryFeatures,
+) -> PackedTensor {
+    // Estimated value for each of `step.next.into_inner().observation`
+    let estimated_next_values =
+        eval_extended_state_values(state_value_fn, features).view_trim_start(1);
+    features
+        .rewards()
+        .batch_map_ref(|rewards| rewards + discount_factor * estimated_next_values.tensor())
+}
+
+/// One-step temporal difference residuals of a state value function
+///
+/// # Args:
+/// * `state_value_fn` - State value function estimator using past & present episode observations.
+/// * `discount_factor` - Discount factor on future rewards. In `[0, 1]`.
+/// * `features` - Experience features.
+pub fn temporal_differences<M: SeqPacked + ?Sized>(
+    state_value_fn: &M,
+    discount_factor: f32,
+    features: &dyn HistoryFeatures,
+) -> PackedTensor {
+    let extended_state_values = eval_extended_state_values(state_value_fn, features);
+
     // Estimated values for each of `step.observation`
-    let estimated_values = extended_estimated_values.trim_end(1);
+    let estimated_values = extended_state_values.trim_end(1);
 
     // Estimated value for each of `step.next.into_inner().observation`
-    let estimated_next_values = extended_estimated_values.view_trim_start(1);
+    let estimated_next_values = extended_state_values.view_trim_start(1);
 
     features.rewards().batch_map_ref(|rewards| {
         rewards + discount_factor * estimated_next_values.tensor() - estimated_values.tensor()
@@ -161,24 +198,32 @@ pub fn gae<M: SeqPacked + ?Sized>(
     residuals.discounted_cumsum_from_end(lambda * discount_factor)
 }
 
-/// Target function for state value estimates.
+/// Target function for per-step selected-action value estimates.
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub enum StateValueTarget {
+pub enum StepValueTarget {
     /// The empirical reward-to-go: discounted sum of future rewards.
     RewardToGo,
+    /// One-step temporal-difference targets: `r_i + γ * V(s_{i+1})`
+    OneStepTd,
 }
 
-impl Default for StateValueTarget {
+impl Default for StepValueTarget {
     fn default() -> Self {
         Self::RewardToGo
     }
 }
 
-impl StateValueTarget {
+impl StepValueTarget {
     /// Generate state value targets for each state in a collection of experience.
-    pub fn targets(&self, discount_factor: f32, features: &dyn HistoryFeatures) -> PackedTensor {
+    pub fn targets<M: SeqPacked + ?Sized>(
+        &self,
+        state_value_fn: &M,
+        discount_factor: f32,
+        features: &dyn HistoryFeatures,
+    ) -> PackedTensor {
         match self {
             Self::RewardToGo => reward_to_go(discount_factor, features),
+            Self::OneStepTd => one_step_values(state_value_fn, discount_factor, features),
         }
     }
 }

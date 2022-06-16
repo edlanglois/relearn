@@ -1,7 +1,7 @@
 use super::super::{n_backward_steps, ToLog};
 use super::{
     AdvantageFn, BuildCritic, Critic, Device, HistoryFeatures, PackedTensor, SeqPacked,
-    StateValueTarget, StatsLogger,
+    StatsLogger, StepValueTarget,
 };
 use crate::torch::modules::{BuildModule, Module};
 use crate::torch::optimizers::{AdamConfig, BuildOptimizer, Optimizer};
@@ -20,7 +20,7 @@ pub struct ValuesOptConfig<MB, OC = AdamConfig> {
     /// Strategy for calculating state value target values.
     ///
     /// The state value module is updated to minimize its mean-squared-error to these targets.
-    pub target: StateValueTarget,
+    pub target: StepValueTarget,
     /// Number of optimization steps per update.
     ///
     /// ## Design Note
@@ -42,7 +42,7 @@ impl<MB: Default, OC: Default> Default for ValuesOptConfig<MB, OC> {
             state_value_fn_config: MB::default(),
             optimizer_config: OC::default(),
             advantage_fn: AdvantageFn::default(),
-            target: StateValueTarget::default(),
+            target: StepValueTarget::default(),
             opt_steps_per_update: 80,
             max_discount_factor: 0.99,
         }
@@ -82,7 +82,7 @@ pub struct ValuesOpt<M, O = COptimizer> {
     state_value_fn: M,
     optimizer: O,
     advantage_fn: AdvantageFn,
-    target: StateValueTarget,
+    target: StepValueTarget,
     discount_factor: f32,
     opt_steps_per_update: u64,
 }
@@ -98,7 +98,10 @@ where
     }
 
     fn update(&mut self, features: &dyn HistoryFeatures, logger: &mut dyn StatsLogger) {
-        let targets = self.target.targets(self.discount_factor, features);
+        let targets = tch::no_grad(|| {
+            self.target
+                .targets(&self.state_value_fn, self.discount_factor, features)
+        });
         let observations = features.observation_features();
         let loss_fn = || {
             self.state_value_fn

@@ -207,7 +207,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::critics::{RewardToGoConfig, ValuesOptConfig};
+    use super::super::critics::{RewardToGoConfig, StepValueTarget, ValuesOptConfig};
     use super::super::policies::{PpoConfig, ReinforceConfig, TrpoConfig};
     use super::*;
     use crate::agents::testing;
@@ -267,17 +267,19 @@ mod tests {
         PhantomData
     }
 
-    impl<MB: Default> FromModuleConfig<MB> for ValuesOptConfig<MB> {
-        fn from_module_config(module_config: MB) -> Self {
-            Self {
-                state_value_fn_config: module_config,
-                optimizer_config: AdamConfig {
-                    learning_rate: 0.1,
-                    ..AdamConfig::default()
-                },
-                opt_steps_per_update: 1,
-                ..Self::default()
-            }
+    fn values_opt_config<MB: Default>(
+        module_config: MB,
+        target: StepValueTarget,
+    ) -> ValuesOptConfig<MB> {
+        ValuesOptConfig {
+            state_value_fn_config: module_config,
+            optimizer_config: AdamConfig {
+                learning_rate: 0.1,
+                ..AdamConfig::default()
+            },
+            target,
+            opt_steps_per_update: 1,
+            ..ValuesOptConfig::default()
         }
     }
 
@@ -306,6 +308,8 @@ mod tests {
     fn learns_deterministic_bandit_values_gae<MB, PB>(
         #[values(MlpConfig::default(), GruMlpConfig::default())] module: MB,
         #[values(reinforce(), ppo(), trpo())] _policy_alg: PhantomData<PB>,
+        #[values(StepValueTarget::RewardToGo, StepValueTarget::OneStepTd)]
+        value_target: StepValueTarget,
         #[values(Device::Cpu, Device::cuda_if_available())] device: Device,
     ) where
         MB: BuildModule + Default + Clone,
@@ -314,7 +318,7 @@ mod tests {
     {
         let config = ActorCriticConfig {
             policy_config: PB::from_module_config(module.clone()),
-            critic_config: ValuesOptConfig::from_module_config(module),
+            critic_config: values_opt_config(module, value_target),
             min_batch_size: HistoryDataBound::new(25, 1),
             device,
         };

@@ -14,7 +14,7 @@ use relearn::simulation::{Steps, StepsIter, StepsSummary};
 use relearn::spaces::{IndexSpace, NonEmptySpace, SingletonSpace, Space};
 use relearn::torch::{
     agents::{
-        critics::{AdvantageFn, StateValueTarget, ValuesOpt, ValuesOptConfig},
+        critics::{AdvantageFn, StepValueTarget, ValuesOpt, ValuesOptConfig},
         policies::{Trpo, TrpoConfig},
         ActorCriticAgent, ActorCriticConfig,
     },
@@ -403,7 +403,7 @@ impl TrainConfig {
             state_value_fn_config: model_config,
             optimizer_config: AdamConfig::default(),
             advantage_fn: AdvantageFn::Gae { lambda: 0.3 },
-            target: StateValueTarget::default(),
+            target: StepValueTarget::default(),
             opt_steps_per_update: 50,
             max_discount_factor: 0.99,
         };
