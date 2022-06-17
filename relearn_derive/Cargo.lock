@@ -913,14 +913,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "tensorboard-rs"
-version = "0.2.4"
+name = "tensorboard-proto"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa65bcd253e6b1f80f417b0e42c1f658c9843102508f5c7df7f7d503099b925c"
+checksum = "fef188ec956e6c63eff0311a186d94e116a2b2b7f21fad175c9867055f93427f"
+dependencies = [
+ "protobuf",
+]
+
+[[package]]
+name = "tensorboard-rs"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "989cb58f7c3cbdb71bb65e344e7484ab3bafaea046256f08302201442fe73905"
 dependencies = [
  "gethostname",
  "image",
  "protobuf",
+ "tensorboard-proto",
 ]
 
 [[package]]
