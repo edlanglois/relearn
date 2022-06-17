@@ -1,3 +1,4 @@
+use env_logger::Env;
 use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent, TabularQLearningAgentConfig};
 use relearn::envs::{BuildEnv, Chain, Environment};
@@ -6,6 +7,8 @@ use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfi
 use relearn::Prng;
 
 fn main() {
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+
     let env_config = Chain::default();
     // let env_config = Chain::default().with_step_limit(100);
     let agent_config = TabularQLearningAgentConfig::default();

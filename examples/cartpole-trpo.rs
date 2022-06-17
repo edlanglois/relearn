@@ -1,4 +1,5 @@
-/// Cart-Pole TRPO Example
+//! Cart-Pole TRPO Example
+use env_logger::Env;
 use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent};
 use relearn::envs::{CartPole, EnvStructure, Environment, WithVisibleStepLimit};
@@ -15,6 +16,8 @@ use tch::Device;
 type AgentConfig = ActorCriticConfig<TrpoConfig<MlpConfig>, ValuesOptConfig<MlpConfig>>;
 
 fn main() {
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+
     let env = CartPole::default().with_visible_step_limit(500);
     println!("Env:\n{:#?}\n", env);
 

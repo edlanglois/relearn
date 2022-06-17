@@ -37,6 +37,7 @@ yansi = "0.5.0"
 chrono = "0.4"
 criterion = { version = "0.3", features = ["html_reports"] }
 ctor = "0.1"
+env_logger = "0.9.0"
 num_cpus = "1.13"
 rstest = "0.13"
 serde_cbor = "0.11" # Archived but alternative 'ciborium' is very new
