@@ -859,9 +859,9 @@ dependencies = [
 
 [[package]]
 name = "slice-of-array"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af7635b5266b4849f36727e108916b2bd7ec2155b9a7dc844af1a10aa3b71863"
+checksum = "a4f120bb98cb4cb0dab21c882968c3cbff79dd23b46f07b1cf5c25044945ce84"
 
 [[package]]
 name = "smallvec"
