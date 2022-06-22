@@ -103,7 +103,10 @@ where
                 .targets(&self.state_value_fn, self.discount_factor, features)
         });
         let observations = features.observation_features();
-        let loss_fn = || {
+
+        let sample_minibatch = || {};
+
+        let loss_fn = |_| {
             self.state_value_fn
                 .seq_packed(observations)
                 .tensor()
@@ -113,6 +116,7 @@ where
 
         n_backward_steps(
             &mut self.optimizer,
+            sample_minibatch,
             loss_fn,
             self.opt_steps_per_update,
             logger,

@@ -1,9 +1,12 @@
 mod actor_critic;
 pub mod critics;
+mod dqn;
 pub mod features;
 pub mod policies;
+pub mod schedules;
 
 pub use actor_critic::{ActorCriticAgent, ActorCriticConfig};
+pub use dqn::{DqnActor, DqnAgent, DqnConfig};
 
 use crate::logging::StatsLogger;
 use crate::torch::modules::{AsModule, Module};
@@ -23,8 +26,15 @@ enum ToLog {
 }
 
 /// Take n backward steps of a loss function with logging.
-fn n_backward_steps<O, F, L>(
+///
+/// # Note
+/// The output of `sample_minibatch` is cloned on each call to `loss_fn` so it should be cheap to
+/// clone (e.g. a reference or a `Rc`).
+/// `loss_fn` does not simply take `&D` because a current limitation in the compiler means that it
+/// is difficult to construct closures that take a reference with any lifetime.
+fn n_backward_steps<O, G, F, L, D>(
     optimizer: &mut O,
+    mut sample_minibatch: G,
     mut loss_fn: F,
     n: u64,
     mut logger: L,
@@ -32,14 +42,18 @@ fn n_backward_steps<O, F, L>(
     err_msg: &str,
 ) where
     O: Optimizer + ?Sized,
-    F: FnMut() -> Tensor,
+    G: FnMut() -> D,
+    F: FnMut(D) -> Tensor,
     L: StatsLogger,
+    D: Clone,
 {
     let mut step_logger = (&mut logger).with_scope("step");
     let mut prev_loss = None;
     let mut prev_start = Instant::now();
     for _ in 0..n {
-        let result = optimizer.backward_step(&mut loss_fn, &mut step_logger);
+        let minibatch = sample_minibatch();
+        let mut minibatch_loss_fn = || loss_fn(minibatch.clone());
+        let result = optimizer.backward_step(&mut minibatch_loss_fn, &mut step_logger);
         let loss = opt_expect_ok_log(result, err_msg).map(f64::from);
 
         if let Some(loss_improvement) = prev_loss.and_then(|p| loss.map(|l| p - l)) {

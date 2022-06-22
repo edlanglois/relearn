@@ -117,7 +117,9 @@ where
         };
 
         // TODO Sample a minibatch on each update.
-        let policy_surrogate_loss_fn = || {
+        let sample_minibatch = || {};
+
+        let policy_surrogate_loss_fn = |_| {
             let policy_output = self.policy_fn.seq_packed(observation_features);
             let distribution = action_space.distribution(policy_output.tensor());
             let log_probs = distribution.log_probs(actions);
@@ -134,6 +136,7 @@ where
 
         n_backward_steps(
             &mut self.optimizer,
+            sample_minibatch,
             policy_surrogate_loss_fn,
             self.opt_steps_per_update,
             logger,

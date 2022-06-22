@@ -49,6 +49,19 @@ impl HistoryDataBound {
         }
     }
 
+    #[inline]
+    #[must_use]
+    /// Create a new `HistoryDataBound` with the default amount of slack.
+    ///
+    /// The default amount of slack is %1 of `min_steps`, between 5 and 1000.
+    pub fn with_default_slack(min_steps: usize) -> Self {
+        let slack_steps = (min_steps / 100).clamp(5, 1000);
+        Self {
+            min_steps,
+            slack_steps,
+        }
+    }
+
     /// The maximum of two bounds (maximum of each field).
     #[inline]
     #[must_use]

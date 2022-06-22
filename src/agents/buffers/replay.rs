@@ -73,6 +73,15 @@ impl<O, A> ReplayBuffer<O, A> {
             index_offset: self.index_offset,
         }
     }
+
+    /// Total number of steps consumed by the buffer over its lifetime.
+    ///
+    /// Excludes any steps dropped for being the last of an incomplete episode
+    /// (at most one per experience collection).
+    #[must_use]
+    pub const fn total_step_count(&self) -> u64 {
+        self.total_step_count
+    }
 }
 
 impl<O, A> WriteExperienceIncremental<O, A> for ReplayBuffer<O, A> {

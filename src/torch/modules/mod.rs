@@ -1,12 +1,14 @@
 //! Neural network modules: variables and implementation for a part of a neural network.
 mod chain;
 mod ff;
+mod map;
 mod seq;
 #[cfg(test)]
 pub mod testing;
 
 pub use chain::{Chain, ChainConfig};
 pub use ff::{Activation, Linear, LinearConfig, Mlp, MlpConfig};
+pub use map::BatchMap;
 pub use seq::{Gru, GruConfig, Lstm, LstmConfig};
 
 pub type GruMlpConfig = ChainConfig<GruConfig, MlpConfig>;
@@ -119,6 +121,24 @@ pub trait AsModule {
     fn as_module(&self) -> &Self::Module;
 
     fn as_module_mut(&mut self) -> &mut Self::Module;
+
+    /// Apply a batch-structure-preserving function to the module output.
+    fn batch_map<F: Fn(Tensor) -> Tensor>(self, f: F) -> BatchMap<Self, F>
+    where
+        Self: Sized,
+    {
+        BatchMap::new(self, f)
+    }
+}
+
+impl<T: Module> AsModule for T {
+    type Module = Self;
+    fn as_module(&self) -> &Self::Module {
+        self
+    }
+    fn as_module_mut(&mut self) -> &mut Self::Module {
+        self
+    }
 }
 
 /// A feed-forward function of a tensor.
