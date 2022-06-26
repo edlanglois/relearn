@@ -1,7 +1,7 @@
 //! `IntervalSpace` definition
 use super::{ElementRefInto, FeatureSpace, NonEmptySpace, ReprSpace, Space, SubsetOrd};
 use crate::logging::Loggable;
-use num_traits::{Float, ToPrimitive};
+use num_traits::{Bounded, Float, ToPrimitive};
 use rand::distributions::Distribution;
 use rand::Rng;
 use rand_distr::{Gamma, StandardNormal};
@@ -10,7 +10,7 @@ use std::cmp::Ordering;
 use std::{fmt, slice};
 use tch::Tensor;
 
-/// A closed interval of floating-point numbers.
+/// A closed interval on bounded, partially ordered types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct IntervalSpace<T> {
     pub low: T,
@@ -26,12 +26,12 @@ impl<T: PartialOrd> IntervalSpace<T> {
 }
 
 /// The default interval is the full real number line.
-impl<T: Float> Default for IntervalSpace<T> {
+impl<T: Bounded> Default for IntervalSpace<T> {
     #[inline]
     fn default() -> Self {
         Self {
-            low: T::neg_infinity(),
-            high: T::infinity(),
+            low: T::min_value(),
+            high: T::max_value(),
         }
     }
 }
@@ -43,12 +43,12 @@ impl<T: fmt::Display> fmt::Display for IntervalSpace<T> {
     }
 }
 
-impl<T: Float + Send> Space for IntervalSpace<T> {
+impl<T: Bounded + PartialOrd + Clone + Send> Space for IntervalSpace<T> {
     type Element = T;
 
     #[inline]
     fn contains(&self, value: &Self::Element) -> bool {
-        &self.low <= value && value <= &self.high && value.is_finite()
+        &self.low <= value && value <= &self.high
     }
 }
 
@@ -68,17 +68,17 @@ impl<T: PartialOrd> SubsetOrd for IntervalSpace<T> {
     }
 }
 
-impl<T: Float + Send> NonEmptySpace for IntervalSpace<T> {
+impl<T: Bounded + PartialOrd + Clone + Send> NonEmptySpace for IntervalSpace<T> {
     #[inline]
     fn some_element(&self) -> Self::Element {
-        self.low
+        self.low.clone()
     }
 }
 
 /// Represent elements as the same type in a tensor.
 impl<T> ReprSpace<Tensor> for IntervalSpace<T>
 where
-    T: Float + tch::kind::Element + Send,
+    T: Bounded + PartialOrd + tch::kind::Element + Clone + Send,
 {
     #[inline]
     fn repr(&self, element: &Self::Element) -> Tensor {
@@ -92,13 +92,13 @@ where
         I::IntoIter: ExactSizeIterator + Clone,
         Self::Element: 'a,
     {
-        let elements: Vec<_> = elements.into_iter().copied().collect();
+        let elements: Vec<_> = elements.into_iter().cloned().collect();
         Tensor::of_slice(&elements)
     }
 }
 
 /// Features are `[f]` for element `f`.
-impl<T: Float + ToPrimitive + Send> FeatureSpace for IntervalSpace<T> {
+impl<T: Bounded + PartialOrd + ToPrimitive + Clone + Send> FeatureSpace for IntervalSpace<T> {
     #[inline]
     fn num_features(&self) -> usize {
         1
@@ -111,7 +111,7 @@ impl<T: Float + ToPrimitive + Send> FeatureSpace for IntervalSpace<T> {
         out: &'a mut [F],
         _zeroed: bool,
     ) -> &'a mut [F] {
-        out[0] = F::from(*element).expect("could not convert element to float");
+        out[0] = F::from(element.clone()).expect("could not convert element to float");
         &mut out[1..]
     }
 }
@@ -119,7 +119,10 @@ impl<T: Float + ToPrimitive + Send> FeatureSpace for IntervalSpace<T> {
 impl Distribution<f32> for IntervalSpace<f32> {
     #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
-        match (self.low.is_finite(), self.high.is_finite()) {
+        match (
+            self.low > Bounded::min_value(),
+            self.high < Bounded::max_value(),
+        ) {
             (true, true) => rng.gen_range(self.low..=self.high),
             (true, false) => self.low + Gamma::new(1.0, 1.0).unwrap().sample(rng),
             (false, true) => self.high - Gamma::new(1.0, 1.0).unwrap().sample(rng),
@@ -131,7 +134,10 @@ impl Distribution<f32> for IntervalSpace<f32> {
 impl Distribution<f64> for IntervalSpace<f64> {
     #[inline]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> <Self as Space>::Element {
-        match (self.low.is_finite(), self.high.is_finite()) {
+        match (
+            self.low > Bounded::min_value(),
+            self.high < Bounded::max_value(),
+        ) {
             (true, true) => rng.gen_range(self.low..=self.high),
             (true, false) => self.low + Gamma::new(1.0, 1.0).unwrap().sample(rng),
             (false, true) => self.high - Gamma::new(1.0, 1.0).unwrap().sample(rng),
@@ -140,10 +146,12 @@ impl Distribution<f64> for IntervalSpace<f64> {
     }
 }
 
-impl<T: Float + Into<f64> + Send> ElementRefInto<Loggable> for IntervalSpace<T> {
+impl<T: Bounded + PartialOrd + Into<f64> + Clone + Send> ElementRefInto<Loggable>
+    for IntervalSpace<T>
+{
     #[inline]
     fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
-        Loggable::Scalar((*element).into())
+        Loggable::Scalar(element.clone().into())
     }
 }
 
@@ -222,13 +230,6 @@ mod space {
     fn unbounded_contains_samples() {
         let space = IntervalSpace::<f64>::default();
         testing::check_contains_samples(&space, 20);
-    }
-
-    #[test]
-    fn unbounded_eq_default() {
-        let default = IntervalSpace::default();
-        let unbounded = IntervalSpace::new(f64::NEG_INFINITY, f64::INFINITY);
-        assert_eq!(default, unbounded);
     }
 
     #[test]
