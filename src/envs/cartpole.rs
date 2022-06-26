@@ -269,13 +269,13 @@ pub struct CartPolePhysicalState {
 #[element(CartPolePhysicalState)]
 pub struct CartPolePhysicalStateSpace {
     /// Cart position from the track midpoint (m).
-    pub cart_position: IntervalSpace,
+    pub cart_position: IntervalSpace<f64>,
     /// Cart velocity (m/s).
-    pub cart_velocity: IntervalSpace,
+    pub cart_velocity: IntervalSpace<f64>,
     /// Angle of the pole from vertical (radians).
-    pub pole_angle: IntervalSpace,
+    pub pole_angle: IntervalSpace<f64>,
     /// Pole angular velocity about the hinge (radians / s).
-    pub pole_angular_velocity: IntervalSpace,
+    pub pole_angular_velocity: IntervalSpace<f64>,
 }
 
 /// State of the [`CartPole`] environment.

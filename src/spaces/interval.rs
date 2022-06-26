@@ -12,7 +12,7 @@ use tch::Tensor;
 
 /// A closed interval of floating-point numbers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct IntervalSpace<T = f64> {
+pub struct IntervalSpace<T> {
     pub low: T,
     pub high: T,
 }

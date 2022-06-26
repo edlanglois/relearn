@@ -126,7 +126,7 @@ impl Default for VisibleStepLimit {
 pub type WithVisibleStepLimit<E> = Wrapped<E, VisibleStepLimit>;
 
 impl<T: EnvStructure> EnvStructure for Wrapped<T, VisibleStepLimit> {
-    type ObservationSpace = TupleSpace2<T::ObservationSpace, IntervalSpace>;
+    type ObservationSpace = TupleSpace2<T::ObservationSpace, IntervalSpace<f64>>;
     type ActionSpace = T::ActionSpace;
 
     fn observation_space(&self) -> Self::ObservationSpace {
