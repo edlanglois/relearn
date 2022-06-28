@@ -1,7 +1,7 @@
 use super::super::{EnvStructure, Environment, Successor};
 use super::Wrapped;
 use crate::logging::StatsLogger;
-use crate::spaces::{IntervalSpace, TupleSpace2};
+use crate::spaces::IntervalSpace;
 use crate::Prng;
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +19,7 @@ impl LatentStepLimit {
     #[must_use]
     #[inline]
     pub const fn new(max_steps_per_episode: u64) -> Self {
+        assert!(max_steps_per_episode > 0, "step limit must be positive");
         Self {
             max_steps_per_episode,
         }
@@ -58,18 +59,28 @@ impl<T: EnvStructure> EnvStructure for Wrapped<T, LatentStepLimit> {
     }
 }
 
+/// Wrapped environment state with a step limit.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct StepLimitState<T> {
+    pub inner: T,
+    pub steps_remaining: u64,
+}
+
 impl<E: Environment> Environment for Wrapped<E, LatentStepLimit> {
     /// `(inner_state, step_count)`
-    type State = (E::State, u64);
+    type State = StepLimitState<E::State>;
     type Observation = E::Observation;
     type Action = E::Action;
 
     fn initial_state(&self, rng: &mut Prng) -> Self::State {
-        (self.inner.initial_state(rng), 0)
+        StepLimitState {
+            inner: self.inner.initial_state(rng),
+            steps_remaining: self.wrapper.max_steps_per_episode,
+        }
     }
 
     fn observe(&self, state: &Self::State, rng: &mut Prng) -> Self::Observation {
-        self.inner.observe(&state.0, rng)
+        self.inner.observe(&state.inner, rng)
     }
 
     fn step(
@@ -79,13 +90,19 @@ impl<E: Environment> Environment for Wrapped<E, LatentStepLimit> {
         rng: &mut Prng,
         logger: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
-        let (inner_state, step_count) = state;
-        let (inner_successor, reward) = self.inner.step(inner_state, action, rng, logger);
+        assert!(
+            state.steps_remaining > 0,
+            "invalid step from a state with no remaining steps"
+        );
+        let (inner_successor, reward) = self.inner.step(state.inner, action, rng, logger);
 
-        // Add the step count to the state and interrupt if it is >= max_steps_per_episode
-        let successor = match inner_successor.map(|s| (s, step_count + 1)) {
-            Successor::Continue((state, steps)) if steps >= self.wrapper.max_steps_per_episode => {
-                Successor::Interrupt((state, steps))
+        // Decrement remaining steps and interrupt if none remain
+        let successor = match inner_successor.map(|inner| StepLimitState {
+            inner,
+            steps_remaining: state.steps_remaining - 1,
+        }) {
+            Successor::Continue(next_state) if next_state.steps_remaining == 0 => {
+                Successor::Interrupt(next_state)
             }
             s => s,
         };
@@ -107,6 +124,7 @@ impl VisibleStepLimit {
     #[must_use]
     #[inline]
     pub const fn new(max_steps_per_episode: u64) -> Self {
+        assert!(max_steps_per_episode > 0, "step limit must be positive");
         Self {
             max_steps_per_episode,
         }
@@ -125,12 +143,45 @@ impl Default for VisibleStepLimit {
 /// Wrap an environment with a per-episode step limit.
 pub type WithVisibleStepLimit<E> = Wrapped<E, VisibleStepLimit>;
 
+/// Wrapped environment observation with a step limit.
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StepLimitObs<T> {
+    pub inner: T,
+    /// Fraction of the episode remaining.
+    pub remaining: f64,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, ProductSpace, Serialize, Deserialize)]
+#[element(StepLimitObs<T::Element>)]
+pub struct StepLimitObsSpace<T> {
+    pub inner: T,
+    pub remaining: IntervalSpace<f64>,
+}
+
+impl<T> From<T> for StepLimitObsSpace<T> {
+    fn from(inner: T) -> Self {
+        StepLimitObsSpace {
+            inner,
+            remaining: IntervalSpace::new(0.0, 1.0),
+        }
+    }
+}
+
+impl<T: Default> Default for StepLimitObsSpace<T> {
+    fn default() -> Self {
+        StepLimitObsSpace {
+            inner: T::default(),
+            remaining: IntervalSpace::new(0.0, 1.0),
+        }
+    }
+}
+
 impl<T: EnvStructure> EnvStructure for Wrapped<T, VisibleStepLimit> {
-    type ObservationSpace = TupleSpace2<T::ObservationSpace, IntervalSpace<f64>>;
+    type ObservationSpace = StepLimitObsSpace<T::ObservationSpace>;
     type ActionSpace = T::ActionSpace;
 
     fn observation_space(&self) -> Self::ObservationSpace {
-        TupleSpace2(self.inner.observation_space(), IntervalSpace::new(0.0, 1.0))
+        self.inner.observation_space().into()
     }
 
     fn action_space(&self) -> Self::ActionSpace {
@@ -148,17 +199,23 @@ impl<T: EnvStructure> EnvStructure for Wrapped<T, VisibleStepLimit> {
 
 impl<E: Environment> Environment for Wrapped<E, VisibleStepLimit> {
     /// `(inner_state, step_count)`
-    type State = (E::State, u64);
-    type Observation = (E::Observation, f64);
+    type State = StepLimitState<E::State>;
+    type Observation = StepLimitObs<E::Observation>;
     type Action = E::Action;
 
     fn initial_state(&self, rng: &mut Prng) -> Self::State {
-        (self.inner.initial_state(rng), 0)
+        StepLimitState {
+            inner: self.inner.initial_state(rng),
+            steps_remaining: self.wrapper.max_steps_per_episode,
+        }
     }
 
     fn observe(&self, state: &Self::State, rng: &mut Prng) -> Self::Observation {
-        let progress = state.1 as f64 / self.wrapper.max_steps_per_episode as f64;
-        (self.inner.observe(&state.0, rng), progress)
+        let remaining = state.steps_remaining as f64 / self.wrapper.max_steps_per_episode as f64;
+        StepLimitObs {
+            inner: self.inner.observe(&state.inner, rng),
+            remaining,
+        }
     }
 
     fn step(
@@ -168,13 +225,19 @@ impl<E: Environment> Environment for Wrapped<E, VisibleStepLimit> {
         rng: &mut Prng,
         logger: &mut dyn StatsLogger,
     ) -> (Successor<Self::State>, f64) {
-        let (inner_state, step_count) = state;
-        let (inner_successor, reward) = self.inner.step(inner_state, action, rng, logger);
+        assert!(
+            state.steps_remaining > 0,
+            "invalid step from a state with no remaining steps"
+        );
+        let (inner_successor, reward) = self.inner.step(state.inner, action, rng, logger);
 
-        // Add the step count to the state and interrupt if it is >= max_steps_per_episode
-        let successor = match inner_successor.map(|s| (s, step_count + 1)) {
-            Successor::Continue((state, steps)) if steps >= self.wrapper.max_steps_per_episode => {
-                Successor::Interrupt((state, steps))
+        // Decrement remaining steps and interrupt if none remain
+        let successor = match inner_successor.map(|inner| StepLimitState {
+            inner,
+            steps_remaining: state.steps_remaining - 1,
+        }) {
+            Successor::Continue(next_state) if next_state.steps_remaining == 0 => {
+                Successor::Interrupt(next_state)
             }
             s => s,
         };
@@ -239,16 +302,17 @@ mod visible {
         let mut rng = Prng::seed_from_u64(110);
         let env = WithVisibleStepLimit::new(Chain::default(), VisibleStepLimit::new(2));
         let state = env.initial_state(&mut rng);
-        assert_eq!(env.observe(&state, &mut rng).1, 0.0);
+        assert_eq!(env.observe(&state, &mut rng).remaining, 1.0);
 
         // Step 1
         let (successor, _) = env.step(state, &Move::Left, &mut rng, &mut ());
         assert!(matches!(successor, Successor::Continue(_)));
         let state = successor.into_continue().unwrap();
-        assert_eq!(env.observe(&state, &mut rng).1, 0.5);
+        assert_eq!(env.observe(&state, &mut rng).remaining, 0.5);
 
         // Step 2
         let (successor, _) = env.step(state, &Move::Left, &mut rng, &mut ());
         assert!(matches!(successor, Successor::Interrupt(_)));
+        assert_eq!(successor.into_interrupt().unwrap().steps_remaining, 0);
     }
 }
