@@ -65,7 +65,7 @@ pub trait StatsLogger: Send {
     where
         Self: Sized,
     {
-        LogGroup(self)
+        LogGroup::new(self)
     }
 
     /// Wrap this logger such that an inner scope is added to all logged ids.
