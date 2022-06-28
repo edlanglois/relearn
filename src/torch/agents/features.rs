@@ -10,8 +10,6 @@ use once_cell::unsync::OnceCell;
 use std::cmp::Reverse;
 use tch::{Device, Tensor};
 
-// TODO: Rename ExperienceFeatures
-
 /// View features of a (mini-)batch of collected history.
 ///
 /// Floating-point tensors are `f32`.
