@@ -1,6 +1,6 @@
 //! `IntervalSpace` definition
-use super::{ElementRefInto, FeatureSpace, NonEmptySpace, ReprSpace, Space, SubsetOrd};
-use crate::logging::LogValue;
+use super::{FeatureSpace, LogElementSpace, NonEmptySpace, ReprSpace, Space, SubsetOrd};
+use crate::logging::{LogError, LogValue, StatsLogger};
 use num_traits::{Bounded, Float, ToPrimitive};
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -146,12 +146,15 @@ impl Distribution<f64> for IntervalSpace<f64> {
     }
 }
 
-impl<T: Bounded + PartialOrd + Into<f64> + Clone + Send> ElementRefInto<LogValue>
-    for IntervalSpace<T>
-{
+impl<T: Bounded + PartialOrd + Into<f64> + Clone + Send> LogElementSpace for IntervalSpace<T> {
     #[inline]
-    fn elem_ref_into(&self, element: &Self::Element) -> LogValue {
-        LogValue::Scalar(element.clone().into())
+    fn log_element<L: StatsLogger + ?Sized>(
+        &self,
+        name: &'static str,
+        element: &Self::Element,
+        logger: &mut L,
+    ) -> Result<(), LogError> {
+        logger.log(name.into(), LogValue::Scalar(element.clone().into()))
     }
 }
 

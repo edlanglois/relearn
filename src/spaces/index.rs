@@ -1,9 +1,9 @@
 //! `IndexSpace` definition
 use super::{
-    ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, ParameterizedDistributionSpace,
+    FeatureSpace, FiniteSpace, LogElementSpace, NonEmptySpace, ParameterizedDistributionSpace,
     ReprSpace, Space, SubsetOrd,
 };
-use crate::logging::LogValue;
+use crate::logging::{LogError, LogValue, StatsLogger};
 use crate::torch::distributions::Categorical;
 use crate::utils::distributions::ArrayDistribution;
 use ndarray::{s, ArrayBase, DataMut, Ix2};
@@ -185,13 +185,19 @@ impl ParameterizedDistributionSpace<Tensor> for IndexSpace {
 }
 
 /// Log the index as a sample from `0..N`
-impl ElementRefInto<LogValue> for IndexSpace {
+impl LogElementSpace for IndexSpace {
     #[inline]
-    fn elem_ref_into(&self, element: &Self::Element) -> LogValue {
-        LogValue::Index {
+    fn log_element<L: StatsLogger + ?Sized>(
+        &self,
+        name: &'static str,
+        element: &Self::Element,
+        logger: &mut L,
+    ) -> Result<(), LogError> {
+        let log_value = LogValue::Index {
             value: self.to_index(element),
             size: self.size,
-        }
+        };
+        logger.log(name.into(), log_value)
     }
 }
 

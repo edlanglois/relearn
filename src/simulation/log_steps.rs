@@ -1,7 +1,7 @@
 use super::{PartialStep, Simulation};
 use crate::envs::EnvStructure;
-use crate::logging::{LogValue, StatsLogger};
-use crate::spaces::ElementRefInto;
+use crate::logging::StatsLogger;
+use crate::spaces::LogElementSpace;
 use serde::{Deserialize, Serialize};
 use std::iter::FusedIterator;
 
@@ -34,8 +34,8 @@ where
 impl<S, OS, AS> Simulation for LogSteps<S, OS, AS>
 where
     S: Simulation<Observation = OS::Element, Action = AS::Element>,
-    OS: ElementRefInto<LogValue>,
-    AS: ElementRefInto<LogValue>,
+    OS: LogElementSpace,
+    AS: LogElementSpace,
 {
     type Observation = S::Observation;
     type Action = S::Action;
@@ -72,8 +72,8 @@ where
 impl<S, OS, AS> Iterator for LogSteps<S, OS, AS>
 where
     S: Simulation<Observation = OS::Element, Action = AS::Element>,
-    OS: ElementRefInto<LogValue>,
-    AS: ElementRefInto<LogValue>,
+    OS: LogElementSpace,
+    AS: LogElementSpace,
 {
     type Item = PartialStep<S::Observation, S::Action>;
 
@@ -83,17 +83,11 @@ where
         let mut group = self.steps.logger_mut().group();
         let mut step_logger = (&mut group).with_scope("step");
         step_logger.log_scalar("reward", step.reward);
-        step_logger
-            .log(
-                "observation".into(),
-                self.observation_space.elem_ref_into(&step.observation),
-            )
+        self.observation_space
+            .log_element("observation", &step.observation, &mut step_logger)
             .unwrap();
-        step_logger
-            .log(
-                "action".into(),
-                self.action_space.elem_ref_into(&step.action),
-            )
+        self.action_space
+            .log_element("action", &step.action, &mut step_logger)
             .unwrap();
 
         step_logger.log_counter_increment("count", 1);
@@ -120,8 +114,8 @@ where
 impl<S, OS, AS> ExactSizeIterator for LogSteps<S, OS, AS>
 where
     S: ExactSizeIterator + Simulation<Observation = OS::Element, Action = AS::Element>,
-    OS: ElementRefInto<LogValue>,
-    AS: ElementRefInto<LogValue>,
+    OS: LogElementSpace,
+    AS: LogElementSpace,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -132,7 +126,7 @@ where
 impl<S, OS, AS> FusedIterator for LogSteps<S, OS, AS>
 where
     S: FusedIterator + Simulation<Observation = OS::Element, Action = AS::Element>,
-    OS: ElementRefInto<LogValue>,
-    AS: ElementRefInto<LogValue>,
+    OS: LogElementSpace,
+    AS: LogElementSpace,
 {
 }

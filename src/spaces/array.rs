@@ -1,9 +1,8 @@
 //! Array space
 use super::{
-    iter_product_subset_ord, ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, Space,
-    SubsetOrd,
+    iter_product_subset_ord, FeatureSpace, FiniteSpace, LogElementSpace, LogError, NonEmptySpace,
+    Space, StatsLogger, SubsetOrd,
 };
-use crate::logging::LogValue;
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -148,11 +147,16 @@ impl<S: FeatureSpace, const N: usize> FeatureSpace for ArraySpace<S, N> {
     }
 }
 
-impl<S: Space, const N: usize> ElementRefInto<LogValue> for ArraySpace<S, N> {
+impl<S: Space, const N: usize> LogElementSpace for ArraySpace<S, N> {
     #[inline]
-    fn elem_ref_into(&self, _element: &Self::Element) -> LogValue {
+    fn log_element<L: StatsLogger + ?Sized>(
+        &self,
+        _name: &'static str,
+        _element: &Self::Element,
+        _logger: &mut L,
+    ) -> Result<(), LogError> {
         // Too complex to log
-        LogValue::Nothing
+        Ok(())
     }
 }
 

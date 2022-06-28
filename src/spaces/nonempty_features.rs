@@ -1,5 +1,6 @@
 //! Wrap spaces to have non-empty feature vectors.
-use super::{FeatureSpace, FiniteSpace, NonEmptySpace, Space, SubsetOrd};
+use super::{FeatureSpace, FiniteSpace, LogElementSpace, NonEmptySpace, Space, SubsetOrd};
+use crate::logging::{LogError, StatsLogger};
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
 use ndarray::{s, ArrayBase, DataMut, Ix2};
 use num_traits::{Float, Zero};
@@ -147,6 +148,18 @@ impl<S: FeatureSpace> FeatureSpace for NonEmptyFeatures<S> {
         } else {
             T::Array::zeros((elements.into_iter().len(), 1)).into()
         }
+    }
+}
+
+impl<S: LogElementSpace> LogElementSpace for NonEmptyFeatures<S> {
+    #[inline]
+    fn log_element<L: StatsLogger + ?Sized>(
+        &self,
+        name: &'static str,
+        element: &Self::Element,
+        logger: &mut L,
+    ) -> Result<(), LogError> {
+        self.inner.log_element(name, element, logger)
     }
 }
 

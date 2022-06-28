@@ -1,6 +1,6 @@
 //! Option space definition.
-use super::{ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, Space, SubsetOrd};
-use crate::logging::LogValue;
+use super::{FeatureSpace, FiniteSpace, LogElementSpace, NonEmptySpace, Space, SubsetOrd};
+use crate::logging::{LogError, LogValue, StatsLogger};
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -130,12 +130,23 @@ where
     }
 }
 
-// NOTE: ElementRefTryInto instead of ElementRefInto?
-impl<S: Space> ElementRefInto<LogValue> for OptionSpace<S> {
+impl<S: LogElementSpace> LogElementSpace for OptionSpace<S> {
     #[inline]
-    fn elem_ref_into(&self, _element: &Self::Element) -> LogValue {
-        // No clear way to convert structured elements into LogValue
-        LogValue::Nothing
+    fn log_element<L: StatsLogger + ?Sized>(
+        &self,
+        name: &'static str,
+        element: &Self::Element,
+        logger: &mut L,
+    ) -> Result<(), LogError> {
+        let mut logger = logger.with_scope(name).group();
+        logger.log(
+            "is_some".into(),
+            LogValue::Scalar(if element.is_some() { 1.0 } else { 0.0 }),
+        )?;
+        if let Some(inner_elem) = element {
+            self.inner.log_element("value", inner_elem, &mut logger)?;
+        }
+        Ok(())
     }
 }
 

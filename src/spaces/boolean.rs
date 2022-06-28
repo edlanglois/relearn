@@ -1,9 +1,9 @@
 //! `BooleanSpace` definition
 use super::{
-    ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, ParameterizedDistributionSpace,
+    FeatureSpace, FiniteSpace, LogElementSpace, NonEmptySpace, ParameterizedDistributionSpace,
     ReprSpace, Space, SubsetOrd,
 };
-use crate::logging::LogValue;
+use crate::logging::{LogError, LogValue, StatsLogger};
 use crate::torch::distributions::Bernoulli;
 use crate::utils::distributions::ArrayDistribution;
 use crate::utils::num_array::{BuildFromArray1D, NumArray1D};
@@ -160,10 +160,15 @@ impl Distribution<<Self as Space>::Element> for BooleanSpace {
     }
 }
 
-impl ElementRefInto<LogValue> for BooleanSpace {
+impl LogElementSpace for BooleanSpace {
     #[inline]
-    fn elem_ref_into(&self, element: &Self::Element) -> LogValue {
-        LogValue::Scalar(u8::from(*element).into())
+    fn log_element<L: StatsLogger + ?Sized>(
+        &self,
+        name: &'static str,
+        element: &Self::Element,
+        logger: &mut L,
+    ) -> Result<(), LogError> {
+        logger.log(name.into(), LogValue::Scalar(u8::from(*element).into()))
     }
 }
 

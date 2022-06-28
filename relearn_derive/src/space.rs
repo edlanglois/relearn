@@ -435,14 +435,30 @@ impl SpaceTraitImpl for FeatureSpaceImpl {
 
 pub(crate) struct LogElementSpaceImpl;
 impl SpaceTraitImpl for LogElementSpaceImpl {
-    fn impl_trait<T: SpaceStruct>(name: &Ident, generics: Generics, _struct: T) -> TokenStream2 {
-        let generics = add_trait_bounds(generics, &parse_quote!(::relearn::spaces::Space));
+    fn impl_trait<T: SpaceStruct>(name: &Ident, generics: Generics, struct_: T) -> TokenStream2 {
+        let generics =
+            add_trait_bounds(generics, &parse_quote!(::relearn::spaces::LogElementSpace));
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
+        let field_log = struct_.fields().map(|(id, _, span)| {
+            let id_name = format!("{}", id.to_token_stream());
+            quote_spanned! {span=>
+                ::relearn::spaces::LogElementSpace::log_element(&self.#id, #id_name, &element.#id, &mut logger)
+            }
+        });
         quote! {
-            impl #impl_generics ::relearn::spaces::ElementRefInto<::relearn::logging::LogValue> for #name #ty_generics #where_clause {
-                fn elem_ref_into(&self, _element: &Self::Element) -> ::relearn::logging::LogValue {
-                    ::relearn::logging::LogValue::Nothing
+            impl #impl_generics ::relearn::spaces::LogElementSpace for #name #ty_generics #where_clause {
+                #[inline]
+                fn log_element<L: ::relearn::logging::StatsLogger + ?Sized>(
+                    &self,
+                    name: &'static str,
+                    element: &Self::Element,
+                    logger: &mut L,
+                ) -> Result<(), ::relearn::logging::LogError> {
+                    let mut logger = ::relearn::logging::StatsLogger::group(
+                        ::relearn::logging::StatsLogger::with_scope(logger, name));
+                    #( #field_log?; )*
+                    Ok(())
                 }
             }
         }

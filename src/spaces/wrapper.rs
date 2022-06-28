@@ -1,7 +1,8 @@
 //! Generic wrapper spaces
 use super::{
-    ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, ReprSpace, Space, SubsetOrd,
+    FeatureSpace, FiniteSpace, LogElementSpace, NonEmptySpace, ReprSpace, Space, SubsetOrd,
 };
+use crate::logging::{LogError, StatsLogger};
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
 use ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::Float;
@@ -286,13 +287,18 @@ where
     }
 }
 
-impl<S, W, T> ElementRefInto<T> for WrappedElementSpace<S, W>
+impl<S, W> LogElementSpace for WrappedElementSpace<S, W>
 where
-    S: ElementRefInto<T>,
+    S: LogElementSpace,
     W: Wrapper<Inner = S::Element> + Clone + Send,
 {
     #[inline]
-    fn elem_ref_into(&self, element: &Self::Element) -> T {
-        self.inner.elem_ref_into(element.inner_ref())
+    fn log_element<L: StatsLogger + ?Sized>(
+        &self,
+        name: &'static str,
+        element: &Self::Element,
+        logger: &mut L,
+    ) -> Result<(), LogError> {
+        self.inner.log_element(name, element.inner_ref(), logger)
     }
 }

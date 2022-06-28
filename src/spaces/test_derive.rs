@@ -1,9 +1,39 @@
 use super::{
-    testing, BooleanSpace, ElementRefInto, FeatureSpace, FiniteSpace, IndexSpace, IntervalSpace,
+    testing, BooleanSpace, FeatureSpace, FiniteSpace, IndexSpace, IntervalSpace, LogElementSpace,
     Space, SubsetOrd,
 };
-use crate::logging::LogValue;
+use crate::logging::{Id, LogError, LogValue, StatsLogger};
 use std::cmp::Ordering;
+
+/// Mock logger for testing `LogElementSpace`
+#[derive(Debug, Default)]
+struct MockLogger {
+    calls: Vec<MockLogCall>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum MockLogCall {
+    GroupStart,
+    Log { id: Id, value: LogValue },
+    GroupEnd,
+    Flush,
+}
+
+impl StatsLogger for MockLogger {
+    fn group_start(&mut self) {
+        self.calls.push(MockLogCall::GroupStart);
+    }
+    fn group_log(&mut self, id: Id, value: LogValue) -> Result<(), LogError> {
+        self.calls.push(MockLogCall::Log { id, value });
+        Ok(())
+    }
+    fn group_end(&mut self) {
+        self.calls.push(MockLogCall::GroupEnd);
+    }
+    fn flush(&mut self) {
+        self.calls.push(MockLogCall::Flush);
+    }
+}
 
 mod unit {
     use super::*;
@@ -103,7 +133,12 @@ mod unit {
 
         #[test]
         fn log_element() {
-            assert_eq!(UnitSpace.elem_ref_into(&()), LogValue::Nothing);
+            let mut logger = MockLogger::default();
+            UnitSpace.log_element("foo", &(), &mut logger).unwrap();
+            assert_eq!(
+                logger.calls,
+                [MockLogCall::GroupStart, MockLogCall::GroupEnd]
+            );
         }
     }
 }
@@ -252,9 +287,24 @@ mod named {
 
         #[test]
         fn log_element() {
+            let mut logger = MockLogger::default();
+            space()
+                .log_element("foo", &NamedStruct::new(true, 1), &mut logger)
+                .unwrap();
             assert_eq!(
-                space().elem_ref_into(&NamedStruct::new(true, 1)),
-                LogValue::Nothing
+                logger.calls,
+                [
+                    MockLogCall::GroupStart,
+                    MockLogCall::Log {
+                        id: ["foo", "a"].into_iter().collect(),
+                        value: LogValue::Scalar(1.0)
+                    },
+                    MockLogCall::Log {
+                        id: ["foo", "b"].into_iter().collect(),
+                        value: LogValue::Index { value: 1, size: 3 }
+                    },
+                    MockLogCall::GroupEnd,
+                ]
             );
         }
     }
@@ -414,9 +464,20 @@ mod named_generic {
 
         #[test]
         fn log_element() {
+            let mut logger = MockLogger::default();
+            space()
+                .log_element("foo", &NamedGeneric::new(1), &mut logger)
+                .unwrap();
             assert_eq!(
-                space().elem_ref_into(&NamedGeneric::new(1)),
-                LogValue::Nothing
+                logger.calls,
+                [
+                    MockLogCall::GroupStart,
+                    MockLogCall::Log {
+                        id: ["foo", "inner"].into_iter().collect(),
+                        value: LogValue::Index { value: 1, size: 3 }
+                    },
+                    MockLogCall::GroupEnd,
+                ]
             );
         }
     }
@@ -547,7 +608,23 @@ mod unnamed {
 
         #[test]
         fn log_element() {
-            assert_eq!(space().elem_ref_into(&(true, 1)), LogValue::Nothing);
+            let mut logger = MockLogger::default();
+            space().log_element("foo", &(true, 1), &mut logger).unwrap();
+            assert_eq!(
+                logger.calls,
+                [
+                    MockLogCall::GroupStart,
+                    MockLogCall::Log {
+                        id: ["foo", "0"].into_iter().collect(),
+                        value: LogValue::Scalar(1.0)
+                    },
+                    MockLogCall::Log {
+                        id: ["foo", "1"].into_iter().collect(),
+                        value: LogValue::Index { value: 1, size: 3 }
+                    },
+                    MockLogCall::GroupEnd,
+                ]
+            );
         }
     }
 }
@@ -762,7 +839,29 @@ mod unnamed_generic {
 
         #[test]
         fn log_element() {
-            assert_eq!(space().elem_ref_into(&(1, true, false)), LogValue::Nothing);
+            let mut logger = MockLogger::default();
+            space()
+                .log_element("foo", &(1, true, false), &mut logger)
+                .unwrap();
+            assert_eq!(
+                logger.calls,
+                [
+                    MockLogCall::GroupStart,
+                    MockLogCall::Log {
+                        id: ["foo", "0"].into_iter().collect(),
+                        value: LogValue::Index { value: 1, size: 3 }
+                    },
+                    MockLogCall::Log {
+                        id: ["foo", "1"].into_iter().collect(),
+                        value: LogValue::Scalar(1.0)
+                    },
+                    MockLogCall::Log {
+                        id: ["foo", "2"].into_iter().collect(),
+                        value: LogValue::Scalar(0.0)
+                    },
+                    MockLogCall::GroupEnd,
+                ]
+            );
         }
     }
 }

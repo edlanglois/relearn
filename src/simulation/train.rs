@@ -1,8 +1,8 @@
 use super::{OnlineStepsSummary, Simulation, Steps, StepsSummary};
 use crate::agents::{buffers::HistoryDataBound, ActorMode, Agent, BatchUpdate, WriteExperience};
 use crate::envs::{EnvStructure, Environment, StructuredEnvironment};
-use crate::logging::{LogValue, StatsLogger};
-use crate::spaces::{ElementRefInto, Space};
+use crate::logging::StatsLogger;
+use crate::spaces::{LogElementSpace, Space};
 use crate::Prng;
 use log::warn;
 use rand::SeedableRng;
@@ -21,8 +21,8 @@ pub fn train_serial<T, E>(
 ) where
     T: Agent<E::Observation, E::Action> + BatchUpdate<E::Observation, E::Action> + ?Sized,
     E: StructuredEnvironment + ?Sized,
-    E::ObservationSpace: ElementRefInto<LogValue>,
-    E::ActionSpace: ElementRefInto<LogValue>,
+    E::ObservationSpace: LogElementSpace,
+    E::ActionSpace: LogElementSpace,
 {
     let mut buffer = agent.buffer();
     for _ in 0..num_periods {
@@ -79,8 +79,8 @@ pub fn train_parallel<T, E>(
         + ?Sized,
     T::Actor: Send,
     T::HistoryBuffer: Send,
-    E::ObservationSpace: ElementRefInto<LogValue>,
-    E::ActionSpace: ElementRefInto<LogValue>,
+    E::ObservationSpace: LogElementSpace,
+    E::ActionSpace: LogElementSpace,
 {
     let mut buffers: Vec<_> = (0..config.num_threads).map(|_| agent.buffer()).collect();
     let mut thread_rngs: Vec<_> = (0..config.num_threads)

@@ -1,6 +1,6 @@
 //! Cartesian power space.
-use super::{ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, Space, SubsetOrd};
-use crate::logging::LogValue;
+use super::{FeatureSpace, FiniteSpace, LogElementSpace, NonEmptySpace, Space, SubsetOrd};
+use crate::logging::{LogError, StatsLogger};
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -115,11 +115,16 @@ impl<S: FeatureSpace, const N: usize> FeatureSpace for PowerSpace<S, N> {
     }
 }
 
-impl<S: Space, const N: usize> ElementRefInto<LogValue> for PowerSpace<S, N> {
+impl<S: Space, const N: usize> LogElementSpace for PowerSpace<S, N> {
     #[inline]
-    fn elem_ref_into(&self, _element: &Self::Element) -> LogValue {
+    fn log_element<L: StatsLogger + ?Sized>(
+        &self,
+        _name: &'static str,
+        _element: &Self::Element,
+        _logger: &mut L,
+    ) -> Result<(), LogError> {
         // Too complex to log
-        LogValue::Nothing
+        Ok(())
     }
 }
 

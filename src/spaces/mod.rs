@@ -38,6 +38,7 @@ pub use relearn_derive::{
     FiniteSpace, Indexed, LogElementSpace, ProductSpace, SampleSpace, Space, SubsetOrd,
 };
 
+use crate::logging::{LogError, StatsLogger};
 use crate::utils::distributions::ArrayDistribution;
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
 use ndarray::{ArrayBase, DataMut, Ix2};
@@ -440,59 +441,13 @@ pub trait ParameterizedDistributionSpace<T, T2 = T>: ReprSpace<T, T2> {
     fn distribution(&self, params: &T2) -> Self::Distribution;
 }
 
-// This could possibly be a single trait like
-//
-// pub trait Convert<T, U> {
-//     fn convert(&self, x: T) -> U;
-// }
-//
-// But doing it for references requires higher order bounds:
-// for<'a> Convert<&'a Self::Element, Foo>
-// which I have had trouble getting to work in all cases.
-
-/// Convert elements of the space into values of type `T`.
-pub trait ElementInto<T>: Space {
-    /// Convert an element into a value of type `T`.
-    fn elem_into(&self, element: Self::Element) -> T;
-}
-
-impl<T: ElementRefInto<U>, U> ElementInto<U> for T {
-    #[inline]
-    fn elem_into(&self, element: Self::Element) -> U {
-        self.elem_ref_into(&element)
-    }
-}
-
-/// Create values of type `T` from element references.
-pub trait ElementRefInto<T>: Space {
-    /// Create a value of type `T` from an element reference.
-    fn elem_ref_into(&self, element: &Self::Element) -> T;
-}
-
-impl<S: ElementRefInto<T> + ?Sized, T> ElementRefInto<T> for &'_ S {
-    #[inline]
-    fn elem_ref_into(&self, element: &Self::Element) -> T {
-        S::elem_ref_into(self, element)
-    }
-}
-
-impl<S: ElementRefInto<T> + ?Sized, T> ElementRefInto<T> for Box<S> {
-    #[inline]
-    fn elem_ref_into(&self, element: &Self::Element) -> T {
-        S::elem_ref_into(self, element)
-    }
-}
-
-/// Construct elements of the space from values of type `T`
-pub trait ElementFrom<T>: Space {
-    /// Construct an element of the space from a value of type `T`
-    fn elem_from(&self, value: T) -> Self::Element;
-}
-
-/// Try to construct an element from a value where the operation may fail.
-pub trait ElementTryFrom<T>: Space {
-    /// Try to construct an element from a value of type `T`, where conversion might not be possible.
-    ///
-    /// Returns Some(x) if and only if x is an element of this space.
-    fn elem_try_from(&self, value: T) -> Option<Self::Element>;
+/// A space whose elements can be logged to a [`StatsLogger`]
+pub trait LogElementSpace: Space {
+    /// Log an element of the space
+    fn log_element<L: StatsLogger + ?Sized>(
+        &self,
+        name: &'static str,
+        element: &Self::Element,
+        logger: &mut L,
+    ) -> Result<(), LogError>;
 }
