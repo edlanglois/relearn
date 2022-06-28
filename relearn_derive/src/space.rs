@@ -440,9 +440,9 @@ impl SpaceTraitImpl for LogElementSpaceImpl {
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
         quote! {
-            impl #impl_generics ::relearn::spaces::ElementRefInto<::relearn::logging::Loggable> for #name #ty_generics #where_clause {
-                fn elem_ref_into(&self, _element: &Self::Element) -> ::relearn::logging::Loggable {
-                    ::relearn::logging::Loggable::Nothing
+            impl #impl_generics ::relearn::spaces::ElementRefInto<::relearn::logging::LogValue> for #name #ty_generics #where_clause {
+                fn elem_ref_into(&self, _element: &Self::Element) -> ::relearn::logging::LogValue {
+                    ::relearn::logging::LogValue::Nothing
                 }
             }
         }

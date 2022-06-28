@@ -2,7 +2,7 @@ use super::{
     testing, BooleanSpace, ElementRefInto, FeatureSpace, FiniteSpace, IndexSpace, IntervalSpace,
     Space, SubsetOrd,
 };
-use crate::logging::Loggable;
+use crate::logging::LogValue;
 use std::cmp::Ordering;
 
 mod unit {
@@ -103,7 +103,7 @@ mod unit {
 
         #[test]
         fn log_element() {
-            assert_eq!(UnitSpace.elem_ref_into(&()), Loggable::Nothing);
+            assert_eq!(UnitSpace.elem_ref_into(&()), LogValue::Nothing);
         }
     }
 }
@@ -254,7 +254,7 @@ mod named {
         fn log_element() {
             assert_eq!(
                 space().elem_ref_into(&NamedStruct::new(true, 1)),
-                Loggable::Nothing
+                LogValue::Nothing
             );
         }
     }
@@ -416,7 +416,7 @@ mod named_generic {
         fn log_element() {
             assert_eq!(
                 space().elem_ref_into(&NamedGeneric::new(1)),
-                Loggable::Nothing
+                LogValue::Nothing
             );
         }
     }
@@ -547,7 +547,7 @@ mod unnamed {
 
         #[test]
         fn log_element() {
-            assert_eq!(space().elem_ref_into(&(true, 1)), Loggable::Nothing);
+            assert_eq!(space().elem_ref_into(&(true, 1)), LogValue::Nothing);
         }
     }
 }
@@ -762,7 +762,7 @@ mod unnamed_generic {
 
         #[test]
         fn log_element() {
-            assert_eq!(space().elem_ref_into(&(1, true, false)), Loggable::Nothing);
+            assert_eq!(space().elem_ref_into(&(1, true, false)), LogValue::Nothing);
         }
     }
 }

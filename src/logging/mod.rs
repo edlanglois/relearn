@@ -29,7 +29,7 @@ pub trait StatsLogger: Send {
     /// * `id` -
     ///     Unique identifier of the statistic to log. Used to track the value over time.
     ///     It is an error to use the same identifier with values that have different
-    ///     [`Loggable`] variants or are otherwise structurally incompatible.
+    ///     [`LogValue`] variants or are otherwise structurally incompatible.
     ///
     ///     The id can be created from a string with `into()`.
     ///     It is recommended that users pass ids containing the name only, not a namespace.
@@ -41,7 +41,7 @@ pub trait StatsLogger: Send {
     ///
     /// * `value` - The value to log.
     #[inline]
-    fn log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+    fn log(&mut self, id: Id, value: LogValue) -> Result<(), LogError> {
         self.group_start();
         let result = self.group_log(id, value);
         self.group_end();
@@ -51,7 +51,7 @@ pub trait StatsLogger: Send {
     /// Internal helper. Do not call directly. Handle the creation of a `LogGroup`. May flush.
     fn group_start(&mut self);
     /// Internal helper. Do not call directly. Log a value within a `LogGroup`. May not flush.
-    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError>;
+    fn group_log(&mut self, id: Id, value: LogValue) -> Result<(), LogError>;
     /// Internal helper. Do not call directly. Handle the drop of a `LogGroup`. May flush.
     fn group_end(&mut self);
 
@@ -89,7 +89,7 @@ pub trait StatsLogger: Send {
     /// Panics if this name was previously used to log a value of a different type.
     #[inline]
     fn log_counter_increment(&mut self, name: &'static str, increment: u64) {
-        self.log(name.into(), Loggable::CounterIncrement(increment))
+        self.log(name.into(), LogValue::CounterIncrement(increment))
             .unwrap()
     }
 
@@ -98,7 +98,7 @@ pub trait StatsLogger: Send {
     /// Panics if this name was previously used to log a value of a different type.
     #[inline]
     fn log_duration(&mut self, name: &'static str, duration: Duration) {
-        self.log(name.into(), Loggable::Duration(duration)).unwrap()
+        self.log(name.into(), LogValue::Duration(duration)).unwrap()
     }
 
     /// Log a named duration as the elapsed time in evaluating a closure.
@@ -122,7 +122,7 @@ pub trait StatsLogger: Send {
     /// Panics if this name was previously used to log a value of a different type.
     #[inline]
     fn log_scalar(&mut self, name: &'static str, value: f64) {
-        self.log(name.into(), Loggable::Scalar(value)).unwrap()
+        self.log(name.into(), LogValue::Scalar(value)).unwrap()
     }
 
     /// Log a named index in `0` to `size - 1` (convenience function).
@@ -131,7 +131,7 @@ pub trait StatsLogger: Send {
     /// or an index value with a different size.
     #[inline]
     fn log_index(&mut self, name: &'static str, value: usize, size: usize) {
-        self.log(name.into(), Loggable::Index { value, size })
+        self.log(name.into(), LogValue::Index { value, size })
             .unwrap()
     }
 }
@@ -148,7 +148,7 @@ macro_rules! impl_wrapped_stats_logger {
                 T::group_start(self)
             }
             #[inline]
-            fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+            fn group_log(&mut self, id: Id, value: LogValue) -> Result<(), LogError> {
                 T::group_log(self, id, value)
             }
             #[inline]
@@ -180,7 +180,7 @@ impl_wrapped_stats_logger!(Box<T>);
 ///     - pro: possibly less dynamic dispatch in some cases
 ///     - con: must downcast for backend; complex interface; hard to do trait objects
 #[derive(Debug, Clone, PartialEq)]
-pub enum Loggable {
+pub enum LogValue {
     Nothing,
     CounterIncrement(u64),
     Duration(Duration),
@@ -188,21 +188,21 @@ pub enum Loggable {
     Index { value: usize, size: usize },
 }
 
-impl From<f64> for Loggable {
+impl From<f64> for LogValue {
     fn from(scalar: f64) -> Self {
         Self::Scalar(scalar)
     }
 }
 
-impl From<Duration> for Loggable {
+impl From<Duration> for LogValue {
     fn from(duration: Duration) -> Self {
         Self::Duration(duration)
     }
 }
 
-impl Loggable {
+impl LogValue {
     const fn variant_name(&self) -> &'static str {
-        use Loggable::*;
+        use LogValue::*;
         match self {
             Nothing => "Nothing",
             CounterIncrement(_) => "CounterIncrement",
@@ -338,7 +338,7 @@ impl StatsLogger for () {
     #[inline]
     fn group_start(&mut self) {}
     #[inline]
-    fn group_log(&mut self, _: Id, _: Loggable) -> Result<(), LogError> {
+    fn group_log(&mut self, _: Id, _: LogValue) -> Result<(), LogError> {
         Ok(())
     }
     #[inline]
@@ -357,7 +357,7 @@ where
         self.0.group_start();
         self.1.group_start();
     }
-    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+    fn group_log(&mut self, id: Id, value: LogValue) -> Result<(), LogError> {
         // Log to both even if one fails
         let r1 = self.0.group_log(id.clone(), value.clone());
         let r2 = self.1.group_log(id, value);
@@ -393,7 +393,7 @@ impl<L: StatsLogger> StatsLogger for ScopedLogger<L> {
         self.logger.group_start()
     }
     #[inline]
-    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+    fn group_log(&mut self, id: Id, value: LogValue) -> Result<(), LogError> {
         self.logger
             .group_log(id.with_inner_scope(self.scope), value)
     }
@@ -421,7 +421,7 @@ impl<L: StatsLogger> StatsLogger for LogGroup<L> {
     #[inline]
     fn group_start(&mut self) {}
     #[inline]
-    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+    fn group_log(&mut self, id: Id, value: LogValue) -> Result<(), LogError> {
         self.0.group_log(id, value)
     }
     #[inline]

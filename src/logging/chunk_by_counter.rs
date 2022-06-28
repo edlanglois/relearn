@@ -1,5 +1,5 @@
 use super::chunk::{ChunkSummary, Chunker};
-use super::{Id, Loggable};
+use super::{Id, LogValue};
 
 /// Chunk summaries at fixed multiples of a counter (for [`ChunkLogger`][super::ChunkLogger]).
 ///
@@ -40,7 +40,7 @@ enum State {
 
 impl Chunker for ByCounter {
     #[inline]
-    fn note_log(&mut self, id: &Id, _: &Loggable) {
+    fn note_log(&mut self, id: &Id, _: &LogValue) {
         debug_assert!(
             matches!(self.state, State::NoFlush | State::Flush),
             "note_log following note_log without note_log_summary in between"

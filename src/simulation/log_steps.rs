@@ -1,6 +1,6 @@
 use super::{PartialStep, Simulation};
 use crate::envs::EnvStructure;
-use crate::logging::{Loggable, StatsLogger};
+use crate::logging::{LogValue, StatsLogger};
 use crate::spaces::ElementRefInto;
 use serde::{Deserialize, Serialize};
 use std::iter::FusedIterator;
@@ -34,8 +34,8 @@ where
 impl<S, OS, AS> Simulation for LogSteps<S, OS, AS>
 where
     S: Simulation<Observation = OS::Element, Action = AS::Element>,
-    OS: ElementRefInto<Loggable>,
-    AS: ElementRefInto<Loggable>,
+    OS: ElementRefInto<LogValue>,
+    AS: ElementRefInto<LogValue>,
 {
     type Observation = S::Observation;
     type Action = S::Action;
@@ -72,8 +72,8 @@ where
 impl<S, OS, AS> Iterator for LogSteps<S, OS, AS>
 where
     S: Simulation<Observation = OS::Element, Action = AS::Element>,
-    OS: ElementRefInto<Loggable>,
-    AS: ElementRefInto<Loggable>,
+    OS: ElementRefInto<LogValue>,
+    AS: ElementRefInto<LogValue>,
 {
     type Item = PartialStep<S::Observation, S::Action>;
 
@@ -120,8 +120,8 @@ where
 impl<S, OS, AS> ExactSizeIterator for LogSteps<S, OS, AS>
 where
     S: ExactSizeIterator + Simulation<Observation = OS::Element, Action = AS::Element>,
-    OS: ElementRefInto<Loggable>,
-    AS: ElementRefInto<Loggable>,
+    OS: ElementRefInto<LogValue>,
+    AS: ElementRefInto<LogValue>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -132,7 +132,7 @@ where
 impl<S, OS, AS> FusedIterator for LogSteps<S, OS, AS>
 where
     S: FusedIterator + Simulation<Observation = OS::Element, Action = AS::Element>,
-    OS: ElementRefInto<Loggable>,
-    AS: ElementRefInto<Loggable>,
+    OS: ElementRefInto<LogValue>,
+    AS: ElementRefInto<LogValue>,
 {
 }

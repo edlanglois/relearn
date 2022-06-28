@@ -108,9 +108,9 @@ pub fn feature_space_macro_derive(input: TokenStream) -> TokenStream {
     space::impl_space_trait_macro::<space::FeatureSpaceImpl>(ast)
 }
 
-/// Derive trivial `relearn::spaces::ElementRefInto<Loggable>` for a struct.
+/// Derive trivial `relearn::spaces::ElementRefInto<LogValue>` for a struct.
 ///
-/// Always just returns `Loggable` since the elements will in general be too complex
+/// Always just returns `LogValue` since the elements will in general be too complex
 /// for the loggable types.
 #[proc_macro_derive(LogElementSpace)]
 pub fn log_element_space_macro_derive(input: TokenStream) -> TokenStream {
@@ -122,7 +122,7 @@ pub fn log_element_space_macro_derive(input: TokenStream) -> TokenStream {
 ///
 /// Derives the following traits:
 /// [`Space`], [`SubsetOrd`], [`NonEmptySpace`], [`SampleSpace`], [`FeatureSpace`],
-/// and [`LogElementSpace`] (`ElementRefInto<Loggable>`).
+/// and [`LogElementSpace`] (`ElementRefInto<LogValue>`).
 ///
 /// Does not derive [`FiniteSpace`].
 ///

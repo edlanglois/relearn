@@ -3,7 +3,7 @@ use super::{
     ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, ParameterizedDistributionSpace,
     ReprSpace, Space, SubsetOrd,
 };
-use crate::logging::Loggable;
+use crate::logging::LogValue;
 use crate::torch::distributions::Categorical;
 use crate::utils::distributions::ArrayDistribution;
 use ndarray::{s, ArrayBase, DataMut, Ix2};
@@ -185,10 +185,10 @@ impl ParameterizedDistributionSpace<Tensor> for IndexSpace {
 }
 
 /// Log the index as a sample from `0..N`
-impl ElementRefInto<Loggable> for IndexSpace {
+impl ElementRefInto<LogValue> for IndexSpace {
     #[inline]
-    fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
-        Loggable::Index {
+    fn elem_ref_into(&self, element: &Self::Element) -> LogValue {
+        LogValue::Index {
             value: self.to_index(element),
             size: self.size,
         }

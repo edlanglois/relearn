@@ -1,4 +1,4 @@
-use super::{Id, LogError, Loggable, StatsLogger};
+use super::{Id, LogError, LogValue, StatsLogger};
 use crate::utils::stats::OnlineMeanVariance;
 use std::collections::{btree_map::Entry, BTreeMap};
 use std::ops::Drop;
@@ -13,7 +13,7 @@ pub trait Chunker: Send {
     }
     /// Note an entry to be logged
     #[inline]
-    fn note_log(&mut self, _id: &Id, _value: &Loggable) {}
+    fn note_log(&mut self, _id: &Id, _value: &LogValue) {}
     /// Note the value of the resulting post-log summary.
     ///
     /// Must immediately follow the corresponding value of `note_log`.
@@ -74,7 +74,7 @@ impl<C: Chunker, W: SummaryWriter> StatsLogger for ChunkLogger<C, W> {
         }
     }
 
-    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+    fn group_log(&mut self, id: Id, value: LogValue) -> Result<(), LogError> {
         self.chunker.note_log(&id, &value);
 
         let node = match self.summaries.entry(id) {
@@ -141,7 +141,7 @@ impl Node {
         }
     }
 
-    fn push(&mut self, value: Loggable) -> Result<(), LogError> {
+    fn push(&mut self, value: LogValue) -> Result<(), LogError> {
         self.dirty = true;
         self.summary.push(value)
     }
@@ -167,25 +167,25 @@ pub enum ChunkSummary {
     Index { counts: Vec<usize> },
 }
 
-impl From<Loggable> for ChunkSummary {
-    fn from(value: Loggable) -> Self {
+impl From<LogValue> for ChunkSummary {
+    fn from(value: LogValue) -> Self {
         match value {
-            Loggable::Nothing => Self::Nothing,
-            Loggable::CounterIncrement(i) => Self::Counter {
+            LogValue::Nothing => Self::Nothing,
+            LogValue::CounterIncrement(i) => Self::Counter {
                 increment: i,
                 initial_value: 0,
             },
-            Loggable::Duration(d) => {
+            LogValue::Duration(d) => {
                 let mut stats = OnlineMeanVariance::new();
                 stats.push(d.as_secs_f64());
                 Self::Duration { stats }
             }
-            Loggable::Scalar(v) => {
+            LogValue::Scalar(v) => {
                 let mut stats = OnlineMeanVariance::new();
                 stats.push(v);
                 Self::Scalar { stats }
             }
-            Loggable::Index { value: v, size } => {
+            LogValue::Index { value: v, size } => {
                 let mut counts = vec![0; size];
                 counts[v] += 1;
                 Self::Index { counts }
@@ -200,23 +200,23 @@ impl ChunkSummary {
     /// Returns and error and does not insert the value if it is incompatible with the current
     /// summary. The value will be incompatible if the summary was created from a different
     /// loggable variant, or if some other structure of the loggable is different.
-    fn push(&mut self, value: Loggable) -> Result<(), LogError> {
+    fn push(&mut self, value: LogValue) -> Result<(), LogError> {
         match (self, value) {
-            (Self::Nothing, Loggable::Nothing) => {}
+            (Self::Nothing, LogValue::Nothing) => {}
             (
                 Self::Counter {
                     increment,
                     initial_value: _,
                 },
-                Loggable::CounterIncrement(i),
+                LogValue::CounterIncrement(i),
             ) => {
                 *increment += i;
             }
-            (Self::Duration { stats }, Loggable::Duration(d)) => {
+            (Self::Duration { stats }, LogValue::Duration(d)) => {
                 stats.push(d.as_secs_f64());
             }
-            (Self::Scalar { stats }, Loggable::Scalar(v)) => stats.push(v),
-            (Self::Index { counts }, Loggable::Index { value: v, size }) => {
+            (Self::Scalar { stats }, LogValue::Scalar(v)) => stats.push(v),
+            (Self::Index { counts }, LogValue::Index { value: v, size }) => {
                 if counts.len() != size {
                     return Err(LogError::IncompatibleIndexSize {
                         prev: counts.len(),

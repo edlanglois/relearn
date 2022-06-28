@@ -1,6 +1,6 @@
 //! Command-line logger
 use super::chunk::{ChunkLogger, ChunkSummary, Chunker, SummaryWriter};
-use super::{ByTime, Id, LogError, Loggable, StatsLogger};
+use super::{ByTime, Id, LogError, LogValue, StatsLogger};
 use crate::utils::fmt::{DisplayFn, Frequency, PrettyPrint};
 use std::fmt;
 use std::time::Duration;
@@ -23,7 +23,7 @@ impl<C: Chunker> StatsLogger for DisplayLogger<C> {
         self.0.group_start()
     }
     #[inline]
-    fn group_log(&mut self, id: Id, value: Loggable) -> Result<(), LogError> {
+    fn group_log(&mut self, id: Id, value: LogValue) -> Result<(), LogError> {
         self.0.group_log(id, value)
     }
     #[inline]

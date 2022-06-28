@@ -1,6 +1,6 @@
 //! Option space definition.
 use super::{ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, Space, SubsetOrd};
-use crate::logging::Loggable;
+use crate::logging::LogValue;
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::Rng;
@@ -131,11 +131,11 @@ where
 }
 
 // NOTE: ElementRefTryInto instead of ElementRefInto?
-impl<S: Space> ElementRefInto<Loggable> for OptionSpace<S> {
+impl<S: Space> ElementRefInto<LogValue> for OptionSpace<S> {
     #[inline]
-    fn elem_ref_into(&self, _element: &Self::Element) -> Loggable {
-        // No clear way to convert structured elements into Loggable
-        Loggable::Nothing
+    fn elem_ref_into(&self, _element: &Self::Element) -> LogValue {
+        // No clear way to convert structured elements into LogValue
+        LogValue::Nothing
     }
 }
 

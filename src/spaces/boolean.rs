@@ -3,7 +3,7 @@ use super::{
     ElementRefInto, FeatureSpace, FiniteSpace, NonEmptySpace, ParameterizedDistributionSpace,
     ReprSpace, Space, SubsetOrd,
 };
-use crate::logging::Loggable;
+use crate::logging::LogValue;
 use crate::torch::distributions::Bernoulli;
 use crate::utils::distributions::ArrayDistribution;
 use crate::utils::num_array::{BuildFromArray1D, NumArray1D};
@@ -160,10 +160,10 @@ impl Distribution<<Self as Space>::Element> for BooleanSpace {
     }
 }
 
-impl ElementRefInto<Loggable> for BooleanSpace {
+impl ElementRefInto<LogValue> for BooleanSpace {
     #[inline]
-    fn elem_ref_into(&self, element: &Self::Element) -> Loggable {
-        Loggable::Scalar(u8::from(*element).into())
+    fn elem_ref_into(&self, element: &Self::Element) -> LogValue {
+        LogValue::Scalar(u8::from(*element).into())
     }
 }
 
