@@ -31,13 +31,10 @@ pub trait StatsLogger: Send {
     ///     It is an error to use the same identifier with values that have different
     ///     [`LogValue`] variants or are otherwise structurally incompatible.
     ///
-    ///     The id can be created from a string with `into()`.
-    ///     It is recommended that users pass ids containing the name only, not a namespace.
-    ///     Namespaces should be managed with [`StatsLogger::with_scope`].
-    ///
-    ///     The namespace on the id is used to internally track scope and, unexpectedly
-    ///     for the external interface, it is an **outer** namespace.
-    ///     Loggers may append inner namespaces.
+    ///     The ID can be created from a string with `into()`.
+    ///     It is a hierarchical name, similar to a file system path.
+    ///     Logger scope names (created with [`StatsLogger::with_scope`]) will be prepended to the
+    ///     given ID.
     ///
     /// * `value` - The value to log.
     #[inline]
@@ -304,8 +301,8 @@ impl FromIterator<&'static str> for Id {
 }
 
 impl Id {
-    /// Add a new inner scope to the namespace.
-    fn with_inner_scope(mut self, scope: &'static str) -> Self {
+    /// Add a new top-level name to the namespace.
+    fn with_prefix(mut self, scope: &'static str) -> Self {
         self.namespace.push(scope);
         self
     }
@@ -394,8 +391,7 @@ impl<L: StatsLogger> StatsLogger for ScopedLogger<L> {
     }
     #[inline]
     fn group_log(&mut self, id: Id, value: LogValue) -> Result<(), LogError> {
-        self.logger
-            .group_log(id.with_inner_scope(self.scope), value)
+        self.logger.group_log(id.with_prefix(self.scope), value)
     }
     #[inline]
     fn group_end(&mut self) {
