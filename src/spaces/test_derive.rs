@@ -143,6 +143,119 @@ mod unit {
     }
 }
 
+/// Unit space with a named element
+mod unit_element {
+    use super::*;
+
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    struct Element;
+
+    #[derive(
+        Debug,
+        PartialEq,
+        Space,
+        SubsetOrd,
+        FiniteSpace,
+        NonEmptySpace,
+        SampleSpace,
+        FeatureSpace,
+        LogElementSpace,
+    )]
+    #[element(Element)]
+    struct UnitSpace;
+
+    mod space {
+        use super::*;
+
+        #[test]
+        fn contains() {
+            let _: &dyn Space<Element = Element> = &UnitSpace;
+
+            let s = UnitSpace;
+            assert!(s.contains(&Element));
+        }
+
+        #[test]
+        fn contains_samples() {
+            testing::check_contains_samples(&UnitSpace, 10);
+        }
+
+        features_tests!(f, UnitSpace, Element, []);
+        batch_features_tests!(b, UnitSpace, [Element, Element, Element], [[], [], []]);
+    }
+
+    mod subset_ord {
+        use super::*;
+
+        #[test]
+        fn cmp_equal() {
+            assert_eq!(UnitSpace.subset_cmp(&UnitSpace), Some(Ordering::Equal));
+        }
+
+        #[test]
+        fn not_strict_subset() {
+            assert!(!UnitSpace.strict_subset_of(&UnitSpace));
+        }
+    }
+
+    mod finite_space {
+        use super::*;
+
+        #[test]
+        fn size() {
+            assert_eq!(UnitSpace.size(), 1);
+        }
+
+        #[test]
+        fn to_index() {
+            assert_eq!(UnitSpace.to_index(&Element), 0);
+        }
+
+        #[test]
+        fn from_index_valid() {
+            assert_eq!(UnitSpace.from_index(0), Some(Element));
+        }
+
+        #[test]
+        fn from_index_invalid() {
+            assert_eq!(UnitSpace.from_index(1), None);
+        }
+
+        #[test]
+        fn from_to_index_iter_size() {
+            testing::check_from_to_index_iter_size(&UnitSpace);
+        }
+
+        #[test]
+        fn from_to_index_random() {
+            testing::check_from_to_index_random(&UnitSpace, 10);
+        }
+    }
+
+    mod feature_space {
+        use super::*;
+
+        #[test]
+        fn num_features() {
+            assert_eq!(UnitSpace.num_features(), 0);
+        }
+    }
+
+    mod log_element_space {
+        use super::*;
+
+        #[test]
+        fn log_element() {
+            let mut logger = MockLogger::default();
+            UnitSpace.log_element("foo", &Element, &mut logger).unwrap();
+            assert_eq!(
+                logger.calls,
+                [MockLogCall::GroupStart, MockLogCall::GroupEnd]
+            );
+        }
+    }
+}
+
 mod named {
     use super::*;
 
@@ -610,6 +723,159 @@ mod unnamed {
         fn log_element() {
             let mut logger = MockLogger::default();
             space().log_element("foo", &(true, 1), &mut logger).unwrap();
+            assert_eq!(
+                logger.calls,
+                [
+                    MockLogCall::GroupStart,
+                    MockLogCall::Log {
+                        id: ["foo", "0"].into_iter().collect(),
+                        value: LogValue::Scalar(1.0)
+                    },
+                    MockLogCall::Log {
+                        id: ["foo", "1"].into_iter().collect(),
+                        value: LogValue::Index { value: 1, size: 3 }
+                    },
+                    MockLogCall::GroupEnd,
+                ]
+            );
+        }
+    }
+}
+
+/// Unnamed struct with a given element type
+mod unnamed_with_element {
+    use super::*;
+
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    struct Element(bool, usize);
+
+    #[derive(
+        Debug,
+        PartialEq,
+        Space,
+        SubsetOrd,
+        FiniteSpace,
+        NonEmptySpace,
+        SampleSpace,
+        FeatureSpace,
+        LogElementSpace,
+    )]
+    #[element(Element)]
+    struct UnnamedElementStructSpace(BooleanSpace, IndexSpace);
+
+    const fn space() -> UnnamedElementStructSpace {
+        UnnamedElementStructSpace(BooleanSpace, IndexSpace::new(3))
+    }
+
+    mod space {
+        use super::*;
+
+        #[test]
+        fn contains() {
+            let s = space();
+
+            let _: &dyn Space<Element = Element> = &s;
+            assert!(s.contains(&Element(false, 0)));
+            assert!(!s.contains(&Element(false, 10)));
+        }
+
+        #[test]
+        fn contains_samples() {
+            testing::check_contains_samples(&space(), 10);
+        }
+    }
+
+    mod subset_ord {
+        use super::*;
+
+        #[test]
+        fn equal() {
+            let s = space();
+            assert_eq!(s.subset_cmp(&s), Some(Ordering::Equal));
+        }
+
+        #[test]
+        fn strict_subset() {
+            let s1 = UnnamedElementStructSpace(BooleanSpace, IndexSpace::new(3));
+            let s2 = UnnamedElementStructSpace(BooleanSpace, IndexSpace::new(4));
+            assert_eq!(s1.subset_cmp(&s2), Some(Ordering::Less));
+        }
+
+        #[test]
+        fn strict_superset() {
+            let s1 = UnnamedElementStructSpace(BooleanSpace, IndexSpace::new(3));
+            let s2 = UnnamedElementStructSpace(BooleanSpace, IndexSpace::new(2));
+            assert_eq!(s1.subset_cmp(&s2), Some(Ordering::Greater));
+        }
+    }
+
+    mod finite_space {
+        use super::*;
+
+        #[test]
+        fn size() {
+            assert_eq!(space().size(), 6);
+        }
+
+        #[test]
+        fn to_index() {
+            let s = space();
+            assert_eq!(s.to_index(&Element(false, 0)), 0);
+            assert_eq!(s.to_index(&Element(true, 0)), 1);
+            assert_eq!(s.to_index(&Element(false, 1)), 2);
+            assert_eq!(s.to_index(&Element(false, 2)), 4);
+        }
+
+        #[test]
+        fn from_index_valid() {
+            let s = space();
+            assert_eq!(s.from_index(1), Some(Element(true, 0)));
+            assert_eq!(s.from_index(2), Some(Element(false, 1)));
+        }
+
+        #[test]
+        fn from_index_invalid() {
+            let s = space();
+            assert_eq!(s.from_index(6), None);
+        }
+
+        #[test]
+        fn from_to_index_iter_size() {
+            testing::check_from_to_index_iter_size(&space());
+        }
+
+        #[test]
+        fn from_to_index_random() {
+            testing::check_from_to_index_random(&space(), 10);
+        }
+    }
+
+    mod feature_space {
+        use super::*;
+
+        #[test]
+        fn num_features() {
+            assert_eq!(space().num_features(), 4);
+        }
+
+        features_tests!(f, space(), Element(true, 1), [1.0, 0.0, 1.0, 0.0]);
+        batch_features_tests!(
+            b,
+            space(),
+            [Element(false, 0), Element(true, 2)],
+            [[0.0, 1.0, 0.0, 0.0], [1.0, 0.0, 0.0, 1.0]]
+        );
+    }
+
+    mod log_element_space {
+        use super::*;
+
+        #[test]
+        fn log_element() {
+            let mut logger = MockLogger::default();
+            space()
+                .log_element("foo", &Element(true, 1), &mut logger)
+                .unwrap();
             assert_eq!(
                 logger.calls,
                 [

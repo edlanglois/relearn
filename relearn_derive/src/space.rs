@@ -6,20 +6,35 @@ use std::iter::{self, Empty, Enumerate, Map};
 use syn::{
     parse_quote, spanned::Spanned, AttrStyle, Attribute, Data, DeriveInput, Field, Fields,
     FieldsNamed, FieldsUnnamed, GenericParam, Generics, Ident, Index, PathArguments, Type,
-    TypeTuple,
 };
 
 /// Macro that implements a trait on a struct implementing [`Space`](relearn::spaces::Space).
 pub(crate) fn impl_space_trait_macro<T: SpaceTraitImpl>(input: DeriveInput) -> TokenStream {
+    // Optional associated element type set explicitly with #[element(ElementType)]
+    // Required for NamedSpacedStruct, optional for Unnamed.
+    let element_type = get_element_type(&input.attrs);
     match &input.data {
         // Product space over the inner spaces
         // Each field is expected to be a space.
         Data::Struct(data) => match data.fields {
-            Fields::Named(ref fields) => {
-                T::impl_trait(&input.ident, input.generics, (fields, &input.attrs as &[_]))
-            }
-            Fields::Unnamed(ref fields) => T::impl_trait(&input.ident, input.generics, fields),
-            Fields::Unit => T::impl_trait(&input.ident, input.generics, ()),
+            Fields::Named(ref fields) => T::impl_trait(
+                &input.ident,
+                input.generics,
+                NamedSpaceStruct::new(
+                    fields,
+                    element_type.expect("must specify #[element(ElementType)] attribute"),
+                ),
+            ),
+            Fields::Unnamed(ref fields) => T::impl_trait(
+                &input.ident,
+                input.generics,
+                UnnamedSpaceStruct::new(fields, element_type),
+            ),
+            Fields::Unit => T::impl_trait(
+                &input.ident,
+                input.generics,
+                UnitSpaceStruct::new(element_type),
+            ),
         },
         _ => unimplemented!("only supports structs"),
     }
@@ -49,27 +64,48 @@ pub(crate) trait SpaceStruct {
         I::Item: ToTokens;
 }
 
+fn get_element_type(attributes: &[Attribute]) -> Option<Type> {
+    Some(
+        attributes
+            .iter()
+            .find(|a| matches!(a.style, AttrStyle::Outer) && a.path.is_ident("element"))?
+            .parse_args()
+            .expect("error parsing #[element(ElementType)]"),
+    )
+}
+
+/// A [`SpaceStruct`] with named fields
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NamedSpaceStruct<'a> {
+    fields: &'a FieldsNamed,
+    element_type: Type,
+}
+
+impl<'a> NamedSpaceStruct<'a> {
+    pub fn new(fields: &'a FieldsNamed, element_type: Type) -> Self {
+        Self {
+            fields,
+            element_type,
+        }
+    }
+}
+
 #[allow(clippy::type_complexity)]
-impl<'a> SpaceStruct for (&'a FieldsNamed, &'a [Attribute]) {
+impl<'a> SpaceStruct for NamedSpaceStruct<'a> {
     type FieldId = &'a Ident;
     type FieldType = &'a Type;
     type FieldIter = Map<syn::punctuated::Iter<'a, Field>, fn(&Field) -> (&Ident, &Type, Span)>;
     type ElementType = Type;
 
     fn fields(&self) -> Self::FieldIter {
-        self.0
+        self.fields
             .named
             .iter()
             .map(|f| (f.ident.as_ref().unwrap(), &f.ty, f.span()))
     }
 
     fn element_type(&self) -> Self::ElementType {
-        self.1
-            .iter()
-            .find(|a| matches!(a.style, AttrStyle::Outer) && a.path.is_ident("element"))
-            .expect("must specify #[element(ElementType)] attribute")
-            .parse_args()
-            .unwrap()
+        self.element_type.clone()
     }
 
     fn new_element<I>(&self, values: I) -> TokenStream2
@@ -78,7 +114,7 @@ impl<'a> SpaceStruct for (&'a FieldsNamed, &'a [Attribute]) {
         I::Item: ToTokens,
     {
         let element_name = into_type_name(self.element_type());
-        let field_name = self.0.named.iter().map(|f| &f.ident);
+        let field_name = self.fields.named.iter().map(|f| &f.ident);
         quote! {
             // Note: Using a qualified path here is not yet supported
             // https://github.com/rust-lang/rust/issues/86935
@@ -102,8 +138,24 @@ fn into_type_name(mut ty: Type) -> Type {
     ty
 }
 
+/// A [`SpaceStruct`] with unnamed fields
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UnnamedSpaceStruct<'a> {
+    fields: &'a FieldsUnnamed,
+    element_type: Option<Type>,
+}
+
+impl<'a> UnnamedSpaceStruct<'a> {
+    pub fn new(fields: &'a FieldsUnnamed, element_type: Option<Type>) -> Self {
+        Self {
+            fields,
+            element_type,
+        }
+    }
+}
+
 #[allow(clippy::type_complexity)]
-impl<'a> SpaceStruct for &'a FieldsUnnamed {
+impl<'a> SpaceStruct for UnnamedSpaceStruct<'a> {
     type FieldId = Index;
     type FieldType = &'a Type;
     type FieldIter = Map<
@@ -113,14 +165,21 @@ impl<'a> SpaceStruct for &'a FieldsUnnamed {
     type ElementType = TokenStream2;
 
     fn fields(&self) -> Self::FieldIter {
-        self.unnamed
+        self.fields
+            .unnamed
             .iter()
             .enumerate()
             .map(|(i, f)| (Index::from(i), &f.ty, f.span()))
     }
 
     fn element_type(&self) -> Self::ElementType {
-        let field_elements = self.unnamed.iter().map(|f| {
+        // Return the element type if set
+        if let Some(element_type) = self.element_type.as_ref().cloned() {
+            return quote! { #element_type };
+        }
+
+        // Otherwise return an anonymous tuple
+        let field_elements = self.fields.unnamed.iter().map(|f| {
             let ty = &f.ty;
             quote_spanned! {f.span()=>
                 <#ty as ::relearn::spaces::Space>::Element
@@ -135,24 +194,45 @@ impl<'a> SpaceStruct for &'a FieldsUnnamed {
         I: Iterator,
         I::Item: ToTokens,
     {
-        // The trailing comma is important so that the one-field case is still a tuple
-        quote! { ( #( #values, )* ) }
+        if let Some(element_type) = self.element_type.as_ref().cloned() {
+            quote! { #element_type ( #( #values ),* ) }
+        } else {
+            // The trailing comma is important so that the one-field case is still a tuple
+            quote! { ( #( #values, )* ) }
+        }
     }
 }
 
-impl SpaceStruct for () {
+/// A [`SpaceStruct`] with no fields
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UnitSpaceStruct {
+    element_type: Option<Type>,
+}
+
+impl UnitSpaceStruct {
+    pub fn new(element_type: Option<Type>) -> Self {
+        Self { element_type }
+    }
+}
+
+impl SpaceStruct for UnitSpaceStruct {
     /// Arbitrary value. No fields are produced.
     type FieldId = u8;
     type FieldType = Type;
     type FieldIter = Empty<(Self::FieldId, Self::FieldType, Span)>;
-    type ElementType = TypeTuple;
+    type ElementType = TokenStream2;
 
     fn fields(&self) -> Self::FieldIter {
         iter::empty()
     }
 
     fn element_type(&self) -> Self::ElementType {
-        parse_quote! {()}
+        // The element type if set otherwise ()
+        if let Some(element_type) = self.element_type.as_ref().cloned() {
+            quote! { #element_type }
+        } else {
+            quote! { () }
+        }
     }
 
     fn new_element<I>(&self, values: I) -> TokenStream2
@@ -161,7 +241,11 @@ impl SpaceStruct for () {
         I::Item: ToTokens,
     {
         assert_eq!(values.count(), 0);
-        quote! {()}
+        if let Some(element_type) = self.element_type.as_ref().cloned() {
+            quote! { #element_type }
+        } else {
+            quote! { () }
+        }
     }
 }
 
@@ -173,7 +257,7 @@ pub(crate) trait SpaceTraitImpl {
     /// * `name`     - Name of the struct
     /// * `generics` - Generics in the struct definition
     /// * `struct_`  - Space struct fields / element.
-    fn impl_trait<T: SpaceStruct + Copy>(
+    fn impl_trait<T: SpaceStruct + Clone>(
         name: &Ident,
         generics: Generics,
         struct_: T,
@@ -470,14 +554,14 @@ pub(crate) struct ProductSpaceImpl;
 impl SpaceTraitImpl for ProductSpaceImpl {
     fn impl_trait<T>(name: &Ident, generics: Generics, struct_: T) -> TokenStream2
     where
-        T: SpaceStruct + Copy,
+        T: SpaceStruct + Clone,
     {
         let impls = [
-            SpaceImpl::impl_trait(name, generics.clone(), struct_),
-            SubsetOrdImpl::impl_trait(name, generics.clone(), struct_),
-            NonEmptySpaceImpl::impl_trait(name, generics.clone(), struct_),
-            SampleSpaceImpl::impl_trait(name, generics.clone(), struct_),
-            FeatureSpaceImpl::impl_trait(name, generics.clone(), struct_),
+            SpaceImpl::impl_trait(name, generics.clone(), struct_.clone()),
+            SubsetOrdImpl::impl_trait(name, generics.clone(), struct_.clone()),
+            NonEmptySpaceImpl::impl_trait(name, generics.clone(), struct_.clone()),
+            SampleSpaceImpl::impl_trait(name, generics.clone(), struct_.clone()),
+            FeatureSpaceImpl::impl_trait(name, generics.clone(), struct_.clone()),
             LogElementSpaceImpl::impl_trait(name, generics, struct_),
         ];
 
