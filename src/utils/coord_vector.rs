@@ -4,23 +4,23 @@ use std::ops::{
     Add, AddAssign, Deref, DerefMut, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign,
 };
 
-/// A mathematical vector in a finite dimensional vector space.
+/// A mathematical coordinate vector in a finite dimensional vector space.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct Vector<T, const N: usize>(pub [T; N]);
+pub struct CoordVector<T, const N: usize>(pub [T; N]);
 
-impl<T, const N: usize> From<[T; N]> for Vector<T, N> {
+impl<T, const N: usize> From<[T; N]> for CoordVector<T, N> {
     fn from(coordinates: [T; N]) -> Self {
         Self(coordinates)
     }
 }
 
-impl<T: Zero, const N: usize> Default for Vector<T, N> {
+impl<T: Zero, const N: usize> Default for CoordVector<T, N> {
     fn default() -> Self {
         Self::zero()
     }
 }
 
-impl<T, const N: usize> Deref for Vector<T, N> {
+impl<T, const N: usize> Deref for CoordVector<T, N> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -28,13 +28,13 @@ impl<T, const N: usize> Deref for Vector<T, N> {
     }
 }
 
-impl<T, const N: usize> DerefMut for Vector<T, N> {
+impl<T, const N: usize> DerefMut for CoordVector<T, N> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T: Zero, const N: usize> Zero for Vector<T, N> {
+impl<T: Zero, const N: usize> Zero for CoordVector<T, N> {
     fn zero() -> Self {
         Self(array_init::array_init(|_| T::zero()))
     }
@@ -49,7 +49,7 @@ impl<T: Zero, const N: usize> Zero for Vector<T, N> {
 }
 
 /// Vector addition
-impl<T: Add<Output = T>, const N: usize> Add for Vector<T, N> {
+impl<T: Add<Output = T>, const N: usize> Add for CoordVector<T, N> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
@@ -58,7 +58,7 @@ impl<T: Add<Output = T>, const N: usize> Add for Vector<T, N> {
 }
 
 /// In-place vector addition
-impl<T: AddAssign, const N: usize> AddAssign for Vector<T, N> {
+impl<T: AddAssign, const N: usize> AddAssign for CoordVector<T, N> {
     fn add_assign(&mut self, other: Self) {
         for (a, b) in self.0.iter_mut().zip(other.0) {
             *a += b
@@ -67,7 +67,7 @@ impl<T: AddAssign, const N: usize> AddAssign for Vector<T, N> {
 }
 
 /// Vector subtraction
-impl<T: Sub<Output = T>, const N: usize> Sub for Vector<T, N> {
+impl<T: Sub<Output = T>, const N: usize> Sub for CoordVector<T, N> {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
@@ -76,7 +76,7 @@ impl<T: Sub<Output = T>, const N: usize> Sub for Vector<T, N> {
 }
 
 /// In-place vector subtraction
-impl<T: SubAssign, const N: usize> SubAssign for Vector<T, N> {
+impl<T: SubAssign, const N: usize> SubAssign for CoordVector<T, N> {
     fn sub_assign(&mut self, other: Self) {
         for (a, b) in self.0.iter_mut().zip(other.0) {
             *a -= b
@@ -85,7 +85,7 @@ impl<T: SubAssign, const N: usize> SubAssign for Vector<T, N> {
 }
 
 /// Negation
-impl<T: Neg<Output = T>, const N: usize> Neg for Vector<T, N> {
+impl<T: Neg<Output = T>, const N: usize> Neg for CoordVector<T, N> {
     type Output = Self;
 
     fn neg(self) -> Self {
@@ -94,7 +94,7 @@ impl<T: Neg<Output = T>, const N: usize> Neg for Vector<T, N> {
 }
 
 /// Scalar multiplication
-impl<T: Mul<Output = T> + Copy, const N: usize> Mul<T> for Vector<T, N> {
+impl<T: Mul<Output = T> + Copy, const N: usize> Mul<T> for CoordVector<T, N> {
     type Output = Self;
 
     fn mul(self, scalar: T) -> Self {
@@ -103,7 +103,7 @@ impl<T: Mul<Output = T> + Copy, const N: usize> Mul<T> for Vector<T, N> {
 }
 
 /// In-place scalar multiplication
-impl<T: MulAssign + Copy, const N: usize> MulAssign<T> for Vector<T, N> {
+impl<T: MulAssign + Copy, const N: usize> MulAssign<T> for CoordVector<T, N> {
     fn mul_assign(&mut self, scalar: T) {
         for a in self.0.iter_mut() {
             *a *= scalar;
@@ -112,7 +112,7 @@ impl<T: MulAssign + Copy, const N: usize> MulAssign<T> for Vector<T, N> {
 }
 
 /// Scalar division
-impl<T: Div<Output = T> + Copy, const N: usize> Div<T> for Vector<T, N> {
+impl<T: Div<Output = T> + Copy, const N: usize> Div<T> for CoordVector<T, N> {
     type Output = Self;
 
     fn div(self, scalar: T) -> Self {
@@ -121,7 +121,7 @@ impl<T: Div<Output = T> + Copy, const N: usize> Div<T> for Vector<T, N> {
 }
 
 /// In-place scalar division
-impl<T: DivAssign + Copy, const N: usize> DivAssign<T> for Vector<T, N> {
+impl<T: DivAssign + Copy, const N: usize> DivAssign<T> for CoordVector<T, N> {
     fn div_assign(&mut self, scalar: T) {
         for a in self.0.iter_mut() {
             *a /= scalar;
@@ -130,7 +130,7 @@ impl<T: DivAssign + Copy, const N: usize> DivAssign<T> for Vector<T, N> {
 }
 
 /// Fused scalar multiply and vector add.
-impl<T: MulAdd<Output = T> + Copy, const N: usize> MulAdd<T> for Vector<T, N> {
+impl<T: MulAdd<Output = T> + Copy, const N: usize> MulAdd<T> for CoordVector<T, N> {
     type Output = Self;
 
     fn mul_add(self, scalar: T, vector: Self) -> Self {
@@ -147,7 +147,7 @@ impl<T: MulAdd<Output = T> + Copy, const N: usize> MulAdd<T> for Vector<T, N> {
 }
 
 /// In-place fused scalar multiply and vector add.
-impl<T: MulAddAssign + Copy, const N: usize> MulAddAssign<T> for Vector<T, N> {
+impl<T: MulAddAssign + Copy, const N: usize> MulAddAssign<T> for CoordVector<T, N> {
     fn mul_add_assign(&mut self, scalar: T, vector: Self) {
         for (a, b) in self.0.iter_mut().zip(vector.0) {
             a.mul_add_assign(scalar, b);
@@ -161,19 +161,19 @@ mod tests {
 
     #[test]
     fn from_array() {
-        let v = Vector::from([1, 2, 3]);
-        assert_eq!(Vector([1, 2, 3]), v);
+        let v = CoordVector::from([1, 2, 3]);
+        assert_eq!(CoordVector([1, 2, 3]), v);
     }
 
     #[test]
     fn default() {
-        let v: Vector<i64, 3> = Vector::default();
-        assert_eq!(Vector([0, 0, 0]), v);
+        let v: CoordVector<i64, 3> = CoordVector::default();
+        assert_eq!(CoordVector([0, 0, 0]), v);
     }
 
     #[test]
     fn deref() {
-        let v = Vector([1, 2, 3]);
+        let v = CoordVector([1, 2, 3]);
         assert_eq!(v.len(), 3);
         let v_slice: &[isize] = &v;
         assert_eq!(v_slice.len(), 3);
@@ -181,113 +181,119 @@ mod tests {
 
     #[test]
     fn deref_mut() {
-        let mut v = Vector([1, 2, 3]);
+        let mut v = CoordVector([1, 2, 3]);
         v.reverse();
-        assert_eq!(v, Vector([3, 2, 1]));
+        assert_eq!(v, CoordVector([3, 2, 1]));
     }
 
     #[test]
     fn zero_i64() {
-        let v: Vector<i64, 3> = Vector::zero();
-        assert_eq!(Vector([0, 0, 0]), v);
+        let v: CoordVector<i64, 3> = CoordVector::zero();
+        assert_eq!(CoordVector([0, 0, 0]), v);
     }
 
     #[test]
     fn zero_f64() {
-        let v: Vector<f64, 3> = Vector::zero();
-        assert_eq!(Vector([0.0, 0.0, 0.0]), v);
+        let v: CoordVector<f64, 3> = CoordVector::zero();
+        assert_eq!(CoordVector([0.0, 0.0, 0.0]), v);
     }
 
     #[test]
     fn is_zero_true() {
-        let v = Vector([0, 0, 0]);
+        let v = CoordVector([0, 0, 0]);
         assert!(v.is_zero());
     }
 
     #[test]
     fn is_zero_false() {
-        let v = Vector([0, 1, 0]);
+        let v = CoordVector([0, 1, 0]);
         assert!(!v.is_zero());
     }
 
     #[test]
     fn is_zero_empty() {
-        let v = Vector::<i64, 0>([]);
+        let v = CoordVector::<i64, 0>([]);
         assert!(v.is_zero());
     }
 
     #[test]
     fn set_zero() {
-        let mut v = Vector([1, 2, 3]);
+        let mut v = CoordVector([1, 2, 3]);
         v.set_zero();
-        assert_eq!(Vector([0, 0, 0]), v);
+        assert_eq!(CoordVector([0, 0, 0]), v);
     }
 
     #[test]
     fn add() {
-        assert_eq!(Vector([2, -1, 3]), Vector([1, 2, 3]) + Vector([1, -3, 0]));
+        assert_eq!(
+            CoordVector([2, -1, 3]),
+            CoordVector([1, 2, 3]) + CoordVector([1, -3, 0])
+        );
     }
 
     #[test]
     fn add_assign() {
-        let mut v = Vector([1, 2, 3]);
-        v += Vector([1, -3, 0]);
-        assert_eq!(Vector([2, -1, 3]), v);
+        let mut v = CoordVector([1, 2, 3]);
+        v += CoordVector([1, -3, 0]);
+        assert_eq!(CoordVector([2, -1, 3]), v);
     }
 
     #[test]
     fn sub() {
-        assert_eq!(Vector([0, 5, 3]), Vector([1, 2, 3]) - Vector([1, -3, 0]));
+        assert_eq!(
+            CoordVector([0, 5, 3]),
+            CoordVector([1, 2, 3]) - CoordVector([1, -3, 0])
+        );
     }
 
     #[test]
     fn sub_assign() {
-        let mut v = Vector([1, 2, 3]);
-        v -= Vector([1, -3, 0]);
-        assert_eq!(Vector([0, 5, 3]), v);
+        let mut v = CoordVector([1, 2, 3]);
+        v -= CoordVector([1, -3, 0]);
+        assert_eq!(CoordVector([0, 5, 3]), v);
     }
 
     #[test]
     fn neg() {
-        assert_eq!(Vector([-1, 2, 0]), -Vector([1, -2, 0]));
+        assert_eq!(CoordVector([-1, 2, 0]), -CoordVector([1, -2, 0]));
     }
 
     #[test]
     fn mul() {
-        assert_eq!(Vector([2, 4, 6]), Vector([1, 2, 3]) * 2);
+        assert_eq!(CoordVector([2, 4, 6]), CoordVector([1, 2, 3]) * 2);
     }
 
     #[test]
     fn mul_assign() {
-        let mut v = Vector([1, 2, 3]);
+        let mut v = CoordVector([1, 2, 3]);
         v *= 2;
-        assert_eq!(Vector([2, 4, 6]), v);
+        assert_eq!(CoordVector([2, 4, 6]), v);
     }
 
     #[test]
     fn div() {
-        assert_eq!(Vector([1, 2, 3]), Vector([2, 4, 6]) / 2);
+        assert_eq!(CoordVector([1, 2, 3]), CoordVector([2, 4, 6]) / 2);
     }
 
     #[test]
     fn div_assign() {
-        let mut v = Vector([2, 4, 6]);
+        let mut v = CoordVector([2, 4, 6]);
         v /= 2;
-        assert_eq!(Vector([1, 2, 3]), v);
+        assert_eq!(CoordVector([1, 2, 3]), v);
     }
 
     #[test]
     fn mul_add() {
         assert_eq!(
-            Vector([-1, -4, -4]),
-            Vector([1, 2, 3]).mul_add(-2, Vector([1, 0, 2]))
+            CoordVector([-1, -4, -4]),
+            CoordVector([1, 2, 3]).mul_add(-2, CoordVector([1, 0, 2]))
         );
     }
 
     #[test]
     fn mul_add_assign() {
-        let mut v = Vector([1, 2, 3]);
-        v.mul_add_assign(-2, Vector([1, 0, 2]));
-        assert_eq!(Vector([-1, -4, -4]), v);
+        let mut v = CoordVector([1, 2, 3]);
+        v.mul_add_assign(-2, CoordVector([1, 0, 2]));
+        assert_eq!(CoordVector([-1, -4, -4]), v);
     }
 }

@@ -5,7 +5,7 @@ use crate::spaces::{
     ArraySpace, BooleanSpace, BoxSpace, FiniteSpace, IndexSpace, IndexedTypeSpace, PowerSpace,
     ProductSpace, Space, TupleSpace2,
 };
-use crate::utils::vector::Vector;
+use crate::utils::coord_vector::CoordVector;
 use crate::Prng;
 use enum_map::{enum_map, Enum, EnumMap};
 use rand::distributions::Standard;
@@ -54,14 +54,14 @@ impl Display for CellView {
     }
 }
 
-pub type GridVec = Vector<usize, 2>;
+pub type GridVec = CoordVector<usize, 2>;
 
 /// a - b % size
 const fn wrapping_sub(a: GridVec, b: GridVec, size: GridVec) -> GridVec {
-    let Vector([ai, aj]) = a;
-    let Vector([bi, bj]) = b;
-    let Vector([si, sj]) = size;
-    Vector([(si + ai - bi) % si, (sj + aj - bj) % sj])
+    let CoordVector([ai, aj]) = a;
+    let CoordVector([bi, bj]) = b;
+    let CoordVector([si, sj]) = size;
+    CoordVector([(si + ai - bi) % si, (sj + aj - bj) % sj])
 }
 
 /// Generate a grid view relative to a given position
@@ -73,7 +73,7 @@ fn grid_view<const W: usize, const H: usize, const VW: usize, const VH: usize>(
     let mut view = Box::new([[CellView::Empty; VW]; VH]);
 
     // Top left corner of the viewport when `pos` is in the middle
-    let rel = wrapping_sub(pos, Vector([VH / 2, VW / 2]), Vector([H, W]));
+    let rel = wrapping_sub(pos, CoordVector([VH / 2, VW / 2]), CoordVector([H, W]));
     for i in 0..VH {
         let cells_row = cells[(rel[0] + i) % H];
         for j in 0..VW {
@@ -82,7 +82,7 @@ fn grid_view<const W: usize, const H: usize, const VW: usize, const VH: usize>(
     }
 
     // Relative position of the other agent
-    let other_rel_pos = wrapping_sub(other_agent_pos, rel, Vector([H, W]));
+    let other_rel_pos = wrapping_sub(other_agent_pos, rel, CoordVector([H, W]));
     if other_rel_pos[0] < VH && other_rel_pos[1] < VW {
         // Should always be empty because agents consume the contents of cells they enter
         assert_eq!(view[other_rel_pos[0]][other_rel_pos[1]], CellView::Empty);
@@ -136,7 +136,7 @@ impl<const W: usize, const H: usize> FruitGameState<W, H> {
             self.positions[Player::Principal],
             self.positions[Player::Assistant],
         );
-        let Vector(principal_pos) = self.positions[Player::Principal];
+        let CoordVector(principal_pos) = self.positions[Player::Principal];
         // If more than 2 fruit then change from BooleanSpace to IndexedTypeSpace
         let goal_is_apple = match self.goal {
             Fruit::Apple => true,
@@ -153,7 +153,7 @@ impl<const W: usize, const H: usize> FruitGameState<W, H> {
             self.positions[Player::Assistant],
             self.positions[Player::Principal],
         );
-        let Vector(assistant_pos) = self.positions[Player::Assistant];
+        let CoordVector(assistant_pos) = self.positions[Player::Assistant];
         let assistant_obs = AssistantObs {
             visible_grid: assistant_view,
             position: assistant_pos,
@@ -163,7 +163,7 @@ impl<const W: usize, const H: usize> FruitGameState<W, H> {
 
     fn step(&mut self, action: Move, player: Player) -> f64 {
         let pos = &mut self.positions[player];
-        *pos = action.apply(*pos, Vector([H, W]));
+        *pos = action.apply(*pos, CoordVector([H, W]));
         let cell = self.cells[pos[0]][pos[1]].take();
         match cell {
             None => 0.0,
@@ -266,14 +266,14 @@ impl Default for Move {
 impl Move {
     /// Apply the move with wrapping around a grid of size `size`.
     const fn apply(self, pos: GridVec, size: GridVec) -> GridVec {
-        let Vector([i, j]) = pos;
-        let Vector([si, sj]) = size;
+        let CoordVector([i, j]) = pos;
+        let CoordVector([si, sj]) = size;
         match self {
             Move::Still => pos,
-            Move::Up => Vector([(si - 1 + i) % si, j]),
-            Move::Down => Vector([(i + 1) % si, j]),
-            Move::Left => Vector([i, (sj - 1 + j) % sj]),
-            Move::Right => Vector([i, (j + 1) % sj]),
+            Move::Up => CoordVector([(si - 1 + i) % si, j]),
+            Move::Down => CoordVector([(i + 1) % si, j]),
+            Move::Left => CoordVector([i, (sj - 1 + j) % sj]),
+            Move::Right => CoordVector([i, (j + 1) % sj]),
         }
     }
 }
@@ -380,7 +380,7 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Environme
         prefix[self.num_fruit..2 * self.num_fruit].fill(Some(Fruit::Cherry));
         prefix.shuffle(rng);
 
-        let origin = Vector([H / 2, W / 2]);
+        let origin = CoordVector([H / 2, W / 2]);
 
         // Swap origin and the last cell. The last cell is None so only need to go one direction.
         *cells_slice.last_mut().unwrap() = cells_slice[origin[0] * W + origin[1]].take();
