@@ -541,8 +541,9 @@ impl SpaceTraitImpl for LogElementSpaceImpl {
                 ) -> Result<(), ::relearn::logging::LogError> {
                     let mut logger = ::relearn::logging::StatsLogger::group(
                         ::relearn::logging::StatsLogger::with_scope(logger, name));
-                    #( #field_log?; )*
-                    Ok(())
+                    let mut result = Ok(());
+                    #( result = result.and(#field_log); )*
+                    result
                 }
             }
         }
