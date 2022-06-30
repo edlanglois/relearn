@@ -75,7 +75,7 @@ fn get_element_type(attributes: &[Attribute]) -> Option<Type> {
 }
 
 /// A [`SpaceStruct`] with named fields
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 struct NamedSpaceStruct<'a> {
     fields: &'a FieldsNamed,
     element_type: Type,
@@ -139,7 +139,7 @@ fn into_type_name(mut ty: Type) -> Type {
 }
 
 /// A [`SpaceStruct`] with unnamed fields
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 struct UnnamedSpaceStruct<'a> {
     fields: &'a FieldsUnnamed,
     element_type: Option<Type>,
@@ -204,7 +204,7 @@ impl<'a> SpaceStruct for UnnamedSpaceStruct<'a> {
 }
 
 /// A [`SpaceStruct`] with no fields
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 struct UnitSpaceStruct {
     element_type: Option<Type>,
 }
