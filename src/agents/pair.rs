@@ -57,6 +57,7 @@ where
     T0::HistoryBuffer: 'static,
     T1::HistoryBuffer: 'static,
 {
+    type Feedback = (T0::Feedback, T1::Feedback);
     type HistoryBuffer = HistoryBufferPair<T0::HistoryBuffer, T1::HistoryBuffer>;
 
     fn buffer(&self) -> Self::HistoryBuffer {
@@ -82,22 +83,23 @@ where
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct HistoryBufferPair<B0, B1>(pub B0, pub B1);
 
-impl<B0, B1, O0, O1, A0, A1> WriteExperience<(O0, O1), (A0, A1)> for HistoryBufferPair<B0, B1>
+impl<B0, B1, O0, O1, A0, A1, F0, F1> WriteExperience<(O0, O1), (A0, A1), (F0, F1)>
+    for HistoryBufferPair<B0, B1>
 where
-    B0: WriteExperience<O0, A0>,
-    B1: WriteExperience<O1, A1>,
+    B0: WriteExperience<O0, A0, F0>,
+    B1: WriteExperience<O1, A1, F1>,
 {
 }
 
-impl<B0, B1, O0, O1, A0, A1> WriteExperienceIncremental<(O0, O1), (A0, A1)>
+impl<B0, B1, O0, O1, A0, A1, F0, F1> WriteExperienceIncremental<(O0, O1), (A0, A1), (F0, F1)>
     for HistoryBufferPair<B0, B1>
 where
-    B0: WriteExperienceIncremental<O0, A0>,
-    B1: WriteExperienceIncremental<O1, A1>,
+    B0: WriteExperienceIncremental<O0, A0, F0>,
+    B1: WriteExperienceIncremental<O1, A1, F1>,
 {
     fn write_step(
         &mut self,
-        step: PartialStep<(O0, O1), (A0, A1)>,
+        step: PartialStep<(O0, O1), (A0, A1), (F0, F1)>,
     ) -> Result<(), WriteExperienceError> {
         let (step1, step2) = split_partial_step(step);
         self.0.write_step(step1)?;
@@ -110,40 +112,44 @@ where
 }
 
 #[allow(clippy::missing_const_for_fn)]
-fn split_partial_step<O1, O2, A1, A2>(
-    step: PartialStep<(O1, O2), (A1, A2)>,
-) -> (PartialStep<O1, A1>, PartialStep<O2, A2>) {
-    let (o1, o2) = step.observation;
-    let (a1, a2) = step.action;
-    let (n1, n2) = match step.next {
+fn split_partial_step<O0, O1, A0, A1, F0, F1>(
+    step: PartialStep<(O0, O1), (A0, A1), (F0, F1)>,
+) -> (PartialStep<O0, A0, F0>, PartialStep<O1, A1, F1>) {
+    let (o0, o1) = step.observation;
+    let (a0, a1) = step.action;
+    let (f0, f1) = step.feedback;
+    let (n0, n1) = match step.next {
         Successor::Continue(()) => (Successor::Continue(()), Successor::Continue(())),
         Successor::Terminate => (Successor::Terminate, Successor::Terminate),
-        Successor::Interrupt((no1, no2)) => (Successor::Interrupt(no1), Successor::Interrupt(no2)),
+        Successor::Interrupt((no0, no1)) => (Successor::Interrupt(no0), Successor::Interrupt(no1)),
+    };
+    let step0 = PartialStep {
+        observation: o0,
+        action: a0,
+        feedback: f0,
+        next: n0,
     };
     let step1 = PartialStep {
         observation: o1,
         action: a1,
-        reward: step.reward,
+        feedback: f1,
         next: n1,
     };
-    let step2 = PartialStep {
-        observation: o2,
-        action: a2,
-        reward: step.reward,
-        next: n2,
-    };
-    (step1, step2)
+    (step0, step1)
 }
 
-impl<T0, T1, OS0, OS1, AS0, AS1> BuildAgent<TupleSpace2<OS0, OS1>, TupleSpace2<AS0, AS1>>
+impl<T0, T1, OS0, OS1, AS0, AS1, FS0, FS1>
+    BuildAgent<TupleSpace2<OS0, OS1>, TupleSpace2<AS0, AS1>, TupleSpace2<FS0, FS1>>
     for AgentPair<T0, T1>
 where
-    T0: BuildAgent<OS0, AS0> + 'static,
-    T1: BuildAgent<OS1, AS1> + 'static,
+    T0: BuildAgent<OS0, AS0, FS0> + 'static,
+    T1: BuildAgent<OS1, AS1, FS1> + 'static,
     OS0: Space + Clone + 'static,
     OS1: Space + Clone + 'static,
     AS0: Space + Clone + 'static,
     AS1: Space + Clone + 'static,
+    FS0: Space + Clone + 'static,
+    FS1: Space + Clone + 'static,
 {
     type Agent = AgentPair<T0::Agent, T1::Agent>;
     fn build_agent(
@@ -151,6 +157,7 @@ where
         env: &dyn EnvStructure<
             ObservationSpace = TupleSpace2<OS0, OS1>,
             ActionSpace = TupleSpace2<AS0, AS1>,
+            FeedbackSpace = TupleSpace2<FS0, FS1>,
         >,
         rng: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
@@ -161,25 +168,31 @@ where
     }
 }
 
-fn split_env_structure<OS1, OS2, AS1, AS2>(
+fn split_env_structure<OS0, OS1, AS0, AS1, FS0, FS1>(
     env: &dyn EnvStructure<
-        ObservationSpace = TupleSpace2<OS1, OS2>,
-        ActionSpace = TupleSpace2<AS1, AS2>,
+        ObservationSpace = TupleSpace2<OS0, OS1>,
+        ActionSpace = TupleSpace2<AS0, AS1>,
+        FeedbackSpace = TupleSpace2<FS0, FS1>,
     >,
-) -> (StoredEnvStructure<OS1, AS1>, StoredEnvStructure<OS2, AS2>)
+) -> (
+    StoredEnvStructure<OS0, AS0, FS0>,
+    StoredEnvStructure<OS1, AS1, FS1>,
+)
 where
+    OS0: Space,
     OS1: Space,
-    OS2: Space,
+    AS0: Space,
     AS1: Space,
-    AS2: Space,
+    FS0: Space,
+    FS1: Space,
 {
-    let TupleSpace2(os1, os2) = env.observation_space();
-    let TupleSpace2(as1, as2) = env.action_space();
-    let reward_range = env.reward_range();
+    let TupleSpace2(os0, os1) = env.observation_space();
+    let TupleSpace2(as0, as1) = env.action_space();
+    let TupleSpace2(fs0, fs1) = env.feedback_space();
     let discount_factor = env.discount_factor();
     (
-        StoredEnvStructure::new(os1, as1, reward_range, discount_factor),
-        StoredEnvStructure::new(os2, as2, reward_range, discount_factor),
+        StoredEnvStructure::new(os0, as0, fs0, discount_factor),
+        StoredEnvStructure::new(os1, as1, fs1, discount_factor),
     )
 }
 

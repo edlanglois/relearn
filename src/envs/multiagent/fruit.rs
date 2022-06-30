@@ -1,9 +1,10 @@
 //! Fruit collection gridworlds.
 use crate::envs::{CloneBuild, EnvStructure, Environment, Successor};
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
 use crate::spaces::{
-    ArraySpace, BooleanSpace, BoxSpace, FiniteSpace, IndexSpace, IndexedTypeSpace, PowerSpace,
-    ProductSpace, Space, TupleSpace2,
+    ArraySpace, BooleanSpace, BoxSpace, FiniteSpace, IndexSpace, IndexedTypeSpace, IntervalSpace,
+    PowerSpace, ProductSpace, Space, TupleSpace2,
 };
 use crate::utils::coord_vector::CoordVector;
 use crate::Prng;
@@ -330,6 +331,8 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> EnvStruct
     type ObservationSpace = JointObsSpace<VW, VH>;
     /// An action for each agent
     type ActionSpace = TupleSpace2<IndexedTypeSpace<Move>, IndexedTypeSpace<Move>>;
+    /// A reward for each agent
+    type FeedbackSpace = TupleSpace2<IntervalSpace<Reward>, IntervalSpace<Reward>>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         let visible_grid = VisibleGridSpace::default(); // No dynamic structure
@@ -350,8 +353,10 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> EnvStruct
         Default::default()
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        (-2.0, 2.0)
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        // Give both agents the same reward
+        let reward_range = IntervalSpace::new(Reward(-2.0), Reward(2.0));
+        TupleSpace2(reward_range, reward_range)
     }
 
     fn discount_factor(&self) -> f64 {
@@ -365,6 +370,7 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Environme
     type State = FruitGameState<W, H>;
     type Observation = <JointObsSpace<VW, VH> as Space>::Element;
     type Action = (Move, Move);
+    type Feedback = (Reward, Reward);
 
     fn initial_state(&self, rng: &mut Prng) -> Self::State {
         let mut cells = Box::new([[None; W]; H]);
@@ -409,7 +415,7 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Environme
         action: &Self::Action,
         _rng: &mut Prng,
         logger: &mut dyn StatsLogger,
-    ) -> (Successor<Self::State>, f64) {
+    ) -> (Successor<Self::State>, Self::Feedback) {
         let (principal_action, assistant_action) = *action;
 
         let reward_principal = state.step(principal_action, Player::Principal);
@@ -417,13 +423,13 @@ impl<const W: usize, const H: usize, const VW: usize, const VH: usize> Environme
         let mut reward_logger = logger.with_scope("reward").group();
         reward_logger.log_scalar("principal", reward_principal);
         reward_logger.log_scalar("assistant", reward_assistant);
-        let reward = reward_principal + reward_assistant;
+        let reward = Reward(reward_principal + reward_assistant);
         let successor = if state.is_terminal() {
             Successor::Terminate
         } else {
             Successor::Continue(state)
         };
-        (successor, reward)
+        (successor, (reward, reward))
     }
 }
 

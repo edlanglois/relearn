@@ -1,4 +1,5 @@
 use super::{HistoryDataBound, WriteExperience, WriteExperienceError, WriteExperienceIncremental};
+use crate::feedback::Reward;
 use crate::simulation::PartialStep;
 use crate::utils::iter::{Differences, SplitChunksByLength};
 use std::iter::Copied;
@@ -11,14 +12,14 @@ use std::{slice, vec};
 /// * the current episode is done and at least `soft_threshold` steps have been collected; or
 /// * at least `hard_threshold` steps have been collected.
 #[derive(Debug, Clone, PartialEq)]
-pub struct VecBuffer<O, A> {
+pub struct VecBuffer<O, A, F = Reward> {
     /// Steps from all episodes with each episode stored contiguously
-    steps: Vec<PartialStep<O, A>>,
+    steps: Vec<PartialStep<O, A, F>>,
     /// One past the end index of each episode within `steps`.
     episode_ends: Vec<usize>,
 }
 
-impl<O, A> VecBuffer<O, A> {
+impl<O, A, F> VecBuffer<O, A, F> {
     /// Create a new empty [`VecBuffer`].
     #[must_use]
     pub const fn new() -> Self {
@@ -56,18 +57,18 @@ impl<O, A> VecBuffer<O, A> {
     }
 
     /// Iterator over all steps stored in the buffer.
-    pub fn steps(&self) -> slice::Iter<PartialStep<O, A>> {
+    pub fn steps(&self) -> slice::Iter<PartialStep<O, A, F>> {
         self.steps.iter()
     }
 
     /// Draining iterator over all steps stored in the buffer.
-    pub fn drain_steps(&mut self) -> vec::Drain<PartialStep<O, A>> {
+    pub fn drain_steps(&mut self) -> vec::Drain<PartialStep<O, A, F>> {
         self.steps.drain(..)
     }
 
     /// Iterator over all episode slices stored in the buffer.
     #[must_use]
-    pub fn episodes(&self) -> EpisodesIter<O, A> {
+    pub fn episodes(&self) -> EpisodesIter<O, A, F> {
         SplitChunksByLength::new(
             &self.steps,
             Differences::new(self.episode_ends.iter().copied(), 0),
@@ -75,8 +76,8 @@ impl<O, A> VecBuffer<O, A> {
     }
 }
 
-impl<O, A> From<Vec<PartialStep<O, A>>> for VecBuffer<O, A> {
-    fn from(steps: Vec<PartialStep<O, A>>) -> Self {
+impl<O, A, F> From<Vec<PartialStep<O, A, F>>> for VecBuffer<O, A, F> {
+    fn from(steps: Vec<PartialStep<O, A, F>>) -> Self {
         let episode_ends = steps
             .iter()
             .enumerate()
@@ -97,10 +98,10 @@ impl<O, A> From<Vec<PartialStep<O, A>>> for VecBuffer<O, A> {
     }
 }
 
-impl<O, A> FromIterator<PartialStep<O, A>> for VecBuffer<O, A> {
+impl<O, A, F> FromIterator<PartialStep<O, A, F>> for VecBuffer<O, A, F> {
     fn from_iter<I>(steps: I) -> Self
     where
-        I: IntoIterator<Item = PartialStep<O, A>>,
+        I: IntoIterator<Item = PartialStep<O, A, F>>,
     {
         let mut buffer = Self::new();
         buffer.write_experience(steps).unwrap(); // TODO: Maybe just ignore if full?
@@ -108,10 +109,10 @@ impl<O, A> FromIterator<PartialStep<O, A>> for VecBuffer<O, A> {
     }
 }
 
-impl<O, A> WriteExperience<O, A> for VecBuffer<O, A> {
+impl<O, A, F> WriteExperience<O, A, F> for VecBuffer<O, A, F> {
     fn write_experience<I>(&mut self, steps: I) -> Result<(), WriteExperienceError>
     where
-        I: IntoIterator<Item = PartialStep<O, A>>,
+        I: IntoIterator<Item = PartialStep<O, A, F>>,
     {
         let offset = self.steps.len();
         self.steps.extend(steps);
@@ -125,8 +126,8 @@ impl<O, A> WriteExperience<O, A> for VecBuffer<O, A> {
     }
 }
 
-impl<O, A> WriteExperienceIncremental<O, A> for VecBuffer<O, A> {
-    fn write_step(&mut self, step: PartialStep<O, A>) -> Result<(), WriteExperienceError> {
+impl<O, A, F> WriteExperienceIncremental<O, A, F> for VecBuffer<O, A, F> {
+    fn write_step(&mut self, step: PartialStep<O, A, F>) -> Result<(), WriteExperienceError> {
         let episode_done = step.episode_done();
         self.steps.push(step);
         if episode_done {
@@ -142,8 +143,8 @@ impl<O, A> WriteExperienceIncremental<O, A> for VecBuffer<O, A> {
     }
 }
 
-pub type EpisodesIter<'a, O, A> = SplitChunksByLength<
-    &'a [PartialStep<O, A>],
+pub type EpisodesIter<'a, O, A, F> = SplitChunksByLength<
+    &'a [PartialStep<O, A, F>],
     Differences<Copied<slice::Iter<'a, usize>>, usize>,
 >;
 
@@ -158,7 +159,7 @@ mod tests {
         PartialStep {
             observation,
             action: false,
-            reward: 0.0,
+            feedback: Reward(0.0),
             next,
         }
     }

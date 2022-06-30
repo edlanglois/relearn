@@ -8,10 +8,11 @@ use relearn::envs::{
     BuildEnv, Environment, MetaEnv, MetaObservationSpace, StructuredEnvironment,
     UniformBernoulliBandits,
 };
+use relearn::feedback::Reward;
 use relearn::logging::{ByCounter, DisplayLogger, StatsLogger, TensorBoardLogger};
 use relearn::simulation::{train_parallel, TrainParallelConfig};
 use relearn::simulation::{Steps, StepsIter, StepsSummary};
-use relearn::spaces::{IndexSpace, NonEmptySpace, SingletonSpace, Space};
+use relearn::spaces::{IndexSpace, IntervalSpace, NonEmptySpace, SingletonSpace, Space};
 use relearn::torch::{
     agents::{
         critics::{AdvantageFn, StepValueTarget, ValuesOpt, ValuesOptConfig},
@@ -186,7 +187,7 @@ impl AgentType {
         num_trials: usize,
         rng_env: Prng,
         rng_agent: Prng,
-    ) -> StepsSummary {
+    ) -> StepsSummary<Reward> {
         macro_rules! eval_resetting {
             ($config:expr) => {
                 eval_resetting_meta(meta_env, $config, num_trials, rng_env, rng_agent)
@@ -220,27 +221,38 @@ impl AgentType {
     }
 }
 
-fn eval_resetting_meta<E, TC, OS, AS>(
+fn eval_resetting_meta<E, TC, OS, AS, FS>(
     meta_env: E,
     actor_config: TC,
     num_trials: usize,
     rng_env: Prng,
     rng_actor: Prng,
-) -> StepsSummary
+) -> StepsSummary<Reward>
 where
-    E: StructuredEnvironment<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
-    TC: BuildAgent<OS, AS>,
-    TC::Agent: BatchUpdate<OS::Element, AS::Element>,
+    E: StructuredEnvironment<
+        ObservationSpace = MetaObservationSpace<OS, AS, FS>,
+        ActionSpace = AS,
+        FeedbackSpace = FS,
+    >,
+    TC: BuildAgent<OS, AS, FS>,
+    TC::Agent: BatchUpdate<OS::Element, AS::Element, Feedback = FS::Element>,
     OS: Space + Clone,
     AS: NonEmptySpace + Clone,
+    FS: Space<Element = Reward> + Clone,
 {
     let meta_actor = ResettingMetaAgent::from_meta_env(actor_config, &meta_env);
     eval(meta_env, meta_actor, num_trials, rng_env, rng_actor)
 }
 
-fn eval<E, T>(env: E, actor: T, num_episodes: usize, rng_env: Prng, rng_actor: Prng) -> StepsSummary
+fn eval<E, T>(
+    env: E,
+    actor: T,
+    num_episodes: usize,
+    rng_env: Prng,
+    rng_actor: Prng,
+) -> StepsSummary<Reward>
 where
-    E: Environment,
+    E: Environment<Feedback = Reward>,
     T: Actor<E::Observation, E::Action>,
 {
     Steps::new(env, actor, rng_env, rng_actor, ())
@@ -338,7 +350,7 @@ impl fmt::Debug for Device {
 
 type Model = Chain<Gru, Linear>;
 type Agent = ActorCriticAgent<
-    MetaObservationSpace<SingletonSpace, IndexSpace>,
+    MetaObservationSpace<SingletonSpace, IndexSpace, IntervalSpace<Reward>>,
     IndexSpace,
     Trpo<Model>,
     ValuesOpt<Model>,
@@ -469,8 +481,8 @@ impl EvalConfig {
             println!("{summary:.3}\n");
         }
         EvalResults {
-            trial_reward_mean: summary.episode_reward.mean().unwrap_or(f64::NAN),
-            trial_reward_stddev: summary.episode_reward.stddev().unwrap_or(f64::NAN),
+            trial_reward_mean: summary.episode_feedback.0.mean().unwrap_or(f64::NAN),
+            trial_reward_stddev: summary.episode_feedback.0.stddev().unwrap_or(f64::NAN),
         }
     }
 }

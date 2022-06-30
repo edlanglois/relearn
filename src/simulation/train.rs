@@ -1,7 +1,8 @@
 use super::{OnlineStepsSummary, Simulation, Steps, StepsSummary};
 use crate::agents::{buffers::HistoryDataBound, ActorMode, Agent, BatchUpdate, WriteExperience};
 use crate::envs::{EnvStructure, Environment, StructuredEnvironment};
-use crate::logging::StatsLogger;
+use crate::feedback::{Feedback, Summary};
+use crate::logging::{Loggable, StatsLogger};
 use crate::spaces::{LogElementSpace, Space};
 use crate::Prng;
 use log::warn;
@@ -19,10 +20,13 @@ pub fn train_serial<T, E>(
     rng_agent: &mut Prng,
     logger: &mut dyn StatsLogger,
 ) where
-    T: Agent<E::Observation, E::Action> + BatchUpdate<E::Observation, E::Action> + ?Sized,
+    T: Agent<E::Observation, E::Action>
+        + BatchUpdate<E::Observation, E::Action, Feedback = E::Feedback>
+        + ?Sized,
     E: StructuredEnvironment + ?Sized,
     E::ObservationSpace: LogElementSpace,
     E::ActionSpace: LogElementSpace,
+    E::Feedback: Feedback,
 {
     let mut buffer = agent.buffer();
     for _ in 0..num_periods {
@@ -72,15 +76,22 @@ pub fn train_parallel<T, E>(
         + Environment<
             Observation = <E::ObservationSpace as Space>::Element,
             Action = <E::ActionSpace as Space>::Element,
+            Feedback = <E::FeedbackSpace as Space>::Element,
         > + Sync
         + ?Sized,
     T: Agent<<E::ObservationSpace as Space>::Element, <E::ActionSpace as Space>::Element>
-        + BatchUpdate<<E::ObservationSpace as Space>::Element, <E::ActionSpace as Space>::Element>
-        + ?Sized,
+        + BatchUpdate<
+            <E::ObservationSpace as Space>::Element,
+            <E::ActionSpace as Space>::Element,
+            Feedback = <E::FeedbackSpace as Space>::Element,
+        > + ?Sized,
     T::Actor: Send,
     T::HistoryBuffer: Send,
     E::ObservationSpace: LogElementSpace,
     E::ActionSpace: LogElementSpace,
+    <E::FeedbackSpace as Space>::Element: Feedback,
+    <<E::FeedbackSpace as Space>::Element as Feedback>::StepSummary: Send,
+    <<E::FeedbackSpace as Space>::Element as Feedback>::EpisodeSummary: Send,
 {
     let mut buffers: Vec<_> = (0..config.num_threads).map(|_| agent.buffer()).collect();
     let mut thread_rngs: Vec<_> = (0..config.num_threads)
@@ -140,7 +151,7 @@ pub fn train_parallel<T, E>(
             threads
                 .into_iter()
                 .map(|t| t.join().unwrap())
-                .sum::<StepsSummary>()
+                .sum::<StepsSummary<_>>()
         })
         .unwrap();
 
@@ -148,19 +159,18 @@ pub fn train_parallel<T, E>(
         let mut episode_logger = (&mut sim_logger).with_scope("ep");
         let num_episodes = summary.episode_length.count();
         if num_episodes > 0 {
-            episode_logger.log_scalar("reward_mean", summary.episode_reward.mean().unwrap());
-            episode_logger.log_scalar("reward_stddev", summary.episode_reward.stddev().unwrap());
+            summary
+                .episode_feedback
+                .log("fbk", &mut episode_logger)
+                .unwrap();
             episode_logger.log_scalar("length_mean", summary.episode_length.mean().unwrap());
             episode_logger.log_scalar("length_stddev", summary.episode_length.stddev().unwrap());
         }
         episode_logger.log_counter_increment("count", num_episodes);
+
         let mut step_logger = (&mut sim_logger).with_scope("step");
-        let num_steps = summary.step_reward.count();
-        if num_steps > 0 {
-            step_logger.log_scalar("reward_mean", summary.step_reward.mean().unwrap());
-            step_logger.log_scalar("reward_stddev", summary.step_reward.stddev().unwrap());
-        }
-        step_logger.log_counter_increment("count", num_steps);
+        summary.step_feedback.log("fbk", &mut step_logger).unwrap();
+        step_logger.log_counter_increment("count", summary.step_feedback.size());
         let update_start = Instant::now();
         sim_logger.log_duration("time", update_start - collect_start);
         drop(sim_logger);

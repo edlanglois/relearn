@@ -13,6 +13,7 @@ repository = "https://github.com/edlanglois/relearn"
 array-init = "2.0"
 coarsetime = "0.1.21"
 crossbeam = "0.8"
+derive_more = "0.99.17"
 enum-map = "2.0"
 log = "0.4"
 ndarray = { version = "0.15", features = ["serde"] }

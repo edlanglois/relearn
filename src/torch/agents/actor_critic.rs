@@ -6,8 +6,9 @@ use super::WithCpuCopy;
 use crate::agents::buffers::VecBuffer;
 use crate::agents::{ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError, HistoryDataBound};
 use crate::envs::EnvStructure;
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
-use crate::spaces::{FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace};
+use crate::spaces::{FeatureSpace, NonEmptyFeatures, ParameterizedDistributionSpace, Space};
 use crate::torch::serialize::DeviceDef;
 use crate::Prng;
 use log::info;
@@ -43,10 +44,13 @@ where
     }
 }
 
-impl<OS, AS, PB, CB> BuildAgent<OS, AS> for ActorCriticConfig<PB, CB>
+impl<OS, AS, FS, PB, CB> BuildAgent<OS, AS, FS> for ActorCriticConfig<PB, CB>
 where
     OS: FeatureSpace + Clone,
+    OS::Element: 'static,
     AS: ParameterizedDistributionSpace<Tensor> + Clone,
+    AS::Element: 'static,
+    FS: Space<Element = Reward>,
     PB: BuildPolicy,
     CB: BuildCritic,
 {
@@ -54,7 +58,7 @@ where
 
     fn build_agent(
         &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS, FeedbackSpace = FS>,
         _: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
         Ok(ActorCriticAgent::new(env, self))
@@ -80,6 +84,7 @@ where
     pub fn new<E, PB, CB>(env: &E, config: &ActorCriticConfig<PB, CB>) -> Self
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
+        E::FeedbackSpace: Space<Element = Reward>,
         PB: BuildPolicy<Policy = P>,
         CB: BuildCritic<Critic = C>,
     {
@@ -132,6 +137,7 @@ where
     P: Policy,
     C: Critic,
 {
+    type Feedback = Reward;
     type HistoryBuffer = VecBuffer<OS::Element, AS::Element>;
 
     fn buffer(&self) -> Self::HistoryBuffer {

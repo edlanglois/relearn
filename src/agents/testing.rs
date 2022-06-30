@@ -1,8 +1,9 @@
 //! Agent testing utilities
 use crate::agents::{Actor, ActorMode, Agent, BatchUpdate, BuildAgent};
 use crate::envs::{DeterministicBandit, Environment};
+use crate::feedback::Reward;
 use crate::simulation::{self, SimSeed};
-use crate::spaces::{IndexSpace, SingletonSpace};
+use crate::spaces::{IndexSpace, IntervalSpace, SingletonSpace};
 use crate::Prng;
 use rand::SeedableRng;
 
@@ -12,8 +13,8 @@ use rand::SeedableRng;
 /// the first arm always gives 0 reward and the second 1.
 pub fn train_deterministic_bandit<TC>(agent_config: &TC, num_periods: usize, threshold: f64)
 where
-    TC: BuildAgent<SingletonSpace, IndexSpace>,
-    TC::Agent: BatchUpdate<(), usize>,
+    TC: BuildAgent<SingletonSpace, IndexSpace, IntervalSpace<Reward>>,
+    TC::Agent: BatchUpdate<(), usize, Feedback = Reward>,
 {
     let mut env_rng = Prng::seed_from_u64(18);
     let mut agent_rng = Prng::seed_from_u64(19);

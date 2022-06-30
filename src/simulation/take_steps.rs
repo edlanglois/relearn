@@ -36,6 +36,7 @@ where
 {
     type Observation = I::Observation;
     type Action = I::Action;
+    type Feedback = I::Feedback;
     type Environment = I::Environment;
     type Actor = I::Actor;
     type Logger = I::Logger;
@@ -66,11 +67,11 @@ where
     }
 }
 
-impl<I, O, A> Iterator for TakeAlignedSteps<I>
+impl<I, O, A, F> Iterator for TakeAlignedSteps<I>
 where
-    I: Iterator<Item = PartialStep<O, A>>,
+    I: Iterator<Item = PartialStep<O, A, F>>,
 {
-    type Item = PartialStep<O, A>;
+    type Item = PartialStep<O, A, F>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -96,9 +97,9 @@ where
     }
 
     #[inline]
-    fn fold<B, F>(self, init: B, f: F) -> B
+    fn fold<B, G>(self, init: B, g: G) -> B
     where
-        F: FnMut(B, Self::Item) -> B,
+        G: FnMut(B, Self::Item) -> B,
     {
         let mut n = self.n;
         let slack_steps = self.slack_steps;
@@ -112,7 +113,7 @@ where
             }
             true
         })
-        .fold(init, f)
+        .fold(init, g)
     }
 }
 
@@ -124,13 +125,14 @@ mod tests {
     use super::super::StepsIter;
     use super::*;
     use crate::envs::Successor::{self, Continue, Interrupt, Terminate};
+    use crate::feedback::Reward;
     use rstest::{fixture, rstest};
 
     const fn step<O>(observation: O, next: Successor<O, ()>) -> PartialStep<O, ()> {
         PartialStep {
             observation,
             action: (),
-            reward: 0.0,
+            feedback: Reward(0.0),
             next,
         }
     }

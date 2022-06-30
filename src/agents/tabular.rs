@@ -4,9 +4,10 @@ use super::{
     BuildAgentError, HistoryDataBound,
 };
 use crate::envs::EnvStructure;
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
 use crate::simulation::{StepsIter, TransientStep};
-use crate::spaces::FiniteSpace;
+use crate::spaces::{FiniteSpace, Space};
 use crate::Prng;
 use ndarray::{Array, Array2, Axis};
 use ndarray_stats::QuantileExt;
@@ -49,16 +50,17 @@ impl Default for TabularQLearningAgentConfig {
     }
 }
 
-impl<OS, AS> BuildAgent<OS, AS> for TabularQLearningAgentConfig
+impl<OS, AS, FS> BuildAgent<OS, AS, FS> for TabularQLearningAgentConfig
 where
     OS: FiniteSpace + Clone + 'static,
     AS: FiniteSpace + Clone + 'static,
+    FS: Space<Element = Reward>,
 {
     type Agent = TabularQLearningAgent<OS, AS>;
 
     fn build_agent(
         &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS, FeedbackSpace = FS>,
         _: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
         let observation_space = env.observation_space();
@@ -168,7 +170,7 @@ impl BaseTabularQLearningAgent {
         let idx = (step.observation, step.action);
         self.state_action_counts[idx] += 1;
 
-        let value = step.reward + discounted_next_value;
+        let value = step.feedback.unwrap() + discounted_next_value;
         let weight = (self.state_action_counts[idx] as f64).recip();
         let state_action_values = Arc::get_mut(&mut self.state_action_values)
             .expect("cannot update agent while actors exist");
@@ -178,6 +180,7 @@ impl BaseTabularQLearningAgent {
 }
 
 impl BatchUpdate<usize, usize> for BaseTabularQLearningAgent {
+    type Feedback = Reward;
     type HistoryBuffer = VecBuffer<usize, usize>;
 
     fn buffer(&self) -> Self::HistoryBuffer {

@@ -6,9 +6,10 @@ use relearn::agents::{
 use relearn::envs::{
     fruit, BuildEnv, EnvStructure, Environment, FruitGame, LatentStepLimit, WithLatentStepLimit,
 };
+use relearn::feedback::Reward;
 use relearn::logging::{DisplayLogger, StatsLogger};
 use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfig};
-use relearn::spaces::{IndexedTypeSpace, Space};
+use relearn::spaces::{IndexedTypeSpace, IntervalSpace, Space};
 use relearn::torch::{
     agents::{critics::ValuesOptConfig, policies::PpoConfig, ActorCriticConfig},
     modules::{ChainConfig, GruConfig, MlpConfig},
@@ -22,7 +23,8 @@ use tch::Device;
 pub struct FruitLazyExpert;
 
 impl<const W: usize, const H: usize>
-    BuildAgent<fruit::PrincipalObsSpace<W, H>, IndexedTypeSpace<fruit::Move>> for FruitLazyExpert
+    BuildAgent<fruit::PrincipalObsSpace<W, H>, IndexedTypeSpace<fruit::Move>, IntervalSpace<Reward>>
+    for FruitLazyExpert
 {
     type Agent = Self;
 
@@ -31,6 +33,7 @@ impl<const W: usize, const H: usize>
         _: &dyn EnvStructure<
             ObservationSpace = fruit::PrincipalObsSpace<W, H>,
             ActionSpace = IndexedTypeSpace<fruit::Move>,
+            FeedbackSpace = IntervalSpace<Reward>,
         >,
         _: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
@@ -108,6 +111,7 @@ impl<const W: usize, const H: usize> Actor<fruit::PrincipalObs<W, H>, fruit::Mov
 }
 
 impl<O, A> BatchUpdate<O, A> for FruitLazyExpert {
+    type Feedback = Reward;
     type HistoryBuffer = NullBuffer;
     fn buffer(&self) -> Self::HistoryBuffer {
         NullBuffer
@@ -160,7 +164,10 @@ fn main() {
             )
             .take(10_000)
             .summarize();
-        println!("Initial Stats\n{}", summary);
+        // TODO: Fix display
+        // It cannot be used because the feedback type is a tuple, which does not implement
+        // display.
+        println!("Initial Stats\n{:#?}", summary);
     }
 
     train_parallel(
@@ -183,5 +190,5 @@ fn main() {
         )
         .take(10_000)
         .summarize();
-    println!("\nFinal Stats\n{}", summary);
+    println!("\nFinal Stats\n{:#?}", summary);
 }

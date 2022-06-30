@@ -3,6 +3,7 @@ use super::{
     HistoryDataBound,
 };
 use crate::envs::EnvStructure;
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
 use crate::spaces::{SampleSpace, Space};
 use crate::Prng;
@@ -20,16 +21,17 @@ impl RandomAgentConfig {
     }
 }
 
-impl<OS, AS> BuildAgent<OS, AS> for RandomAgentConfig
+impl<OS, AS, FS> BuildAgent<OS, AS, FS> for RandomAgentConfig
 where
     OS: Space,
     AS: SampleSpace + Clone,
+    FS: Space,
 {
     type Agent = RandomAgent<AS>;
 
     fn build_agent(
         &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS, FeedbackSpace = FS>,
         _: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
         Ok(RandomAgent::new(env.action_space()))
@@ -72,6 +74,7 @@ impl<O, AS: SampleSpace + Clone> Actor<O, AS::Element> for RandomAgent<AS> {
 }
 
 impl<O, AS: Space> BatchUpdate<O, AS::Element> for RandomAgent<AS> {
+    type Feedback = Reward;
     type HistoryBuffer = NullBuffer;
 
     fn buffer(&self) -> Self::HistoryBuffer {

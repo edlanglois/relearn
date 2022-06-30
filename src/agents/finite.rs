@@ -82,8 +82,10 @@ where
     T: BatchUpdate<usize, usize>,
     OS: FiniteSpace + Clone + 'static,
     AS: FiniteSpace + Clone + 'static,
+    T::Feedback: Clone,
     T::HistoryBuffer: 'static,
 {
+    type Feedback = T::Feedback;
     type HistoryBuffer = FiniteSpaceBuffer<T::HistoryBuffer, OS, AS>;
 
     fn buffer(&self) -> Self::HistoryBuffer {
@@ -116,15 +118,16 @@ pub struct FiniteSpaceBuffer<B, OS, AS> {
     action_space: AS,
 }
 
-impl<B, OS, AS> WriteExperience<OS::Element, AS::Element> for FiniteSpaceBuffer<B, OS, AS>
+impl<B, OS, AS, F> WriteExperience<OS::Element, AS::Element, F> for FiniteSpaceBuffer<B, OS, AS>
 where
-    B: WriteExperience<usize, usize>,
+    B: WriteExperience<usize, usize, F>,
     OS: FiniteSpace,
     AS: FiniteSpace,
+    F: Clone,
 {
     fn write_experience<I>(&mut self, steps: I) -> Result<(), WriteExperienceError>
     where
-        I: IntoIterator<Item = PartialStep<OS::Element, AS::Element>>,
+        I: IntoIterator<Item = PartialStep<OS::Element, AS::Element, F>>,
     {
         self.buffer.write_experience(
             steps.into_iter().map(|step| {
@@ -134,16 +137,17 @@ where
     }
 }
 
-impl<B, OS, AS> WriteExperienceIncremental<OS::Element, AS::Element>
+impl<B, OS, AS, F> WriteExperienceIncremental<OS::Element, AS::Element, F>
     for FiniteSpaceBuffer<B, OS, AS>
 where
-    B: WriteExperienceIncremental<usize, usize>,
+    B: WriteExperienceIncremental<usize, usize, F>,
     OS: FiniteSpace,
     AS: FiniteSpace,
+    F: Clone,
 {
     fn write_step(
         &mut self,
-        step: PartialStep<OS::Element, AS::Element>,
+        step: PartialStep<OS::Element, AS::Element, F>,
     ) -> Result<(), WriteExperienceError> {
         self.buffer.write_step(indexed_partial_step(
             &step,
@@ -158,19 +162,20 @@ where
 }
 
 /// Convert a finite-space `PartialStep` into an index step.
-fn indexed_partial_step<OS, AS>(
-    step: &PartialStep<OS::Element, AS::Element>,
+fn indexed_partial_step<OS, AS, F>(
+    step: &PartialStep<OS::Element, AS::Element, F>,
     observation_space: &OS,
     action_space: &AS,
-) -> PartialStep<usize, usize>
+) -> PartialStep<usize, usize, F>
 where
     OS: FiniteSpace,
     AS: FiniteSpace,
+    F: Clone,
 {
     Step {
         observation: observation_space.to_index(&step.observation),
         action: action_space.to_index(&step.action),
-        reward: step.reward,
+        feedback: step.feedback.clone(),
         next: match &step.next {
             Successor::Continue(()) => Successor::Continue(()),
             Successor::Terminate => Successor::Terminate,

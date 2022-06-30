@@ -199,7 +199,7 @@ where
         self.cached_rewards.get_or_init(|| {
             let tensor = Tensor::of_slice(
                 &PackedSeqIter::from_sorted(&self.episodes)
-                    .map(|step| step.reward as f32)
+                    .map(|step| f64::from(step.feedback) as f32)
                     .collect::<Vec<_>>(),
             )
             .to(self.device);
@@ -265,6 +265,7 @@ where
 pub(crate) mod tests {
     use super::*;
     use crate::envs::Successor::{Continue, Interrupt, Terminate};
+    use crate::feedback::Reward;
     use crate::spaces::{BooleanSpace, IndexSpace};
     use rstest::{fixture, rstest};
 
@@ -293,25 +294,25 @@ pub(crate) mod tests {
     pub fn history() -> StoredHistory<BooleanSpace, IndexSpace> {
         let episodes = vec![
             vec![
-                PartialStep::new(true, 0, 1.0, Continue(())),
-                PartialStep::new(true, 1, 1.0, Continue(())),
-                PartialStep::new(true, 2, 1.0, Continue(())),
-                PartialStep::new(true, 3, 1.0, Continue(())),
+                PartialStep::new(true, 0, Reward(1.0), Continue(())),
+                PartialStep::new(true, 1, Reward(1.0), Continue(())),
+                PartialStep::new(true, 2, Reward(1.0), Continue(())),
+                PartialStep::new(true, 3, Reward(1.0), Continue(())),
             ],
             vec![
-                PartialStep::new(false, 10, -1.0, Continue(())),
-                PartialStep::new(false, 11, -1.0, Continue(())),
-                PartialStep::new(false, 12, 0.0, Continue(())),
-                PartialStep::new(false, 13, 0.0, Continue(())),
-                PartialStep::new(false, 14, 1.0, Continue(())),
-                PartialStep::new(false, 15, 1.0, Terminate),
+                PartialStep::new(false, 10, Reward(-1.0), Continue(())),
+                PartialStep::new(false, 11, Reward(-1.0), Continue(())),
+                PartialStep::new(false, 12, Reward(0.0), Continue(())),
+                PartialStep::new(false, 13, Reward(0.0), Continue(())),
+                PartialStep::new(false, 14, Reward(1.0), Continue(())),
+                PartialStep::new(false, 15, Reward(1.0), Terminate),
             ],
             vec![
-                PartialStep::new(false, 20, 2.0, Continue(())),
-                PartialStep::new(true, 21, 2.0, Continue(())),
-                PartialStep::new(false, 22, 2.0, Interrupt(true)),
+                PartialStep::new(false, 20, Reward(2.0), Continue(())),
+                PartialStep::new(true, 21, Reward(2.0), Continue(())),
+                PartialStep::new(false, 22, Reward(2.0), Interrupt(true)),
             ],
-            vec![PartialStep::new(true, 30, 3.0, Terminate)],
+            vec![PartialStep::new(true, 30, Reward(3.0), Terminate)],
         ];
 
         // Packing order (by action)

@@ -8,8 +8,9 @@ use relearn::agents::{
     TabularQLearningAgentConfig, UCB1AgentConfig,
 };
 use relearn::envs::{EnvStructure, Environment, Successor};
+use relearn::feedback::Reward;
 use relearn::logging::StatsLogger;
-use relearn::spaces::{BooleanSpace, IndexSpace};
+use relearn::spaces::{BooleanSpace, IndexSpace, IntervalSpace};
 use relearn::torch::{
     agents::{critics::RewardToGoConfig, policies::ReinforceConfig, ActorCriticConfig},
     modules::{GruConfig, MlpConfig},
@@ -28,6 +29,7 @@ impl Environment for RingEnv {
     type State = usize;
     type Observation = usize;
     type Action = bool;
+    type Feedback = Reward;
 
     fn initial_state(&self, _: &mut Prng) -> Self::State {
         0
@@ -41,7 +43,7 @@ impl Environment for RingEnv {
         action: &Self::Action,
         _: &mut Prng,
         _: &mut dyn StatsLogger,
-    ) -> (Successor<Self::State>, f64) {
+    ) -> (Successor<Self::State>, Self::Feedback) {
         let new_state = match *action {
             false => state.checked_sub(1).unwrap_or(RING_ENV_SIZE - 1),
             true => {
@@ -52,13 +54,14 @@ impl Environment for RingEnv {
                 state
             }
         };
-        (Successor::Continue(new_state), 0.0)
+        (Successor::Continue(new_state), Reward(0.0))
     }
 }
 
 impl EnvStructure for RingEnv {
     type ObservationSpace = IndexSpace;
     type ActionSpace = BooleanSpace;
+    type FeedbackSpace = IntervalSpace<Reward>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         IndexSpace::new(RING_ENV_SIZE)
@@ -66,8 +69,8 @@ impl EnvStructure for RingEnv {
     fn action_space(&self) -> Self::ActionSpace {
         BooleanSpace
     }
-    fn reward_range(&self) -> (f64, f64) {
-        (0.0, 0.0)
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        IntervalSpace::new(Reward(0.0), Reward(0.0))
     }
     fn discount_factor(&self) -> f64 {
         0.99
@@ -78,7 +81,7 @@ impl EnvStructure for RingEnv {
 fn benchmark_agent_act<M, TC>(group: &mut BenchmarkGroup<M>, name: &str, agent_config: &TC)
 where
     M: Measurement,
-    TC: BuildAgent<IndexSpace, BooleanSpace>,
+    TC: BuildAgent<IndexSpace, BooleanSpace, IntervalSpace<Reward>>,
 {
     let mut rng = Prng::seed_from_u64(0);
 

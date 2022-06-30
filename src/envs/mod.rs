@@ -30,9 +30,10 @@ pub use wrappers::{
 };
 
 use crate::agents::Actor;
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
 use crate::simulation::{SimSeed, Steps};
-use crate::spaces::Space;
+use crate::spaces::{IntervalSpace, Space};
 use crate::Prng;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
@@ -50,6 +51,7 @@ pub trait StructuredEnvironment:
     + Environment<
         Observation = <Self::ObservationSpace as Space>::Element,
         Action = <Self::ActionSpace as Space>::Element,
+        Feedback = <Self::FeedbackSpace as Space>::Element,
     >
 {
 }
@@ -58,13 +60,15 @@ impl<T> StructuredEnvironment for T where
         + Environment<
             Observation = <Self::ObservationSpace as Space>::Element,
             Action = <Self::ActionSpace as Space>::Element,
+            Feedback = <Self::FeedbackSpace as Space>::Element,
         > + ?Sized
 {
 }
 
 /// A reinforcement learning environment.
 ///
-/// Formally, this is a Partially Observable Markov Decision Process (POMDP) with episodes.
+/// Formally, this is a Partially Observable Markov Decision Process (POMDP) but with arbitrary
+/// feedback instead of just reward values, and with episodes.
 /// An episode is a sequence of environment steps starting with [`Environment::initial_state`]
 /// and ending when [`Environment::step`] returns either
 /// * [`Successor::Terminate`] meaning all possible future rewards are zero; or
@@ -95,9 +99,18 @@ impl<T> StructuredEnvironment for T where
 ///
 /// [GAT]: https://rust-lang.github.io/rfcs/1598-generic_associated_types.html
 pub trait Environment {
+    /// Environment state type. Possibly hidden.
     type State;
+    /// Observation of the state provided to the agent.
     type Observation;
+    /// Action selected by the agent.
     type Action;
+    /// Feedback provided to a learning agent as the result of each step. [`Reward`], for example.
+    ///
+    /// This is distinguished from `observation` in that it is only part of the training or
+    /// evaluation process. Unless the agent is explicitly updated within an episode, its actions
+    /// cannot depend on the `feedback` of previous steps.
+    type Feedback;
 
     /// Sample a state for the start of a new episode.
     ///
@@ -117,15 +130,15 @@ pub trait Environment {
     /// * `logger` - Logger for any auxiliary information.
     ///
     /// # Returns
-    /// * `successor` - The resulting state or outcome.
-    /// * `reward` - The reward value for this transition.
+    /// * `successor` - The resulting state or episode outcome.
+    /// * `feedback`  - Feedback to the agent learning process.
     fn step(
         &self,
         state: Self::State,
         action: &Self::Action,
         rng: &mut Prng,
         logger: &mut dyn StatsLogger,
-    ) -> (Successor<Self::State>, f64);
+    ) -> (Successor<Self::State>, Self::Feedback);
 
     /// Run this environment with the given actor.
     fn run<T, L>(self, actor: T, seed: SimSeed, logger: L) -> Steps<Self, T, Prng, L>
@@ -161,6 +174,7 @@ macro_rules! impl_wrapped_environment {
             type State = T::State;
             type Observation = T::Observation;
             type Action = T::Action;
+            type Feedback = T::Feedback;
             fn initial_state(&self, rng: &mut Prng) -> Self::State {
                 T::initial_state(self, rng)
             }
@@ -173,7 +187,7 @@ macro_rules! impl_wrapped_environment {
                 action: &Self::Action,
                 rng: &mut Prng,
                 logger: &mut dyn StatsLogger,
-            ) -> (Successor<Self::State>, f64) {
+            ) -> (Successor<Self::State>, Self::Feedback) {
                 T::step(self, state, action, rng, logger)
             }
         }
@@ -182,10 +196,14 @@ macro_rules! impl_wrapped_environment {
 impl_wrapped_environment!(&'_ T);
 impl_wrapped_environment!(Box<T>);
 
+pub trait Pomdp: Environment<Feedback = f64> {}
+impl<T: Environment<Feedback = f64>> Pomdp for T {}
+
 /// The external structure of a reinforcement learning environment.
 pub trait EnvStructure {
     type ObservationSpace: Space;
     type ActionSpace: Space;
+    type FeedbackSpace: Space;
 
     /// Space containing all possible observations.
     ///
@@ -200,12 +218,13 @@ pub trait EnvStructure {
     /// The environment may misbehave or panic for actions outside of this action space.
     fn action_space(&self) -> Self::ActionSpace;
 
-    /// A lower and upper bound on possible reward values.
+    /// The space of all possible feedback.
     ///
-    /// These bounds are not required to be tight but ideally will be as tight as possible.
-    fn reward_range(&self) -> (f64, f64);
+    /// This is not required to be tight:
+    /// the space may contain elements that can never be produced as a feedback signal.
+    fn feedback_space(&self) -> Self::FeedbackSpace;
 
-    /// A discount factor applied to future rewards.
+    /// A discount factor applied to future feedback.
     ///
     /// A value between `0` and `1`, inclusive.
     fn discount_factor(&self) -> f64;
@@ -217,6 +236,7 @@ macro_rules! impl_wrapped_env_structure {
         impl<T: EnvStructure + ?Sized> EnvStructure for $wrapper {
             type ObservationSpace = T::ObservationSpace;
             type ActionSpace = T::ActionSpace;
+            type FeedbackSpace = T::FeedbackSpace;
 
             fn observation_space(&self) -> Self::ObservationSpace {
                 T::observation_space(self)
@@ -224,8 +244,8 @@ macro_rules! impl_wrapped_env_structure {
             fn action_space(&self) -> Self::ActionSpace {
                 T::action_space(self)
             }
-            fn reward_range(&self) -> (f64, f64) {
-                T::reward_range(self)
+            fn feedback_space(&self) -> Self::FeedbackSpace {
+                T::feedback_space(self)
             }
             fn discount_factor(&self) -> f64 {
                 T::discount_factor(self)
@@ -235,6 +255,9 @@ macro_rules! impl_wrapped_env_structure {
 }
 impl_wrapped_env_structure!(&'_ T);
 impl_wrapped_env_structure!(Box<T>);
+
+pub trait PomdpStructure: EnvStructure<FeedbackSpace = IntervalSpace<Reward>> {}
+impl<T: EnvStructure<FeedbackSpace = IntervalSpace<Reward>>> PomdpStructure for T {}
 
 /// The successor state or outcome of an episode step.
 ///
@@ -389,51 +412,53 @@ pub type PartialSuccessor<T> = Successor<T, ()>;
 ///
 /// See [`EnvStructure`] for details.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct StoredEnvStructure<OS, AS> {
+pub struct StoredEnvStructure<OS, AS, FS = IntervalSpace<Reward>> {
     pub observation_space: OS,
     pub action_space: AS,
-    pub reward_range: (f64, f64),
+    pub feedback_space: FS,
     pub discount_factor: f64,
 }
 
-impl<OS, AS> StoredEnvStructure<OS, AS> {
+impl<OS, AS, FS> StoredEnvStructure<OS, AS, FS> {
     pub const fn new(
         observation_space: OS,
         action_space: AS,
-        reward_range: (f64, f64),
+        feedback_space: FS,
         discount_factor: f64,
     ) -> Self {
         Self {
             observation_space,
             action_space,
-            reward_range,
+            feedback_space,
             discount_factor,
         }
     }
 }
 
-impl<OS, AS> EnvStructure for StoredEnvStructure<OS, AS>
+impl<OS, AS, FS> EnvStructure for StoredEnvStructure<OS, AS, FS>
 where
     OS: Space + Clone,
     AS: Space + Clone,
+    FS: Space + Clone,
 {
     type ObservationSpace = OS;
     type ActionSpace = AS;
+    type FeedbackSpace = FS;
     fn observation_space(&self) -> Self::ObservationSpace {
         self.observation_space.clone()
     }
     fn action_space(&self) -> Self::ActionSpace {
         self.action_space.clone()
     }
-    fn reward_range(&self) -> (f64, f64) {
-        self.reward_range
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        self.feedback_space.clone()
     }
     fn discount_factor(&self) -> f64 {
         self.discount_factor
     }
 }
 
-impl<E> From<&E> for StoredEnvStructure<E::ObservationSpace, E::ActionSpace>
+impl<E> From<&E> for StoredEnvStructure<E::ObservationSpace, E::ActionSpace, E::FeedbackSpace>
 where
     E: EnvStructure + ?Sized,
 {
@@ -441,7 +466,7 @@ where
         Self {
             observation_space: env.observation_space(),
             action_space: env.action_space(),
-            reward_range: env.reward_range(),
+            feedback_space: env.feedback_space(),
             discount_factor: env.discount_factor(),
         }
     }
@@ -456,6 +481,7 @@ pub trait EnvDistribution: EnvStructure {
     type Environment: StructuredEnvironment<
         ObservationSpace = Self::ObservationSpace,
         ActionSpace = Self::ActionSpace,
+        FeedbackSpace = Self::FeedbackSpace,
     >;
 
     /// Sample an environment from the distribution.

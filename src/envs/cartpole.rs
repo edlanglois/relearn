@@ -1,4 +1,5 @@
 use super::{BuildEnv, BuildEnvError, EnvStructure, Environment, Successor};
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
 use crate::spaces::{Indexed, IndexedTypeSpace, IntervalSpace};
 use crate::Prng;
@@ -17,8 +18,10 @@ pub struct CartPoleConfig {
 impl BuildEnv for CartPoleConfig {
     type Observation = CartPolePhysicalState;
     type Action = Push;
+    type Feedback = Reward;
     type ObservationSpace = CartPolePhysicalStateSpace;
     type ActionSpace = IndexedTypeSpace<Push>;
+    type FeedbackSpace = IntervalSpace<Reward>;
     type Environment = CartPole;
 
     fn build_env(&self, _: &mut Prng) -> Result<Self::Environment, BuildEnvError> {
@@ -65,6 +68,7 @@ pub enum Push {
 impl EnvStructure for CartPole {
     type ObservationSpace = CartPolePhysicalStateSpace;
     type ActionSpace = IndexedTypeSpace<Push>;
+    type FeedbackSpace = IntervalSpace<Reward>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         let max_pos = self.env.max_pos;
@@ -81,8 +85,8 @@ impl EnvStructure for CartPole {
         IndexedTypeSpace::new()
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        (0.0, 1.0)
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        IntervalSpace::new(Reward(0.0), Reward(1.0))
     }
 
     fn discount_factor(&self) -> f64 {
@@ -94,6 +98,7 @@ impl Environment for CartPole {
     type State = CartPoleInternalState;
     type Observation = CartPolePhysicalState;
     type Action = Push;
+    type Feedback = Reward;
 
     fn initial_state(&self, rng: &mut Prng) -> Self::State {
         // All parameters are sampled from the same range of values
@@ -126,7 +131,7 @@ impl Environment for CartPole {
         action: &Self::Action,
         _: &mut Prng,
         _: &mut dyn StatsLogger,
-    ) -> (Successor<Self::State>, f64) {
+    ) -> (Successor<Self::State>, Self::Feedback) {
         let applied_force = match action {
             Push::Left => -self.env.action_force,
             Push::Right => self.env.action_force,
@@ -144,7 +149,7 @@ impl Environment for CartPole {
         } else {
             Successor::Continue(next_state)
         };
-        (successor, reward)
+        (successor, reward.into())
     }
 }
 

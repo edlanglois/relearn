@@ -21,6 +21,7 @@ where
 {
     type Observation = I::Observation;
     type Action = I::Action;
+    type Feedback = I::Feedback;
     type Environment = I::Environment;
     type Actor = I::Actor;
     type Logger = I::Logger;
@@ -51,11 +52,11 @@ where
     }
 }
 
-impl<I, O, A> Iterator for TakeEpisodes<I>
+impl<I, O, A, F> Iterator for TakeEpisodes<I>
 where
-    I: Iterator<Item = PartialStep<O, A>>,
+    I: Iterator<Item = PartialStep<O, A, F>>,
 {
-    type Item = PartialStep<O, A>;
+    type Item = PartialStep<O, A, F>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -78,9 +79,9 @@ where
     }
 
     #[inline]
-    fn fold<B, F>(self, init: B, f: F) -> B
+    fn fold<B, G>(self, init: B, g: G) -> B
     where
-        F: FnMut(B, Self::Item) -> B,
+        G: FnMut(B, Self::Item) -> B,
     {
         let mut n = self.n;
         self.take_while(move |step| {
@@ -93,7 +94,7 @@ where
                 false
             }
         })
-        .fold(init, f)
+        .fold(init, g)
     }
 }
 
@@ -114,7 +115,7 @@ mod tests {
 
         let env = Chain::default().with_latent_step_limit(steps_per_episode);
         let agent = RandomAgent::new(env.action_space());
-        let summary: StepsSummary = env
+        let summary: StepsSummary<_> = env
             .run(agent, SimSeed::Root(53), ())
             // Additional step bound so that the test does not hang if take_episodes breaks
             .take((5 * steps_per_episode * num_episodes) as usize)

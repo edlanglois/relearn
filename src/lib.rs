@@ -48,6 +48,7 @@ extern crate self as relearn;
 
 pub mod agents;
 pub mod envs;
+pub mod feedback;
 pub mod logging;
 pub mod simulation;
 pub mod spaces;

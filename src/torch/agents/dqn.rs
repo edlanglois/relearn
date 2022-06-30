@@ -5,8 +5,9 @@ use super::{n_backward_steps, ToLog, WithCpuCopy};
 use crate::agents::buffers::{HistoryDataBound, ReplayBuffer};
 use crate::agents::{Actor, ActorMode, Agent, BatchUpdate, BuildAgent, BuildAgentError};
 use crate::envs::EnvStructure;
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
-use crate::spaces::{FeatureSpace, FiniteSpace, NonEmptyFeatures, ReprSpace, SampleSpace};
+use crate::spaces::{FeatureSpace, FiniteSpace, NonEmptyFeatures, ReprSpace, SampleSpace, Space};
 use crate::torch::modules::{AsModule, BuildModule, Module, SeqIterative, SeqPacked};
 use crate::torch::optimizers::{AdamConfig, BuildOptimizer, Optimizer};
 use crate::torch::packed::PackedTensor;
@@ -71,12 +72,13 @@ where
     }
 }
 
-impl<OS, AS, VB, OB> BuildAgent<OS, AS> for DqnConfig<VB, OB>
+impl<OS, AS, FS, VB, OB> BuildAgent<OS, AS, FS> for DqnConfig<VB, OB>
 where
     OS: FeatureSpace + Clone,
     OS::Element: 'static,
     AS: FiniteSpace + SampleSpace + ReprSpace<Tensor> + Clone,
     AS::Element: 'static,
+    FS: Space<Element = Reward>,
     VB: BuildModule,
     VB::Module: SeqPacked + SeqIterative,
     OB: BuildOptimizer,
@@ -86,7 +88,7 @@ where
 
     fn build_agent(
         &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS, FeedbackSpace = FS>,
         rng: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
         Ok(DqnAgent::new(env, self, Prng::from_rng(rng).unwrap()))
@@ -142,6 +144,7 @@ where
     pub fn new<E, VB, OB>(env: &E, config: &DqnConfig<VB, OB>, rng: Prng) -> Self
     where
         E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
+        E::FeedbackSpace: Space<Element = Reward>,
         VB: BuildModule<Module = V>,
         OB: BuildOptimizer<Optimizer = O>,
     {
@@ -219,6 +222,7 @@ where
     V::Module: SeqPacked,
     O: Optimizer,
 {
+    type Feedback = Reward;
     type HistoryBuffer = ReplayBuffer<OS::Element, AS::Element>;
 
     fn buffer(&self) -> Self::HistoryBuffer {

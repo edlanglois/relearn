@@ -4,9 +4,10 @@ use super::super::{
     BuildAgentError, HistoryDataBound,
 };
 use crate::envs::EnvStructure;
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
-use crate::spaces::FiniteSpace;
+use crate::spaces::{FiniteSpace, IntervalSpace};
 use crate::utils::iter::ArgMaxBy;
 use crate::Prng;
 use ndarray::{Array, Array1, Array2, Axis};
@@ -38,7 +39,7 @@ impl Default for UCB1AgentConfig {
     }
 }
 
-impl<OS, AS> BuildAgent<OS, AS> for UCB1AgentConfig
+impl<OS, AS> BuildAgent<OS, AS, IntervalSpace<Reward>> for UCB1AgentConfig
 where
     OS: FiniteSpace + Clone + 'static,
     AS: FiniteSpace + Clone + 'static,
@@ -47,16 +48,24 @@ where
 
     fn build_agent(
         &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        env: &dyn EnvStructure<
+            ObservationSpace = OS,
+            ActionSpace = AS,
+            FeedbackSpace = IntervalSpace<Reward>,
+        >,
         _: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
         let observation_space = env.observation_space();
         let action_space = env.action_space();
+        let IntervalSpace {
+            low: Reward(r_min),
+            high: Reward(r_max),
+        } = env.feedback_space();
         Ok(FiniteSpaceAgent {
             agent: Arc::new(BaseUCB1Agent::new(
                 observation_space.size(),
                 action_space.size(),
-                env.reward_range(),
+                (r_min, r_max),
                 self.exploration_rate,
             )?),
             observation_space,
@@ -135,7 +144,7 @@ impl fmt::Display for BaseUCB1Agent {
 impl BaseUCB1Agent {
     /// Update based on an on-policy or off-policy step.
     fn step_update(&mut self, step: PartialStep<usize, usize>) {
-        let scaled_reward = (step.reward + self.reward_shift) * self.reward_scale_factor;
+        let scaled_reward = (step.feedback.unwrap() + self.reward_shift) * self.reward_scale_factor;
 
         self.state_visit_count[step.observation] += 1;
         let state_action_count = self
@@ -163,6 +172,7 @@ impl Agent<usize, usize> for Arc<BaseUCB1Agent> {
 }
 
 impl BatchUpdate<usize, usize> for Arc<BaseUCB1Agent> {
+    type Feedback = Reward;
     type HistoryBuffer = VecBuffer<usize, usize>;
 
     fn buffer(&self) -> Self::HistoryBuffer {

@@ -71,6 +71,7 @@ where
 {
     type Observation = E::Observation;
     type Action = E::Action;
+    type Feedback = E::Feedback;
     type Environment = E;
     type Actor = T;
     type Logger = L;
@@ -109,7 +110,7 @@ where
     L: StatsLogger,
 {
     /// Advance to the next environment-actor step.
-    pub fn step(&mut self) -> PartialStep<E::Observation, E::Action> {
+    pub fn step(&mut self) -> PartialStep<E::Observation, E::Action, E::Feedback> {
         // Extract the current environment and actor state.
         // If None then start a new episode.
         let (env_state, observation, mut actor_state) = match self.state.take() {
@@ -126,7 +127,7 @@ where
             .actor
             .act(&mut actor_state, &observation, self.rng_actor.borrow_mut());
         // Take an environment step using this action.
-        let (successor, reward) = self.env.step(
+        let (successor, feedback) = self.env.step(
             env_state,
             &action,
             self.rng_env.borrow_mut(),
@@ -160,7 +161,7 @@ where
         PartialStep {
             observation,
             action,
-            reward,
+            feedback,
             next,
         }
     }
@@ -174,7 +175,7 @@ where
     L: StatsLogger,
 {
     /// Cannot return a `TransientStep` without Generic Associated Types
-    type Item = PartialStep<E::Observation, E::Action>;
+    type Item = PartialStep<E::Observation, E::Action, E::Feedback>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

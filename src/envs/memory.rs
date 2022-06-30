@@ -1,6 +1,7 @@
 use super::{CloneBuild, EnvStructure, Environment, Successor};
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
-use crate::spaces::IndexSpace;
+use crate::spaces::{IndexSpace, IntervalSpace};
 use crate::Prng;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -56,6 +57,7 @@ impl MemoryGame {
 impl EnvStructure for MemoryGame {
     type ObservationSpace = IndexSpace;
     type ActionSpace = IndexSpace;
+    type FeedbackSpace = IntervalSpace<Reward>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         IndexSpace::new(self.num_actions + self.history_len)
@@ -65,8 +67,8 @@ impl EnvStructure for MemoryGame {
         IndexSpace::new(self.num_actions)
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        (-1.0, 1.0)
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        IntervalSpace::new(Reward(-1.0), Reward(1.0))
     }
 
     fn discount_factor(&self) -> f64 {
@@ -79,6 +81,7 @@ impl Environment for MemoryGame {
     type State = (usize, usize);
     type Observation = usize;
     type Action = usize;
+    type Feedback = Reward;
 
     fn initial_state(&self, rng: &mut Prng) -> Self::State {
         let state = rng.gen_range(0..self.num_actions);
@@ -96,18 +99,18 @@ impl Environment for MemoryGame {
         action: &Self::Action,
         _: &mut Prng,
         _: &mut dyn StatsLogger,
-    ) -> (Successor<Self::State>, f64) {
+    ) -> (Successor<Self::State>, Self::Feedback) {
         let (current_state, initial_state) = state;
         if current_state == self.num_actions + self.history_len - 1 {
             let reward = if *action == initial_state { 1.0 } else { -1.0 };
-            (Successor::Terminate, reward)
+            (Successor::Terminate, Reward(reward))
         } else {
             let new_state = if current_state < self.num_actions {
                 self.num_actions
             } else {
                 current_state + 1
             };
-            (Successor::Continue((new_state, initial_state)), 0.0)
+            (Successor::Continue((new_state, initial_state)), Reward(0.0))
         }
     }
 }

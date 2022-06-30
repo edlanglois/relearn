@@ -165,7 +165,9 @@ pub enum ActorMode {
 /// If old data in the buffer needs to be cleared that is the reponsibility of either the buffer
 /// or the `batch_update` method.
 pub trait BatchUpdate<O, A> {
-    type HistoryBuffer: WriteExperience<O, A>;
+    /// Environment feedback type
+    type Feedback;
+    type HistoryBuffer: WriteExperience<O, A, Self::Feedback>;
 
     /// Create a new history buffer.
     fn buffer(&self) -> Self::HistoryBuffer;
@@ -196,9 +198,9 @@ pub trait BatchUpdate<O, A> {
 }
 
 /// Build an agent instance for a given environment structure.
-pub trait BuildAgent<OS: Space, AS: Space> {
+pub trait BuildAgent<OS: Space, AS: Space, FS: Space> {
     /// Type of agent to build
-    type Agent: Agent<OS::Element, AS::Element>;
+    type Agent: Agent<OS::Element, AS::Element> + BatchUpdate<OS::Element, AS::Element>;
 
     /// Build an agent for the given environment structure ([`EnvStructure`]).
     ///
@@ -207,7 +209,7 @@ pub trait BuildAgent<OS: Space, AS: Space> {
     /// * `rng` - Used for seeding the agent's pseudo-random internal parameters, if any.
     fn build_agent(
         &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS, FeedbackSpace = FS>,
         rng: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError>;
 }

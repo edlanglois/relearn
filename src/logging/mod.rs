@@ -210,6 +210,18 @@ impl LogValue {
     }
 }
 
+/// A type that can be logged to a [`StatsLogger`].
+///
+/// While [`LogValue`] are the core log value types, a `Loggable` decomposes itself into zero or
+/// more `LogValues` in the process of logging.
+pub trait Loggable {
+    fn log<L: StatsLogger + ?Sized>(
+        &self,
+        name: &'static str,
+        logger: &mut L,
+    ) -> Result<(), LogError>;
+}
+
 /// A hierarchical identifier.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Id {
@@ -302,7 +314,8 @@ impl FromIterator<&'static str> for Id {
 
 impl Id {
     /// Add a new top-level name to the namespace.
-    fn with_prefix(mut self, scope: &'static str) -> Self {
+    #[must_use]
+    pub fn with_prefix(mut self, scope: &'static str) -> Self {
         self.namespace.push(scope);
         self
     }

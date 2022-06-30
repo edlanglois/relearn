@@ -41,6 +41,7 @@ pub type WithLatentStepLimit<E> = Wrapped<E, LatentStepLimit>;
 impl<T: EnvStructure> EnvStructure for Wrapped<T, LatentStepLimit> {
     type ObservationSpace = T::ObservationSpace;
     type ActionSpace = T::ActionSpace;
+    type FeedbackSpace = T::FeedbackSpace;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         self.inner.observation_space()
@@ -50,8 +51,8 @@ impl<T: EnvStructure> EnvStructure for Wrapped<T, LatentStepLimit> {
         self.inner.action_space()
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        self.inner.reward_range()
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        self.inner.feedback_space()
     }
 
     fn discount_factor(&self) -> f64 {
@@ -71,6 +72,7 @@ impl<E: Environment> Environment for Wrapped<E, LatentStepLimit> {
     type State = StepLimitState<E::State>;
     type Observation = E::Observation;
     type Action = E::Action;
+    type Feedback = E::Feedback;
 
     fn initial_state(&self, rng: &mut Prng) -> Self::State {
         StepLimitState {
@@ -89,12 +91,12 @@ impl<E: Environment> Environment for Wrapped<E, LatentStepLimit> {
         action: &Self::Action,
         rng: &mut Prng,
         logger: &mut dyn StatsLogger,
-    ) -> (Successor<Self::State>, f64) {
+    ) -> (Successor<Self::State>, Self::Feedback) {
         assert!(
             state.steps_remaining > 0,
             "invalid step from a state with no remaining steps"
         );
-        let (inner_successor, reward) = self.inner.step(state.inner, action, rng, logger);
+        let (inner_successor, feedback) = self.inner.step(state.inner, action, rng, logger);
 
         // Decrement remaining steps and interrupt if none remain
         let successor = match inner_successor.map(|inner| StepLimitState {
@@ -106,7 +108,7 @@ impl<E: Environment> Environment for Wrapped<E, LatentStepLimit> {
             }
             s => s,
         };
-        (successor, reward)
+        (successor, feedback)
     }
 }
 
@@ -179,6 +181,7 @@ impl<T: Default> Default for StepLimitObsSpace<T> {
 impl<T: EnvStructure> EnvStructure for Wrapped<T, VisibleStepLimit> {
     type ObservationSpace = StepLimitObsSpace<T::ObservationSpace>;
     type ActionSpace = T::ActionSpace;
+    type FeedbackSpace = T::FeedbackSpace;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         self.inner.observation_space().into()
@@ -188,8 +191,8 @@ impl<T: EnvStructure> EnvStructure for Wrapped<T, VisibleStepLimit> {
         self.inner.action_space()
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        self.inner.reward_range()
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        self.inner.feedback_space()
     }
 
     fn discount_factor(&self) -> f64 {
@@ -202,6 +205,7 @@ impl<E: Environment> Environment for Wrapped<E, VisibleStepLimit> {
     type State = StepLimitState<E::State>;
     type Observation = StepLimitObs<E::Observation>;
     type Action = E::Action;
+    type Feedback = E::Feedback;
 
     fn initial_state(&self, rng: &mut Prng) -> Self::State {
         StepLimitState {
@@ -224,12 +228,12 @@ impl<E: Environment> Environment for Wrapped<E, VisibleStepLimit> {
         action: &Self::Action,
         rng: &mut Prng,
         logger: &mut dyn StatsLogger,
-    ) -> (Successor<Self::State>, f64) {
+    ) -> (Successor<Self::State>, Self::Feedback) {
         assert!(
             state.steps_remaining > 0,
             "invalid step from a state with no remaining steps"
         );
-        let (inner_successor, reward) = self.inner.step(state.inner, action, rng, logger);
+        let (inner_successor, feedback) = self.inner.step(state.inner, action, rng, logger);
 
         // Decrement remaining steps and interrupt if none remain
         let successor = match inner_successor.map(|inner| StepLimitState {
@@ -241,7 +245,7 @@ impl<E: Environment> Environment for Wrapped<E, VisibleStepLimit> {
             }
             s => s,
         };
-        (successor, reward)
+        (successor, feedback)
     }
 }
 

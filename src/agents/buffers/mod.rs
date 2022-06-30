@@ -91,16 +91,20 @@ impl HistoryDataBound {
     /// * `last`      - The last step in the sequence (or `None` if the sequence is empty).
     #[inline]
     #[must_use]
-    pub fn is_satisfied<O, A, U>(&self, num_steps: usize, last: Option<&Step<O, A, U>>) -> bool {
+    pub fn is_satisfied<O, A, F, U>(
+        &self,
+        num_steps: usize,
+        last: Option<&Step<O, A, F, U>>,
+    ) -> bool {
         num_steps >= self.min_steps && last.map_or(true, Step::episode_done)
             || num_steps >= self.min_steps + self.slack_steps
     }
 
     /// Apply the bound to an iterator of steps, taking the required number of steps.
     #[inline]
-    pub fn take<I, O, A>(self, steps: I) -> TakeAlignedSteps<I::IntoIter>
+    pub fn take<I, O, A, F>(self, steps: I) -> TakeAlignedSteps<I::IntoIter>
     where
-        I: IntoIterator<Item = PartialStep<O, A>>,
+        I: IntoIterator<Item = PartialStep<O, A, F>>,
     {
         steps
             .into_iter()
@@ -128,11 +132,11 @@ const fn div_ceil(numerator: usize, denominator: usize) -> usize {
 ///
 /// In particular, a step with `step.next == Successor::Continue` must not be followed by
 /// a step from a different episode.
-pub trait WriteExperience<O, A>: WriteExperienceIncremental<O, A> {
+pub trait WriteExperience<O, A, F>: WriteExperienceIncremental<O, A, F> {
     /// Write a thread of experience into the buffer.
     fn write_experience<I>(&mut self, steps: I) -> Result<(), WriteExperienceError>
     where
-        I: IntoIterator<Item = PartialStep<O, A>>,
+        I: IntoIterator<Item = PartialStep<O, A, F>>,
         Self: Sized,
     {
         for (i, step) in steps.into_iter().enumerate() {
@@ -151,10 +155,13 @@ pub trait WriteExperience<O, A>: WriteExperienceIncremental<O, A> {
     }
 }
 
-/// Implement `WriteExperience<O, A>` for a deref-able generic wrapper type.
+/// Implement `WriteExperience<O, A, F>` for a deref-able generic wrapper type.
 macro_rules! impl_wrapped_write_experience {
     ($wrapper:ty) => {
-        impl<T, O, A> WriteExperience<O, A> for $wrapper where T: WriteExperience<O, A> + ?Sized {}
+        impl<T, O, A, F> WriteExperience<O, A, F> for $wrapper where
+            T: WriteExperience<O, A, F> + ?Sized
+        {
+        }
     };
 }
 impl_wrapped_write_experience!(&'_ mut T);
@@ -177,12 +184,12 @@ impl_wrapped_write_experience!(Box<T>);
 ///    the incremental writer together when the writer (mutably) references the buffer.
 ///
 /// [1]: super::SerialActorAgent
-pub trait WriteExperienceIncremental<O, A> {
+pub trait WriteExperienceIncremental<O, A, F> {
     /// Write a step into the the buffer.
     ///
     /// Successive steps must be from the same thread of experience unless `end_experience()` is
     /// called in between.
-    fn write_step(&mut self, step: PartialStep<O, A>) -> Result<(), WriteExperienceError>;
+    fn write_step(&mut self, step: PartialStep<O, A, F>) -> Result<(), WriteExperienceError>;
 
     /// End the current thread of experience.
     ///
@@ -194,13 +201,17 @@ pub trait WriteExperienceIncremental<O, A> {
 /// Implement `WriteExperienceIncremental<O, A>` for a deref-able generic wrapper type.
 macro_rules! impl_wrapped_write_experience_incremental {
     ($wrapper:ty) => {
-        impl<T, O, A> WriteExperienceIncremental<O, A> for $wrapper
+        impl<T, O, A, F> WriteExperienceIncremental<O, A, F> for $wrapper
         where
-            T: WriteExperienceIncremental<O, A> + ?Sized,
+            T: WriteExperienceIncremental<O, A, F> + ?Sized,
         {
-            fn write_step(&mut self, step: PartialStep<O, A>) -> Result<(), WriteExperienceError> {
+            fn write_step(
+                &mut self,
+                step: PartialStep<O, A, F>,
+            ) -> Result<(), WriteExperienceError> {
                 T::write_step(self, step)
             }
+
             fn end_experience(&mut self) {
                 T::end_experience(self)
             }
@@ -223,9 +234,9 @@ pub enum WriteExperienceError {
 /// Returns whether a new episode was created.
 /// If a new episode was created then the last step was popped.
 /// If no new episode was created then the last step may or may not have been popped.
-fn finalize_last_episode<S, O, A>(steps: &mut S) -> bool
+fn finalize_last_episode<S, O, A, F>(steps: &mut S) -> bool
 where
-    S: Stack<PartialStep<O, A>>,
+    S: Stack<PartialStep<O, A, F>>,
 {
     // If the last step ends the episode (or if there is no last episode) then we're done.
     if steps.top().map_or(true, PartialStep::episode_done) {

@@ -79,6 +79,7 @@ fn main() {
             let actor: <<AgentConfig as BuildAgent<
                 <WithVisibleStepLimit<CartPole> as EnvStructure>::ObservationSpace,
                 <WithVisibleStepLimit<CartPole> as EnvStructure>::ActionSpace,
+                <WithVisibleStepLimit<CartPole> as EnvStructure>::FeedbackSpace,
             >>::Agent as Agent<_, _>>::Actor =
                 serde_cbor::from_reader(File::open(&actor_path).unwrap()).unwrap();
 

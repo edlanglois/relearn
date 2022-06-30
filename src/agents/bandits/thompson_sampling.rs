@@ -4,9 +4,10 @@ use super::super::{
     BuildAgentError, HistoryDataBound,
 };
 use crate::envs::EnvStructure;
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
-use crate::spaces::FiniteSpace;
+use crate::spaces::{FiniteSpace, IntervalSpace};
 use crate::utils::iter::ArgMaxBy;
 use crate::Prng;
 use ndarray::{Array, Array2, Axis};
@@ -37,7 +38,7 @@ impl Default for BetaThompsonSamplingAgentConfig {
     }
 }
 
-impl<OS, AS> BuildAgent<OS, AS> for BetaThompsonSamplingAgentConfig
+impl<OS, AS> BuildAgent<OS, AS, IntervalSpace<Reward>> for BetaThompsonSamplingAgentConfig
 where
     OS: FiniteSpace + Clone + 'static,
     AS: FiniteSpace + Clone + 'static,
@@ -46,16 +47,24 @@ where
 
     fn build_agent(
         &self,
-        env: &dyn EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        env: &dyn EnvStructure<
+            ObservationSpace = OS,
+            ActionSpace = AS,
+            FeedbackSpace = IntervalSpace<Reward>,
+        >,
         _: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
         let observation_space = env.observation_space();
         let action_space = env.action_space();
+        let IntervalSpace {
+            low: Reward(r_min),
+            high: Reward(r_max),
+        } = env.feedback_space();
         Ok(FiniteSpaceAgent {
             agent: BaseBetaThompsonSamplingAgent::new(
                 observation_space.size(),
                 action_space.size(),
-                env.reward_range(),
+                (r_min, r_max),
                 self.num_samples,
             ),
             observation_space,
@@ -74,7 +83,7 @@ pub type BetaThompsonSamplingAgent<OS, AS> =
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct BaseBetaThompsonSamplingAgent {
     /// Reward is partitioned into high/low separated by this threshold.
-    pub reward_threshold: f64,
+    pub reward_threshold: Reward,
     /// Number of posterior samples to draw.
     /// Takes the action with the highest mean sampled value.
     pub num_samples: usize,
@@ -91,7 +100,7 @@ impl BaseBetaThompsonSamplingAgent {
         num_samples: usize,
     ) -> Self {
         let (reward_min, reward_max) = reward_range;
-        let reward_threshold = (reward_min + reward_max) / 2.0;
+        let reward_threshold = Reward((reward_min + reward_max) / 2.0);
         let low_high_reward_counts =
             Arc::new(Array::from_elem((num_observations, num_actions), (1, 1)));
         Self {
@@ -119,7 +128,7 @@ impl BaseBetaThompsonSamplingAgent {
             .expect("cannot update agent while actors exist")
             .get_mut((step.observation, step.action))
             .unwrap();
-        if step.reward > self.reward_threshold {
+        if step.feedback > self.reward_threshold {
             reward_count.1 += 1;
         } else {
             reward_count.0 += 1;
@@ -140,6 +149,7 @@ impl Agent<usize, usize> for BaseBetaThompsonSamplingAgent {
 }
 
 impl BatchUpdate<usize, usize> for BaseBetaThompsonSamplingAgent {
+    type Feedback = Reward;
     type HistoryBuffer = VecBuffer<usize, usize>;
 
     fn buffer(&self) -> Self::HistoryBuffer {

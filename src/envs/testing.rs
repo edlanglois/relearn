@@ -4,8 +4,9 @@ use super::{
     StoredEnvStructure, StructuredEnvironment, Successor,
 };
 use crate::agents::{ActorMode, Agent, RandomAgent};
+use crate::feedback::Reward;
 use crate::simulation::SimSeed;
-use crate::spaces::{IndexSpace, SampleSpace, SingletonSpace, Space, SubsetOrd};
+use crate::spaces::{IndexSpace, IntervalSpace, SampleSpace, SingletonSpace, Space, SubsetOrd};
 use crate::Prng;
 use rand::SeedableRng;
 use std::cell::Cell;
@@ -29,8 +30,7 @@ where
 {
     let observation_space = env.observation_space();
     let action_space = env.action_space();
-    let (min_reward, max_reward) = env.reward_range();
-    assert!(min_reward <= max_reward);
+    let feedback_space = env.feedback_space();
 
     let discount_factor = env.discount_factor();
     assert!(discount_factor >= 0.0);
@@ -48,8 +48,7 @@ where
     )
     .take(num_steps)
     .for_each(|step| {
-        assert!(step.reward >= min_reward);
-        assert!(step.reward <= max_reward);
+        assert!(feedback_space.contains(&step.feedback));
         assert!(observation_space.contains(&step.observation));
         if let Successor::Interrupt(next_obs) = &step.next {
             assert!(observation_space.contains(next_obs));
@@ -64,9 +63,9 @@ where
     D: EnvDistribution + ?Sized,
     D::ObservationSpace: SubsetOrd + Debug,
     D::ActionSpace: SubsetOrd + Debug,
+    D::FeedbackSpace: SubsetOrd + Debug,
 {
     let env_structure = StoredEnvStructure::from(env_dist);
-    let (dist_reward_min, dist_reward_max) = env_structure.reward_range;
 
     let mut rng = Prng::seed_from_u64(75);
     for _ in 0..num_samples {
@@ -84,18 +83,12 @@ where
             env.action_space(),
             env_structure.action_space,
         );
-        let (env_reward_min, env_reward_max) = env.reward_range();
         assert!(
-            dist_reward_min <= env_reward_min,
-            "{} </= {}",
-            dist_reward_min,
-            env_reward_min
-        );
-        assert!(
-            dist_reward_max >= env_reward_max,
-            "{} >/= {}",
-            dist_reward_max,
-            env_reward_max
+            env.feedback_space()
+                .subset_of(&env_structure.feedback_space),
+            "{:?} ⊄ {:?}",
+            env.feedback_space(),
+            env_structure.feedback_space,
         );
         assert_eq!(env.discount_factor(), env_structure.discount_factor);
     }
@@ -127,6 +120,7 @@ impl RoundRobinDeterministicBandits {
 impl EnvStructure for RoundRobinDeterministicBandits {
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
+    type FeedbackSpace = IntervalSpace<Reward>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         SingletonSpace::new()
@@ -136,8 +130,8 @@ impl EnvStructure for RoundRobinDeterministicBandits {
         IndexSpace::new(self.num_arms)
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        (0.0, 1.0)
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        IntervalSpace::new(Reward(0.0), Reward(1.0))
     }
 
     fn discount_factor(&self) -> f64 {

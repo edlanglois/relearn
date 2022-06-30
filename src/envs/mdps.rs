@@ -1,7 +1,8 @@
 //! Generic Markov Decision Processes
 use super::{CloneBuild, EnvDistribution, EnvStructure, Environment, Successor};
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
-use crate::spaces::IndexSpace;
+use crate::spaces::{IndexSpace, IntervalSpace};
 use crate::Prng;
 use ndarray::{Array2, Axis};
 use rand::distributions::Distribution;
@@ -13,24 +14,25 @@ use serde::{Deserialize, Serialize};
 /// The environment always starts in the state with index 0.
 /// There are no terminal states; episodes last forever.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TabularMdp<T = WeightedAliasIndex<f32>, R = Normal<f64>> {
+pub struct TabularMdp<T = WeightedAliasIndex<f32>, D = Normal<f64>> {
     /// Environment transitions table.
     ///
     /// Given state index `s` and action index `a`,
     /// `transitions[s, a] = (successor_distribution, reward_distribution)` where
     /// `successor_distribution` is the distribution of the successor state index `s'` and
     /// `reward_distribution` is the reward distribution for the step.
-    pub transitions: Array2<(T, R)>,
+    pub transitions: Array2<(T, D)>,
 
     /// Environment discount factor.
     pub discount_factor: f64,
 }
 
-impl<T: Clone, R: Clone> CloneBuild for TabularMdp<T, R> {}
+impl<T: Clone, D: Clone> CloneBuild for TabularMdp<T, D> {}
 
-impl<T, R> EnvStructure for TabularMdp<T, R> {
+impl<T, D> EnvStructure for TabularMdp<T, D> {
     type ObservationSpace = IndexSpace;
     type ActionSpace = IndexSpace;
+    type FeedbackSpace = IntervalSpace<Reward>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         IndexSpace::new(self.transitions.len_of(Axis(0)))
@@ -40,9 +42,9 @@ impl<T, R> EnvStructure for TabularMdp<T, R> {
         IndexSpace::new(self.transitions.len_of(Axis(1)))
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        // TODO: Could get a tighter bound by requiring R: Bounded
-        (f64::NEG_INFINITY, f64::INFINITY)
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        // TODO: Could get a tighter bound by requiring D: Bounded
+        IntervalSpace::default()
     }
 
     fn discount_factor(&self) -> f64 {
@@ -50,14 +52,15 @@ impl<T, R> EnvStructure for TabularMdp<T, R> {
     }
 }
 
-impl<T, R> Environment for TabularMdp<T, R>
+impl<T, D> Environment for TabularMdp<T, D>
 where
     T: Distribution<usize>,
-    R: Distribution<f64>,
+    D: Distribution<f64>,
 {
     type State = usize;
     type Observation = usize;
     type Action = usize;
+    type Feedback = Reward;
 
     fn initial_state(&self, _: &mut Prng) -> Self::State {
         0
@@ -73,11 +76,11 @@ where
         action: &Self::Action,
         rng: &mut Prng,
         _: &mut dyn StatsLogger,
-    ) -> (Successor<Self::State>, f64) {
+    ) -> (Successor<Self::State>, Self::Feedback) {
         let (successor_distribution, reward_distribution) = &self.transitions[(state, *action)];
         let next_state = successor_distribution.sample(rng);
         let reward = reward_distribution.sample(rng);
-        (Successor::Continue(next_state), reward)
+        (Successor::Continue(next_state), reward.into())
     }
 }
 
@@ -121,6 +124,7 @@ impl Default for DirichletRandomMdps {
 impl EnvStructure for DirichletRandomMdps {
     type ObservationSpace = IndexSpace;
     type ActionSpace = IndexSpace;
+    type FeedbackSpace = IntervalSpace<Reward>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         IndexSpace::new(self.num_states)
@@ -128,8 +132,8 @@ impl EnvStructure for DirichletRandomMdps {
     fn action_space(&self) -> Self::ActionSpace {
         IndexSpace::new(self.num_actions)
     }
-    fn reward_range(&self) -> (f64, f64) {
-        (f64::NEG_INFINITY, f64::INFINITY)
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        IntervalSpace::new(Reward(f64::NEG_INFINITY), Reward(f64::INFINITY))
     }
     fn discount_factor(&self) -> f64 {
         self.discount_factor

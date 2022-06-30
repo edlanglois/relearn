@@ -1,7 +1,8 @@
 use super::{CloneBuild, EnvStructure, Environment, Successor};
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
 use crate::spaces::{
-    BooleanSpace, Indexed, IndexedTypeSpace, OptionSpace, PowerSpace, TupleSpace2,
+    BooleanSpace, Indexed, IndexedTypeSpace, IntervalSpace, OptionSpace, PowerSpace, TupleSpace2,
 };
 use crate::Prng;
 use rand::Rng;
@@ -63,6 +64,7 @@ pub type FeedbackSpace = TupleSpace2<ElementSpace, IndexedTypeSpace<Classificati
 impl EnvStructure for PartitionGame {
     type ObservationSpace = TupleSpace2<ElementSpace, OptionSpace<FeedbackSpace>>;
     type ActionSpace = IndexedTypeSpace<Action>;
+    type FeedbackSpace = IntervalSpace<Reward>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         Default::default()
@@ -72,8 +74,8 @@ impl EnvStructure for PartitionGame {
         Default::default()
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        (-1.0, 1.0)
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        IntervalSpace::new(Reward(-1.0), Reward(1.0))
     }
 
     fn discount_factor(&self) -> f64 {
@@ -86,6 +88,7 @@ impl Environment for PartitionGame {
     /// Current element and feedback
     type Observation = (Element, Option<(Element, Classification)>);
     type Action = Action;
+    type Feedback = Reward;
 
     fn initial_state(&self, rng: &mut Prng) -> Self::State {
         let supervisor = Supervisor::AxisAligned(rng.gen_range(0..NUM_FEATURES));
@@ -107,7 +110,7 @@ impl Environment for PartitionGame {
         action: &Self::Action,
         rng: &mut Prng,
         _: &mut dyn StatsLogger,
-    ) -> (Successor<Self::State>, f64) {
+    ) -> (Successor<Self::State>, Self::Feedback) {
         let label = state.supervisor.classify(&state.element);
         let reward = match (label, action) {
             (Classification::Left, Action::ClassifyLeft)
@@ -121,7 +124,7 @@ impl Environment for PartitionGame {
                 // Feedback on the previous state and action
                 feedback: Some((state.element, label)),
             }),
-            reward,
+            Reward(reward),
         )
     }
 }

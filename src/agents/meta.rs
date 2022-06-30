@@ -27,18 +27,24 @@ impl<TC> ResettingMetaAgentConfig<TC> {
     }
 }
 
-impl<TC, OS, AS> BuildAgent<MetaObservationSpace<OS, AS>, AS> for ResettingMetaAgentConfig<TC>
+impl<TC, OS, AS, FS> BuildAgent<MetaObservationSpace<OS, AS, FS>, AS, FS>
+    for ResettingMetaAgentConfig<TC>
 where
-    TC: BuildAgent<OS, AS> + Clone,
-    TC::Agent: BatchUpdate<OS::Element, AS::Element>,
+    TC: BuildAgent<OS, AS, FS> + Clone,
+    TC::Agent: BatchUpdate<OS::Element, AS::Element, Feedback = FS::Element>,
     OS: Space + Clone,
     AS: NonEmptySpace + Clone,
+    FS: Space + Clone,
 {
-    type Agent = Arc<ResettingMetaAgent<TC, OS, AS>>;
+    type Agent = Arc<ResettingMetaAgent<TC, OS, AS, FS>>;
 
     fn build_agent(
         &self,
-        env: &dyn EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
+        env: &dyn EnvStructure<
+            ObservationSpace = MetaObservationSpace<OS, AS, FS>,
+            ActionSpace = AS,
+            FeedbackSpace = FS,
+        >,
         _: &mut Prng,
     ) -> Result<Self::Agent, BuildAgentError> {
         Ok(Arc::new(ResettingMetaAgent::from_meta_env(
@@ -50,15 +56,15 @@ where
 
 /// Lifts a regular agent to act on a meta environment (agent interface).
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ResettingMetaAgent<TC, OS, AS> {
+pub struct ResettingMetaAgent<TC, OS, AS, FS> {
     inner_agent_config: TC,
-    inner_env_structure: StoredEnvStructure<OS, AS>,
+    inner_env_structure: StoredEnvStructure<OS, AS, FS>,
 }
 
-impl<TC, OS, AS> ResettingMetaAgent<TC, OS, AS> {
+impl<TC, OS, AS, FS> ResettingMetaAgent<TC, OS, AS, FS> {
     pub fn new<E: ?Sized>(inner_agent_config: TC, inner_env_structure: &E) -> Self
     where
-        E: EnvStructure<ObservationSpace = OS, ActionSpace = AS>,
+        E: EnvStructure<ObservationSpace = OS, ActionSpace = AS, FeedbackSpace = FS>,
     {
         Self {
             inner_agent_config,
@@ -67,26 +73,32 @@ impl<TC, OS, AS> ResettingMetaAgent<TC, OS, AS> {
     }
 }
 
-impl<TC, OS, AS> ResettingMetaAgent<TC, OS, AS>
+impl<TC, OS, AS, FS> ResettingMetaAgent<TC, OS, AS, FS>
 where
     OS: Space,
     AS: Space,
+    FS: Space,
 {
     pub fn from_meta_env<E: ?Sized>(inner_agent_config: TC, env: &E) -> Self
     where
-        E: EnvStructure<ObservationSpace = MetaObservationSpace<OS, AS>, ActionSpace = AS>,
+        E: EnvStructure<
+            ObservationSpace = MetaObservationSpace<OS, AS, FS>,
+            ActionSpace = AS,
+            FeedbackSpace = FS,
+        >,
     {
         Self::new(inner_agent_config, &InnerEnvStructure::new(env))
     }
 }
 
-impl<TC, OS, AS> Agent<MetaObservation<OS::Element, AS::Element>, AS::Element>
-    for Arc<ResettingMetaAgent<TC, OS, AS>>
+impl<TC, OS, AS, FS> Agent<MetaObservation<OS::Element, AS::Element, FS::Element>, AS::Element>
+    for Arc<ResettingMetaAgent<TC, OS, AS, FS>>
 where
-    TC: BuildAgent<OS, AS>,
-    TC::Agent: BatchUpdate<OS::Element, AS::Element>,
+    TC: BuildAgent<OS, AS, FS>,
+    TC::Agent: BatchUpdate<OS::Element, AS::Element, Feedback = FS::Element>,
     OS: Space + Clone,
     AS: NonEmptySpace + Clone,
+    FS: Space + Clone,
 {
     type Actor = Self;
 
@@ -122,13 +134,14 @@ where
     }
 }
 
-impl<TC, OS, AS> Actor<MetaObservation<OS::Element, AS::Element>, AS::Element>
-    for ResettingMetaAgent<TC, OS, AS>
+impl<TC, OS, AS, FS> Actor<MetaObservation<OS::Element, AS::Element, FS::Element>, AS::Element>
+    for ResettingMetaAgent<TC, OS, AS, FS>
 where
-    TC: BuildAgent<OS, AS>,
-    TC::Agent: BatchUpdate<OS::Element, AS::Element>,
+    TC: BuildAgent<OS, AS, FS>,
+    TC::Agent: BatchUpdate<OS::Element, AS::Element, Feedback = FS::Element>,
     OS: Space + Clone,
     AS: NonEmptySpace + Clone,
+    FS: Space + Clone,
 {
     type EpisodeState = InnerEpisodeState<TC::Agent, OS::Element, AS::Element>;
 
@@ -148,7 +161,7 @@ where
     fn act(
         &self,
         state: &mut Self::EpisodeState,
-        obs: &MetaObservation<OS::Element, AS::Element>,
+        obs: &MetaObservation<OS::Element, AS::Element, FS::Element>,
         rng: &mut Prng,
     ) -> AS::Element {
         // If the observation includes a previous step result then update the inner agent.
@@ -164,7 +177,7 @@ where
                     "meta observation follows a previous step but no previous observation stored",
                 ),
                 action: step_obs.action.clone(),
-                reward: step_obs.reward,
+                feedback: step_obs.feedback.clone(),
                 next: step_next,
             };
             state.inner_actor_agent.update(step, &mut ());
@@ -188,12 +201,15 @@ where
 }
 
 /// No updates at the meta-level.
-impl<TC, OS, AS> BatchUpdate<MetaObservation<OS::Element, AS::Element>, AS::Element>
-    for Arc<ResettingMetaAgent<TC, OS, AS>>
+impl<TC, OS, AS, FS>
+    BatchUpdate<MetaObservation<OS::Element, AS::Element, FS::Element>, AS::Element>
+    for Arc<ResettingMetaAgent<TC, OS, AS, FS>>
 where
     OS: Space,
     AS: Space,
+    FS: Space,
 {
+    type Feedback = FS::Element;
     type HistoryBuffer = NullBuffer;
 
     fn buffer(&self) -> Self::HistoryBuffer {
@@ -237,7 +253,7 @@ mod resetting_meta {
             .run(agent.actor(ActorMode::Evaluation), SimSeed::Root(221), ())
             .take(1000)
         {
-            current_episode_reward += step.reward;
+            current_episode_reward += step.feedback.unwrap();
             if step.next.episode_done() {
                 total_episode_reward += current_episode_reward;
                 current_episode_reward = 0.0;

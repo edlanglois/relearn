@@ -1,7 +1,8 @@
 //! Chain environment
 use super::{CloneBuild, EnvStructure, Environment, Successor};
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
-use crate::spaces::{IndexSpace, IndexedTypeSpace};
+use crate::spaces::{IndexSpace, IndexedTypeSpace, IntervalSpace};
 use crate::Prng;
 use rand::prelude::*;
 use relearn_derive::Indexed;
@@ -46,6 +47,7 @@ impl Default for Chain {
 impl EnvStructure for Chain {
     type ObservationSpace = IndexSpace;
     type ActionSpace = IndexedTypeSpace<Move>;
+    type FeedbackSpace = IntervalSpace<Reward>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         IndexSpace::new(self.size)
@@ -55,8 +57,8 @@ impl EnvStructure for Chain {
         Self::ActionSpace::new()
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        (0.0, 10.0)
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        IntervalSpace::new(Reward(0.0), Reward(10.0))
     }
 
     fn discount_factor(&self) -> f64 {
@@ -68,6 +70,7 @@ impl Environment for Chain {
     type State = usize;
     type Observation = usize;
     type Action = Move;
+    type Feedback = Reward;
 
     fn initial_state(&self, _: &mut Prng) -> Self::State {
         0
@@ -83,7 +86,7 @@ impl Environment for Chain {
         action: &Self::Action,
         rng: &mut Prng,
         _: &mut dyn StatsLogger,
-    ) -> (Successor<Self::State>, f64) {
+    ) -> (Successor<Self::State>, Self::Feedback) {
         let mut action = *action;
         if rng.gen::<f32>() < 0.2 {
             action = action.invert();
@@ -98,7 +101,7 @@ impl Environment for Chain {
                 }
             }
         };
-        (Successor::Continue(next_state), reward)
+        (Successor::Continue(next_state), reward.into())
     }
 }
 

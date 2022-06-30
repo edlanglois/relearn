@@ -1,7 +1,8 @@
 //! Multi-armed bandit environments
 use super::{CloneBuild, EnvDistribution, EnvStructure, Environment, Successor};
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
-use crate::spaces::{IndexSpace, SingletonSpace};
+use crate::spaces::{IndexSpace, IntervalSpace, SingletonSpace};
 use crate::utils::distributions::{Bernoulli, Bounded, Deterministic, FromMean};
 use crate::Prng;
 use rand::distributions::{Distribution, Uniform};
@@ -29,6 +30,7 @@ impl<D> Bandit<D> {
 impl<D: Bounded<f64>> EnvStructure for Bandit<D> {
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
+    type FeedbackSpace = IntervalSpace<Reward>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         SingletonSpace::new()
@@ -38,12 +40,14 @@ impl<D: Bounded<f64>> EnvStructure for Bandit<D> {
         IndexSpace::new(self.distributions.len())
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        self.distributions
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        let (min, max) = self
+            .distributions
             .iter()
             .map(Bounded::bounds)
             .reduce(|(a_min, a_max), (b_min, b_max)| (a_min.min(b_min), a_max.max(b_max)))
-            .expect("No arms on the bandit")
+            .unwrap_or((0.0, 0.0));
+        IntervalSpace::new(Reward(min), Reward(max))
     }
 
     fn discount_factor(&self) -> f64 {
@@ -55,6 +59,7 @@ impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
     type State = ();
     type Observation = ();
     type Action = usize;
+    type Feedback = Reward;
 
     fn initial_state(&self, _: &mut Prng) -> Self::State {}
 
@@ -66,9 +71,9 @@ impl<D: Distribution<f64> + Bounded<f64>> Environment for Bandit<D> {
         action: &Self::Action,
         rng: &mut Prng,
         _logger: &mut dyn StatsLogger,
-    ) -> (Successor<Self::State>, f64) {
+    ) -> (Successor<Self::State>, Self::Feedback) {
         let reward = self.distributions[*action].sample(rng);
-        (Successor::Terminate, reward)
+        (Successor::Terminate, reward.into())
     }
 }
 
@@ -143,6 +148,7 @@ impl CloneBuild for UniformBernoulliBandits {}
 impl EnvStructure for UniformBernoulliBandits {
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
+    type FeedbackSpace = IntervalSpace<Reward>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         SingletonSpace::new()
@@ -152,8 +158,8 @@ impl EnvStructure for UniformBernoulliBandits {
         IndexSpace::new(self.num_arms)
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        (0.0, 1.0)
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        IntervalSpace::new(Reward(0.0), Reward(1.0))
     }
 
     fn discount_factor(&self) -> f64 {
@@ -196,6 +202,7 @@ impl CloneBuild for OneHotBandits {}
 impl EnvStructure for OneHotBandits {
     type ObservationSpace = SingletonSpace;
     type ActionSpace = IndexSpace;
+    type FeedbackSpace = IntervalSpace<Reward>;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         SingletonSpace::new()
@@ -205,8 +212,8 @@ impl EnvStructure for OneHotBandits {
         IndexSpace::new(self.num_arms)
     }
 
-    fn reward_range(&self) -> (f64, f64) {
-        (0.0, 1.0)
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        IntervalSpace::new(Reward(0.0), Reward(1.0))
     }
 
     fn discount_factor(&self) -> f64 {
@@ -244,12 +251,12 @@ mod bernoulli_bandit {
         let mut rng = Prng::seed_from_u64(1);
         let mut reward_1_count = 0;
         for _ in 0..num_samples {
-            let (_, reward) = env.step((), &0, &mut rng, &mut ());
+            let (_, feedback) = env.step((), &0, &mut rng, &mut ());
             #[allow(clippy::float_cmp)] // Expecting exact values without error
-            if reward < 0.5 {
-                assert_eq!(reward, 0.0);
+            if feedback < Reward(0.5) {
+                assert_eq!(feedback, Reward(0.0));
             } else {
-                assert_eq!(reward, 1.0);
+                assert_eq!(feedback, Reward(1.0));
                 reward_1_count += 1
             }
         }
@@ -282,9 +289,9 @@ mod deterministic_bandit {
         let mut rng = Prng::seed_from_u64(0);
         let env = DeterministicBandit::from_values(vec![0.2, 0.8]);
         let (_, reward_0) = env.step((), &0, &mut rng, &mut ());
-        assert_eq!(reward_0, 0.2);
+        assert_eq!(reward_0, Reward(0.2));
         let (_, reward_1) = env.step((), &1, &mut rng, &mut ());
-        assert_eq!(reward_1, 0.8);
+        assert_eq!(reward_1, Reward(0.8));
     }
 }
 

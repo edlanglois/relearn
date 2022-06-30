@@ -57,7 +57,7 @@ where
     /// Update with the most recent step result.
     ///
     /// This step must correspond to the most recent call to `Actor::act`.
-    pub fn update(&mut self, step: PartialStep<O, A>, logger: &mut dyn StatsLogger) {
+    pub fn update(&mut self, step: PartialStep<O, A, T::Feedback>, logger: &mut dyn StatsLogger) {
         self.num_collected_steps += 1;
         let ready = self
             .update_size

@@ -1,4 +1,5 @@
 //! Statistics utilities
+use crate::logging::{LogError, LogValue, Loggable, StatsLogger};
 use num_traits::{real::Real, Zero};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -41,6 +42,29 @@ impl<T: Real + fmt::Display> fmt::Display for OnlineMeanVariance<T> {
         write!(f, "; n = ")?;
         fmt::Display::fmt(&self.count, f)?;
         write!(f, ")")
+    }
+}
+
+impl<T: Real> Loggable for OnlineMeanVariance<T> {
+    fn log<L: StatsLogger + ?Sized>(
+        &self,
+        name: &'static str,
+        logger: &mut L,
+    ) -> Result<(), LogError> {
+        let mut logger = logger.group().with_scope(name);
+        if let Some(mean) = self.mean() {
+            logger.log(
+                "mean".into(),
+                LogValue::Scalar(num_traits::cast::cast(mean).unwrap()),
+            )?;
+        }
+        if let Some(stddev) = self.stddev() {
+            logger.log(
+                "stddev".into(),
+                LogValue::Scalar(num_traits::cast::cast(stddev).unwrap()),
+            )?;
+        }
+        Ok(())
     }
 }
 

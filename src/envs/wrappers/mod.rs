@@ -37,8 +37,10 @@ where
 {
     type Observation = <Self::Environment as Environment>::Observation;
     type Action = <Self::Environment as Environment>::Action;
+    type Feedback = <Self::Environment as Environment>::Feedback;
     type ObservationSpace = <Self::Environment as EnvStructure>::ObservationSpace;
     type ActionSpace = <Self::Environment as EnvStructure>::ActionSpace;
+    type FeedbackSpace = <Self::Environment as EnvStructure>::FeedbackSpace;
     type Environment = Wrapped<EC::Environment, W>;
 
     fn build_env(&self, rng: &mut Prng) -> Result<Self::Environment, BuildEnvError> {
@@ -57,6 +59,7 @@ where
     Wrapped<ED::Environment, W>: StructuredEnvironment<
         ObservationSpace = Self::ObservationSpace,
         ActionSpace = Self::ActionSpace,
+        FeedbackSpace = Self::FeedbackSpace,
     >,
 {
     type Environment = Wrapped<ED::Environment, W>;
@@ -76,12 +79,15 @@ where
     Wrapped<EDC::EnvDistribution, W>: EnvDistribution<
         ObservationSpace = <EDC::EnvDistribution as EnvStructure>::ObservationSpace,
         ActionSpace = <EDC::EnvDistribution as EnvStructure>::ActionSpace,
+        FeedbackSpace = <EDC::EnvDistribution as EnvStructure>::FeedbackSpace,
     >,
 {
     type Observation = <Self::ObservationSpace as Space>::Element;
     type Action = <Self::ActionSpace as Space>::Element;
+    type Feedback = <Self::FeedbackSpace as Space>::Element;
     type ObservationSpace = <Self::EnvDistribution as EnvStructure>::ObservationSpace;
     type ActionSpace = <Self::EnvDistribution as EnvStructure>::ActionSpace;
+    type FeedbackSpace = <Self::EnvDistribution as EnvStructure>::FeedbackSpace;
     type EnvDistribution = Wrapped<EDC::EnvDistribution, W>;
 
     fn build_env_dist(&self) -> Self::EnvDistribution {

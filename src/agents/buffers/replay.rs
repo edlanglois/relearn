@@ -1,4 +1,5 @@
 use super::{WriteExperience, WriteExperienceError, WriteExperienceIncremental};
+use crate::feedback::Reward;
 use crate::simulation::PartialStep;
 use crate::utils::iter::{Differences, SplitChunksByLength};
 use crate::utils::sequence::Sequence;
@@ -7,11 +8,11 @@ use std::collections::{vec_deque, VecDeque};
 use std::iter::{Copied, Map};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ReplayBuffer<O, A> {
+pub struct ReplayBuffer<O, A, F = Reward> {
     /// A circular buffer of steps.
     ///
     /// Care is taken to prevent the queue from growing beyond its initial capacity.
-    steps: VecDeque<PartialStep<O, A>>,
+    steps: VecDeque<PartialStep<O, A, F>>,
     /// One past the end index of each episode in terms of `total_step_count`.
     ///
     /// Subtracting `index_offset` gives an index into the `steps` queue.
@@ -25,7 +26,7 @@ pub struct ReplayBuffer<O, A> {
     total_step_count: u64,
 }
 
-impl<O, A> ReplayBuffer<O, A> {
+impl<O, A, F> ReplayBuffer<O, A, F> {
     /// Create a new `ReplayBuffer` with space for at least `capacity` steps.
     ///
     /// The buffer will not grow beyond its initial capacity (although this capacity might be
@@ -60,13 +61,13 @@ impl<O, A> ReplayBuffer<O, A> {
 
     /// Iterator over all steps stored in the buffer.
     #[must_use]
-    pub fn steps(&self) -> vec_deque::Iter<PartialStep<O, A>> {
+    pub fn steps(&self) -> vec_deque::Iter<PartialStep<O, A, F>> {
         self.steps.iter()
     }
 
     /// View all episodes stored in the buffer.
     #[must_use]
-    pub fn episodes(&self) -> Episodes<O, A> {
+    pub fn episodes(&self) -> Episodes<O, A, F> {
         Episodes {
             steps: self.steps.as_slices().into(),
             episode_ends: &self.episode_ends,
@@ -84,8 +85,8 @@ impl<O, A> ReplayBuffer<O, A> {
     }
 }
 
-impl<O, A> WriteExperienceIncremental<O, A> for ReplayBuffer<O, A> {
-    fn write_step(&mut self, step: PartialStep<O, A>) -> Result<(), WriteExperienceError> {
+impl<O, A, F> WriteExperienceIncremental<O, A, F> for ReplayBuffer<O, A, F> {
+    fn write_step(&mut self, step: PartialStep<O, A, F>) -> Result<(), WriteExperienceError> {
         if self.steps.len() == self.steps.capacity() {
             // Steps buffer is full, drop the oldest episode to free up space.
             let ep_end = self
@@ -124,18 +125,18 @@ impl<O, A> WriteExperienceIncremental<O, A> for ReplayBuffer<O, A> {
     }
 }
 
-impl<O, A> WriteExperience<O, A> for ReplayBuffer<O, A> {}
+impl<O, A, F> WriteExperience<O, A, F> for ReplayBuffer<O, A, F> {}
 
 /// [`Sequence`] of episodes from a [`ReplayBuffer`].
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Episodes<'a, O, A> {
-    steps: SplitSlice<'a, PartialStep<O, A>>,
+pub struct Episodes<'a, O, A, F> {
+    steps: SplitSlice<'a, PartialStep<O, A, F>>,
     episode_ends: &'a VecDeque<u64>,
     index_offset: u64,
 }
 
-impl<'a, O, A> Sequence for Episodes<'a, O, A> {
-    type Item = SplitSlice<'a, PartialStep<O, A>>;
+impl<'a, O, A, F> Sequence for Episodes<'a, O, A, F> {
+    type Item = SplitSlice<'a, PartialStep<O, A, F>>;
 
     #[inline]
     fn len(&self) -> usize {
@@ -164,9 +165,9 @@ impl<'a, O, A> Sequence for Episodes<'a, O, A> {
     }
 }
 
-impl<'a, O, A> IntoIterator for Episodes<'a, O, A> {
-    type IntoIter = EpisodesIter<'a, O, A>;
-    type Item = SplitSlice<'a, PartialStep<O, A>>;
+impl<'a, O, A, F> IntoIterator for Episodes<'a, O, A, F> {
+    type IntoIter = EpisodesIter<'a, O, A, F>;
+    type Item = SplitSlice<'a, PartialStep<O, A, F>>;
     fn into_iter(self) -> Self::IntoIter {
         SplitChunksByLength::new(
             self.steps,
@@ -176,8 +177,8 @@ impl<'a, O, A> IntoIterator for Episodes<'a, O, A> {
     }
 }
 
-pub type EpisodesIter<'a, O, A> = SplitChunksByLength<
-    SplitSlice<'a, PartialStep<O, A>>,
+pub type EpisodesIter<'a, O, A, F> = SplitChunksByLength<
+    SplitSlice<'a, PartialStep<O, A, F>>,
     Map<Differences<Copied<vec_deque::Iter<'a, u64>>, u64>, fn(u64) -> usize>,
 >;
 
@@ -198,7 +199,7 @@ mod tests {
         PartialStep {
             observation,
             action: false,
-            reward: 0.0,
+            feedback: Reward(0.0),
             next,
         }
     }

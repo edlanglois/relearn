@@ -19,16 +19,22 @@ pub trait BuildEnv {
     type Observation: Clone + Send;
     /// Environment action type.
     type Action: Clone + Send;
+    /// Environment feedback type.
+    type Feedback: Clone + Send;
     /// Environment observation space type.
     type ObservationSpace: Space<Element = Self::Observation>;
     /// Environment action space type.
     type ActionSpace: Space<Element = Self::Action>;
+    /// Environment feedback space type.
+    type FeedbackSpace: Space<Element = Self::Feedback>;
     /// Type of environment to build
     type Environment: StructuredEnvironment<
         Observation = Self::Observation,
         Action = Self::Action,
+        Feedback = Self::Feedback,
         ObservationSpace = Self::ObservationSpace,
         ActionSpace = Self::ActionSpace,
+        FeedbackSpace = Self::FeedbackSpace,
     >;
 
     /// Build an environment instance.
@@ -41,8 +47,10 @@ pub trait BuildEnv {
 impl<T: CloneBuild + StructuredEnvironment + ?Sized> BuildEnv for T {
     type Observation = T::Observation;
     type Action = T::Action;
+    type Feedback = T::Feedback;
     type ObservationSpace = T::ObservationSpace;
     type ActionSpace = T::ActionSpace;
+    type FeedbackSpace = T::FeedbackSpace;
     type Environment = Self;
 
     fn build_env(&self, _: &mut Prng) -> Result<Self::Environment, BuildEnvError> {
@@ -67,11 +75,14 @@ impl From<Infallible> for BuildEnvError {
 pub trait BuildEnvDist {
     type Observation: Clone + Send;
     type Action: Clone + Send;
+    type Feedback: Clone + Send;
     type ObservationSpace: Space<Element = Self::Observation>;
     type ActionSpace: Space<Element = Self::Action>;
+    type FeedbackSpace: Space<Element = Self::Feedback>;
     type EnvDistribution: EnvDistribution<
         ObservationSpace = Self::ObservationSpace,
         ActionSpace = Self::ActionSpace,
+        FeedbackSpace = Self::FeedbackSpace,
     >;
 
     /// Build an environment distribution instance.
@@ -84,8 +95,10 @@ where
 {
     type Observation = <T::ObservationSpace as Space>::Element;
     type Action = <T::ActionSpace as Space>::Element;
+    type Feedback = <T::FeedbackSpace as Space>::Element;
     type ObservationSpace = T::ObservationSpace;
     type ActionSpace = T::ActionSpace;
+    type FeedbackSpace = T::FeedbackSpace;
     type EnvDistribution = Self;
 
     fn build_env_dist(&self) -> Self::EnvDistribution {
