@@ -115,7 +115,7 @@ impl<S: FeatureSpace, const N: usize> FeatureSpace for PowerSpace<S, N> {
     }
 }
 
-impl<S: Space, const N: usize> LogElementSpace for PowerSpace<S, N> {
+impl<S: LogElementSpace, const N: usize> LogElementSpace for PowerSpace<S, N> {
     #[inline]
     fn log_element<L: StatsLogger + ?Sized>(
         &self,

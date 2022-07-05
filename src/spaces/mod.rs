@@ -12,6 +12,7 @@ mod boolean;
 mod index;
 mod indexed_type;
 mod interval;
+mod ndarray;
 mod nonempty_features;
 mod option;
 mod power;
@@ -21,6 +22,7 @@ mod test_derive;
 mod tuple;
 mod wrapper;
 
+pub use self::ndarray::{Array1Space, Array2Space, Array3Space, NdArraySpace};
 pub use array::ArraySpace;
 pub use boolean::BooleanSpace;
 pub use index::IndexSpace;
@@ -41,7 +43,7 @@ pub use relearn_derive::{
 use crate::logging::{LogError, StatsLogger};
 use crate::utils::distributions::ArrayDistribution;
 use crate::utils::num_array::{BuildFromArray1D, BuildFromArray2D, NumArray1D, NumArray2D};
-use ndarray::{ArrayBase, DataMut, Ix2};
+use ::ndarray::{ArrayBase, DataMut, Ix2};
 use num_traits::Float;
 use rand::distributions::Distribution;
 use rand::RngCore;
