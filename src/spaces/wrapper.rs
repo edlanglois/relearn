@@ -14,6 +14,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::sync::Arc;
 
 /// A wrapper space that boxes the elements of an inner space.
 pub type BoxSpace<S> = WrappedElementSpace<S, Box<<S as Space>::Element>>;
@@ -21,6 +22,15 @@ pub type BoxSpace<S> = WrappedElementSpace<S, Box<<S as Space>::Element>>;
 impl<S: Space + fmt::Display> fmt::Display for BoxSpace<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "BoxSpace<{}>", self.inner)
+    }
+}
+
+/// A wrapper space that atomically reference-counts the elements of an inner space.
+pub type ArcSpace<S> = WrappedElementSpace<S, Arc<<S as Space>::Element>>;
+
+impl<S: Space + fmt::Display> fmt::Display for ArcSpace<S> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ArcSpace<{}>", self.inner)
     }
 }
 
