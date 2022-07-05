@@ -165,7 +165,7 @@ impl<'a> fmt::Display for DisplaySummary<'a> {
 fn duration_div_u64(d: Duration, x: u64) -> Duration {
     // Cannot directly translate div_u32 to div_u64 because there might be overflow.
     // Instead use float division if the divisor cannot be converted to u32.
-    if let Ok(x32) = x.try_into() {
+    if let Ok(x32) = u32::try_from(x) {
         d / x32
     } else {
         d.div_f64(x as f64)
