@@ -342,7 +342,7 @@ fn init_orthogonal(shape: &[i64], gain: f64, options: (Kind, Device)) -> Tensor 
         let _ = flattened.t_();
     }
 
-    let (mut q, r) = flattened.linalg_qr("reduced");
+    let (mut q, r) = Tensor::linalg_qr(&flattened, "reduced");
     let d = r.diag(0);
     let ph = d.sign();
     q *= ph;
