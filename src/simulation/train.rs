@@ -63,6 +63,8 @@ pub struct TrainParallelConfig {
 ///
 /// The logger is used by the main thread for agent updates
 /// as well as by one of the worker threads for action and step logs.
+// False positive in the ::StepSummary:Send bound
+#[allow(clippy::trait_duplication_in_bounds)]
 pub fn train_parallel<T, E>(
     agent: &mut T,
     environment: &E,
