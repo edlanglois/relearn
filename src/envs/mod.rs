@@ -99,7 +99,7 @@ impl<T> StructuredEnvironment for T where
 ///
 /// [GAT]: https://rust-lang.github.io/rfcs/1598-generic_associated_types.html
 pub trait Environment {
-    /// Environment state type. Possibly hidden.
+    /// Environment state type. Not necessarily observable by the agent.
     type State;
     /// Observation of the state provided to the agent.
     type Observation;
