@@ -196,8 +196,11 @@ macro_rules! impl_wrapped_environment {
 impl_wrapped_environment!(&'_ T);
 impl_wrapped_environment!(Box<T>);
 
-pub trait Pomdp: Environment<Feedback = f64> {}
-impl<T: Environment<Feedback = f64>> Pomdp for T {}
+/// A Partially Observable Markov Decision Process
+///
+/// An [`Environment`] with [`Reward`] feedback.
+pub trait Pomdp: Environment<Feedback = Reward> {}
+impl<T: Environment<Feedback = Reward>> Pomdp for T {}
 
 /// The external structure of a reinforcement learning environment.
 pub trait EnvStructure {
