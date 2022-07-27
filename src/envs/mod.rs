@@ -108,8 +108,8 @@ pub trait Environment {
     /// Feedback provided to a learning agent as the result of each step. [`Reward`], for example.
     ///
     /// This is distinguished from `observation` in that it is only part of the training or
-    /// evaluation process. Unless the agent is explicitly updated within an episode, its actions
-    /// cannot depend on the `feedback` of previous steps.
+    /// evaluation process. Unless an agent is explicitly updated within an episode,
+    /// its actions are not able to depend on the `feedback` of previous steps.
     type Feedback;
 
     /// Sample a state for the start of a new episode.
