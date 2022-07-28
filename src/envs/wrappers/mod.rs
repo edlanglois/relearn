@@ -6,15 +6,20 @@ pub use step_limit::{
 
 use super::{
     BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment,
-    StructuredEnvironment,
+    StructuredEnvDist, StructuredEnvironment,
 };
-use crate::spaces::Space;
 use crate::Prng;
 use serde::{Deserialize, Serialize};
 
 /// A basic wrapped object.
 ///
 /// Consists of the inner object and the wrapper state.
+///
+/// # Implementation
+/// To implement a wrapper type, define `struct MyWrapper` and implement
+/// `impl<T: Environment> Environment for Wrapped<T, MyWrapper>` and
+/// `impl<T: EnvStructure> EnvStructure for Wrapped<T, MyWrapper>`.
+///
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Wrapped<T, W> {
     /// Wrapped object
@@ -43,6 +48,7 @@ where
     type FeedbackSpace = <Self::Environment as EnvStructure>::FeedbackSpace;
     type Environment = Wrapped<EC::Environment, W>;
 
+    #[inline]
     fn build_env(&self, rng: &mut Prng) -> Result<Self::Environment, BuildEnvError> {
         Ok(Wrapped {
             inner: self.inner.build_env(rng)?,
@@ -55,15 +61,15 @@ impl<ED, W> EnvDistribution for Wrapped<ED, W>
 where
     ED: EnvDistribution,
     W: Clone,
-    Self: EnvStructure,
-    Wrapped<ED::Environment, W>: StructuredEnvironment<
-        ObservationSpace = Self::ObservationSpace,
-        ActionSpace = Self::ActionSpace,
-        FeedbackSpace = Self::FeedbackSpace,
-    >,
+    Wrapped<ED::Environment, W>: Environment,
 {
+    type State = <Self::Environment as Environment>::State;
+    type Observation = <Self::Environment as Environment>::Observation;
+    type Action = <Self::Environment as Environment>::Action;
+    type Feedback = <Self::Environment as Environment>::Feedback;
     type Environment = Wrapped<ED::Environment, W>;
 
+    #[inline]
     fn sample_environment(&self, rng: &mut Prng) -> Self::Environment {
         Wrapped {
             inner: self.inner.sample_environment(rng),
@@ -76,20 +82,17 @@ impl<EDC, W> BuildEnvDist for Wrapped<EDC, W>
 where
     EDC: BuildEnvDist,
     W: Clone,
-    Wrapped<EDC::EnvDistribution, W>: EnvDistribution<
-        ObservationSpace = <EDC::EnvDistribution as EnvStructure>::ObservationSpace,
-        ActionSpace = <EDC::EnvDistribution as EnvStructure>::ActionSpace,
-        FeedbackSpace = <EDC::EnvDistribution as EnvStructure>::FeedbackSpace,
-    >,
+    Wrapped<EDC::EnvDistribution, W>: StructuredEnvDist,
 {
-    type Observation = <Self::ObservationSpace as Space>::Element;
-    type Action = <Self::ActionSpace as Space>::Element;
-    type Feedback = <Self::FeedbackSpace as Space>::Element;
+    type Observation = <Self::EnvDistribution as EnvDistribution>::Observation;
+    type Action = <Self::EnvDistribution as EnvDistribution>::Action;
+    type Feedback = <Self::EnvDistribution as EnvDistribution>::Feedback;
     type ObservationSpace = <Self::EnvDistribution as EnvStructure>::ObservationSpace;
     type ActionSpace = <Self::EnvDistribution as EnvStructure>::ActionSpace;
     type FeedbackSpace = <Self::EnvDistribution as EnvStructure>::FeedbackSpace;
     type EnvDistribution = Wrapped<EDC::EnvDistribution, W>;
 
+    #[inline]
     fn build_env_dist(&self) -> Self::EnvDistribution {
         Wrapped {
             inner: self.inner.build_env_dist(),

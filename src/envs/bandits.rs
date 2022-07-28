@@ -168,8 +168,13 @@ impl EnvStructure for UniformBernoulliBandits {
 }
 
 impl EnvDistribution for UniformBernoulliBandits {
+    type State = <Self::Environment as Environment>::State;
+    type Observation = <Self::Environment as Environment>::Observation;
+    type Action = <Self::Environment as Environment>::Action;
+    type Feedback = <Self::Environment as Environment>::Feedback;
     type Environment = BernoulliBandit;
 
+    #[inline]
     fn sample_environment(&self, rng: &mut Prng) -> Self::Environment {
         BernoulliBandit::uniform(self.num_arms, rng)
     }
@@ -222,8 +227,13 @@ impl EnvStructure for OneHotBandits {
 }
 
 impl EnvDistribution for OneHotBandits {
+    type State = <Self::Environment as Environment>::State;
+    type Observation = <Self::Environment as Environment>::Observation;
+    type Action = <Self::Environment as Environment>::Action;
+    type Feedback = <Self::Environment as Environment>::Feedback;
     type Environment = DeterministicBandit;
 
+    #[inline]
     fn sample_environment(&self, rng: &mut Prng) -> Self::Environment {
         let mut means = vec![0.0; self.num_arms];
         let index = rng.gen_range(0..self.num_arms);

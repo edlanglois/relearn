@@ -1,5 +1,5 @@
 //! Environment builder traits
-use super::{EnvDistribution, StructuredEnvironment};
+use super::{StructuredEnvDist, StructuredEnvironment};
 use crate::spaces::Space;
 use crate::Prng;
 use std::convert::Infallible;
@@ -79,7 +79,10 @@ pub trait BuildEnvDist {
     type ObservationSpace: Space<Element = Self::Observation>;
     type ActionSpace: Space<Element = Self::Action>;
     type FeedbackSpace: Space<Element = Self::Feedback>;
-    type EnvDistribution: EnvDistribution<
+    type EnvDistribution: StructuredEnvDist<
+        Observation = Self::Observation,
+        Action = Self::Action,
+        Feedback = Self::Feedback,
         ObservationSpace = Self::ObservationSpace,
         ActionSpace = Self::ActionSpace,
         FeedbackSpace = Self::FeedbackSpace,
@@ -91,7 +94,7 @@ pub trait BuildEnvDist {
 
 impl<T> BuildEnvDist for T
 where
-    T: EnvDistribution + CloneBuild,
+    T: StructuredEnvDist + CloneBuild,
 {
     type Observation = <T::ObservationSpace as Space>::Element;
     type Action = <T::ActionSpace as Space>::Element;
@@ -101,6 +104,7 @@ where
     type FeedbackSpace = T::FeedbackSpace;
     type EnvDistribution = Self;
 
+    #[inline]
     fn build_env_dist(&self) -> Self::EnvDistribution {
         self.clone()
     }

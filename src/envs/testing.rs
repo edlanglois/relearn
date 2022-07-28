@@ -1,7 +1,7 @@
 //! Environment testing utilities
 use super::{
     CloneBuild, DeterministicBandit, EnvDistribution, EnvStructure, Environment,
-    StoredEnvStructure, StructuredEnvironment, Successor,
+    StoredEnvStructure, StructuredEnvDist, StructuredEnvironment, Successor,
 };
 use crate::agents::{ActorMode, Agent, RandomAgent};
 use crate::feedback::Reward;
@@ -60,7 +60,12 @@ where
 #[allow(clippy::float_cmp)] // discount factor should be exactly equal
 pub fn check_env_distribution_structure<D>(env_dist: &D, num_samples: usize)
 where
-    D: EnvDistribution + ?Sized,
+    D: StructuredEnvDist + ?Sized,
+    D::Environment: StructuredEnvironment<
+        ObservationSpace = D::ObservationSpace,
+        ActionSpace = D::ActionSpace,
+        FeedbackSpace = D::FeedbackSpace,
+    >,
     D::ObservationSpace: SubsetOrd + Debug,
     D::ActionSpace: SubsetOrd + Debug,
     D::FeedbackSpace: SubsetOrd + Debug,
@@ -140,6 +145,10 @@ impl EnvStructure for RoundRobinDeterministicBandits {
 }
 
 impl EnvDistribution for RoundRobinDeterministicBandits {
+    type State = <Self::Environment as Environment>::State;
+    type Observation = <Self::Environment as Environment>::Observation;
+    type Action = <Self::Environment as Environment>::Action;
+    type Feedback = <Self::Environment as Environment>::Feedback;
     type Environment = DeterministicBandit;
 
     fn sample_environment(&self, _: &mut Prng) -> Self::Environment {

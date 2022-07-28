@@ -124,8 +124,9 @@ where
 impl<E> Environment for MetaEnv<E>
 where
     E: EnvDistribution,
-    <E::Environment as Environment>::Action: Copy,
-    <E::Environment as Environment>::Feedback: Default,
+    E::Action: Clone,
+    E::Observation: Clone,
+    E::Feedback: Clone + Default,
 {
     type State = MetaState<E::Environment>;
     type Observation = MetaObservation<
@@ -179,7 +180,7 @@ where
                     inner_successor,
                     episode_index: state.episode_index,
                     prev_step_obs: Some(InnerStepObs {
-                        action: *action,
+                        action: action.clone(),
                         feedback: inner_feedback.clone(),
                     }),
                 };

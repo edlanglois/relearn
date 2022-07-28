@@ -39,32 +39,6 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::f64;
 
-/// A reinforcement learning [`Environment`] with consistent [`EnvStructure`].
-///
-/// # Design Discussion
-/// [`EnvStructure`] is not a supertrait of [`Environment`] because knowing the observation and
-/// action spaces is not necessary for simulation, only the observation and action types must be
-/// known.
-///
-pub trait StructuredEnvironment:
-    EnvStructure
-    + Environment<
-        Observation = <Self::ObservationSpace as Space>::Element,
-        Action = <Self::ActionSpace as Space>::Element,
-        Feedback = <Self::FeedbackSpace as Space>::Element,
-    >
-{
-}
-impl<T> StructuredEnvironment for T where
-    T: EnvStructure
-        + Environment<
-            Observation = <Self::ObservationSpace as Space>::Element,
-            Action = <Self::ActionSpace as Space>::Element,
-            Feedback = <Self::FeedbackSpace as Space>::Element,
-        > + ?Sized
-{
-}
-
 /// A reinforcement learning environment.
 ///
 /// Formally, this is a Partially Observable Markov Decision Process (POMDP) but with arbitrary
@@ -261,6 +235,32 @@ impl_wrapped_env_structure!(Box<T>);
 
 pub trait PomdpStructure: EnvStructure<FeedbackSpace = IntervalSpace<Reward>> {}
 impl<T: EnvStructure<FeedbackSpace = IntervalSpace<Reward>>> PomdpStructure for T {}
+
+/// A reinforcement learning [`Environment`] with consistent [`EnvStructure`].
+///
+/// # Design Discussion
+/// [`EnvStructure`] is not a supertrait of [`Environment`] because knowing the observation and
+/// action spaces is not necessary for simulation, only the observation and action types must be
+/// known.
+///
+pub trait StructuredEnvironment:
+    EnvStructure
+    + Environment<
+        Observation = <Self::ObservationSpace as Space>::Element,
+        Action = <Self::ActionSpace as Space>::Element,
+        Feedback = <Self::FeedbackSpace as Space>::Element,
+    >
+{
+}
+impl<T> StructuredEnvironment for T where
+    T: EnvStructure
+        + Environment<
+            Observation = <Self::ObservationSpace as Space>::Element,
+            Action = <Self::ActionSpace as Space>::Element,
+            Feedback = <Self::FeedbackSpace as Space>::Element,
+        > + ?Sized
+{
+}
 
 /// The successor state or outcome of an episode step.
 ///
@@ -480,11 +480,16 @@ where
 /// The [`EnvStructure`] of each sampled environment must be a subset of the `EnvStructure` of the
 /// distribution as a whole. The discount factors must be identical.
 /// The transition dynamics of the individual environment samples may differ.
-pub trait EnvDistribution: EnvStructure {
-    type Environment: StructuredEnvironment<
-        ObservationSpace = Self::ObservationSpace,
-        ActionSpace = Self::ActionSpace,
-        FeedbackSpace = Self::FeedbackSpace,
+pub trait EnvDistribution {
+    type State;
+    type Observation;
+    type Action;
+    type Feedback;
+    type Environment: Environment<
+        State = Self::State,
+        Observation = Self::Observation,
+        Action = Self::Action,
+        Feedback = Self::Feedback,
     >;
 
     /// Sample an environment from the distribution.
@@ -492,4 +497,27 @@ pub trait EnvDistribution: EnvStructure {
     /// # Args
     /// * `rng` - Random number generator used for sampling the environment structure.
     fn sample_environment(&self, rng: &mut Prng) -> Self::Environment;
+}
+
+/// An environment distribution with consistent [`EnvStructure`].
+///
+/// If the sampled environments implement `EnvStructure` then the spaces of the sampled environment
+/// must be a subset of the spaces of the distribution.
+pub trait StructuredEnvDist:
+    EnvStructure
+    + EnvDistribution<
+        Observation = <Self::ObservationSpace as Space>::Element,
+        Action = <Self::ActionSpace as Space>::Element,
+        Feedback = <Self::FeedbackSpace as Space>::Element,
+    >
+{
+}
+impl<T> StructuredEnvDist for T where
+    T: EnvStructure
+        + EnvDistribution<
+            Observation = <Self::ObservationSpace as Space>::Element,
+            Action = <Self::ActionSpace as Space>::Element,
+            Feedback = <Self::FeedbackSpace as Space>::Element,
+        > + ?Sized
+{
 }

@@ -141,6 +141,10 @@ impl EnvStructure for DirichletRandomMdps {
 }
 
 impl EnvDistribution for DirichletRandomMdps {
+    type State = <Self::Environment as Environment>::State;
+    type Observation = <Self::Environment as Environment>::Observation;
+    type Action = <Self::Environment as Environment>::Action;
+    type Feedback = <Self::Environment as Environment>::Feedback;
     type Environment = TabularMdp;
 
     #[allow(clippy::cast_possible_truncation)]
