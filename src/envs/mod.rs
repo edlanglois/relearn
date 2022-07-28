@@ -21,7 +21,10 @@ pub use cartpole::{CartPole, CartPoleConfig};
 pub use chain::Chain;
 pub use mdps::DirichletRandomMdps;
 pub use memory::MemoryGame;
-pub use meta::{InnerEnvStructure, MetaEnv, MetaObservation, MetaObservationSpace, MetaState};
+pub use meta::{
+    InnerEnvStructure, MetaEnv, MetaFeedback, MetaFeedbackSpace, MetaObservation,
+    MetaObservationSpace, MetaState,
+};
 pub use multiagent::fruit::{self, FruitGame};
 pub use multiagent::views::{FirstPlayerView, SecondPlayerView};
 pub use partition::PartitionGame;

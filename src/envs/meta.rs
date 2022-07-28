@@ -2,6 +2,7 @@
 use super::{
     BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment, Successor,
 };
+use crate::feedback::Reward;
 use crate::logging::StatsLogger;
 use crate::spaces::{BooleanSpace, OptionSpace, ProductSpace, Space};
 use crate::Prng;
@@ -28,7 +29,9 @@ use serde::{Deserialize, Serialize};
 /// inner episode.
 ///
 /// # Feedback
-/// The feedback is the same as the inner feedback.
+/// The inner environment feedback must implement [`MetaFeedback`] (and [`MetaFeedbackSpace`] for
+/// the space). This feedback is decomposed into separate inner and outer feedback.
+/// In the case of [`Reward`] feedback, the same value is used as both the inner and outer feedback.
 ///
 /// # States
 /// The state ([`MetaState`]) consists of an inner environment instance,
@@ -70,7 +73,11 @@ impl<EC> BuildEnv for MetaEnv<EC>
 where
     EC: BuildEnvDist,
     EC::Action: Copy,
-    EC::Feedback: Default,
+    // Bounds are a bit of a mess to convince the compiler that
+    // EC::FeedbackSpace::InnerSpace::Element == EC::Feedback::Inner
+    EC::FeedbackSpace: MetaFeedbackSpace<Element = EC::Feedback>,
+    <EC::FeedbackSpace as Space>::Element: MetaFeedback,
+    EC::Feedback: MetaFeedback,
 {
     type Observation = <Self::Environment as Environment>::Observation;
     type Action = <Self::Environment as Environment>::Action;
@@ -91,11 +98,15 @@ where
 impl<E> EnvStructure for MetaEnv<E>
 where
     E: EnvStructure,
+    E::FeedbackSpace: MetaFeedbackSpace,
 {
-    type ObservationSpace =
-        MetaObservationSpace<E::ObservationSpace, E::ActionSpace, E::FeedbackSpace>;
+    type ObservationSpace = MetaObservationSpace<
+        E::ObservationSpace,
+        E::ActionSpace,
+        <E::FeedbackSpace as MetaFeedbackSpace>::InnerSpace,
+    >;
     type ActionSpace = E::ActionSpace;
-    type FeedbackSpace = E::FeedbackSpace;
+    type FeedbackSpace = <E::FeedbackSpace as MetaFeedbackSpace>::OuterSpace;
 
     fn observation_space(&self) -> Self::ObservationSpace {
         MetaObservationSpace::from_inner_env(&self.env_distribution)
@@ -104,7 +115,7 @@ where
         self.env_distribution.action_space()
     }
     fn feedback_space(&self) -> Self::FeedbackSpace {
-        self.env_distribution.feedback_space()
+        self.env_distribution.feedback_space().into_outer()
     }
     fn discount_factor(&self) -> f64 {
         self.env_distribution.discount_factor()
@@ -126,16 +137,13 @@ where
     E: EnvDistribution,
     E::Action: Clone,
     E::Observation: Clone,
-    E::Feedback: Clone + Default,
+    E::Feedback: MetaFeedback,
 {
     type State = MetaState<E::Environment>;
-    type Observation = MetaObservation<
-        <E::Environment as Environment>::Observation,
-        <E::Environment as Environment>::Action,
-        <E::Environment as Environment>::Feedback,
-    >;
-    type Action = <E::Environment as Environment>::Action;
-    type Feedback = <E::Environment as Environment>::Feedback;
+    type Observation =
+        MetaObservation<E::Observation, E::Action, <E::Feedback as MetaFeedback>::Inner>;
+    type Action = E::Action;
+    type Feedback = <E::Feedback as MetaFeedback>::Outer;
 
     fn initial_state(&self, rng: &mut Prng) -> Self::State {
         // Sample a new inner environment.
@@ -172,8 +180,9 @@ where
         match state.inner_successor {
             Successor::Continue(prev_inner_state) => {
                 // Take a step in the inner episode
-                let (inner_successor, inner_feedback) =
+                let (inner_successor, feedback) =
                     state.inner_env.step(prev_inner_state, action, rng, logger);
+                let (inner_feedback, outer_feedback) = feedback.into_inner_outer();
 
                 let mut new_state = MetaState {
                     inner_env: state.inner_env,
@@ -181,7 +190,7 @@ where
                     episode_index: state.episode_index,
                     prev_step_obs: Some(InnerStepObs {
                         action: action.clone(),
-                        feedback: inner_feedback.clone(),
+                        feedback: inner_feedback,
                     }),
                 };
 
@@ -191,11 +200,11 @@ where
                         // Completed the last inner episode of the trial.
                         // This is treated as an abrupt cut-off of a theorically infinite sequence
                         // of inner episodes so the meta state is not treated as terminal.
-                        return (Successor::Interrupt(new_state), inner_feedback);
+                        return (Successor::Interrupt(new_state), outer_feedback);
                     }
                 }
 
-                (Successor::Continue(new_state), inner_feedback)
+                (Successor::Continue(new_state), outer_feedback)
             }
             _ => {
                 // The inner state ended the episode.
@@ -207,9 +216,92 @@ where
                     episode_index: state.episode_index,
                     prev_step_obs: None,
                 };
-                (Successor::Continue(state), Default::default())
+                (Successor::Continue(state), E::Feedback::neutral_outer())
             }
         }
+    }
+}
+
+/// A feedback space that can be decomposed into an inner and outer space for a meta environment.
+pub trait MetaFeedbackSpace: Space<Element = <Self as MetaFeedbackSpace>::Element> {
+    type Element: MetaFeedback;
+    type InnerSpace: Space<Element = <<Self as MetaFeedbackSpace>::Element as MetaFeedback>::Inner>;
+    type OuterSpace: Space<Element = <<Self as MetaFeedbackSpace>::Element as MetaFeedback>::Outer>;
+
+    /// Convert the feedback space into the inner and outer feedback spaces.
+    fn into_inner_outer(self) -> (Self::InnerSpace, Self::OuterSpace);
+
+    /// Convert the feedback space into the inner feedback space.
+    #[inline]
+    fn into_inner(self) -> Self::InnerSpace
+    where
+        Self: Sized,
+    {
+        self.into_inner_outer().0
+    }
+
+    /// Convert the feedback space into the outer feedback space.
+    fn into_outer(self) -> Self::OuterSpace
+    where
+        Self: Sized,
+    {
+        self.into_inner_outer().1
+    }
+}
+
+/// Reward feedback is always replicated in both the inner and outer environments.
+///
+/// This is the structure of RL-Squared meta reinforcement learning.
+impl<F> MetaFeedbackSpace for F
+where
+    F: Space<Element = Reward> + Clone,
+{
+    type Element = Reward;
+    type InnerSpace = Self;
+    type OuterSpace = Self;
+
+    #[inline]
+    fn into_inner_outer(self) -> (Self::InnerSpace, Self::OuterSpace) {
+        (self.clone(), self)
+    }
+    #[inline]
+    fn into_inner(self) -> Self::InnerSpace {
+        self
+    }
+    #[inline]
+    fn into_outer(self) -> Self::OuterSpace {
+        self
+    }
+}
+
+/// A feedback type that can be decomposed into an inner and outer space for a meta environment.
+pub trait MetaFeedback {
+    // Clone + Send to match bound on `Space::Element`.
+    type Inner: Clone + Send;
+    type Outer: Clone + Send;
+
+    /// Neutral outer feedback that does not indicate good or bad behaviour.
+    fn neutral_outer() -> Self::Outer;
+
+    /// Split the feedback into inner and outer environment feedback
+    fn into_inner_outer(self) -> (Self::Inner, Self::Outer);
+}
+
+/// Reward feedback is always replicated in both the inner and outer environments.
+///
+/// This is the structure of RL-Squared meta reinforcement learning.
+impl MetaFeedback for Reward {
+    type Inner = Self;
+    type Outer = Self;
+
+    #[inline]
+    fn neutral_outer() -> Self {
+        Self(0.0)
+    }
+
+    #[inline]
+    fn into_inner_outer(self) -> (Self, Self) {
+        (self, self)
     }
 }
 
@@ -220,38 +312,49 @@ where
 /// The agent is expected to remember the inner observation if necessary, so it is not included.
 /// The agent is not expected to have a mechanism to remember its own actions, since actions only
 /// ought to matter to the extent that they affect the resulting state.
+///
+/// # Note
+/// The generic feedback type `FI` is the inner feedback `E::Feedback::Inner` for `MetaEnv<E>`.
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct InnerStepObs<A, F> {
+pub struct InnerStepObs<A, FI> {
     /// Action selected by the agent on the step.
     pub action: A,
-    /// Feedback for this step.
-    pub feedback: F,
+    /// Inner feedback for this step.
+    pub feedback: FI,
 }
 
 /// Observation space for [`InnerStepObs`].
+///
+/// # Note
+/// The generic feedback space type `FSI`
+/// is the inner feedback space `E::FeedbackSpace::InnerSpace` for `MetaEnv<E>`.
 #[derive(Debug, Copy, Clone, PartialEq, ProductSpace)]
-#[element(InnerStepObs<AS::Element, FS::Element>)]
-pub struct InnerStepObsSpace<AS, FS> {
+#[element(InnerStepObs<AS::Element, FSI::Element>)]
+pub struct InnerStepObsSpace<AS, FSI> {
     pub action: AS,
-    pub feedback: FS,
+    pub feedback: FSI,
 }
 
-impl<AS, FS> InnerStepObsSpace<AS, FS> {
+impl<AS, FSI> InnerStepObsSpace<AS, FSI> {
     /// Construct a step observation space from an inner environment structure
     fn from_inner_env<E>(env: &E) -> Self
     where
-        E: EnvStructure<ActionSpace = AS, FeedbackSpace = FS> + ?Sized,
+        E: EnvStructure<ActionSpace = AS> + ?Sized,
+        E::FeedbackSpace: MetaFeedbackSpace<InnerSpace = FSI>,
     {
         Self {
             action: env.action_space(),
-            feedback: env.feedback_space(),
+            feedback: env.feedback_space().into_inner(),
         }
     }
 }
 
 /// An observation from a meta enviornment.
+///
+/// # Note
+/// The generic feedback type `FI` is the inner feedback `E::Feedback::Inner` for `MetaEnv<E>`.
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct MetaObservation<O, A, F> {
+pub struct MetaObservation<O, A, FI> {
     /// The current inner observation on which the next step will act.
     ///
     /// Is `None` if this is a terminal state, in which case `episode_done` must be `True`.
@@ -260,26 +363,31 @@ pub struct MetaObservation<O, A, F> {
     /// Observation of the previous inner step.
     ///
     /// Is `None` if this is the first step of an inner episode.
-    pub prev_step: Option<InnerStepObs<A, F>>,
+    pub prev_step: Option<InnerStepObs<A, FI>>,
 
     /// Whether the previous step ended the inner episode.
     pub episode_done: bool,
 }
 
 /// [`MetaEnv`] observation space for element [`MetaObservation`].
+///
+/// # Note
+/// The generic feedback space type `FSI`
+/// is the inner feedback space `E::FeedbackSpace::InnerSpace` for `MetaEnv<E>`.
 #[derive(Debug, Copy, Clone, PartialEq, ProductSpace)]
-#[element(MetaObservation<OS::Element, AS::Element, FS::Element>)]
-pub struct MetaObservationSpace<OS, AS, FS> {
+#[element(MetaObservation<OS::Element, AS::Element, FSI::Element>)]
+pub struct MetaObservationSpace<OS, AS, FSI> {
     pub inner_observation: OptionSpace<OS>,
-    pub prev_step: OptionSpace<InnerStepObsSpace<AS, FS>>,
+    pub prev_step: OptionSpace<InnerStepObsSpace<AS, FSI>>,
     pub episode_done: BooleanSpace,
 }
 
-impl<OS, AS, FS> MetaObservationSpace<OS, AS, FS> {
+impl<OS, AS, FSI> MetaObservationSpace<OS, AS, FSI> {
     /// Construct a meta observation space from an inner environment structure
     fn from_inner_env<E>(env: &E) -> Self
     where
-        E: EnvStructure<ObservationSpace = OS, ActionSpace = AS, FeedbackSpace = FS> + ?Sized,
+        E: EnvStructure<ObservationSpace = OS, ActionSpace = AS> + ?Sized,
+        E::FeedbackSpace: MetaFeedbackSpace<InnerSpace = FSI>,
     {
         Self {
             inner_observation: OptionSpace::new(env.observation_space()),
@@ -290,16 +398,20 @@ impl<OS, AS, FS> MetaObservationSpace<OS, AS, FS> {
 }
 
 /// The state of a [`MetaEnv`].
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct MetaState<E: Environment> {
+// #[derive(Debug, Copy, Clone, PartialEq)] // XXX
+pub struct MetaState<E: Environment>
+where
+    E::Feedback: MetaFeedback,
+{
     /// An instance of the inner environment (sampled for this trial).
     inner_env: E,
     /// The upcoming inner environment state.
     inner_successor: Successor<E::State>,
+    // TODO: Remove episode_index and replace with a wrapper
     /// The inner episode index within the current trial.
     episode_index: u64,
     /// Observation of the previous step of this inner episode.
-    prev_step_obs: Option<InnerStepObs<E::Action, E::Feedback>>,
+    prev_step_obs: Option<InnerStepObs<E::Action, <E::Feedback as MetaFeedback>::Inner>>,
 }
 
 /// Wrapper that provides the inner environment structure of a meta environment ([`MetaEnv`]).
