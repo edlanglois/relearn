@@ -29,7 +29,7 @@ pub use multiagent::fruit::{self, FruitGame};
 pub use multiagent::views::{FirstPlayerView, SecondPlayerView};
 pub use partition::PartitionGame;
 pub use wrappers::{
-    LatentStepLimit, VisibleStepLimit, WithLatentStepLimit, WithVisibleStepLimit, Wrapped,
+    LatentStepLimit, VisibleStepLimit, WithLatentStepLimit, WithVisibleStepLimit, Wrap, Wrapped,
 };
 
 use crate::agents::Actor;
@@ -125,19 +125,6 @@ pub trait Environment {
         Self: Sized,
     {
         Steps::new_seeded(self, actor, seed, logger)
-    }
-
-    /// Wrap the environment in the given wrapper.
-    #[inline]
-    fn wrap<W>(self, wrapper: W) -> Wrapped<Self, W>
-    where
-        Wrapped<Self, W>: Environment, // to help with debugging - fail immediately if invalid
-        Self: Sized,
-    {
-        Wrapped {
-            inner: self,
-            wrapper,
-        }
     }
 }
 
@@ -497,19 +484,6 @@ pub trait EnvDistribution {
     /// # Args
     /// * `rng` - Random number generator used for sampling the environment structure.
     fn sample_environment(&self, rng: &mut Prng) -> Self::Environment;
-
-    /// Wrap the environments in the distribution.
-    #[inline]
-    fn wrap<W>(self, wrapper: W) -> Wrapped<Self, W>
-    where
-        Wrapped<Self, W>: EnvDistribution, // to help with debugging - fail immediately if invalid
-        Self: Sized,
-    {
-        Wrapped {
-            inner: self,
-            wrapper,
-        }
-    }
 }
 
 /// An environment distribution with consistent [`EnvStructure`].

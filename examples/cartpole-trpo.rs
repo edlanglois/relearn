@@ -2,7 +2,9 @@
 use env_logger::Env;
 use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent};
-use relearn::envs::{CartPole, EnvStructure, Environment, VisibleStepLimit, WithVisibleStepLimit};
+use relearn::envs::{
+    CartPole, EnvStructure, Environment, VisibleStepLimit, WithVisibleStepLimit, Wrap,
+};
 use relearn::logging::{ByCounter, DisplayLogger, TensorBoardLogger};
 use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfig};
 use relearn::torch::agents::{critics::ValuesOptConfig, policies::TrpoConfig, ActorCriticConfig};

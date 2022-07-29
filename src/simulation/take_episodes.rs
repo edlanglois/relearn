@@ -103,7 +103,7 @@ impl<I, O, A> FusedIterator for TakeEpisodes<I> where I: FusedIterator<Item = Pa
 #[cfg(test)]
 mod tests {
     use crate::agents::RandomAgent;
-    use crate::envs::{Chain, EnvStructure, Environment, VisibleStepLimit};
+    use crate::envs::{Chain, EnvStructure, Environment, VisibleStepLimit, Wrap};
     use crate::simulation::{SimSeed, StepsIter, StepsSummary};
 
     #[allow(clippy::cast_possible_truncation)]

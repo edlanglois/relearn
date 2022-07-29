@@ -11,6 +11,20 @@ use super::{
 use crate::Prng;
 use serde::{Deserialize, Serialize};
 
+/// Trait providing a `wrap` method for all sized types.
+pub trait Wrap: Sized {
+    /// Wrap in the given wrapper.
+    #[inline]
+    fn wrap<W>(self, wrapper: W) -> Wrapped<Self, W> {
+        Wrapped {
+            inner: self,
+            wrapper,
+        }
+    }
+}
+
+impl<T> Wrap for T {}
+
 /// A basic wrapped object.
 ///
 /// Consists of the inner object and the wrapper state.
