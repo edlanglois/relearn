@@ -1,6 +1,7 @@
 //! Meta reinforcement learning environment.
 use super::{
-    BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment, Successor,
+    BuildEnv, BuildEnvDist, BuildEnvError, EnvDistribution, EnvStructure, Environment,
+    StructurePreservingWrapper, Successor, Wrapped,
 };
 use crate::feedback::Reward;
 use crate::logging::StatsLogger;
@@ -47,16 +48,11 @@ use serde::{Deserialize, Serialize};
 pub struct MetaEnv<E> {
     /// Environment distribution from which each trial's episode is sampled.
     pub env_distribution: E,
-    /// Number of inner episodes per trial.
-    pub episodes_per_trial: u64,
 }
 
 impl<E> MetaEnv<E> {
-    pub const fn new(env_distribution: E, episodes_per_trial: u64) -> Self {
-        Self {
-            env_distribution,
-            episodes_per_trial,
-        }
+    pub const fn new(env_distribution: E) -> Self {
+        Self { env_distribution }
     }
 }
 
@@ -64,7 +60,6 @@ impl<E: Default> Default for MetaEnv<E> {
     fn default() -> Self {
         Self {
             env_distribution: E::default(),
-            episodes_per_trial: 10,
         }
     }
 }
@@ -88,10 +83,7 @@ where
     type Environment = MetaEnv<EC::EnvDistribution>;
 
     fn build_env(&self, _: &mut Prng) -> Result<Self::Environment, BuildEnvError> {
-        Ok(MetaEnv::new(
-            self.env_distribution.build_env_dist(),
-            self.episodes_per_trial,
-        ))
+        Ok(MetaEnv::new(self.env_distribution.build_env_dist()))
     }
 }
 
@@ -152,7 +144,6 @@ where
         MetaState {
             inner_env,
             inner_successor: Successor::Continue(inner_state),
-            episode_index: 0,
             prev_step_obs: None,
         }
     }
@@ -184,25 +175,14 @@ where
                     state.inner_env.step(prev_inner_state, action, rng, logger);
                 let (inner_feedback, outer_feedback) = feedback.into_inner_outer();
 
-                let mut new_state = MetaState {
+                let new_state = MetaState {
                     inner_env: state.inner_env,
                     inner_successor,
-                    episode_index: state.episode_index,
                     prev_step_obs: Some(InnerStepObs {
                         action: action.clone(),
                         feedback: inner_feedback,
                     }),
                 };
-
-                if new_state.inner_successor.episode_done() {
-                    new_state.episode_index += 1;
-                    if new_state.episode_index >= self.episodes_per_trial {
-                        // Completed the last inner episode of the trial.
-                        // This is treated as an abrupt cut-off of a theorically infinite sequence
-                        // of inner episodes so the meta state is not treated as terminal.
-                        return (Successor::Interrupt(new_state), outer_feedback);
-                    }
-                }
 
                 (Successor::Continue(new_state), outer_feedback)
             }
@@ -213,7 +193,6 @@ where
                 let state = MetaState {
                     inner_env: state.inner_env,
                     inner_successor: Successor::Continue(inner_state),
-                    episode_index: state.episode_index,
                     prev_step_obs: None,
                 };
                 (Successor::Continue(state), E::Feedback::neutral_outer())
@@ -407,11 +386,34 @@ where
     inner_env: E,
     /// The upcoming inner environment state.
     inner_successor: Successor<E::State>,
-    // TODO: Remove episode_index and replace with a wrapper
-    /// The inner episode index within the current trial.
-    episode_index: u64,
     /// Observation of the previous step of this inner episode.
     prev_step_obs: Option<InnerStepObs<E::Action, <E::Feedback as MetaFeedback>::Inner>>,
+}
+
+/// Whether the inner episode represented by this state is done.
+pub trait InnerEpisodeDone {
+    fn inner_episode_done(&self) -> bool;
+}
+
+impl<E> InnerEpisodeDone for MetaState<E>
+where
+    E: Environment,
+    E::Feedback: MetaFeedback,
+{
+    #[inline]
+    fn inner_episode_done(&self) -> bool {
+        self.inner_successor.episode_done()
+    }
+}
+
+impl<A, B> InnerEpisodeDone for (A, B)
+where
+    A: InnerEpisodeDone,
+{
+    #[inline]
+    fn inner_episode_done(&self) -> bool {
+        self.0.inner_episode_done()
+    }
 }
 
 /// Wrapper that provides the inner environment structure of a meta environment ([`MetaEnv`]).
@@ -421,10 +423,10 @@ where
 ///
 /// # Example
 ///
-///     use relearn::envs::{InnerEnvStructure, MetaEnv, OneHotBandits, StoredEnvStructure};
+///     use relearn::envs::{meta::InnerEnvStructure, MetaEnv, OneHotBandits, StoredEnvStructure};
 ///
 ///     let base_env = OneHotBandits::default();
-///     let meta_env = MetaEnv::new(base_env, 10);
+///     let meta_env = MetaEnv::new(base_env);
 ///
 ///     let base_structure = StoredEnvStructure::from(&base_env);
 ///     let meta_inner_structure = StoredEnvStructure::from(&InnerEnvStructure::new(&meta_env));
@@ -469,29 +471,112 @@ where
     }
 }
 
+/// Wrapper that limits the number of inner episodes in a meta-env trial.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct TrialEpisodeLimit {
+    pub episodes_per_trial: u64,
+}
+
+impl TrialEpisodeLimit {
+    #[must_use]
+    #[inline]
+    pub fn new(episodes_per_trial: u64) -> Self {
+        assert!(
+            episodes_per_trial > 0,
+            "trials must contain at least 1 episode"
+        );
+        Self { episodes_per_trial }
+    }
+}
+
+impl Default for TrialEpisodeLimit {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            episodes_per_trial: 10,
+        }
+    }
+}
+
+impl StructurePreservingWrapper for TrialEpisodeLimit {}
+
+impl<E> Environment for Wrapped<E, TrialEpisodeLimit>
+where
+    E: Environment,
+    E::State: InnerEpisodeDone,
+{
+    /// (Inner state, remaining episodes)
+    type State = (E::State, u64);
+    type Observation = E::Observation;
+    type Action = E::Action;
+    type Feedback = E::Feedback;
+
+    #[inline]
+    fn initial_state(&self, rng: &mut Prng) -> Self::State {
+        assert!(
+            self.wrapper.episodes_per_trial > 0,
+            "trials must contain at least 1 episode"
+        );
+        (
+            self.inner.initial_state(rng),
+            self.wrapper.episodes_per_trial,
+        )
+    }
+
+    #[inline]
+    fn observe(&self, state: &Self::State, rng: &mut Prng) -> Self::Observation {
+        self.inner.observe(&state.0, rng)
+    }
+
+    fn step(
+        &self,
+        state: Self::State,
+        action: &Self::Action,
+        rng: &mut Prng,
+        logger: &mut dyn StatsLogger,
+    ) -> (Successor<Self::State>, Self::Feedback) {
+        // Note: "inner" here refers to the wrapped environment,
+        // not the inner environment of the meta structure.
+        let (inner_state, mut remaining_episodes) = state;
+        let (inner_successor, feedback) = self.inner.step(inner_state, action, rng, logger);
+        let successor = inner_successor
+            .map(|s| {
+                if s.inner_episode_done() {
+                    remaining_episodes -= 1;
+                }
+                (s, remaining_episodes)
+            })
+            .then_interrupt_if(|(_, remaining_episodes)| *remaining_episodes == 0);
+        (successor, feedback)
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::float_cmp)] // Comparing exact reward values; 0.0 or 1.0 without error
 mod meta_env_bandits {
-    use super::super::testing;
+    use super::super::{testing, Wrap};
     use super::*;
     use crate::feedback::Reward;
     use rand::SeedableRng;
 
     #[test]
     fn build_meta_env() {
-        let config = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3);
+        let config = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2))
+            .wrap(TrialEpisodeLimit::new(3));
         let _env = config.build_env(&mut Prng::seed_from_u64(0)).unwrap();
     }
 
     #[test]
     fn run_meta_env() {
-        let env = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3);
+        let env = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2))
+            .wrap(TrialEpisodeLimit::new(3));
         testing::check_structured_env(&env, 1000, 0);
     }
 
     #[test]
     fn meta_env_expected_steps() {
-        let env = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2), 3);
+        let env = MetaEnv::new(testing::RoundRobinDeterministicBandits::new(2))
+            .wrap(TrialEpisodeLimit::new(3));
         let mut rng = Prng::seed_from_u64(0);
 
         // Trial 0; Ep 0; Init

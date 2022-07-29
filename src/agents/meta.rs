@@ -3,10 +3,8 @@ use super::{
     buffers::NullBuffer, serial::SerialActorAgent, Actor, ActorMode, Agent, BatchUpdate,
     BuildAgent, BuildAgentError, HistoryDataBound,
 };
-use crate::envs::{
-    EnvStructure, InnerEnvStructure, MetaObservation, MetaObservationSpace, StoredEnvStructure,
-    Successor,
-};
+use crate::envs::meta::{InnerEnvStructure, MetaObservation, MetaObservationSpace};
+use crate::envs::{EnvStructure, StoredEnvStructure, Successor};
 use crate::logging::StatsLogger;
 use crate::simulation::PartialStep;
 use crate::spaces::{NonEmptySpace, Space};
@@ -232,7 +230,7 @@ where
 mod resetting_meta {
     use super::super::{ActorMode, UCB1AgentConfig};
     use super::*;
-    use crate::envs::{Environment, MetaEnv, OneHotBandits};
+    use crate::envs::{meta::TrialEpisodeLimit, Environment, MetaEnv, OneHotBandits, Wrap};
     use crate::simulation::SimSeed;
     use rand::SeedableRng;
 
@@ -240,7 +238,8 @@ mod resetting_meta {
     fn ucb_one_hot_bandits() {
         let num_arms = 3;
         let num_episodes_per_trial = 20;
-        let env = MetaEnv::new(OneHotBandits::new(num_arms), num_episodes_per_trial);
+        let env = MetaEnv::new(OneHotBandits::new(num_arms))
+            .wrap(TrialEpisodeLimit::new(num_episodes_per_trial));
         let agent_config = ResettingMetaAgentConfig::new(UCB1AgentConfig::default());
         let agent = agent_config
             .build_agent(&env, &mut Prng::seed_from_u64(0))

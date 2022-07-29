@@ -6,7 +6,7 @@ mod cartpole;
 mod chain;
 mod mdps;
 mod memory;
-mod meta;
+pub mod meta;
 mod multiagent;
 mod partition;
 #[cfg(test)]
@@ -21,10 +21,7 @@ pub use cartpole::{CartPole, CartPoleConfig};
 pub use chain::Chain;
 pub use mdps::DirichletRandomMdps;
 pub use memory::MemoryGame;
-pub use meta::{
-    InnerEnvStructure, MetaEnv, MetaFeedback, MetaFeedbackSpace, MetaObservation,
-    MetaObservationSpace, MetaState,
-};
+pub use meta::MetaEnv;
 pub use multiagent::fruit::{self, FruitGame};
 pub use multiagent::views::{FirstPlayerView, SecondPlayerView};
 pub use partition::PartitionGame;

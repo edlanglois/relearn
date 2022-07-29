@@ -4,9 +4,9 @@ use relearn::agents::{
     Actor, BatchUpdate, BetaThompsonSamplingAgentConfig, BuildAgent, HistoryDataBound,
     RandomAgentConfig, ResettingMetaAgent, TabularQLearningAgentConfig, UCB1AgentConfig,
 };
+use relearn::envs::meta::{MetaObservationSpace, TrialEpisodeLimit};
 use relearn::envs::{
-    BuildEnv, Environment, MetaEnv, MetaObservationSpace, StructuredEnvironment,
-    UniformBernoulliBandits,
+    BuildEnv, Environment, MetaEnv, StructuredEnvironment, UniformBernoulliBandits, Wrap, Wrapped,
 };
 use relearn::feedback::Reward;
 use relearn::logging::{ByCounter, DisplayLogger, StatsLogger, TensorBoardLogger};
@@ -183,7 +183,7 @@ pub enum AgentType {
 impl AgentType {
     fn evaluate(
         self,
-        meta_env: MetaEnv<UniformBernoulliBandits>,
+        meta_env: Wrapped<MetaEnv<UniformBernoulliBandits>, TrialEpisodeLimit>,
         num_trials: usize,
         rng_env: Prng,
         rng_agent: Prng,
@@ -270,11 +270,9 @@ fn make_env(
     num_episodes: u64,
     rng: &mut Prng,
     verbose: bool,
-) -> MetaEnv<UniformBernoulliBandits> {
-    let env_config = MetaEnv {
-        env_distribution: UniformBernoulliBandits::new(num_arms),
-        episodes_per_trial: num_episodes,
-    };
+) -> Wrapped<MetaEnv<UniformBernoulliBandits>, TrialEpisodeLimit> {
+    let env_config = MetaEnv::new(UniformBernoulliBandits::new(num_arms))
+        .wrap(TrialEpisodeLimit::new(num_episodes));
     if verbose {
         println!("{env_config:#?}\n");
     }
