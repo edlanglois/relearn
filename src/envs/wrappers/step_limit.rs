@@ -1,5 +1,5 @@
 use super::super::{EnvStructure, Environment, Successor};
-use super::Wrapped;
+use super::{StructurePreservingWrapper, Wrapped};
 use crate::logging::StatsLogger;
 use crate::spaces::IntervalSpace;
 use crate::Prng;
@@ -38,27 +38,7 @@ impl Default for LatentStepLimit {
 /// Wrap an environment with a per-episode step limit.
 pub type WithLatentStepLimit<E> = Wrapped<E, LatentStepLimit>;
 
-impl<T: EnvStructure> EnvStructure for Wrapped<T, LatentStepLimit> {
-    type ObservationSpace = T::ObservationSpace;
-    type ActionSpace = T::ActionSpace;
-    type FeedbackSpace = T::FeedbackSpace;
-
-    fn observation_space(&self) -> Self::ObservationSpace {
-        self.inner.observation_space()
-    }
-
-    fn action_space(&self) -> Self::ActionSpace {
-        self.inner.action_space()
-    }
-
-    fn feedback_space(&self) -> Self::FeedbackSpace {
-        self.inner.feedback_space()
-    }
-
-    fn discount_factor(&self) -> f64 {
-        self.inner.discount_factor()
-    }
-}
+impl StructurePreservingWrapper for LatentStepLimit {}
 
 /// Wrapped environment state with a step limit.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -286,17 +266,22 @@ mod latent {
 #[cfg(test)]
 mod visible {
     use super::super::super::{chain::Move, testing, BuildEnv, Chain};
+    use super::super::Wrap;
     use super::*;
     use rand::SeedableRng;
 
     #[test]
     fn run_default() {
-        testing::check_structured_env(&WithVisibleStepLimit::<Chain>::default(), 1000, 119);
+        testing::check_structured_env(
+            &Chain::default().wrap(VisibleStepLimit::default()),
+            1000,
+            119,
+        );
     }
 
     #[test]
     fn build() {
-        let config = WithVisibleStepLimit::<Chain>::default();
+        let config = Chain::default().wrap(VisibleStepLimit::default());
         let _env = config.build_env(&mut Prng::seed_from_u64(0)).unwrap();
     }
 

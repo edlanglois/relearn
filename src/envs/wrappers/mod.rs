@@ -48,6 +48,36 @@ impl<T, W> Wrapped<T, W> {
     }
 }
 
+/// Marker trait for a wrapper that does not modify the environment structure.
+pub trait StructurePreservingWrapper {}
+
+impl<E, W> EnvStructure for Wrapped<E, W>
+where
+    E: EnvStructure,
+    W: StructurePreservingWrapper,
+{
+    type ObservationSpace = E::ObservationSpace;
+    type ActionSpace = E::ActionSpace;
+    type FeedbackSpace = E::FeedbackSpace;
+
+    #[inline]
+    fn observation_space(&self) -> Self::ObservationSpace {
+        self.inner.observation_space()
+    }
+    #[inline]
+    fn action_space(&self) -> Self::ActionSpace {
+        self.inner.action_space()
+    }
+    #[inline]
+    fn feedback_space(&self) -> Self::FeedbackSpace {
+        self.inner.feedback_space()
+    }
+    #[inline]
+    fn discount_factor(&self) -> f64 {
+        self.inner.discount_factor()
+    }
+}
+
 impl<EC, W> BuildEnv for Wrapped<EC, W>
 where
     EC: BuildEnv,

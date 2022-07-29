@@ -29,7 +29,8 @@ pub use multiagent::fruit::{self, FruitGame};
 pub use multiagent::views::{FirstPlayerView, SecondPlayerView};
 pub use partition::PartitionGame;
 pub use wrappers::{
-    LatentStepLimit, VisibleStepLimit, WithLatentStepLimit, WithVisibleStepLimit, Wrap, Wrapped,
+    LatentStepLimit, StructurePreservingWrapper, VisibleStepLimit, WithLatentStepLimit,
+    WithVisibleStepLimit, Wrap, Wrapped,
 };
 
 use crate::agents::Actor;
