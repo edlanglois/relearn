@@ -79,15 +79,12 @@ impl<E: Environment> Environment for Wrapped<E, LatentStepLimit> {
         let (inner_successor, feedback) = self.inner.step(state.inner, action, rng, logger);
 
         // Decrement remaining steps and interrupt if none remain
-        let successor = match inner_successor.map(|inner| StepLimitState {
-            inner,
-            steps_remaining: state.steps_remaining - 1,
-        }) {
-            Successor::Continue(next_state) if next_state.steps_remaining == 0 => {
-                Successor::Interrupt(next_state)
-            }
-            s => s,
-        };
+        let successor = inner_successor
+            .map(|inner| StepLimitState {
+                inner,
+                steps_remaining: state.steps_remaining - 1,
+            })
+            .then_interrupt_if(|next_state| next_state.steps_remaining == 0);
         (successor, feedback)
     }
 }
@@ -216,15 +213,12 @@ impl<E: Environment> Environment for Wrapped<E, VisibleStepLimit> {
         let (inner_successor, feedback) = self.inner.step(state.inner, action, rng, logger);
 
         // Decrement remaining steps and interrupt if none remain
-        let successor = match inner_successor.map(|inner| StepLimitState {
-            inner,
-            steps_remaining: state.steps_remaining - 1,
-        }) {
-            Successor::Continue(next_state) if next_state.steps_remaining == 0 => {
-                Successor::Interrupt(next_state)
-            }
-            s => s,
-        };
+        let successor = inner_successor
+            .map(|inner| StepLimitState {
+                inner,
+                steps_remaining: state.steps_remaining - 1,
+            })
+            .then_interrupt_if(|next_state| next_state.steps_remaining == 0);
         (successor, feedback)
     }
 }

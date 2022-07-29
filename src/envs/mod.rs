@@ -345,6 +345,24 @@ impl<T> Successor<T> {
         }
     }
 
+    /// Interrupt the successor if it is `Continue` and the condition evaluates true.
+    #[must_use]
+    #[inline]
+    pub fn then_interrupt_if<F>(self, f: F) -> Self
+    where
+        F: FnOnce(&T) -> bool,
+    {
+        if let Self::Continue(state) = self {
+            if f(&state) {
+                Self::Interrupt(state)
+            } else {
+                Self::Continue(state)
+            }
+        } else {
+            self
+        }
+    }
+
     /// Get the inner state of `Continue` and `Interrupt` variants.
     #[allow(clippy::missing_const_for_fn)] // not allowed to be const at time of writing
     #[inline]
