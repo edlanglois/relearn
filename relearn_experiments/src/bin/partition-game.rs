@@ -1,6 +1,6 @@
 use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent};
-use relearn::envs::{BuildEnv, Environment, PartitionGame};
+use relearn::envs::{BuildEnv, Environment, PartitionGame, VisibleStepLimit};
 use relearn::logging::DisplayLogger;
 use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfig};
 use relearn::torch::agents::{critics::ValuesOptConfig, policies::TrpoConfig, ActorCriticConfig};
@@ -9,7 +9,7 @@ use relearn::Prng;
 use tch::Device;
 
 fn main() {
-    let env_config = PartitionGame::default().with_visible_step_limit(1000);
+    let env_config = BuildEnv::wrap(PartitionGame::default(), VisibleStepLimit::new(1000));
 
     let agent_config: ActorCriticConfig<TrpoConfig<GruMlpConfig>, ValuesOptConfig<GruMlpConfig>> =
         ActorCriticConfig {

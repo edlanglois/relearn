@@ -2,7 +2,7 @@
 use env_logger::Env;
 use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent};
-use relearn::envs::{CartPole, EnvStructure, Environment, WithVisibleStepLimit};
+use relearn::envs::{CartPole, EnvStructure, Environment, VisibleStepLimit, WithVisibleStepLimit};
 use relearn::logging::{ByCounter, DisplayLogger, TensorBoardLogger};
 use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfig};
 use relearn::torch::agents::{critics::ValuesOptConfig, policies::TrpoConfig, ActorCriticConfig};
@@ -18,7 +18,7 @@ type AgentConfig = ActorCriticConfig<TrpoConfig<MlpConfig>, ValuesOptConfig<MlpC
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
-    let env = CartPole::default().with_visible_step_limit(500);
+    let env = CartPole::default().wrap(VisibleStepLimit::new(500));
     println!("Env:\n{:#?}\n", env);
 
     let args: Vec<String> = env::args().collect();

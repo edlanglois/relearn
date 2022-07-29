@@ -127,20 +127,17 @@ pub trait Environment {
         Steps::new_seeded(self, actor, seed, logger)
     }
 
-    /// Wrap the environment in an episode step limit without changing the observation space.
-    fn with_latent_step_limit(self, max_steps_per_episode: u64) -> WithLatentStepLimit<Self>
+    /// Wrap the environment in the given wrapper.
+    #[inline]
+    fn wrap<W>(self, wrapper: W) -> Wrapped<Self, W>
     where
+        Wrapped<Self, W>: Environment, // to help with debugging - fail immediately if invalid
         Self: Sized,
     {
-        Wrapped::new(self, LatentStepLimit::new(max_steps_per_episode))
-    }
-
-    /// Wrap the environment in an episode step limit that is represented in the observation space.
-    fn with_visible_step_limit(self, max_steps_per_episode: u64) -> WithVisibleStepLimit<Self>
-    where
-        Self: Sized,
-    {
-        Wrapped::new(self, VisibleStepLimit::new(max_steps_per_episode))
+        Wrapped {
+            inner: self,
+            wrapper,
+        }
     }
 }
 
@@ -500,6 +497,19 @@ pub trait EnvDistribution {
     /// # Args
     /// * `rng` - Random number generator used for sampling the environment structure.
     fn sample_environment(&self, rng: &mut Prng) -> Self::Environment;
+
+    /// Wrap the environments in the distribution.
+    #[inline]
+    fn wrap<W>(self, wrapper: W) -> Wrapped<Self, W>
+    where
+        Wrapped<Self, W>: EnvDistribution, // to help with debugging - fail immediately if invalid
+        Self: Sized,
+    {
+        Wrapped {
+            inner: self,
+            wrapper,
+        }
+    }
 }
 
 /// An environment distribution with consistent [`EnvStructure`].

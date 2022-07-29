@@ -1,7 +1,7 @@
 /// Cart-Pole DQN Example
 use rand::SeedableRng;
 use relearn::agents::{ActorMode, Agent, BuildAgent};
-use relearn::envs::{CartPole, EnvStructure, Environment, WithVisibleStepLimit};
+use relearn::envs::{CartPole, EnvStructure, Environment, VisibleStepLimit, WithVisibleStepLimit};
 use relearn::logging::{ByCounter, ByTime, DisplayLogger, TensorBoardLogger};
 use relearn::simulation::{train_parallel, SimSeed, StepsIter, TrainParallelConfig};
 use relearn::torch::agents::schedules::DataCollectionSchedule;
@@ -19,7 +19,7 @@ type AgentConfig = DqnConfig<MlpConfig, AdamConfig>;
 
 fn main() {
     let max_episode_len = 500;
-    let env = CartPole::default().with_visible_step_limit(max_episode_len);
+    let env = CartPole::default().wrap(VisibleStepLimit::new(max_episode_len));
     println!("Env:\n{:#?}\n", env);
 
     let args: Vec<String> = env::args().collect();

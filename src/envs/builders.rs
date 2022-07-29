@@ -1,5 +1,5 @@
 //! Environment builder traits
-use super::{StructuredEnvDist, StructuredEnvironment};
+use super::{StructuredEnvDist, StructuredEnvironment, Wrapped};
 use crate::spaces::Space;
 use crate::Prng;
 use std::convert::Infallible;
@@ -42,6 +42,19 @@ pub trait BuildEnv {
     /// # Args
     /// * `rng` - Random number generator for randomness in the environment structure.
     fn build_env(&self, rng: &mut Prng) -> Result<Self::Environment, BuildEnvError>;
+
+    /// Add a wrapper to the built environment
+    #[inline]
+    fn wrap<W>(self, wrapper: W) -> Wrapped<Self, W>
+    where
+        Wrapped<Self, W>: BuildEnv, // to help with debugging - fail immediately if invalid
+        Self: Sized,
+    {
+        Wrapped {
+            inner: self,
+            wrapper,
+        }
+    }
 }
 
 impl<T: CloneBuild + StructuredEnvironment + ?Sized> BuildEnv for T {
@@ -90,6 +103,19 @@ pub trait BuildEnvDist {
 
     /// Build an environment distribution instance.
     fn build_env_dist(&self) -> Self::EnvDistribution;
+
+    /// Wrap the environments in the built distribution.
+    #[inline]
+    fn wrap<W>(self, wrapper: W) -> Wrapped<Self, W>
+    where
+        Wrapped<Self, W>: BuildEnvDist, // to help with debugging - fail immediately if invalid
+        Self: Sized,
+    {
+        Wrapped {
+            inner: self,
+            wrapper,
+        }
+    }
 }
 
 impl<T> BuildEnvDist for T

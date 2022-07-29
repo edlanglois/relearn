@@ -103,8 +103,7 @@ impl<I, O, A> FusedIterator for TakeEpisodes<I> where I: FusedIterator<Item = Pa
 #[cfg(test)]
 mod tests {
     use crate::agents::RandomAgent;
-    use crate::envs::Chain;
-    use crate::envs::{EnvStructure, Environment};
+    use crate::envs::{Chain, EnvStructure, Environment, VisibleStepLimit};
     use crate::simulation::{SimSeed, StepsIter, StepsSummary};
 
     #[allow(clippy::cast_possible_truncation)]
@@ -113,7 +112,7 @@ mod tests {
         let steps_per_episode = 10;
         let num_episodes = 30;
 
-        let env = Chain::default().with_latent_step_limit(steps_per_episode);
+        let env = Chain::default().wrap(VisibleStepLimit::new(steps_per_episode));
         let agent = RandomAgent::new(env.action_space());
         let summary: StepsSummary<_> = env
             .run(agent, SimSeed::Root(53), ())
