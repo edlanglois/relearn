@@ -20,7 +20,7 @@ syn="1.0"
 ndarray = "0.15"
 num-traits = "0.2"
 rand = "0.8"
-relearn = { version = "0.3.0", path = ".." }
+relearn = { version = "0.3.1", path = ".." }
 
 [features]
 doc-only = ["relearn/doc-only"]
