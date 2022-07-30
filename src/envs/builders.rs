@@ -71,7 +71,7 @@ impl From<Infallible> for BuildEnvError {
     }
 }
 
-/// Build an [`EnvDistribution`].
+/// Build an [`EnvDistribution`](super::EnvDistribution).
 pub trait BuildEnvDist {
     type Observation: Clone + Send;
     type Action: Clone + Send;
