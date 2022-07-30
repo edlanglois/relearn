@@ -8,6 +8,7 @@ use crate::logging::StatsLogger;
 use crate::spaces::{BooleanSpace, OptionSpace, ProductSpace, Space};
 use crate::Prng;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 /// A meta reinforcement learning environment that treats RL itself as an environment.
 ///
@@ -377,7 +378,6 @@ impl<OS, AS, FSI> MetaObservationSpace<OS, AS, FSI> {
 }
 
 /// The state of a [`MetaEnv`].
-// #[derive(Debug, Copy, Clone, PartialEq)] // XXX
 pub struct MetaState<E: Environment>
 where
     E::Feedback: MetaFeedback,
@@ -388,6 +388,71 @@ where
     inner_successor: Successor<E::State>,
     /// Observation of the previous step of this inner episode.
     prev_step_obs: Option<InnerStepObs<E::Action, <E::Feedback as MetaFeedback>::Inner>>,
+}
+
+// Custom implementations to satisfy the non-trivial associated type bounds
+
+#[allow(clippy::expl_impl_clone_on_copy)]
+impl<E> Clone for MetaState<E>
+where
+    E: Environment,
+    E: Clone,
+    E::State: Clone,
+    E::Action: Clone,
+    E::Feedback: MetaFeedback,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner_env: self.inner_env.clone(),
+            inner_successor: self.inner_successor.clone(),
+            prev_step_obs: self.prev_step_obs.clone(),
+        }
+    }
+}
+
+impl<E> Copy for MetaState<E>
+where
+    E: Environment,
+    E: Copy,
+    E::State: Copy,
+    E::Action: Copy,
+    E::Feedback: MetaFeedback,
+    <E::Feedback as MetaFeedback>::Inner: Copy,
+{
+}
+
+impl<E> PartialEq for MetaState<E>
+where
+    E: Environment,
+    E: PartialEq,
+    E::State: PartialEq,
+    E::Action: PartialEq,
+    E::Feedback: MetaFeedback,
+    <E::Feedback as MetaFeedback>::Inner: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.inner_env == other.inner_env
+            && self.inner_successor == other.inner_successor
+            && self.prev_step_obs == other.prev_step_obs
+    }
+}
+
+impl<E> fmt::Debug for MetaState<E>
+where
+    E: Environment,
+    E: fmt::Debug,
+    E::State: fmt::Debug,
+    E::Action: fmt::Debug,
+    E::Feedback: MetaFeedback,
+    <E::Feedback as MetaFeedback>::Inner: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("MetaState")
+            .field("inner_env", &self.inner_env)
+            .field("inner_successor", &self.inner_successor)
+            .field("prev_step_obs", &self.prev_step_obs)
+            .finish()
+    }
 }
 
 /// Whether the inner episode represented by this state is done.
