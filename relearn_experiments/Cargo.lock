@@ -1058,7 +1058,7 @@ dependencies = [
 
 [[package]]
 name = "relearn"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "array-init",
  "coarsetime",
@@ -1096,7 +1096,7 @@ dependencies = [
 
 [[package]]
 name = "relearn_experiments"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "clap",

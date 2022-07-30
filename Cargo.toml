@@ -1,6 +1,6 @@
 [package]
 name = "relearn"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Eric Langlois <eric@langlois.xyz>"]
 edition = "2021"
 description = "A Reinforcement Learning library"
